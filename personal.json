@@ -1,0 +1,792 @@
+[
+    {
+        "legajo": "2",
+        "nombre": "SALINAS JOSE AURELIO",
+        "cuil": "20-21316171-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "15",
+        "nombre": "GALLI NICOLAS DANIEL",
+        "cuil": "23-26793075-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "32",
+        "nombre": "CRUZ DAVID HUMBERTO",
+        "cuil": "20-26983825-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "36",
+        "nombre": "ZUBELZA VICTOR LUIS",
+        "cuil": "20-18515457-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "52",
+        "nombre": "RIOS VILDA MAGDALENA",
+        "cuil": "27-25064294-1",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "64",
+        "nombre": "LEIVA HECTOR MARCELO",
+        "cuil": "23-26301869-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "66",
+        "nombre": "CRUZ CARLOS AMERICO",
+        "cuil": "20-25256749-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "SI",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "72",
+        "nombre": "ALFREDO EVELIO",
+        "cuil": "20-24513199-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "76",
+        "nombre": "MAMANI JULIO ANIBAL",
+        "cuil": "20-35783609-0",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "154",
+        "nombre": "BARRIENTOS RODRIGO ABEL",
+        "cuil": "20-32629126-5",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "161",
+        "nombre": "APARICIO JOSE RICARDO",
+        "cuil": "20-28748282-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "215",
+        "nombre": "ZUBELZA SANDRO",
+        "cuil": "20-34009567-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "222",
+        "nombre": "LAMAS GRACIELA PATRICIA",
+        "cuil": "27-29685769-1",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "223",
+        "nombre": "VASQUEZ ADRIEL LEONEL",
+        "cuil": "30-27645578-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "225",
+        "nombre": "FLORES HECTOR MATIAS",
+        "cuil": "20-28310301-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "240",
+        "nombre": "CARLOS JULIO ANGEL",
+        "cuil": "20-14473983-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "243",
+        "nombre": "CALISAYA MOISES PACIFICO",
+        "cuil": "20-33455109-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "249",
+        "nombre": "ZUBELZA JUAN PABLO",
+        "cuil": "20-37645614-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "250",
+        "nombre": "SANTILLAN RENE ENRIQUE",
+        "cuil": "20-11765534-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "252",
+        "nombre": "MAMANI AGUSTIN",
+        "cuil": "20-17922175-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "261",
+        "nombre": "JAUREZ SERGIO EMMANUEL",
+        "cuil": "20-36511312-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "270",
+        "nombre": "OBLAND LUCIANA ARACELI",
+        "cuil": "23-37729862-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "303",
+        "nombre": "ALANCAY FIDEL",
+        "cuil": "20-37270060-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "307",
+        "nombre": "MACHUCA MATIAS NICOLAS",
+        "cuil": "20-36979266-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "320",
+        "nombre": "CHURQUINA DARIO SEBASTIAN",
+        "cuil": "20-35911265-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "321",
+        "nombre": "LIMACHE JAIME JOSE",
+        "cuil": "20-25931836-5",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "331",
+        "nombre": "TINTE REINALDO WILFREDO",
+        "cuil": "20-32556837-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "333",
+        "nombre": "CALPANCHAY HERNAN ROBINSON",
+        "cuil": "20-34636095-0",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "338",
+        "nombre": "CARDOZO CESAR EZEQUIEL",
+        "cuil": "20-36769220-1",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "351",
+        "nombre": "GOMEZ ANTONIO JOSE MARCELO",
+        "cuil": "23-20487213-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "352",
+        "nombre": "PAREDES DIEGO DANIEL",
+        "cuil": "20-25613101-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "357",
+        "nombre": "VILLAGRA ARIEL EDGARDO",
+        "cuil": "20-26329282-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "364",
+        "nombre": "FLORES EUGENIO NICOLAS",
+        "cuil": "20-29419216-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "369",
+        "nombre": "ABALOS GERARDO DALMACIO",
+        "cuil": "23-18177954-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "375",
+        "nombre": "BAUTISTA JOSE BERNARDO",
+        "cuil": "20-21321887-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "377",
+        "nombre": "BUTTIGLIERO MIGUEL ANGEL",
+        "cuil": "20-17202842-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "381",
+        "nombre": "NAZER JORGE CEFERINO",
+        "cuil": "20-18147245-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "382",
+        "nombre": "CRUZ GUILLERMO MARCOS",
+        "cuil": "20-27697222-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "387",
+        "nombre": "ABALOS SERGIO ANIBAL",
+        "cuil": "20-39199791-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "394",
+        "nombre": "VALDIVIEZO ALDO DAVID",
+        "cuil": "20-34999925-1",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "399",
+        "nombre": "VALLE LAZARO EUGENIO",
+        "cuil": "20-31755000-0",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "403",
+        "nombre": "ALANCAY MISAEL DANTE EZEQUIEL",
+        "cuil": "20-39230008-0",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "408",
+        "nombre": "BURGOS PABLO ADRIAN",
+        "cuil": "20-38035820-5",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "424",
+        "nombre": "LAMAS DANIEL AGUSTIN",
+        "cuil": "20-42349009-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "430",
+        "nombre": "VASQUEZ IVAN JOAQUIN",
+        "cuil": "20-38165276-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "431",
+        "nombre": "VALDIVIEZO FILOMEN SATURNINO",
+        "cuil": "20-28766614-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "433",
+        "nombre": "MENDEZ JORGE BENJAMIN",
+        "cuil": "20-31203105-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "503",
+        "nombre": "CALPANCHAY PANTALEON",
+        "cuil": "20-27297314-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "504",
+        "nombre": "ALVAREZ HUGO ADRIAN",
+        "cuil": "20-23680576-0",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "506",
+        "nombre": "GUTIERREZ OSCAR ENRIQUE",
+        "cuil": "20-22900547-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "507",
+        "nombre": "CRUZ DARIO GUILLERMO",
+        "cuil": "20-26973656-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "508",
+        "nombre": "LUNA ANGEL RODRIGO",
+        "cuil": "20-23140767-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "509",
+        "nombre": "GERONIMO PABLO MAXIMO",
+        "cuil": "24-39234086-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "514",
+        "nombre": "ABALOS ALDO ARMANDO",
+        "cuil": "20-24419016-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "515",
+        "nombre": "COCA SOCOMPE HUGO VICTOR",
+        "cuil": "20-24420343-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "518",
+        "nombre": "SALVA CAMILO DAMIAN",
+        "cuil": "20-34970333-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "519",
+        "nombre": "SENGER RUBEN DARIO",
+        "cuil": "20-25775560-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "520",
+        "nombre": "LIQUIN EMILIO FRANCISCO",
+        "cuil": "20-39785111-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "522",
+        "nombre": "ALANCAY ELISEO YORDAN",
+        "cuil": "20-43451465-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "526",
+        "nombre": "MARTINEZ MARCELO RUBEN",
+        "cuil": "20-34526238-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "528",
+        "nombre": "GUTIERREZ KEVIN FERNANDO",
+        "cuil": "20-43139299-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "529",
+        "nombre": "SANTIAGO FISRAEL HECTOR",
+        "cuil": "20-37036009-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "530",
+        "nombre": "CARI ARTURO EZQUEL",
+        "cuil": "20-38975608-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "531",
+        "nombre": "CORTEZ HECTOR DANIEL",
+        "cuil": "20-38975613-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "532",
+        "nombre": "CACHAUCA CRISTIAN JORGE",
+        "cuil": "20-44350045-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "533",
+        "nombre": "QUISPE GABRIEL CRISPIN",
+        "cuil": "20-33937319-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "534",
+        "nombre": "RIVERO MATIAS ANGEL MARCEL",
+        "cuil": "20-43253026-2",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "535",
+        "nombre": "TREJO CARLOS GONZALO",
+        "cuil": "20-46402004-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "536",
+        "nombre": "BELTRAN JUAN CARLOS",
+        "cuil": "20-24916299-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "537",
+        "nombre": "OLIVERA DANIEL FRANCISCO",
+        "cuil": "20-30666175-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "538",
+        "nombre": "TORRES ARNALDO ARIEL",
+        "cuil": "20-36734986-8",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "541",
+        "nombre": "ALANCAY SERBANDO",
+        "cuil": "20-21848466-3",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "544",
+        "nombre": "ARANIBIA OSCAR MARCELO",
+        "cuil": "20-36282708-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "545",
+        "nombre": "RUEDA DAVID MARCOS",
+        "cuil": "23-27916369-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "547",
+        "nombre": "WAYAR LOPEZ ELVER",
+        "cuil": "20-29268170-4",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "549",
+        "nombre": "CRUZ DIEGO ORLANDO",
+        "cuil": "20-39320075-9",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "551",
+        "nombre": "LEDESMA RAFAEL DE JESUS",
+        "cuil": "20-29729750-6",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "552",
+        "nombre": "BALLEDA SIMON JUAN NICOLAS",
+        "cuil": "20-43508186-7",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    },
+    {
+        "legajo": "555",
+        "nombre": "CAMACHO FRANCISCO JAVIER",
+        "cuil": "20-22043518-1",
+        "habilitacion_pirquitas": "",
+        "habilitacion_exar": "",
+        "habilitacion_sdj": "",
+        "habilitacion_rincon": "",
+        "habilitacion_arli": ""
+    }
+]

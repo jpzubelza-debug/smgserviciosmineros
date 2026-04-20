@@ -1,0 +1,190 @@
+[
+    {
+        "nro_orden": "OS-000001",
+        "fecha_orden": "2026-04-18 21:40:54",
+        "id_viaje": 7,
+        "viaje": {
+            "solicitante": "Juan Pablo Zubelza",
+            "area": "Mantenimiento",
+            "origen": "San Salvador de Jujuy (Taller)",
+            "destino": "Pirquitas",
+            "motivo": "Probando sistema",
+            "fecha_salida": "2026-04-19",
+            "fecha_regreso": "2026-05-20",
+            "id": 7,
+            "estado": "ASIGNADO",
+            "fecha_creacion": "2026-04-18 20:25:18",
+            "recursos": {
+                "id_viaje": 7,
+                "fecha": "2026-04-19",
+                "centro_costo": "106",
+                "datos_solicitante": "Juan Pablo Zubelza",
+                "area_solicitante": "Mantenimiento",
+                "partida": "San Salvador de Jujuy (Taller)",
+                "destino": "Pirquitas",
+                "motivo_viaje": "Probando sistema",
+                "fecha_salida_viaje": "2026-04-19",
+                "fecha_regreso_viaje": "2026-05-20",
+                "hora_salida": "06:00",
+                "hora_regreso": "20:00",
+                "duracion_jornadas": "32",
+                "itinerario": "no pasa nada",
+                "rutas": "todo bien",
+                "paradas": "no pasa nada",
+                "chofer": "ZUBELZA VICTOR LUIS",
+                "chofer_viatico": 1000.0,
+                "vehiculo": "C-10 - S/D - Mercedes Atron 1720 - Operativo: NO",
+                "acompanantes": [
+                    "ALFREDO EVELIO"
+                ],
+                "acompanantes_con_viatico": [
+                    {
+                        "nombre": "ALFREDO EVELIO",
+                        "viatico": 2000
+                    }
+                ],
+                "viaticos": 3000.0,
+                "medio_pago": "Transferencia",
+                "alojamiento": "SI",
+                "otros_gastos": 1500.0,
+                "verificado_administracion": "NO",
+                "comprobacion_operaciones_logistica": {
+                    "taller": "SI",
+                    "rrhh": "NO",
+                    "administracion": "SI",
+                    "logistica_operaciones": "SI"
+                }
+            }
+        },
+        "recursos": {
+            "id_viaje": 7,
+            "fecha": "2026-04-19",
+            "centro_costo": "106",
+            "datos_solicitante": "Juan Pablo Zubelza",
+            "area_solicitante": "Mantenimiento",
+            "partida": "San Salvador de Jujuy (Taller)",
+            "destino": "Pirquitas",
+            "motivo_viaje": "Probando sistema",
+            "fecha_salida_viaje": "2026-04-19",
+            "fecha_regreso_viaje": "2026-05-20",
+            "hora_salida": "06:00",
+            "hora_regreso": "20:00",
+            "duracion_jornadas": "32",
+            "itinerario": "no pasa nada",
+            "rutas": "todo bien",
+            "paradas": "no pasa nada",
+            "chofer": "ZUBELZA VICTOR LUIS",
+            "chofer_viatico": 1000.0,
+            "vehiculo": "C-10 - S/D - Mercedes Atron 1720 - Operativo: NO",
+            "acompanantes": [
+                "ALFREDO EVELIO"
+            ],
+            "acompanantes_con_viatico": [
+                {
+                    "nombre": "ALFREDO EVELIO",
+                    "viatico": 2000
+                }
+            ],
+            "viaticos": 3000.0,
+            "medio_pago": "Transferencia",
+            "alojamiento": "SI",
+            "otros_gastos": 1500.0,
+            "verificado_administracion": "NO",
+            "comprobacion_operaciones_logistica": {
+                "taller": "SI",
+                "rrhh": "NO",
+                "administracion": "SI",
+                "logistica_operaciones": "SI"
+            }
+        }
+    },
+    {
+        "nro_orden": "OS-000002",
+        "fecha_orden": "2026-04-18 22:49:36",
+        "id_viaje": 8,
+        "viaje": {
+            "solicitante": "Mauro Balceda",
+            "area": "Mantenimiento",
+            "origen": "Taller Alto la Torre",
+            "destino": "Exar",
+            "motivo": "Varios",
+            "fecha_salida": "2026-04-18",
+            "fecha_regreso": "2026-04-18",
+            "id": 8,
+            "estado": "ASIGNADO",
+            "fecha_creacion": "2026-04-18 22:09:57",
+            "recursos": {
+                "id_viaje": 8,
+                "fecha": "2026-04-19",
+                "centro_costo": "106",
+                "datos_solicitante": "Mauro Balceda",
+                "area_solicitante": "Mantenimiento",
+                "partida": "Taller Alto la Torre",
+                "destino": "Exar",
+                "motivo_viaje": "Varios",
+                "fecha_salida_viaje": "2026-04-18",
+                "fecha_regreso_viaje": "2026-04-18",
+                "hora_salida": "06:00",
+                "hora_regreso": "20:00",
+                "duracion_jornadas": "1",
+                "itinerario": "Por donde siempre",
+                "rutas": "Las mismas de siempre",
+                "paradas": "Estamos probando el sistema",
+                "chofer": "SALINAS JOSE AURELIO",
+                "chofer_viatico": 20000.0,
+                "vehiculo": "C-08 - S/D - Iveco Trakker 380T38 - Operativo: SI",
+                "vehiculo_fuera_flota": false,
+                "acompanantes": [],
+                "acompanantes_con_viatico": [],
+                "viaticos": 20000.0,
+                "medio_pago": "Caja",
+                "alojamiento": "NO",
+                "otros_gastos": 0.0,
+                "verificado_administracion": "NO",
+                "comprobacion_operaciones_logistica": {
+                    "taller": "NO",
+                    "rrhh": "SI",
+                    "administracion": "NO",
+                    "logistica_operaciones": "NO VERIFICADO"
+                }
+            },
+            "orden_salida_generada": true,
+            "nro_orden_salida": "OS-000002"
+        },
+        "recursos": {
+            "id_viaje": 8,
+            "fecha": "2026-04-19",
+            "centro_costo": "106",
+            "datos_solicitante": "Mauro Balceda",
+            "area_solicitante": "Mantenimiento",
+            "partida": "Taller Alto la Torre",
+            "destino": "Exar",
+            "motivo_viaje": "Varios",
+            "fecha_salida_viaje": "2026-04-18",
+            "fecha_regreso_viaje": "2026-04-18",
+            "hora_salida": "06:00",
+            "hora_regreso": "20:00",
+            "duracion_jornadas": "1",
+            "itinerario": "Por donde siempre",
+            "rutas": "Las mismas de siempre",
+            "paradas": "Estamos probando el sistema",
+            "chofer": "SALINAS JOSE AURELIO",
+            "chofer_viatico": 20000.0,
+            "vehiculo": "C-08 - S/D - Iveco Trakker 380T38 - Operativo: SI",
+            "vehiculo_fuera_flota": false,
+            "acompanantes": [],
+            "acompanantes_con_viatico": [],
+            "viaticos": 20000.0,
+            "medio_pago": "Caja",
+            "alojamiento": "NO",
+            "otros_gastos": 0.0,
+            "verificado_administracion": "NO",
+            "comprobacion_operaciones_logistica": {
+                "taller": "NO",
+                "rrhh": "SI",
+                "administracion": "NO",
+                "logistica_operaciones": "NO VERIFICADO"
+            }
+        }
+    }
+]

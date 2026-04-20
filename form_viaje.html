@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Solicitud de Viaje</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .bg-photo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+
+    .bg-blur {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255, 0, 150, 0.18), transparent 55%),
+        radial-gradient(circle at 80% 70%, rgba(0, 200, 255, 0.18), transparent 58%);
+    }
+
+    .card {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 560px;
+      padding: 25px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: scale(1.03);
+      transition: 0.3s;
+    }
+
+    .logo-corner {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 3;
+      padding: 0;
+    }
+
+    .logo-corner img {
+      display: block;
+      width: 195px;
+      max-width: 38vw;
+      height: auto;
+    }
+
+    .logo-box img {
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
+    }
+
+    .logo-text {
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    h2 {
+      text-align: center;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    form {
+      width: 100%;
+    }
+
+    label {
+      color: #ddd;
+      font-size: 13px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0 15px 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      color: white;
+      outline: none;
+      font-size: 14px;
+      transition: 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(168,199,246,0.9);
+      box-shadow: 0 0 0 3px rgba(119,163,231,0.25), 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: #bbb;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(59,130,246,0.6);
+    }
+
+    #mensaje {
+      color: #dff5ff;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .card {
+        margin: 10px;
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="logo-corner logo-box">
+  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+</div>
+<div class="card">
+  <h2>Solicitud de Viaje</h2>
+
+<form id="form">
+  <label>Solicitante</label>
+  <input type="text" id="solicitante" placeholder="Solicitante" required>
+
+  <label>Área</label>
+  <input type="text" id="area" list="areas" required>
+  <datalist id="areas">
+    <option value="Mantenimiento">
+    <option value="Operaciones">
+    <option value="Logística">
+  </datalist>
+
+  <label>Origen</label>
+  <input type="text" id="origen" placeholder="Origen" required>
+
+  <label>Destino</label>
+  <input type="text" id="destino" list="destinos" required>
+  <datalist id="destinos">
+    <option value="Pirquitas">
+    <option value="Exar">
+    <option value="SDJ">
+    <option value="Rincón">
+    <option value="ARLI">
+  </datalist>
+
+  <label>Motivo</label>
+  <textarea id="motivo" placeholder="Motivo" required rows="3" style="resize: vertical;"></textarea>
+
+  <label>Fecha salida</label>
+  <input type="date" id="fecha_salida" required>
+
+  <label>Fecha regreso</label>
+  <input type="date" id="fecha_regreso" required>
+
+  <button type="submit">Enviar</button>
+
+  <p id="mensaje"></p>
+</form>
+
+<script>
+function obtenerHoyLocal() {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = String(hoy.getMonth() + 1).padStart(2, "0");
+  const day = String(hoy.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function configurarRestriccionesFechas() {
+  const fechaSalidaInput = document.getElementById("fecha_salida");
+  const fechaRegresoInput = document.getElementById("fecha_regreso");
+  const hoy = obtenerHoyLocal();
+
+  fechaSalidaInput.min = hoy;
+  fechaRegresoInput.min = fechaSalidaInput.value || hoy;
+}
+
+document.getElementById("fecha_salida").addEventListener("change", function() {
+  const fechaRegresoInput = document.getElementById("fecha_regreso");
+  const hoy = obtenerHoyLocal();
+  const minRegreso = this.value || hoy;
+  fechaRegresoInput.min = minRegreso;
+
+  if (fechaRegresoInput.value && fechaRegresoInput.value < minRegreso) {
+    fechaRegresoInput.value = minRegreso;
+  }
+});
+
+document.getElementById("form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  try {
+    const fechaSalida = document.getElementById("fecha_salida").value;
+    const fechaRegreso = document.getElementById("fecha_regreso").value;
+    const hoy = obtenerHoyLocal();
+
+    if (fechaSalida < hoy) {
+      alert("La fecha de salida debe ser hoy o posterior");
+      return;
+    }
+
+    if (fechaRegreso < fechaSalida) {
+      alert("La fecha de regreso no puede ser menor que la de salida");
+      return;
+    }
+
+    const data = {
+      solicitante: document.getElementById("solicitante").value,
+      area: document.getElementById("area").value,
+      origen: document.getElementById("origen").value,
+      destino: document.getElementById("destino").value,
+      motivo: document.getElementById("motivo").value,
+      fecha_salida: fechaSalida,
+      fecha_regreso: fechaRegreso
+    };
+
+    const res = await fetch("http://127.0.0.1:8000/viajes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    document.getElementById("mensaje").innerText =
+      "✅ Viaje creado correctamente (ID: " + result.id + ")";
+
+    document.getElementById("form").reset();
+
+  } catch (error) {
+    console.error("ERROR:", error);
+    alert("Error al enviar");
+  }
+});
+
+// Auto-resize textarea motivo
+document.getElementById("motivo").addEventListener("input", function() {
+  this.style.height = "auto";
+  this.style.height = this.scrollHeight + "px";
+});
+
+configurarRestriccionesFechas();
+</script>
+
+</div>
+
+</body>
+</html>

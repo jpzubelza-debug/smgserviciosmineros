@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ordenes de Salida</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  color: #e2e8f0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.bg-photo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
+  opacity: 0.76;
+  pointer-events: none;
+}
+
+.bg-blur {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,0,150,0.18), transparent 55%),
+    radial-gradient(circle at 80% 70%, rgba(0,200,255,0.18), transparent 58%);
+}
+
+header {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 16px 20px;
+}
+
+.logo-corner {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  padding: 0;
+}
+
+.logo-corner img {
+  display: block;
+  width: 195px;
+  max-width: 38vw;
+  height: auto;
+}
+
+.logo-box img {
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
+}
+
+.logo-text {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.selector-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.selector-card select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #e2e8f0;
+}
+
+.card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  transition: 0.3s;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.item {
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.title {
+  font-weight: bold;
+  color: #93c5fd;
+  margin-bottom: 8px;
+}
+
+.bloque {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.bloque h3 {
+  margin: 0 0 10px;
+  color: #bfdbfe;
+}
+
+.solicitud-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.solicitud-field {
+  background: #0b1220;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.solicitud-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: #93c5fd;
+  font-size: 12px;
+}
+
+.solicitud-field input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+.asignacion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.asignacion-field {
+  background: #0b1220;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.asignacion-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: #93c5fd;
+  font-size: 12px;
+}
+
+.asignacion-field input,
+.asignacion-field select,
+.asignacion-field textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+.asignacion-field textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.asignacion-span-2 {
+  grid-column: span 2;
+}
+
+.viaticos-list {
+  display: grid;
+  gap: 8px;
+}
+
+.viaticos-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(120px, 1fr) auto;
+  gap: 8px;
+}
+
+.viaticos-row .nombre-editable {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+.btn-remove-acomp {
+  margin: 0;
+  padding: 8px 10px;
+  background: #b91c1c;
+}
+
+.btn-remove-acomp:hover {
+  background: #991b1b;
+}
+
+.btn-add-acomp {
+  margin-top: 8px;
+  background: #1d4ed8;
+}
+
+.btn-add-acomp:hover {
+  background: #1e40af;
+}
+
+.seguimiento-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.seguimiento-table th,
+.seguimiento-table td {
+  border: 1px solid #334155;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.seguimiento-table th {
+  background: #1e293b;
+  color: #bfdbfe;
+  text-align: left;
+}
+
+.total-extra-box {
+  margin-top: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #60a5fa;
+  border-radius: 6px;
+  background: #0b1220;
+  color: #bfdbfe;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.seguimiento-table input {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+.seguimiento-checks {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.seguimiento-check-item {
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.seguimiento-check-item label {
+  display: block;
+  margin-bottom: 6px;
+  color: #93c5fd;
+  font-size: 12px;
+}
+
+.seguimiento-check-item select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+.adjuntos-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.adjunto-item {
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.adjunto-item label {
+  display: block;
+  margin-bottom: 6px;
+  color: #93c5fd;
+  font-size: 12px;
+}
+
+.adjunto-item input[type="file"] {
+  width: 100%;
+}
+
+.cierre-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cierre-msg {
+  color: #bfdbfe;
+  font-size: 13px;
+}
+
+label {
+  color: #94a3b8;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+}
+
+button {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border: none;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: 0.2s;
+}
+
+button:hover {
+  box-shadow: 0 0 12px rgba(59,130,246,0.6);
+  transform: scale(1.05);
+}
+</style>
+</head>
+<body>
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="logo-corner logo-box">
+  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+</div>
+<header>
+  <h1>Ordenes de Salida</h1>
+  <p>Detalle completo de viajes asignados</p>
+</header>
+
+<div class="container">
+  <div class="card selector-card">
+    <div>
+      <label for="selector-os">Seleccionar Orden de Salida</label>
+      <select id="selector-os"></select>
+    </div>
+    <button id="btn-recargar" type="button">Recargar</button>
+  </div>
+  <div id="listado"></div>
+</div>
+
+<script>
+let ordenesCache = [];
+
+function esc(valor) {
+  const div = document.createElement("div");
+  div.textContent = valor ?? "";
+  return div.innerHTML;
+}
+
+function renderItems(obj) {
+  return Object.entries(obj || {})
+    .map(([k, v]) => {
+      const valor = typeof v === "object" ? JSON.stringify(v, null, 2) : String(v ?? "");
+      return `<div class="item"><label>${esc(k)}:</label><br>${esc(valor)}</div>`;
+    })
+    .join("");
+}
+
+function sumarDias(fechaBase, dias) {
+  const base = new Date(`${fechaBase}T00:00:00`);
+  if (Number.isNaN(base.getTime())) {
+    return "";
+  }
+  base.setDate(base.getDate() + dias);
+  return base.toISOString().slice(0, 10);
+}
+
+function renderFilasSeguimiento(duracionJornadas, fechaSalida = "") {
+  const jornadas = Number.parseInt(duracionJornadas, 10);
+  const total = Number.isFinite(jornadas) && jornadas > 0 ? jornadas : 1;
+
+  let filas = "";
+  for (let i = 1; i <= total; i += 1) {
+    const fechaAuto = fechaSalida ? sumarDias(fechaSalida, i - 1) : "";
+    filas += `
+      <tr>
+        <td>Dia ${i}</td>
+        <td><input type="date" value="${esc(fechaAuto)}"></td>
+        <td><input type="time" class="hs-inicio"></td>
+        <td><input type="time" class="hs-final"></td>
+        <td><input type="text" placeholder="Observaciones"></td>
+        <td><input type="text" class="hs-acumuladas" value="0.00 hs | Extra: 0.00 hs" readonly></td>
+      </tr>
+    `;
+  }
+
+  return filas;
+}
+
+function timeToMinutes(value) {
+  if (!value || !value.includes(":")) {
+    return null;
+  }
+  const [h, m] = value.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) {
+    return null;
+  }
+  return (h * 60) + m;
+}
+
+function actualizarHorasFila(fila) {
+  const inicioInput = fila.querySelector(".hs-inicio");
+  const finalInput = fila.querySelector(".hs-final");
+  const salidaInput = fila.querySelector(".hs-acumuladas");
+
+  if (!inicioInput || !finalInput || !salidaInput) {
+    return;
+  }
+
+  const inicioMin = timeToMinutes(inicioInput.value);
+  const finalMin = timeToMinutes(finalInput.value);
+
+  if (inicioMin === null || finalMin === null) {
+    fila.dataset.extraHoras = "0";
+    salidaInput.value = "0.00 hs | Extra: 0.00 hs";
+    actualizarTotalExtrasSeguimiento();
+    return;
+  }
+
+  let minutos = finalMin - inicioMin;
+  if (minutos < 0) {
+    minutos += 24 * 60;
+  }
+
+  const horas = minutos / 60;
+  const extra = Math.max(horas - 10, 0);
+  fila.dataset.extraHoras = String(extra);
+  salidaInput.value = `${horas.toFixed(2)} hs | Extra: ${extra.toFixed(2)} hs`;
+  actualizarTotalExtrasSeguimiento();
+}
+
+function actualizarTotalExtrasSeguimiento() {
+  const filas = document.querySelectorAll("#seguimiento-body tr");
+  let totalExtra = 0;
+
+  filas.forEach((fila) => {
+    const extra = Number(fila.dataset.extraHoras || 0);
+    if (Number.isFinite(extra)) {
+      totalExtra += extra;
+    }
+  });
+
+  const totalInput = document.getElementById("seguimiento-total-extra");
+  if (totalInput) {
+    totalInput.value = `${totalExtra.toFixed(2)} hs`;
+  }
+}
+
+function activarCalculoHorasSeguimiento() {
+  const filas = document.querySelectorAll("#seguimiento-body tr");
+  filas.forEach((fila) => {
+    const inicioInput = fila.querySelector(".hs-inicio");
+    const finalInput = fila.querySelector(".hs-final");
+    if (inicioInput) {
+      inicioInput.addEventListener("change", () => actualizarHorasFila(fila));
+    }
+    if (finalInput) {
+      finalInput.addEventListener("change", () => actualizarHorasFila(fila));
+    }
+    actualizarHorasFila(fila);
+  });
+  actualizarTotalExtrasSeguimiento();
+}
+
+function formatearSoloFecha(valor) {
+  if (!valor) {
+    return "";
+  }
+  return String(valor).slice(0, 10);
+}
+
+function calcularJornadas(fechaSalida, fechaLlegada) {
+  if (!fechaSalida || !fechaLlegada) {
+    return 1;
+  }
+
+  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const llegada = new Date(`${fechaLlegada}T00:00:00`);
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const diferencia = Math.floor((llegada - salida) / msPorDia) + 1;
+  return diferencia > 0 ? diferencia : 1;
+}
+
+function renderDatosSolicitud(orden, viaje, recursos) {
+  const fechaEmision = orden.fecha_orden || "";
+  const centroCosto = recursos.centro_costo || "";
+  const quienSolicita = recursos.datos_solicitante || viaje.solicitante || "";
+  const areaSolicita = recursos.area_solicitante || viaje.area || "";
+  const partida = recursos.partida || viaje.origen || "";
+  const destino = recursos.destino || viaje.destino || "";
+  const motivo = recursos.motivo_viaje || viaje.motivo || "";
+  const fechaSalida = formatearSoloFecha(recursos.fecha_salida_viaje || viaje.fecha_salida || "");
+  const fechaLlegada = formatearSoloFecha(recursos.fecha_regreso_viaje || viaje.fecha_regreso || "");
+  const horaSalida = recursos.hora_salida || "";
+  const horaRegreso = recursos.hora_regreso || "";
+  const jornadas = calcularJornadas(fechaSalida, fechaLlegada);
+
+  return `
+    <div class="solicitud-grid">
+      <div class="solicitud-field">
+        <label>Fecha de Emision</label>
+        <input id="sol-fecha-emision" type="text" value="${esc(fechaEmision)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Centro de Costos</label>
+        <input id="sol-centro-costos" type="text" value="${esc(centroCosto)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Quien Solicita</label>
+        <input id="sol-quien-solicita" type="text" value="${esc(quienSolicita)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Area que Solicita</label>
+        <input id="sol-area-solicita" type="text" value="${esc(areaSolicita)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Partida</label>
+        <input id="sol-partida" type="text" value="${esc(partida)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Destino</label>
+        <input id="sol-destino" type="text" value="${esc(destino)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Motivo del Viaje</label>
+        <input id="sol-motivo" type="text" value="${esc(motivo)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Fecha de Salida (Editable)</label>
+        <input id="solicitud-fecha-salida" type="date" value="${esc(fechaSalida)}">
+      </div>
+      <div class="solicitud-field">
+        <label>Fecha de Llegada (Editable)</label>
+        <input id="solicitud-fecha-llegada" type="date" value="${esc(fechaLlegada)}">
+      </div>
+      <div class="solicitud-field">
+        <label>Hora de Salida</label>
+        <input id="sol-hora-salida" type="time" value="${esc(horaSalida)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Hora de Regreso</label>
+        <input id="sol-hora-regreso" type="time" value="${esc(horaRegreso)}" readonly>
+      </div>
+      <div class="solicitud-field">
+        <label>Duracion de Jornadas</label>
+        <input id="solicitud-duracion-jornadas" type="text" value="${esc(String(jornadas))}" readonly>
+      </div>
+    </div>
+  `;
+}
+
+function renderAcompanantesConViaticos(recursos) {
+  const acompDet = Array.isArray(recursos.acompanantes_con_viatico) ? recursos.acompanantes_con_viatico : [];
+
+  if (acompDet.length > 0) {
+    return acompDet
+      .map((a, idx) => {
+        const nombre = a?.nombre || `Acompanante ${idx + 1}`;
+        const viatico = Number(a?.viatico || 0);
+        return `
+          <div class="viaticos-row">
+            <input type="text" class="nombre-editable" value="${esc(nombre)}">
+            <input type="number" min="0" step="0.01" class="viatico-acompanante" value="${esc(viatico.toFixed(2))}">
+            <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  const acomp = Array.isArray(recursos.acompanantes) ? recursos.acompanantes : [];
+  if (acomp.length === 0) {
+    return `
+      <div class="viaticos-row">
+        <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompañante">
+        <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
+        <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
+      </div>
+    `;
+  }
+
+  return acomp
+    .map((nombre) => `
+      <div class="viaticos-row">
+        <input type="text" class="nombre-editable" value="${esc(nombre || "")}" placeholder="Nombre del acompañante">
+        <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
+        <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
+      </div>
+    `)
+    .join("");
+}
+
+function agregarAcompanante() {
+  const lista = document.getElementById("lista-acompanantes-editable");
+  if (!lista) {
+    return;
+  }
+
+  const fila = document.createElement("div");
+  fila.className = "viaticos-row";
+  fila.innerHTML = `
+    <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompañante">
+    <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
+    <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
+  `;
+  lista.appendChild(fila);
+
+  const inputViatico = fila.querySelector(".viatico-acompanante");
+  if (inputViatico) {
+    inputViatico.addEventListener("input", recalcularTotalAsignacion);
+  }
+
+  recalcularTotalAsignacion();
+}
+
+function quitarAcompanante(btn) {
+  const fila = btn?.closest(".viaticos-row");
+  const lista = document.getElementById("lista-acompanantes-editable");
+  if (!fila || !lista) {
+    return;
+  }
+  fila.remove();
+
+  if (lista.querySelectorAll(".viaticos-row").length === 0) {
+    agregarAcompanante();
+  }
+
+  recalcularTotalAsignacion();
+}
+
+function renderDatosAsignacion(recursos) {
+  const itinerario = recursos.itinerario || "";
+  const rutas = recursos.rutas || "";
+  const paradas = recursos.paradas || "";
+  const chofer = recursos.chofer || "";
+  const vehiculo = recursos.vehiculo || "";
+  const choferViatico = Number(recursos.chofer_viatico || 0);
+  const otrosGastos = Number(recursos.otros_gastos || 0);
+  const medioPago = (recursos.medio_pago || "Caja").toString();
+  const alojamiento = (recursos.alojamiento || "NO").toString();
+  const comp = recursos.comprobacion_operaciones_logistica || {};
+
+  return `
+    <div class="asignacion-grid">
+      <div class="asignacion-field asignacion-span-2">
+        <label>(Itinerario + Rutas + Paradas)</label>
+        <textarea readonly>${esc(`${itinerario}\n${rutas}\n${paradas}`)}</textarea>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Chofer</label>
+        <input type="text" value="${esc(chofer)}" readonly>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Vehiculo</label>
+        <input type="text" value="${esc(vehiculo)}" readonly>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Viatico Chofer</label>
+        <input id="asig-viatico-chofer" type="number" min="0" step="0.01" value="${esc(choferViatico.toFixed(2))}">
+      </div>
+
+      <div class="asignacion-field asignacion-span-2">
+        <label>Acompañantes y Viaticos</label>
+        <div id="lista-acompanantes-editable" class="viaticos-list">${renderAcompanantesConViaticos(recursos)}</div>
+        <button type="button" class="btn-add-acomp" onclick="agregarAcompanante()">+ Agregar Acompañante</button>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Otros Gastos</label>
+        <input id="asig-otros-gastos" type="number" min="0" step="0.01" value="${esc(otrosGastos.toFixed(2))}">
+      </div>
+
+      <div class="asignacion-field">
+        <label>Total (Viaticos + Otros Gastos)</label>
+        <input id="asig-total" type="text" value="0.00" readonly>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Medio (Caja / Transferencia)</label>
+        <select id="asig-medio-pago">
+          <option value="Caja" ${medioPago === "Caja" ? "selected" : ""}>Caja</option>
+          <option value="Transferencia" ${medioPago === "Transferencia" ? "selected" : ""}>Transferencia</option>
+        </select>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Alojamiento</label>
+        <select id="asig-alojamiento">
+          <option value="SI" ${alojamiento === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${alojamiento === "NO" ? "selected" : ""}>NO</option>
+        </select>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Comprobación Taller</label>
+        <select id="asig-comp-taller">
+          <option value="SI" ${(comp.taller || "") === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${(comp.taller || "") === "NO" ? "selected" : ""}>NO</option>
+          <option value="NO VERIFICADO" ${(comp.taller || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
+        </select>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Comprobación RRHH</label>
+        <select id="asig-comp-rrhh">
+          <option value="SI" ${(comp.rrhh || "") === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${(comp.rrhh || "") === "NO" ? "selected" : ""}>NO</option>
+          <option value="NO VERIFICADO" ${(comp.rrhh || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
+        </select>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Comprobación Administración</label>
+        <select id="asig-comp-admin">
+          <option value="SI" ${(comp.administracion || "") === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${(comp.administracion || "") === "NO" ? "selected" : ""}>NO</option>
+          <option value="NO VERIFICADO" ${(comp.administracion || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
+        </select>
+      </div>
+
+      <div class="asignacion-field">
+        <label>Comprobación Logística y Operaciones</label>
+        <select id="asig-comp-logistica">
+          <option value="SI" ${(comp.logistica_operaciones || "") === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${(comp.logistica_operaciones || "") === "NO" ? "selected" : ""}>NO</option>
+          <option value="NO VERIFICADO" ${(comp.logistica_operaciones || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+function actualizarControlSegunFechas() {
+  const salidaInput = document.getElementById("solicitud-fecha-salida");
+  const llegadaInput = document.getElementById("solicitud-fecha-llegada");
+  const duracionInput = document.getElementById("solicitud-duracion-jornadas");
+  const seguimientoBody = document.getElementById("seguimiento-body");
+
+  if (!salidaInput || !llegadaInput || !duracionInput || !seguimientoBody) {
+    return;
+  }
+
+  if (salidaInput.value) {
+    llegadaInput.min = salidaInput.value;
+  } else {
+    llegadaInput.min = "";
+  }
+
+  if (salidaInput.value && llegadaInput.value && llegadaInput.value < salidaInput.value) {
+    llegadaInput.value = salidaInput.value;
+  }
+
+  const jornadas = calcularJornadas(salidaInput.value, llegadaInput.value);
+  duracionInput.value = String(jornadas);
+  seguimientoBody.innerHTML = renderFilasSeguimiento(jornadas, salidaInput.value);
+  activarCalculoHorasSeguimiento();
+}
+
+function activarEventosSolicitud() {
+  const salidaInput = document.getElementById("solicitud-fecha-salida");
+  const llegadaInput = document.getElementById("solicitud-fecha-llegada");
+
+  if (salidaInput) {
+    salidaInput.addEventListener("change", actualizarControlSegunFechas);
+  }
+  if (llegadaInput) {
+    llegadaInput.addEventListener("change", actualizarControlSegunFechas);
+  }
+
+  actualizarControlSegunFechas();
+  activarCalculoHorasSeguimiento();
+}
+
+function recalcularTotalAsignacion() {
+  const chofer = Number(document.getElementById("asig-viatico-chofer")?.value || 0);
+  const otros = Number(document.getElementById("asig-otros-gastos")?.value || 0);
+  const acompInputs = document.querySelectorAll(".viatico-acompanante");
+
+  let sumaAcomp = 0;
+  acompInputs.forEach((input) => {
+    const valor = Number(input.value || 0);
+    if (Number.isFinite(valor)) {
+      sumaAcomp += valor;
+    }
+  });
+
+  const total = chofer + sumaAcomp + otros;
+  const totalInput = document.getElementById("asig-total");
+  if (totalInput) {
+    totalInput.value = total.toFixed(2);
+  }
+}
+
+function activarEventosAsignacion() {
+  const choferInput = document.getElementById("asig-viatico-chofer");
+  const otrosInput = document.getElementById("asig-otros-gastos");
+  const acompInputs = document.querySelectorAll(".viatico-acompanante");
+
+  if (choferInput) {
+    choferInput.addEventListener("input", recalcularTotalAsignacion);
+  }
+  if (otrosInput) {
+    otrosInput.addEventListener("input", recalcularTotalAsignacion);
+  }
+  acompInputs.forEach((input) => {
+    input.addEventListener("input", recalcularTotalAsignacion);
+  });
+
+  recalcularTotalAsignacion();
+}
+
+function obtenerOrdenActualSeleccionada() {
+  const idx = Number(document.getElementById("selector-os")?.value || -1);
+  if (!Number.isInteger(idx) || idx < 0) {
+    return null;
+  }
+  return ordenesCache[idx] || null;
+}
+
+function recolectarCierrePayload() {
+  const filasSeguimiento = Array.from(document.querySelectorAll("#seguimiento-body tr"));
+  const seguimiento = filasSeguimiento.map((fila, idx) => ({
+    dia: idx + 1,
+    fecha: fila.querySelector('input[type="date"]')?.value || "",
+    hs_inicio: fila.querySelector(".hs-inicio")?.value || "",
+    hs_final: fila.querySelector(".hs-final")?.value || "",
+    observaciones: fila.querySelector('input[type="text"]:not(.hs-acumuladas)')?.value || "",
+    resumen_horas: fila.querySelector(".hs-acumuladas")?.value || "",
+    extra_horas: Number(fila.dataset.extraHoras || 0),
+  }));
+
+  return {
+    solicitud: {
+      fecha_emision: document.getElementById("sol-fecha-emision")?.value || "",
+      centro_costos: document.getElementById("sol-centro-costos")?.value || "",
+      quien_solicita: document.getElementById("sol-quien-solicita")?.value || "",
+      area_solicita: document.getElementById("sol-area-solicita")?.value || "",
+      partida: document.getElementById("sol-partida")?.value || "",
+      destino: document.getElementById("sol-destino")?.value || "",
+      motivo: document.getElementById("sol-motivo")?.value || "",
+      fecha_salida: document.getElementById("solicitud-fecha-salida")?.value || "",
+      fecha_llegada: document.getElementById("solicitud-fecha-llegada")?.value || "",
+      duracion_jornadas: document.getElementById("solicitud-duracion-jornadas")?.value || "",
+      hora_salida: document.getElementById("sol-hora-salida")?.value || "",
+      hora_regreso: document.getElementById("sol-hora-regreso")?.value || "",
+    },
+    asignacion: {
+      viatico_chofer: Number(document.getElementById("asig-viatico-chofer")?.value || 0),
+      otros_gastos: Number(document.getElementById("asig-otros-gastos")?.value || 0),
+      total: Number(document.getElementById("asig-total")?.value || 0),
+      viaticos_sin_otros: Number(document.getElementById("asig-total")?.value || 0) - Number(document.getElementById("asig-otros-gastos")?.value || 0),
+      medio_pago: document.getElementById("asig-medio-pago")?.value || "",
+      alojamiento: document.getElementById("asig-alojamiento")?.value || "",
+      acompanantes: Array.from(document.querySelectorAll(".viaticos-row .nombre-editable")).map((n) => n.value.trim()).filter((v) => v.length > 0),
+      acompanantes_con_viatico: Array.from(document.querySelectorAll(".viaticos-row")).map((row) => ({
+        nombre: row.querySelector(".nombre-editable")?.value?.trim() || "",
+        viatico: Number(row.querySelector(".viatico-acompanante")?.value || 0),
+      })).filter((a) => a.nombre.length > 0),
+      comprobaciones: {
+        taller: document.getElementById("asig-comp-taller")?.value || "",
+        rrhh: document.getElementById("asig-comp-rrhh")?.value || "",
+        administracion: document.getElementById("asig-comp-admin")?.value || "",
+        logistica_operaciones: document.getElementById("asig-comp-logistica")?.value || "",
+      },
+    },
+    control_y_seguimiento: {
+      total_extra_horas: document.getElementById("seguimiento-total-extra")?.value || "0.00 hs",
+      cumple_procedimiento: document.getElementById("check-cumple-procedimiento")?.value || "NO",
+      nota_desvios: document.getElementById("check-nota-desvios")?.value || "NO",
+      aplica_sanciones: document.getElementById("check-aplica-sanciones")?.value || "NO",
+      detalle_dias: seguimiento,
+    },
+  };
+}
+
+async function guardarCierreLogistica() {
+  const orden = obtenerOrdenActualSeleccionada();
+  const msg = document.getElementById("cierre-msg");
+
+  if (!orden || !orden.nro_orden) {
+    if (msg) {
+      msg.textContent = "No hay una Orden de Salida válida seleccionada.";
+    }
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("payload", JSON.stringify(recolectarCierrePayload()));
+
+  const checklistFile = document.getElementById("adjunto-checklist")?.files?.[0];
+  const formularioFile = document.getElementById("adjunto-formulario")?.files?.[0];
+
+  if (checklistFile) {
+    formData.append("checklist_mantenimiento", checklistFile);
+  }
+  if (formularioFile) {
+    formData.append("formulario_logistica_viaje", formularioFile);
+  }
+
+  try {
+    if (msg) {
+      msg.textContent = "Guardando cierre logístico...";
+    }
+
+    const res = await fetch(`http://127.0.0.1:8000/ordenes/${encodeURIComponent(orden.nro_orden)}/cierre`, {
+      method: "POST",
+      body: formData,
+    });
+    const result = await res.json();
+
+    if (result.error) {
+      if (msg) {
+        msg.textContent = result.error;
+      }
+      return;
+    }
+
+    if (msg) {
+      msg.textContent = "Cierre logístico guardado correctamente.";
+    }
+
+    await cargarOrdenes();
+    const selector = document.getElementById("selector-os");
+    const idxReSelect = ordenesCache.findIndex((o) => o.nro_orden === orden.nro_orden);
+    if (idxReSelect >= 0 && selector) {
+      selector.value = String(idxReSelect);
+      renderOrdenSeleccionada(ordenesCache[idxReSelect]);
+    }
+  } catch (error) {
+    if (msg) {
+      msg.textContent = "No se pudo guardar el cierre logístico.";
+    }
+    console.error(error);
+  }
+}
+
+function renderOrdenSeleccionada(orden) {
+  const cont = document.getElementById("listado");
+
+  if (!orden) {
+    cont.innerHTML = '<div class="card">No hay orden seleccionada.</div>';
+    return;
+  }
+
+  const viaje = orden.viaje || {};
+  const recursos = orden.recursos || {};
+
+  const html = `
+    <div class="card">
+      <div class="title">${esc(orden.nro_orden || "SIN NUMERO")}</div>
+      <div class="grid">
+        <div class="item"><label>Fecha Orden:</label><br>${esc(orden.fecha_orden || "")}</div>
+        <div class="item"><label>ID Viaje:</label><br>${esc(orden.id_viaje || "")}</div>
+        <div class="item"><label>Nro Orden:</label><br>${esc(orden.nro_orden || "")}</div>
+        <div class="item"><label>Estado Viaje:</label><br>${esc(viaje.estado || "")}</div>
+      </div>
+
+      <div class="bloque">
+        <h3>Datos de la Solicitud</h3>
+        ${renderDatosSolicitud(orden, viaje, recursos)}
+      </div>
+
+      <div class="bloque">
+        <h3>Datos de la Asignación</h3>
+        ${renderDatosAsignacion(recursos)}
+      </div>
+
+      <div class="bloque">
+        <h3>CONTROL Y SEGUIMIENTO</h3>
+        <table class="seguimiento-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Fecha</th>
+              <th>Hs Inicio</th>
+              <th>Hs Final</th>
+              <th>Observaciones</th>
+              <th>Hs Acumuladas / Extra
+                <input id="seguimiento-total-extra" class="total-extra-box" type="text" value="0.00 hs" readonly>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="seguimiento-body">${renderFilasSeguimiento(recursos.duracion_jornadas, formatearSoloFecha(recursos.fecha_salida_viaje || viaje.fecha_salida || ""))}</tbody>
+        </table>
+
+        <div class="seguimiento-checks">
+          <div class="seguimiento-check-item">
+            <label>Cumple Procedimiento</label>
+            <select id="check-cumple-procedimiento">
+              <option value="SI">SI</option>
+              <option value="NO">NO</option>
+            </select>
+          </div>
+
+          <div class="seguimiento-check-item">
+            <label>Nota Desvios</label>
+            <select id="check-nota-desvios">
+              <option value="SI">SI</option>
+              <option value="NO">NO</option>
+            </select>
+          </div>
+
+          <div class="seguimiento-check-item">
+            <label>Aplica Sanciones</label>
+            <select id="check-aplica-sanciones">
+              <option value="SI">SI</option>
+              <option value="NO">NO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="adjuntos-grid">
+          <div class="adjunto-item">
+            <label>Check List emitido por Mantenimiento del Equipo</label>
+            <input id="adjunto-checklist" type="file">
+          </div>
+          <div class="adjunto-item">
+            <label>Formulario Logistica de Viaje</label>
+            <input id="adjunto-formulario" type="file">
+          </div>
+        </div>
+
+        <div class="cierre-footer">
+          <button type="button" onclick="guardarCierreLogistica()">GUARDAR</button>
+          <span id="cierre-msg" class="cierre-msg"></span>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  cont.innerHTML = html;
+  activarEventosSolicitud();
+  activarEventosAsignacion();
+}
+
+function poblarSelector(ordenes) {
+  const selector = document.getElementById("selector-os");
+  selector.innerHTML = "";
+
+  if (!Array.isArray(ordenes) || ordenes.length === 0) {
+    selector.innerHTML = '<option value="">Sin ordenes</option>';
+    renderOrdenSeleccionada(null);
+    return;
+  }
+
+  ordenes.forEach((orden, idx) => {
+    const option = document.createElement("option");
+    option.value = String(idx);
+    option.textContent = `${orden.nro_orden || "SIN NUMERO"} | Viaje ID ${orden.id_viaje || "-"} | ${orden.fecha_orden || ""}`;
+    selector.appendChild(option);
+  });
+
+  selector.value = "0";
+  renderOrdenSeleccionada(ordenes[0]);
+}
+
+async function cargarOrdenes() {
+  const res = await fetch("http://127.0.0.1:8000/ordenes");
+  const ordenes = await res.json();
+
+  ordenesCache = Array.isArray(ordenes) ? ordenes.slice().reverse() : [];
+  poblarSelector(ordenesCache);
+}
+
+document.getElementById("selector-os").addEventListener("change", (e) => {
+  const idx = Number(e.target.value);
+  const orden = Number.isInteger(idx) ? ordenesCache[idx] : null;
+  renderOrdenSeleccionada(orden || null);
+});
+
+document.getElementById("btn-recargar").addEventListener("click", () => {
+  cargarOrdenes();
+});
+
+cargarOrdenes().catch((err) => {
+  document.getElementById("listado").innerHTML = `<div class="card">Error cargando ordenes: ${esc(err.message)}</div>`;
+});
+</script>
+</body>
+</html>

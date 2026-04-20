@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Asignar Recursos</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .bg-photo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+
+    .bg-blur {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255, 0, 150, 0.18), transparent 55%),
+        radial-gradient(circle at 80% 70%, rgba(0, 200, 255, 0.18), transparent 58%);
+    }
+
+    .card {
+      position: relative;
+      z-index: 2;
+      width: min(96vw, 1200px);
+      max-width: 1200px;
+      padding: 28px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: scale(1.01);
+    }
+
+    .logo-corner {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 3;
+      padding: 0;
+    }
+
+    .logo-corner img {
+      display: block;
+      width: 195px;
+      max-width: 38vw;
+      height: auto;
+    }
+
+    .logo-box img {
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
+    }
+
+    .logo-text {
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    h2 {
+      text-align: center;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    form {
+      width: 100%;
+    }
+
+    .subtitle {
+      color: #cde7f2;
+      text-align: center;
+      font-size: 13px;
+      margin: -8px 0 18px;
+    }
+
+    label {
+      color: #ddd;
+      font-size: 13px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0 15px 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      color: white;
+      outline: none;
+      font-size: 14px;
+      transition: 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(168,199,246,0.9);
+      box-shadow: 0 0 0 3px rgba(119,163,231,0.25), 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: #bbb;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .section-title {
+      color: #dff5ff;
+      font-size: 13px;
+      margin: 8px 0 4px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .companero-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 2.5fr) minmax(160px, 1fr);
+      gap: 14px;
+      align-items: end;
+    }
+
+    .acomp-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .btn-small {
+      width: auto;
+      padding: 8px 12px;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .btn-remove {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .btn-remove:hover {
+      box-shadow: 0 0 12px #ef4444;
+    }
+
+    .acomp-row {
+      display: grid;
+      grid-template-columns: minmax(260px, 2.5fr) minmax(160px, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(59,130,246,0.6);
+    }
+
+    #mensaje {
+      color: #dff5ff;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .card {
+        width: 100%;
+        margin: 8px;
+        padding: 20px;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .companero-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .acomp-actions {
+        flex-direction: column;
+      }
+
+      .acomp-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+
+<div class="logo-corner logo-box">
+  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+</div>
+
+<div class="card">
+
+<h2>Asignar Recursos</h2>
+<p class="subtitle">Complete todos los items para asignar recursos al viaje aprobado</p>
+
+<form id="form">
+  <label>Viaje aprobado</label>
+  <select id="id_viaje" required onchange="completarDatosViaje()"></select>
+
+  <div class="row">
+    <div>
+      <label>Fecha</label>
+      <input type="date" id="fecha" required readonly>
+    </div>
+
+    <div>
+      <label>Centro de Costo</label>
+      <input type="text" id="centro_costo" placeholder="Ej: CC-001" required>
+    </div>
+  </div>
+
+  <label>Datos de quien solicita</label>
+  <input type="text" id="datos_solicitante" placeholder="Solicitante" readonly>
+
+  <label>Area Solicitante</label>
+  <input type="text" id="area_solicitante" placeholder="Area" readonly>
+
+  <div class="row">
+    <div>
+      <label>Partida</label>
+      <input type="text" id="partida" placeholder="Origen" readonly>
+    </div>
+
+    <div>
+      <label>Destino</label>
+      <input type="text" id="destino" placeholder="Destino" readonly>
+    </div>
+  </div>
+
+  <label>Motivo del Viaje</label>
+  <input type="text" id="motivo_viaje" placeholder="Motivo" readonly>
+
+  <div class="row">
+    <div>
+      <label>Fecha de Salida</label>
+      <input type="date" id="fecha_salida_viaje" readonly>
+    </div>
+
+    <div>
+      <label>Fecha de Regreso</label>
+      <input type="date" id="fecha_regreso_viaje" readonly>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Hora de Salida</label>
+      <input type="time" id="hora_salida">
+    </div>
+
+    <div>
+      <label>Hora de Regreso</label>
+      <input type="time" id="hora_regreso">
+    </div>
+  </div>
+
+  <label>Duracion estimada en jornadas</label>
+  <input type="text" id="duracion_jornadas" placeholder="0" readonly>
+
+  <div class="section-title">Itinerario / Rutas / Paradas</div>
+  <label>Itinerario</label>
+  <textarea id="itinerario" placeholder="Itinerario del viaje"></textarea>
+
+  <label>Rutas</label>
+  <textarea id="rutas" placeholder="Rutas previstas"></textarea>
+
+  <label>Paradas</label>
+  <textarea id="paradas" placeholder="Paradas planificadas"></textarea>
+
+  <div class="companero-grid">
+    <div>
+      <label>Chofer</label>
+      <input type="text" id="chofer" list="lista-choferes" placeholder="Seleccionar o escribir chofer" required>
+      <datalist id="lista-choferes"></datalist>
+    </div>
+    <div>
+      <label>Viatico Chofer</label>
+      <input type="number" id="viatico_chofer" placeholder="0" min="0" step="0.01">
+    </div>
+  </div>
+
+  <label>Vehiculo</label>
+  <input type="text" id="vehiculo" list="lista-vehiculos" placeholder="Seleccionar o escribir vehiculo" required>
+  <datalist id="lista-vehiculos"></datalist>
+
+  <div class="section-title">Acompanantes y viaticos</div>
+  <div class="acomp-actions">
+    <button class="btn-small" type="button" id="btn-add-acomp">+ Agregar acompañante</button>
+  </div>
+  <div id="acompanantes-container"></div>
+
+  <label>Total Viaticos</label>
+  <input type="number" id="viaticos" placeholder="Viáticos" min="0" step="0.01" readonly>
+
+  <datalist id="lista-acompanantes"></datalist>
+
+  <div class="section-title">RECURSOS ECONOMICOS</div>
+
+  <div class="row">
+    <div>
+      <label>Viaticos ($)</label>
+      <input type="number" id="viaticos_monto" min="0" step="0.01" readonly>
+    </div>
+
+    <div>
+      <label>Medio (Caja/Transferencia)</label>
+      <select id="medio_pago">
+        <option value="Caja">Caja</option>
+        <option value="Transferencia">Transferencia</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Alojamiento</label>
+      <select id="alojamiento">
+        <option value="NO">NO</option>
+        <option value="SI">SI</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Otros Gastos</label>
+      <input type="number" id="otros_gastos" placeholder="0" min="0" step="0.01">
+    </div>
+  </div>
+
+  <div class="section-title">COMPROBACION DE OPERACIONES Y LOGISTICA</div>
+  <div class="row">
+    <div>
+      <label>Taller</label>
+      <select id="comp_taller">
+        <option value="SI">SI</option>
+        <option value="NO" selected>NO</option>
+        <option value="NO VERIFICADO">NO VERIFICADO</option>
+      </select>
+    </div>
+    <div>
+      <label>RRHH</label>
+      <select id="comp_rrhh">
+        <option value="SI" selected>SI</option>
+        <option value="NO">NO</option>
+        <option value="NO VERIFICADO">NO VERIFICADO</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Administracion</label>
+      <select id="comp_administracion">
+        <option value="SI">SI</option>
+        <option value="NO" selected>NO</option>
+        <option value="NO VERIFICADO">NO VERIFICADO</option>
+      </select>
+    </div>
+    <div>
+      <label>Logistica y Operaciones</label>
+      <select id="comp_logistica_operaciones">
+        <option value="SI">SI</option>
+        <option value="NO">NO</option>
+        <option value="NO VERIFICADO" selected>NO VERIFICADO</option>
+      </select>
+    </div>
+  </div>
+
+  <button type="submit">Asignar</button>
+  <p id="mensaje"></p>
+</form>
+
+<script>
+let viajesAprobados = [];
+let personalData = [];
+const MAX_ACOMPANANTES = 20;
+
+function actualizarListasPersonal() {
+  const listaChoferes = document.getElementById("lista-choferes");
+  const listaAcompanantes = document.getElementById("lista-acompanantes");
+
+  listaChoferes.innerHTML = "";
+  listaAcompanantes.innerHTML = "";
+
+  personalData.forEach(p => {
+    const option = document.createElement("option");
+    option.value = p.nombre || "";
+    listaChoferes.appendChild(option);
+
+    const optionAcomp = document.createElement("option");
+    optionAcomp.value = p.nombre || "";
+    listaAcompanantes.appendChild(optionAcomp);
+  });
+}
+
+async function cargarViajes() {
+  const [resViajes, resOrdenes] = await Promise.all([
+    fetch("http://127.0.0.1:8000/viajes"),
+    fetch("http://127.0.0.1:8000/ordenes")
+  ]);
+  const data = await resViajes.json();
+  const ordenes = await resOrdenes.json();
+  const idsConOrden = new Set((Array.isArray(ordenes) ? ordenes : []).map(o => o.id_viaje));
+
+  const select = document.getElementById("id_viaje");
+  select.innerHTML = "";
+
+  viajesAprobados = data.filter(v => v.estado === "APROBADO" && !idsConOrden.has(v.id) && !v.orden_salida_generada);
+
+  viajesAprobados.forEach(v => {
+    const option = document.createElement("option");
+    option.value = v.id;
+    option.text = `ID ${v.id} - ${v.solicitante} (${v.destino})`;
+    select.appendChild(option);
+  });
+
+  if (viajesAprobados.length === 0) {
+    document.getElementById("mensaje").style.color = "#dff5ff";
+    document.getElementById("mensaje").textContent = "No hay viajes aprobados disponibles para generar Orden de Salida.";
+  } else {
+    document.getElementById("mensaje").textContent = "";
+  }
+
+  completarDatosViaje();
+}
+
+function completarDatosViaje() {
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const idSeleccionado = parseInt(document.getElementById("id_viaje").value || "0");
+  const viaje = viajesAprobados.find(v => v.id === idSeleccionado);
+
+  document.getElementById("fecha").value = hoy;
+  document.getElementById("datos_solicitante").value = viaje?.solicitante || "";
+  document.getElementById("area_solicitante").value = viaje?.area || "";
+  document.getElementById("partida").value = viaje?.origen || "";
+  document.getElementById("destino").value = viaje?.destino || "";
+  document.getElementById("motivo_viaje").value = viaje?.motivo || "";
+  document.getElementById("fecha_salida_viaje").value = viaje?.fecha_salida || "";
+  document.getElementById("fecha_regreso_viaje").value = viaje?.fecha_regreso || "";
+  document.getElementById("hora_salida").value = viaje?.hora_salida || "";
+  document.getElementById("hora_regreso").value = viaje?.hora_regreso || "";
+  document.getElementById("itinerario").value = viaje?.itinerario || viaje?.intinerario || "";
+  document.getElementById("rutas").value = viaje?.rutas || "";
+  document.getElementById("paradas").value = viaje?.paradas || "";
+
+  const jornadas = calcularDuracionJornadas(viaje?.fecha_salida, viaje?.fecha_regreso);
+  document.getElementById("duracion_jornadas").value = jornadas > 0 ? String(jornadas) : "";
+
+  actualizarListasPersonal();
+}
+
+function calcularTotalViaticos() {
+  const viaticoChofer = parseFloat(document.getElementById("viatico_chofer").value || 0);
+
+  const viaticosAcomp = Array.from(document.querySelectorAll(".input-viatico-acomp"))
+    .map(input => parseFloat(input.value || 0))
+    .reduce((acc, val) => acc + val, 0);
+
+  const viaticos = viaticoChofer + viaticosAcomp;
+
+  const total = viaticos.toFixed(2);
+  document.getElementById("viaticos").value = total;
+  document.getElementById("viaticos_monto").value = total;
+}
+
+function crearFilaAcompanante(nombre = "", viatico = "") {
+  const cont = document.getElementById("acompanantes-container");
+  const cantidadActual = cont.querySelectorAll(".acomp-row").length;
+
+  if (cantidadActual >= MAX_ACOMPANANTES) {
+    const mensaje = document.getElementById("mensaje");
+    mensaje.style.color = "#ffb3b3";
+    mensaje.textContent = `Máximo ${MAX_ACOMPANANTES} acompañantes.`;
+    return;
+  }
+
+  const fila = document.createElement("div");
+  fila.className = "acomp-row";
+  fila.innerHTML = `
+    <div>
+      <label>Acompanante</label>
+      <input type="text" class="input-acomp" list="lista-acompanantes" placeholder="Nombre del acompañante" value="${nombre}">
+    </div>
+    <div>
+      <label>Viatico</label>
+      <input type="number" class="input-viatico-acomp" placeholder="0" min="0" step="0.01" value="${viatico}">
+    </div>
+    <div>
+      <button type="button" class="btn-small btn-remove">Quitar</button>
+    </div>
+  `;
+
+  fila.querySelector(".btn-remove").addEventListener("click", () => {
+    fila.remove();
+    calcularTotalViaticos();
+  });
+
+  fila.querySelector(".input-viatico-acomp").addEventListener("input", calcularTotalViaticos);
+
+  cont.appendChild(fila);
+}
+
+function resetAcompanantes() {
+  const cont = document.getElementById("acompanantes-container");
+  cont.innerHTML = "";
+  crearFilaAcompanante();
+}
+
+function calcularDuracionJornadas(fechaSalida, fechaRegreso) {
+  if (!fechaSalida || !fechaRegreso) {
+    return 0;
+  }
+
+  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const regreso = new Date(`${fechaRegreso}T00:00:00`);
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const diferencia = Math.floor((regreso - salida) / msPorDia) + 1;
+
+  return diferencia > 0 ? diferencia : 0;
+}
+
+function generarPDF(data, nroOrden) {
+  const vehiculoTexto = data.vehiculo || "";
+  const partesVehiculo = vehiculoTexto.split(" - ");
+  const marcaModelo = (partesVehiculo[2] || "").trim();
+  const marcaModeloPartes = marcaModelo.split(" ");
+
+  const payloadPDF = {
+    nro_orden: nroOrden || "",
+    id: data.id_viaje,
+    fecha: data.fecha,
+    solicitante: data.datos_solicitante,
+    area: data.area_solicitante,
+    origen: data.partida,
+    destino: data.destino,
+    motivo: data.motivo_viaje,
+    fecha_salida: data.fecha_salida_viaje,
+    fecha_regreso: data.fecha_regreso_viaje,
+    vehiculo: partesVehiculo[0] || vehiculoTexto,
+    dominio: partesVehiculo[1] || "",
+    marca: marcaModeloPartes[0] || "",
+    modelo: marcaModeloPartes.slice(1).join(" ") || "",
+    chofer: data.chofer,
+    acompanantes: (data.acompanantes || []).join(", "),
+    viaticos: data.viaticos,
+    alojamiento: data.alojamiento
+  };
+
+  localStorage.setItem("viaje_pdf", JSON.stringify(payloadPDF));
+  window.open("/print_viaje");
+}
+
+async function cargarVehiculos() {
+  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  const data = await res.json();
+
+  const listaVehiculos = document.getElementById("lista-vehiculos");
+  listaVehiculos.innerHTML = "";
+
+  data.forEach(v => {
+    const option = document.createElement("option");
+    const codigo = v.codigo || "";
+    const dominio = v.dominio || "S/D";
+    const marcaModelo = `${v.marca || ""} ${v.modelo || ""}`.trim() || "Sin modelo";
+    const operativo = v.operativo || "NO";
+    option.value = `${codigo} - ${dominio} - ${marcaModelo} - Operativo: ${operativo}`;
+    listaVehiculos.appendChild(option);
+  });
+}
+
+async function cargarChoferes() {
+  const res = await fetch("http://127.0.0.1:8000/personal");
+  personalData = await res.json();
+  actualizarListasPersonal();
+}
+
+document.getElementById("form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  try {
+    if (viajesAprobados.length === 0) {
+      const mensaje = document.getElementById("mensaje");
+      mensaje.style.color = "#ffb3b3";
+      mensaje.textContent = "No hay viajes disponibles para asignar.";
+      return;
+    }
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    document.getElementById("fecha").value = hoy;
+    calcularTotalViaticos();
+
+    const acompanantesDetalle = Array.from(document.querySelectorAll("#acompanantes-container .acomp-row")).map(row => ({
+      nombre: row.querySelector(".input-acomp")?.value.trim() || "",
+      viatico: parseFloat(row.querySelector(".input-viatico-acomp")?.value || 0)
+    }));
+
+    const acompanantes = acompanantesDetalle
+      .map(a => a.nombre)
+      .filter(n => n.length > 0);
+
+    const acompanantes_con_viatico = acompanantesDetalle
+      .filter(a => a.nombre.length > 0 || a.viatico > 0);
+
+    const mensaje = document.getElementById("mensaje");
+
+    const data = {
+      id_viaje: parseInt(document.getElementById("id_viaje").value),
+      fecha: document.getElementById("fecha").value,
+      centro_costo: document.getElementById("centro_costo").value,
+      datos_solicitante: document.getElementById("datos_solicitante").value,
+      area_solicitante: document.getElementById("area_solicitante").value,
+      partida: document.getElementById("partida").value,
+      destino: document.getElementById("destino").value,
+      motivo_viaje: document.getElementById("motivo_viaje").value,
+      fecha_salida_viaje: document.getElementById("fecha_salida_viaje").value,
+      fecha_regreso_viaje: document.getElementById("fecha_regreso_viaje").value,
+      hora_salida: document.getElementById("hora_salida").value,
+      hora_regreso: document.getElementById("hora_regreso").value,
+      duracion_jornadas: document.getElementById("duracion_jornadas").value,
+      itinerario: document.getElementById("itinerario").value,
+      rutas: document.getElementById("rutas").value,
+      paradas: document.getElementById("paradas").value,
+      chofer: document.getElementById("chofer").value,
+      chofer_viatico: parseFloat(document.getElementById("viatico_chofer").value || 0),
+      vehiculo: document.getElementById("vehiculo").value,
+      acompanantes: acompanantes,
+      acompanantes_con_viatico: acompanantes_con_viatico,
+      viaticos: parseFloat(document.getElementById("viaticos").value || 0),
+      medio_pago: document.getElementById("medio_pago").value,
+      alojamiento: document.getElementById("alojamiento").value,
+      otros_gastos: parseFloat(document.getElementById("otros_gastos").value || 0),
+      comprobacion_operaciones_logistica: {
+        taller: document.getElementById("comp_taller").value,
+        rrhh: document.getElementById("comp_rrhh").value,
+        administracion: document.getElementById("comp_administracion").value,
+        logistica_operaciones: document.getElementById("comp_logistica_operaciones").value
+      }
+    };
+
+    const res = await fetch("http://127.0.0.1:8000/recursos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (result.error) {
+      mensaje.style.color = "#ffb3b3";
+      mensaje.textContent = result.error;
+      return;
+    }
+
+    mensaje.style.color = "#dff5ff";
+    mensaje.textContent = `Recursos asignados correctamente. Orden generada: ${result.nro_orden || "SIN NUMERO"}`;
+    generarPDF(data, result.nro_orden);
+    document.getElementById("form").reset();
+    resetAcompanantes();
+    calcularTotalViaticos();
+  } catch (error) {
+    console.error("Error al asignar recursos:", error);
+    const mensaje = document.getElementById("mensaje");
+    mensaje.style.color = "#ffb3b3";
+    mensaje.textContent = "No se pudo asignar recursos.";
+  }
+});
+
+cargarViajes();
+cargarVehiculos();
+cargarChoferes();
+document.getElementById("viatico_chofer").addEventListener("input", calcularTotalViaticos);
+document.getElementById("btn-add-acomp").addEventListener("click", () => crearFilaAcompanante());
+
+resetAcompanantes();
+</script>
+
+</div>
+
+</body>
+</html>

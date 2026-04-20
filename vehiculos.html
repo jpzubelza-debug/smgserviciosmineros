@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gestión de Vehículos</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: #eef4ff;
+      padding: 20px;
+      position: relative;
+    }
+    .bg-photo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+    .bg-blur {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,0,150,0.18), transparent 55%),
+        radial-gradient(circle at 80% 70%, rgba(0,200,255,0.18), transparent 58%);
+    }
+    .page {
+      position: relative;
+      z-index: 2;
+      max-width: 1500px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+    h2 { text-align: center; color: #ffffff; }
+    input, select, button { padding: 8px; margin: 5px; }
+    input, select {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #eef4ff;
+      border-radius: 8px;
+    }
+    .habilitacion-select,
+    .campo-select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
+        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
+      background-position:
+        calc(100% - 16px) calc(50% - 3px),
+        calc(100% - 10px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 30px;
+    }
+    button { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+    button:hover { box-shadow: 0 0 12px rgba(59,130,246,0.6); transform: scale(1.05); }
+    .tabla-equipos-wrap {
+      margin-top: 20px;
+      max-height: 60vh;
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      background: rgba(255,255,255,0.08);
+    }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.08); }
+    th {
+      background: rgba(10, 24, 38, 0.82);
+      color: #ffffff;
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.24);
+    }
+    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); }
+    tr:hover { background: rgba(255,255,255,0.08); }
+    #lista th:nth-child(10), #lista td:nth-child(10),
+    #lista th:nth-child(11), #lista td:nth-child(11),
+    #lista th:nth-child(12), #lista td:nth-child(12),
+    #lista th:nth-child(13), #lista td:nth-child(13),
+    #lista th:nth-child(14), #lista td:nth-child(14),
+    #lista th:nth-child(15), #lista td:nth-child(15),
+    #lista th:nth-child(16), #lista td:nth-child(16),
+    #lista th:nth-child(17), #lista td:nth-child(17) {
+      width: 120px;
+      min-width: 120px;
+      max-width: 120px;
+    }
+    .operativo-select, .habilitacion-select, .campo-select {
+      width: 100%;
+      padding: 6px;
+      margin: 0;
+      box-sizing: border-box;
+    }
+    .operativo-select.estado-si {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 10px rgba(34, 197, 94, 0.2);
+      color: #dcfce7;
+      font-weight: 700;
+    }
+    .operativo-select.estado-no {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 10px rgba(239, 68, 68, 0.2);
+      color: #fee2e2;
+      font-weight: 700;
+    }
+    .eliminar-btn { background: red; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+    .eliminar-btn:hover { background: darkred; }
+    .toggle-btn { margin-bottom: 10px; }
+    .panel-form {
+      display: none;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 14px 0 12px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .stat-title {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #dbeafe;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .stat-filter {
+      width: 100%;
+      margin: 0 0 10px;
+      padding: 7px 28px 7px 10px;
+      box-sizing: border-box;
+      background: rgba(15,23,42,0.38);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 10px;
+      color: #eaf2ff;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
+        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
+      background-position:
+        calc(100% - 15px) calc(50% - 3px),
+        calc(100% - 9px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .kpi-pill {
+      background: rgba(15,23,42,0.38);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+    }
+    .kpi-alerta {
+      border: 1px solid rgba(255, 80, 80, 0.5);
+      box-shadow: 0 0 10px rgba(255, 80, 80, 0.3);
+    }
+    .kpi-label {
+      display: block;
+      font-size: 11px;
+      color: #dbeafe;
+      opacity: 0.88;
+    }
+    .kpi-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .chart-box {
+      position: relative;
+      height: 220px;
+    }
+    .chart-box canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .conclusion-card {
+      margin-top: 10px;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .conclusion {
+      background: rgba(0,0,0,0.2);
+      border-left: 3px solid #3b82f6;
+    }
+    .conclusion-title {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #f8fbff;
+      letter-spacing: 0.3px;
+    }
+    .conclusion-main {
+      margin: 0 0 10px;
+      color: #e6f0ff;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .conclusion-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #dbeafe;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="page">
+
+<h2>🚛 Vehículos</h2>
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <h3 class="stat-title">Resumen General</h3>
+    <select id="filtro-proyecto-resumen" class="stat-filter" onchange="onCambioFiltroResumen()">
+      <option value="__GENERAL__">General (Todos los proyectos)</option>
+    </select>
+    <div class="kpi-row">
+      <div class="kpi-pill">
+        <span class="kpi-label">Total</span>
+        <span id="kpi-total" class="kpi-value">0</span>
+      </div>
+      <div class="kpi-pill">
+        <span class="kpi-label">Operativos</span>
+        <span id="kpi-si" class="kpi-value">0</span>
+      </div>
+      <div class="kpi-pill kpi-alerta">
+        <span class="kpi-label">No Operativos</span>
+        <span id="kpi-no" class="kpi-value">0</span>
+      </div>
+    </div>
+    <div class="chart-box">
+      <canvas id="chart-operativos"></canvas>
+    </div>
+  </article>
+
+  <article class="stat-card">
+    <h3 class="stat-title">Vehículos por Proyecto</h3>
+    <div class="chart-box">
+      <canvas id="chart-proyectos"></canvas>
+    </div>
+  </article>
+
+  <article class="stat-card">
+    <h3 class="stat-title">Habilitaciones (SI)</h3>
+    <div class="chart-box">
+      <canvas id="chart-habilitaciones"></canvas>
+    </div>
+  </article>
+</section>
+
+<section class="conclusion-card conclusion">
+  <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
+  <p id="conclusion-main" class="conclusion-main">
+    Cargando conclusión operativa...
+  </p>
+  <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
+  <ul id="conclusion-list" class="conclusion-list"></ul>
+</section>
+
+<button class="toggle-btn" onclick="toggleFormularioVehiculos()">Agregar Vehiculos</button>
+
+<div id="panel-form-vehiculos" class="panel-form">
+
+<input id="codigo" placeholder="Código">
+<input id="propiedad" placeholder="Propiedad">
+<input id="marca" placeholder="Marca">
+<input id="tipo" placeholder="Tipo">
+<input id="modelo" placeholder="Modelo">
+<input id="dominio" placeholder="Dominio">
+<input id="anio" placeholder="Año">
+<input id="motor" placeholder="Motor">
+<input id="chasis" placeholder="Chasis">
+<input id="sector" placeholder="Sector">
+<select id="proyecto">
+  <option value="">Seleccionar proyecto</option>
+  <option value="Pirquitas">Pirquitas</option>
+  <option value="Exar">Exar</option>
+  <option value="SDJ">SDJ</option>
+  <option value="Rincón">Rincón</option>
+  <option value="ARLI">ARLI</option>
+</select>
+
+<select id="operativo">
+  <option value="SI">Operativo</option>
+  <option value="NO">No operativo</option>
+</select>
+
+<select id="habilitacion_pirquitas">
+  <option value="NO" selected>Habilitación Pirquitas: NO</option>
+  <option value="SI">Habilitación Pirquitas: SI</option>
+</select>
+
+<select id="habilitacion_exar">
+  <option value="NO" selected>Habilitación Exar: NO</option>
+  <option value="SI">Habilitación Exar: SI</option>
+</select>
+
+<select id="habilitacion_sdj">
+  <option value="NO" selected>Habilitación SDJ: NO</option>
+  <option value="SI">Habilitación SDJ: SI</option>
+</select>
+
+<select id="habilitacion_rincon">
+  <option value="NO" selected>Habilitación Rincón: NO</option>
+  <option value="SI">Habilitación Rincón: SI</option>
+</select>
+
+<select id="habilitacion_arli">
+  <option value="NO" selected>Habilitación ARLI: NO</option>
+  <option value="SI">Habilitación ARLI: SI</option>
+</select>
+
+<button onclick="agregar()">Guardar</button>
+</div>
+
+<hr>
+
+<div class="tabla-equipos-wrap">
+  <table id="lista">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Propiedad</th>
+        <th>Marca</th>
+        <th>Tipo</th>
+        <th>Modelo</th>
+        <th>Dominio</th>
+        <th>Año</th>
+        <th>Motor</th>
+        <th>Chasis</th>
+        <th>Sector</th>
+        <th>Proyecto</th>
+        <th>Operativo</th>
+        <th>Pirquitas</th>
+        <th>Exar</th>
+        <th>SDJ</th>
+        <th>Rincón</th>
+        <th>ARLI</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="lista-body"></tbody>
+  </table>
+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  let chartOperativos;
+  let chartProyectos;
+  let chartHabilitaciones;
+  let vehiculosCache = [];
+  const valueLabelPlugin = {
+    id: "valueLabels",
+    afterDatasetsDraw(chart, args, pluginOptions) {
+      if (chart.config.type !== "bar") {
+        return;
+      }
+
+      const { ctx } = chart;
+      const dataset = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      const color = (pluginOptions && pluginOptions.color) || "#ffffff";
+      const fontSize = (pluginOptions && pluginOptions.fontSize) || 12;
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = `700 ${fontSize}px Arial`;
+
+      meta.data.forEach((bar, index) => {
+        const valor = Number(dataset.data[index] || 0);
+        ctx.fillText(String(valor), bar.x, bar.y - 6);
+      });
+
+      ctx.restore();
+    }
+  };
+
+function toggleFormularioVehiculos() {
+  const panel = document.getElementById("panel-form-vehiculos");
+  if (panel.style.display === "block") {
+    panel.style.display = "none";
+  } else {
+    panel.style.display = "block";
+  }
+}
+
+function selectHabilitacion(codigo, campo, valorActual) {
+  const valor = (valorActual || "NO").toString().toUpperCase() === "SI" ? "SI" : "NO";
+  const selectedSi = valor === "SI" ? "selected" : "";
+  const selectedNo = valor === "NO" ? "selected" : "";
+  return `
+    <select class="habilitacion-select" onchange="actualizarHabilitacionVehiculo('${codigo}', '${campo}', this.value)">
+      <option value="SI" ${selectedSi}>SI</option>
+      <option value="NO" ${selectedNo}>NO</option>
+    </select>
+  `;
+}
+
+function escapeHtml(texto) {
+  return (texto || "")
+    .toString()
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function selectEditable(codigo, campo, valorActual, opciones) {
+  const valor = (valorActual || "").toString().trim();
+  const lista = [...opciones];
+
+  if (valor && !lista.includes(valor)) {
+    lista.unshift(valor);
+  }
+
+  const htmlOpciones = lista
+    .map(op => {
+      const selected = op === valor ? "selected" : "";
+      return `<option value="${escapeHtml(op)}" ${selected}>${escapeHtml(op)}</option>`;
+    })
+    .join("");
+
+  return `
+    <select class="campo-select" onchange="actualizarCampoVehiculo('${codigo}', '${campo}', this.value)">
+      <option value="">SIN DATO</option>
+      ${htmlOpciones}
+    </select>
+  `;
+}
+
+function normalizarProyecto(valor) {
+  return (valor || "SIN DATO").toString().trim() || "SIN DATO";
+}
+
+function poblarFiltroResumen(data) {
+  const filtro = document.getElementById("filtro-proyecto-resumen");
+  const valorActual = filtro.value || "__GENERAL__";
+  const proyectos = Array.from(new Set(data.map(v => normalizarProyecto(v.proyecto)))).sort((a, b) => a.localeCompare(b));
+
+  filtro.innerHTML = '<option value="__GENERAL__">General (Todos los proyectos)</option>';
+  proyectos.forEach(proyecto => {
+    const option = document.createElement("option");
+    option.value = proyecto;
+    option.textContent = proyecto;
+    filtro.appendChild(option);
+  });
+
+  filtro.value = Array.from(filtro.options).some(op => op.value === valorActual)
+    ? valorActual
+    : "__GENERAL__";
+}
+
+function renderResumenGeneral(data) {
+  const filtro = document.getElementById("filtro-proyecto-resumen");
+  const proyectoSeleccionado = filtro ? filtro.value : "__GENERAL__";
+  const dataFiltrada = proyectoSeleccionado === "__GENERAL__"
+    ? data
+    : data.filter(v => normalizarProyecto(v.proyecto) === proyectoSeleccionado);
+
+  const total = dataFiltrada.length;
+  const totalSi = dataFiltrada.filter(v => String(v.operativo || "").toUpperCase() === "SI").length;
+  const totalNo = total - totalSi;
+
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-si").textContent = totalSi;
+  document.getElementById("kpi-no").textContent = totalNo;
+
+  if (typeof Chart === "undefined") {
+    return;
+  }
+
+  if (chartOperativos) {
+    chartOperativos.destroy();
+  }
+  chartOperativos = new Chart(document.getElementById("chart-operativos"), {
+    type: "doughnut",
+    data: {
+      labels: ["Operativo", "No Operativo"],
+      datasets: [{
+        data: [totalSi, totalNo],
+        backgroundColor: ["rgba(34,197,94,0.82)", "rgba(239,68,68,0.82)"],
+        borderColor: ["rgba(34,197,94,1)", "rgba(239,68,68,1)"],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#e2e8f0",
+            font: { size: 12, family: "Arial" }
+          }
+        }
+      }
+    }
+  });
+}
+
+function onCambioFiltroResumen() {
+  renderResumenGeneral(vehiculosCache);
+}
+
+function construirResumenAnalitico(data) {
+  const total = data.length;
+  const operativos = data.filter(v => String(v.operativo || "").toUpperCase() === "SI").length;
+  const noOperativos = total - operativos;
+  const flotaOperativaPct = total > 0 ? Math.round((operativos / total) * 100) : 0;
+
+  const conteoProyectos = new Map();
+  const conteoSectores = new Map();
+  data.forEach(v => {
+    const proyecto = normalizarProyecto(v.proyecto);
+    const sector = (v.sector || "SIN DATO").toString().trim().toUpperCase() || "SIN DATO";
+    conteoProyectos.set(proyecto, (conteoProyectos.get(proyecto) || 0) + 1);
+    conteoSectores.set(sector, (conteoSectores.get(sector) || 0) + 1);
+  });
+  const proyectoTop = Array.from(conteoProyectos.entries()).sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
+  const sectorTop = Array.from(conteoSectores.entries()).sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
+  const pctTop = total > 0 ? Math.round((proyectoTop[1] / total) * 100) : 0;
+
+  const camposHab = [
+    "habilitacion_pirquitas",
+    "habilitacion_exar",
+    "habilitacion_sdj",
+    "habilitacion_rincon",
+    "habilitacion_arli"
+  ];
+  let habilitados = 0;
+  data.forEach(v => {
+    camposHab.forEach(campo => {
+      if (String(v[campo] || "").toUpperCase() === "SI") {
+        habilitados += 1;
+      }
+    });
+  });
+  const totalChecks = total * camposHab.length;
+  const pctHabilitaciones = totalChecks > 0 ? Math.round((habilitados / totalChecks) * 100) : 0;
+
+  return {
+    total,
+    operativos,
+    no_operativos: noOperativos,
+    flota: flotaOperativaPct,
+    proyecto_principal: proyectoTop[0],
+    sector_principal: sectorTop[0],
+    pct_habilitaciones: pctHabilitaciones,
+    proyecto_top_cantidad: proyectoTop[1],
+    proyecto_top_pct: pctTop
+  };
+}
+
+function generarConclusion(data) {
+  let texto = "";
+
+  if (data.flota < 60) {
+    texto += "⚠️ Baja disponibilidad de flota. ";
+  }
+
+  if (data.no_operativos > data.operativos) {
+    texto += "Mayor cantidad de equipos fuera de servicio. ";
+  }
+
+  if (data.proyecto_principal === "TALLER" || data.sector_principal === "TALLER") {
+    texto += "Alta concentración en Taller. ";
+  }
+
+  if (!texto) {
+    texto = "Operación estable con indicadores controlados y disponibilidad de flota adecuada.";
+  }
+
+  return texto.trim();
+}
+
+async function obtenerConclusionIA(data) {
+  const payload = {
+    total: data.total,
+    operativos: data.operativos,
+    no_operativos: data.no_operativos,
+    flota: data.flota,
+    proyecto_principal: data.proyecto_principal,
+    sector_principal: data.sector_principal,
+    pct_habilitaciones: data.pct_habilitaciones
+  };
+
+  const res = await fetch("/analisis_vehiculos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    throw new Error("No disponible");
+  }
+
+  const body = await res.json();
+  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) {
+    throw new Error("Respuesta invalida");
+  }
+
+  return body.conclusion.trim();
+}
+
+async function actualizarConclusiones(data) {
+  const resumen = construirResumenAnalitico(data);
+  let conclusion = generarConclusion(resumen);
+  let fuente = "Fuente: motor local de reglas";
+
+  try {
+    const conclusionIA = await obtenerConclusionIA(resumen);
+    conclusion = conclusionIA;
+    fuente = "Fuente: IA backend (/analisis_vehiculos)";
+  } catch (error) {
+    // Si no hay endpoint IA disponible, se conserva la conclusion local.
+  }
+
+  const recomendaciones = [
+    `Total equipos: ${resumen.total}. Operativos: ${resumen.operativos}. No operativos: ${resumen.no_operativos}.`,
+    `Mayor concentración en proyecto ${resumen.proyecto_principal} (${resumen.proyecto_top_cantidad} equipos, ${resumen.proyecto_top_pct}% del total).`,
+    `Nivel global de habilitaciones: ${resumen.pct_habilitaciones}% sobre los checks de Pirquitas, Exar, SDJ, Rincón y ARLI.`
+  ];
+
+  if (resumen.no_operativos > resumen.operativos) {
+    recomendaciones.push("La cantidad de no operativos supera a los operativos: activar plan de recuperación de flota de corto plazo.");
+  }
+  if (resumen.pct_habilitaciones < 50) {
+    recomendaciones.push("El nivel de habilitaciones es bajo: revisar documentación, vencimientos y gestión por proyecto.");
+  }
+
+  const main = document.getElementById("conclusion-main");
+  const source = document.getElementById("conclusion-source");
+  const list = document.getElementById("conclusion-list");
+  if (main) {
+    main.textContent = conclusion;
+  }
+  if (source) {
+    source.textContent = fuente;
+  }
+  if (list) {
+    list.innerHTML = recomendaciones.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+  }
+}
+
+function actualizarGraficos(data) {
+  vehiculosCache = data;
+  poblarFiltroResumen(data);
+  renderResumenGeneral(data);
+  actualizarConclusiones(data);
+
+  if (typeof Chart === "undefined") {
+    return;
+  }
+
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: "#e2e8f0",
+          font: { size: 12, family: "Arial" }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: "#dbeafe", font: { family: "Arial" } },
+        grid: { color: "rgba(255,255,255,0.12)" }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: "#dbeafe", precision: 0, font: { family: "Arial" } },
+        grid: { color: "rgba(255,255,255,0.12)" }
+      }
+    }
+  };
+
+  const mapaProyectos = new Map();
+  data.forEach(v => {
+    const proyecto = normalizarProyecto(v.proyecto);
+    mapaProyectos.set(proyecto, (mapaProyectos.get(proyecto) || 0) + 1);
+  });
+  const proyectosOrdenados = Array.from(mapaProyectos.entries()).sort((a, b) => b[1] - a[1]);
+  const labelsProyectos = proyectosOrdenados.map(([nombre]) => nombre);
+  const valoresProyectos = proyectosOrdenados.map(([, cantidad]) => cantidad);
+
+  if (chartProyectos) {
+    chartProyectos.destroy();
+  }
+  chartProyectos = new Chart(document.getElementById("chart-proyectos"), {
+    type: "bar",
+    plugins: [valueLabelPlugin],
+    data: {
+      labels: labelsProyectos,
+      datasets: [{
+        label: "Vehículos",
+        data: valoresProyectos,
+        backgroundColor: "rgba(56,189,248,0.7)",
+        borderColor: "rgba(56,189,248,1)",
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      ...baseOptions,
+      plugins: {
+        ...baseOptions.plugins,
+        valueLabels: {
+          color: "#eaf2ff",
+          fontSize: 12
+        }
+      }
+    }
+  });
+
+  const habilitaciones = [
+    { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
+    { etiqueta: "Exar", campo: "habilitacion_exar" },
+    { etiqueta: "SDJ", campo: "habilitacion_sdj" },
+    { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+    { etiqueta: "ARLI", campo: "habilitacion_arli" }
+  ];
+  const labelsHab = habilitaciones.map(h => h.etiqueta);
+  const valoresHab = habilitaciones.map(h =>
+    data.filter(v => String(v[h.campo] || "").toUpperCase() === "SI").length
+  );
+
+  if (chartHabilitaciones) {
+    chartHabilitaciones.destroy();
+  }
+  chartHabilitaciones = new Chart(document.getElementById("chart-habilitaciones"), {
+    type: "bar",
+    plugins: [valueLabelPlugin],
+    data: {
+      labels: labelsHab,
+      datasets: [{
+        label: "Habilitados",
+        data: valoresHab,
+        backgroundColor: "rgba(250,204,21,0.72)",
+        borderColor: "rgba(250,204,21,1)",
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      ...baseOptions,
+      plugins: {
+        ...baseOptions.plugins,
+        valueLabels: {
+          color: "#fff7d6",
+          fontSize: 12
+        }
+      }
+    }
+  });
+}
+
+async function cargar() {
+  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  const data = await res.json();
+
+  actualizarGraficos(data);
+
+  const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
+  const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
+
+  const tbody = document.getElementById("lista-body");
+  tbody.innerHTML = "";
+
+  const claseOperativo = (valor) => {
+    return String(valor || "").toUpperCase() === "SI" ? "estado-si" : "estado-no";
+  };
+
+  data.forEach(v => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${v.codigo || ""}</td>
+      <td>${v.propiedad || ""}</td>
+      <td>${v.marca || ""}</td>
+      <td>${v.tipo || ""}</td>
+      <td>${v.modelo || ""}</td>
+      <td>${v.dominio || ""}</td>
+      <td>${v.anio || ""}</td>
+      <td>${v.motor || ""}</td>
+      <td>${v.chasis || ""}</td>
+      <td>${selectEditable(v.codigo, "sector", v.sector, opcionesSector)}</td>
+      <td>${selectEditable(v.codigo, "proyecto", v.proyecto, opcionesProyecto)}</td>
+      <td>
+        <select class="operativo-select ${claseOperativo(v.operativo)}" onchange="actualizarOperativo('${v.codigo}', this.value)">
+          <option value="SI" ${v.operativo === "SI" ? "selected" : ""}>SI</option>
+          <option value="NO" ${v.operativo === "NO" ? "selected" : ""}>NO</option>
+        </select>
+      </td>
+      <td>${selectHabilitacion(v.codigo, "habilitacion_pirquitas", v.habilitacion_pirquitas)}</td>
+      <td>${selectHabilitacion(v.codigo, "habilitacion_exar", v.habilitacion_exar)}</td>
+      <td>${selectHabilitacion(v.codigo, "habilitacion_sdj", v.habilitacion_sdj)}</td>
+      <td>${selectHabilitacion(v.codigo, "habilitacion_rincon", v.habilitacion_rincon)}</td>
+      <td>${selectHabilitacion(v.codigo, "habilitacion_arli", v.habilitacion_arli)}</td>
+      <td><button class="eliminar-btn" onclick="eliminar('${v.codigo}')">X</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function actualizarHabilitacionVehiculo(codigo, campo, valor) {
+  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ [campo]: valor })
+  });
+
+  cargar();
+}
+
+async function actualizarOperativo(codigo, operativo) {
+  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ operativo: operativo })
+  });
+
+  cargar();
+}
+
+async function actualizarCampoVehiculo(codigo, campo, valor) {
+  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ [campo]: valor })
+  });
+
+  cargar();
+}
+
+async function agregar() {
+  const codigo = document.getElementById("codigo").value;
+
+  // Verificar si el vehículo ya existe
+  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  const vehiculos = await res.json();
+
+  if (vehiculos.some(v => v.codigo === codigo)) {
+    alert("❌ El vehículo con código " + codigo + " ya existe en la base de datos");
+    return;
+  }
+
+  const vehiculo = {
+    codigo: codigo,
+    propiedad: document.getElementById("propiedad").value,
+    marca: document.getElementById("marca").value,
+    tipo: document.getElementById("tipo").value,
+    modelo: document.getElementById("modelo").value,
+    dominio: document.getElementById("dominio").value,
+    anio: document.getElementById("anio").value,
+    motor: document.getElementById("motor").value,
+    chasis: document.getElementById("chasis").value,
+    sector: document.getElementById("sector").value,
+    proyecto: document.getElementById("proyecto").value,
+    operativo: document.getElementById("operativo").value,
+    habilitacion_pirquitas: document.getElementById("habilitacion_pirquitas").value,
+    habilitacion_exar: document.getElementById("habilitacion_exar").value,
+    habilitacion_sdj: document.getElementById("habilitacion_sdj").value,
+    habilitacion_rincon: document.getElementById("habilitacion_rincon").value,
+    habilitacion_arli: document.getElementById("habilitacion_arli").value
+  };
+
+  await fetch("http://127.0.0.1:8000/vehiculos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(vehiculo)
+  });
+
+  document.getElementById("panel-form-vehiculos").style.display = "none";
+  cargar();
+}
+
+async function eliminar(codigo) {
+  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+    method: "DELETE"
+  });
+
+  cargar();
+}
+
+cargar();
+</script>
+
+</div>
+
+</body>
+</html>

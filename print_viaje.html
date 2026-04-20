@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Itinerario de Viaje</title>
+
+<style>
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  color: #000;
+  margin: 0;
+}
+
+.container {
+  width: 100%;
+}
+
+/* HEADER */
+.header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.header h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.header p {
+  margin: 2px 0;
+  font-size: 11px;
+}
+
+/* TABLAS */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+}
+
+.table td {
+  border: 1px solid #000;
+  padding: 4px;
+  vertical-align: middle;
+}
+
+.title {
+  background: #f2f2f2;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* CAMPOS */
+.label {
+  font-weight: bold;
+  width: 25%;
+}
+
+.value {
+  width: 25%;
+}
+
+/* FIRMAS */
+.signatures {
+  width: 100%;
+  margin-top: 30px;
+}
+
+.signatures td {
+  border: none;
+  text-align: center;
+  padding-top: 40px;
+}
+
+.line {
+  border-top: 1px solid #000;
+  margin-top: 5px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1>ITINERARIO DE VIAJE N° <span id="id"></span></h1>
+  <p><strong>SMG S.R.L.</strong></p>
+  <p>Santa Catalina Nº 551 - San Salvador de Jujuy</p>
+  <p>Fecha de emisión: <span id="fecha"></span></p>
+</div>
+
+<!-- DATOS DEL SOLICITANTE -->
+<table class="table">
+<tr><td colspan="4" class="title">DATOS DEL SOLICITANTE</td></tr>
+<tr>
+  <td class="label">Quién solicita</td>
+  <td class="value" id="solicitante"></td>
+  <td class="label">Área</td>
+  <td class="value" id="area"></td>
+</tr>
+</table>
+
+<!-- DATOS DEL VIAJE -->
+<table class="table">
+<tr><td colspan="4" class="title">DATOS DEL VIAJE</td></tr>
+<tr>
+  <td class="label">Partida</td>
+  <td id="origen"></td>
+  <td class="label">Destino</td>
+  <td id="destino"></td>
+</tr>
+<tr>
+  <td class="label">Motivo</td>
+  <td colspan="3" id="motivo"></td>
+</tr>
+<tr>
+  <td class="label">Fecha salida</td>
+  <td id="fsalida"></td>
+  <td class="label">Fecha regreso</td>
+  <td id="fregreso"></td>
+</tr>
+</table>
+
+<!-- RECURSOS HUMANOS -->
+<table class="table">
+<tr><td colspan="4" class="title">RECURSOS HUMANOS</td></tr>
+<tr>
+  <td class="label">Chofer</td>
+  <td id="chofer"></td>
+  <td class="label">Acompañantes</td>
+  <td id="acompanantes"></td>
+</tr>
+</table>
+
+<!-- VEHICULO -->
+<table class="table">
+<tr><td colspan="4" class="title">VEHÍCULO / EQUIPO</td></tr>
+<tr>
+  <td class="label">Vehículo</td>
+  <td id="vehiculo"></td>
+  <td class="label">Dominio</td>
+  <td id="dominio"></td>
+</tr>
+<tr>
+  <td class="label">Marca</td>
+  <td id="marca"></td>
+  <td class="label">Modelo</td>
+  <td id="modelo"></td>
+</tr>
+</table>
+
+<!-- ECONOMICOS -->
+<table class="table">
+<tr><td colspan="4" class="title">RECURSOS ECONÓMICOS</td></tr>
+<tr>
+  <td class="label">Viáticos ($)</td>
+  <td id="viaticos"></td>
+  <td class="label">Alojamiento</td>
+  <td id="alojamiento"></td>
+</tr>
+</table>
+
+<!-- FIRMAS -->
+<table class="signatures">
+<tr>
+<td>
+  <div class="line"></div>
+  Firma quien solicita
+</td>
+<td>
+  <div class="line"></div>
+  Firma quien aprueba
+</td>
+</tr>
+</table>
+
+</div>
+
+<script>
+const data = JSON.parse(localStorage.getItem("viaje_pdf"));
+
+if (data) {
+  document.getElementById("id").innerText = data.id || "";
+  document.getElementById("fecha").innerText = data.fecha || "";
+
+  document.getElementById("solicitante").innerText = data.solicitante || "";
+  document.getElementById("area").innerText = data.area || "";
+
+  document.getElementById("origen").innerText = data.origen || "";
+  document.getElementById("destino").innerText = data.destino || "";
+  document.getElementById("motivo").innerText = data.motivo || "";
+  document.getElementById("fsalida").innerText = data.fecha_salida || "";
+  document.getElementById("fregreso").innerText = data.fecha_regreso || "";
+
+  document.getElementById("chofer").innerText = data.chofer || "";
+  document.getElementById("acompanantes").innerText = data.acompanantes || "";
+
+  document.getElementById("vehiculo").innerText = data.vehiculo || "";
+  document.getElementById("dominio").innerText = data.dominio || "";
+  document.getElementById("marca").innerText = data.marca || "";
+  document.getElementById("modelo").innerText = data.modelo || "";
+
+  document.getElementById("viaticos").innerText = data.viaticos || "";
+  document.getElementById("alojamiento").innerText = data.alojamiento || "";
+}
+
+window.print();
+</script>
+
+</body>
+</html>

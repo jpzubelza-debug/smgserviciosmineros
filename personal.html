@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestión de Personal</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: #eef4ff;
+      padding: 20px;
+      position: relative;
+    }
+    .bg-photo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+    .bg-blur {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,0,150,0.18), transparent 55%),
+        radial-gradient(circle at 80% 70%, rgba(0,200,255,0.18), transparent 58%);
+    }
+    .page {
+      position: relative;
+      z-index: 2;
+      max-width: 1500px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .logo-corner {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 3;
+      padding: 0;
+    }
+    .logo-corner img {
+      display: block;
+      width: 195px;
+      max-width: 38vw;
+      height: auto;
+    }
+    .logo-box img {
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
+    }
+    h2 { text-align: center; color: #ffffff; }
+    .actions-bar { max-width: 600px; margin: 0 auto 10px; }
+    .actions-bar button { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .actions-bar button:hover { box-shadow: 0 0 12px rgba(59,130,246,0.6); transform: scale(1.05); }
+    .form-wrapper { display: none; }
+    .form-wrapper.open { display: block; }
+    form {
+      max-width: 600px;
+      margin: auto;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 8px;
+    }
+    input, select, button { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border-radius: 8px; }
+    input, select {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #eef4ff;
+    }
+    button {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover { box-shadow: 0 0 12px rgba(59,130,246,0.6); transform: scale(1.05); }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 14px 0 12px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .stat-title {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #dbeafe;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .kpi-pill {
+      background: rgba(15,23,42,0.38);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+    }
+    .kpi-alerta {
+      border: 1px solid rgba(255, 80, 80, 0.5);
+      box-shadow: 0 0 10px rgba(255, 80, 80, 0.3);
+    }
+    .kpi-label {
+      display: block;
+      font-size: 11px;
+      color: #dbeafe;
+      opacity: 0.88;
+    }
+    .kpi-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .chart-box {
+      position: relative;
+      height: 220px;
+    }
+    .chart-box canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .conclusion-card {
+      margin-top: 10px;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .conclusion {
+      background: rgba(0,0,0,0.2);
+      border-left: 3px solid #3b82f6;
+    }
+    .conclusion-title {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #f8fbff;
+      letter-spacing: 0.3px;
+    }
+    .conclusion-main {
+      margin: 0 0 10px;
+      color: #e6f0ff;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .conclusion-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #dbeafe;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .message { text-align: center; margin-top: 10px; color: #86efac; }
+
+    .tabla-personal-wrap {
+      margin-top: 20px;
+      max-height: 56vh;
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      background: rgba(255,255,255,0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.08);
+    }
+    th {
+      background: rgba(10, 24, 38, 0.82);
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.24);
+    }
+    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); }
+    tr:hover { background: rgba(255,255,255,0.08); }
+    .cell-select {
+      width: 100%;
+      min-width: 72px;
+      padding: 6px;
+      margin: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
+        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
+      background-position:
+        calc(100% - 14px) calc(50% - 3px),
+        calc(100% - 8px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 26px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="logo-corner logo-box">
+  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+</div>
+
+<div class="page">
+
+<h2>👥 Gestión de Personal</h2>
+
+<section class="stats-grid">
+  <article class="stat-card">
+    <h3 class="stat-title">Resumen General</h3>
+    <div class="kpi-row">
+      <div class="kpi-pill">
+        <span class="kpi-label">Total Personal</span>
+        <span id="kpi-total" class="kpi-value">0</span>
+      </div>
+      <div class="kpi-pill">
+        <span class="kpi-label">Con Alguna Habilitación</span>
+        <span id="kpi-con" class="kpi-value">0</span>
+      </div>
+      <div class="kpi-pill kpi-alerta">
+        <span class="kpi-label">Sin Habilitaciones</span>
+        <span id="kpi-sin" class="kpi-value">0</span>
+      </div>
+    </div>
+    <div class="chart-box"><canvas id="chart-resumen"></canvas></div>
+  </article>
+
+  <article class="stat-card">
+    <h3 class="stat-title">Habilitaciones SI por Proyecto</h3>
+    <div class="chart-box"><canvas id="chart-si"></canvas></div>
+  </article>
+
+  <article class="stat-card">
+    <h3 class="stat-title">Habilitaciones NO por Proyecto</h3>
+    <div class="chart-box"><canvas id="chart-no"></canvas></div>
+  </article>
+</section>
+
+<section class="conclusion-card conclusion">
+  <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
+  <p id="conclusion-main" class="conclusion-main">Cargando conclusión operativa...</p>
+  <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
+  <ul id="conclusion-list" class="conclusion-list"></ul>
+</section>
+
+<div class="actions-bar">
+  <button type="button" id="btn-cargar-empleado">Cargar empleados</button>
+</div>
+
+<div id="form-wrapper" class="form-wrapper">
+  <form id="form">
+    <input type="text" id="legajo" placeholder="N° de Legajo" required>
+    <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
+    <input type="text" id="cuil" placeholder="CUIL" required>
+
+    <select id="habilitacion_pirquitas">
+      <option value="">Habilitación Pirquitas</option>
+      <option value="SI">SI</option>
+      <option value="NO">NO</option>
+    </select>
+    <select id="habilitacion_exar">
+      <option value="">Habilitación Exar</option>
+      <option value="SI">SI</option>
+      <option value="NO">NO</option>
+    </select>
+    <select id="habilitacion_sdj">
+      <option value="">Habilitación SDJ</option>
+      <option value="SI">SI</option>
+      <option value="NO">NO</option>
+    </select>
+    <select id="habilitacion_rincon">
+      <option value="">Habilitación Rincón</option>
+      <option value="SI">SI</option>
+      <option value="NO">NO</option>
+    </select>
+    <select id="habilitacion_arli">
+      <option value="">Habilitación ARLI</option>
+      <option value="SI">SI</option>
+      <option value="NO">NO</option>
+    </select>
+
+    <button type="submit">Guardar</button>
+  </form>
+</div>
+
+<p class="message" id="mensaje"></p>
+
+<div class="tabla-personal-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Legajo</th>
+        <th>Empleado</th>
+        <th>CUIL</th>
+        <th>Pirquitas</th>
+        <th>Exar</th>
+        <th>SDJ</th>
+        <th>Rincón</th>
+        <th>ARLI</th>
+      </tr>
+    </thead>
+    <tbody id="personal-body"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const formWrapper = document.getElementById("form-wrapper");
+const btnCargarEmpleado = document.getElementById("btn-cargar-empleado");
+let chartResumen;
+let chartSi;
+let chartNo;
+
+const camposHabilitacion = [
+  { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
+  { etiqueta: "Exar", campo: "habilitacion_exar" },
+  { etiqueta: "SDJ", campo: "habilitacion_sdj" },
+  { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+  { etiqueta: "ARLI", campo: "habilitacion_arli" }
+];
+
+function actualizarTextoBotonCarga() {
+  btnCargarEmpleado.textContent = formWrapper.classList.contains("open") ? "Ocultar carga" : "Cargar empleados";
+}
+
+function toggleFormularioEmpleado() {
+  formWrapper.classList.toggle("open");
+  actualizarTextoBotonCarga();
+}
+
+function minimizarFormularioEmpleado() {
+  formWrapper.classList.remove("open");
+  actualizarTextoBotonCarga();
+}
+
+btnCargarEmpleado.addEventListener("click", toggleFormularioEmpleado);
+
+function escapeHtml(texto) {
+  return (texto || "")
+    .toString()
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function valorSN(valor) {
+  return String(valor || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+}
+
+function selectHabilitacion(legajo, campo, valorActual) {
+  const valor = valorSN(valorActual);
+  const selectedSi = valor === "SI" ? "selected" : "";
+  const selectedNo = valor === "NO" ? "selected" : "";
+  return `
+    <select class="cell-select" onchange="actualizarHabilitacion('${escapeHtml(legajo)}', '${campo}', this.value)">
+      <option value="SI" ${selectedSi}>SI</option>
+      <option value="NO" ${selectedNo}>NO</option>
+    </select>
+  `;
+}
+
+function construirResumenPersonal(data) {
+  const total = data.length;
+
+  const conteoSiPorProyecto = {};
+  const conteoNoPorProyecto = {};
+  camposHabilitacion.forEach(h => {
+    conteoSiPorProyecto[h.etiqueta] = 0;
+    conteoNoPorProyecto[h.etiqueta] = 0;
+  });
+
+  let conAlguna = 0;
+  let totalSiChecks = 0;
+
+  data.forEach(p => {
+    let tieneAlguna = false;
+    camposHabilitacion.forEach(h => {
+      const v = valorSN(p[h.campo]);
+      if (v === "SI") {
+        conteoSiPorProyecto[h.etiqueta] += 1;
+        totalSiChecks += 1;
+        tieneAlguna = true;
+      } else {
+        conteoNoPorProyecto[h.etiqueta] += 1;
+      }
+    });
+    if (tieneAlguna) {
+      conAlguna += 1;
+    }
+  });
+
+  const sinHabilitaciones = total - conAlguna;
+  const totalChecks = total * camposHabilitacion.length;
+  const pctCobertura = totalChecks > 0 ? Math.round((totalSiChecks / totalChecks) * 100) : 0;
+
+  let proyectoPrincipal = "SIN DATO";
+  let maxSi = -1;
+  Object.keys(conteoSiPorProyecto).forEach(k => {
+    if (conteoSiPorProyecto[k] > maxSi) {
+      maxSi = conteoSiPorProyecto[k];
+      proyectoPrincipal = k;
+    }
+  });
+
+  return {
+    total,
+    con_alguna: conAlguna,
+    sin_habilitaciones: sinHabilitaciones,
+    pct_cobertura: pctCobertura,
+    proyecto_principal: proyectoPrincipal,
+    si_por_proyecto: conteoSiPorProyecto,
+    no_por_proyecto: conteoNoPorProyecto
+  };
+}
+
+function renderGraficosPersonal(resumen) {
+  document.getElementById("kpi-total").textContent = resumen.total;
+  document.getElementById("kpi-con").textContent = resumen.con_alguna;
+  document.getElementById("kpi-sin").textContent = resumen.sin_habilitaciones;
+
+  if (typeof Chart === "undefined") {
+    return;
+  }
+
+  if (chartResumen) chartResumen.destroy();
+  chartResumen = new Chart(document.getElementById("chart-resumen"), {
+    type: "doughnut",
+    data: {
+      labels: ["Con alguna habilitación", "Sin habilitaciones"],
+      datasets: [{
+        data: [resumen.con_alguna, resumen.sin_habilitaciones],
+        backgroundColor: ["rgba(34,197,94,0.82)", "rgba(239,68,68,0.82)"],
+        borderColor: ["rgba(34,197,94,1)", "rgba(239,68,68,1)"],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#e2e8f0",
+            font: { size: 12, family: "Arial" }
+          }
+        }
+      }
+    }
+  });
+
+  const labels = Object.keys(resumen.si_por_proyecto);
+  const valoresSi = labels.map(k => resumen.si_por_proyecto[k]);
+  const valoresNo = labels.map(k => resumen.no_por_proyecto[k]);
+
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: "#e2e8f0",
+          font: { size: 12, family: "Arial" }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: "#dbeafe", font: { family: "Arial" } },
+        grid: { color: "rgba(255,255,255,0.12)" }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: "#dbeafe", precision: 0, font: { family: "Arial" } },
+        grid: { color: "rgba(255,255,255,0.12)" }
+      }
+    }
+  };
+
+  if (chartSi) chartSi.destroy();
+  chartSi = new Chart(document.getElementById("chart-si"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "SI",
+        data: valoresSi,
+        backgroundColor: "rgba(56,189,248,0.72)",
+        borderColor: "rgba(56,189,248,1)",
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: baseOptions
+  });
+
+  if (chartNo) chartNo.destroy();
+  chartNo = new Chart(document.getElementById("chart-no"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "NO",
+        data: valoresNo,
+        backgroundColor: "rgba(250,204,21,0.72)",
+        borderColor: "rgba(250,204,21,1)",
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: baseOptions
+  });
+}
+
+function generarConclusionLocal(resumen) {
+  let texto = "";
+  if (resumen.pct_cobertura < 50) {
+    texto += "Cobertura de habilitaciones baja para la dotación actual. ";
+  }
+  if (resumen.sin_habilitaciones > resumen.con_alguna) {
+    texto += "Predomina personal sin habilitaciones registradas. ";
+  }
+  if (!texto) {
+    texto = "La dotación presenta un nivel de habilitación aceptable para la operación.";
+  }
+  return texto.trim();
+}
+
+async function obtenerConclusionIA(resumen) {
+  const res = await fetch("/analisis_personal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(resumen)
+  });
+  if (!res.ok) throw new Error("No disponible");
+  const body = await res.json();
+  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) {
+    throw new Error("Respuesta invalida");
+  }
+  return body.conclusion.trim();
+}
+
+async function actualizarConclusiones(resumen) {
+  let conclusion = generarConclusionLocal(resumen);
+  let fuente = "Fuente: motor local de reglas";
+
+  try {
+    conclusion = await obtenerConclusionIA(resumen);
+    fuente = "Fuente: IA backend (/analisis_personal)";
+  } catch (error) {
+    // fallback local
+  }
+
+  const recomendaciones = [
+    `Total personal: ${resumen.total}. Con habilitación: ${resumen.con_alguna}. Sin habilitaciones: ${resumen.sin_habilitaciones}.`,
+    `Cobertura global de habilitaciones: ${resumen.pct_cobertura}%.`,
+    `Proyecto con mayor dotación habilitada: ${resumen.proyecto_principal}.`
+  ];
+  if (resumen.pct_cobertura < 50) {
+    recomendaciones.push("Reforzar carga documental y regularización de habilitaciones críticas.");
+  }
+  if (resumen.sin_habilitaciones > 0) {
+    recomendaciones.push("Priorizar plan de habilitación para personal sin cobertura.");
+  }
+
+  document.getElementById("conclusion-main").textContent = conclusion;
+  document.getElementById("conclusion-source").textContent = fuente;
+  document.getElementById("conclusion-list").innerHTML = recomendaciones
+    .map(item => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+}
+
+async function actualizarHabilitacion(legajo, campo, valor) {
+  const mensaje = document.getElementById("mensaje");
+
+  try {
+    const res = await fetch(`http://127.0.0.1:8000/personal/${encodeURIComponent(legajo)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [campo]: valor })
+    });
+
+    const result = await res.json();
+    if (result.error) {
+      mensaje.style.color = "#fca5a5";
+      mensaje.textContent = result.error;
+      return;
+    }
+
+    mensaje.style.color = "#86efac";
+    mensaje.textContent = `Habilitación actualizada (${legajo})`;
+    cargarPersonal();
+  } catch (error) {
+    console.error("Error actualizando habilitación:", error);
+    mensaje.style.color = "#fca5a5";
+    mensaje.textContent = "No se pudo actualizar la habilitación";
+  }
+}
+
+async function cargarPersonal() {
+  try {
+    const res = await fetch("http://127.0.0.1:8000/personal");
+    const data = await res.json();
+
+    const tbody = document.getElementById("personal-body");
+    tbody.innerHTML = "";
+
+    data.forEach(p => {
+      const fila = document.createElement("tr");
+      const legajo = p.legajo || "";
+      fila.innerHTML = `
+        <td>${escapeHtml(legajo)}</td>
+        <td>${escapeHtml(p.nombre || "")}</td>
+        <td>${escapeHtml(p.cuil || "")}</td>
+        <td>${selectHabilitacion(legajo, "habilitacion_pirquitas", p.habilitacion_pirquitas || "NO")}</td>
+        <td>${selectHabilitacion(legajo, "habilitacion_exar", p.habilitacion_exar || "NO")}</td>
+        <td>${selectHabilitacion(legajo, "habilitacion_sdj", p.habilitacion_sdj || "NO")}</td>
+        <td>${selectHabilitacion(legajo, "habilitacion_rincon", p.habilitacion_rincon || "NO")}</td>
+        <td>${selectHabilitacion(legajo, "habilitacion_arli", p.habilitacion_arli || "NO")}</td>
+      `;
+      tbody.appendChild(fila);
+    });
+
+    const resumen = construirResumenPersonal(data);
+    renderGraficosPersonal(resumen);
+    actualizarConclusiones(resumen);
+
+  } catch (error) {
+    console.error("Error cargando personal:", error);
+  }
+}
+
+document.getElementById("form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const empleado = {
+    legajo: document.getElementById("legajo").value,
+    nombre: document.getElementById("nombre").value,
+    cuil: document.getElementById("cuil").value,
+    habilitacion_pirquitas: document.getElementById("habilitacion_pirquitas").value,
+    habilitacion_exar: document.getElementById("habilitacion_exar").value,
+    habilitacion_sdj: document.getElementById("habilitacion_sdj").value,
+    habilitacion_rincon: document.getElementById("habilitacion_rincon").value,
+    habilitacion_arli: document.getElementById("habilitacion_arli").value
+  };
+
+  const res = await fetch("http://127.0.0.1:8000/personal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(empleado)
+  });
+
+  const result = await res.json();
+  const mensaje = document.getElementById("mensaje");
+
+  if (result.error) {
+    mensaje.style.color = "#fca5a5";
+    mensaje.textContent = result.error;
+    return;
+  }
+
+  mensaje.style.color = "#86efac";
+  mensaje.textContent = "Empleado agregado correctamente.";
+  document.getElementById("form").reset();
+  minimizarFormularioEmpleado();
+  cargarPersonal();
+});
+
+cargarPersonal().catch(err => {
+  const mensaje = document.getElementById("mensaje");
+  mensaje.style.color = "#fca5a5";
+  mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté en http://127.0.0.1:8000";
+  console.error(err);
+});
+</script>
+
+</div>
+
+</body>
+</html>
