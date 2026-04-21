@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -171,12 +171,12 @@
   <label>Solicitante</label>
   <input type="text" id="solicitante" placeholder="Solicitante" required>
 
-  <label>Área</label>
+  <label>Ãrea</label>
   <input type="text" id="area" list="areas" required>
   <datalist id="areas">
     <option value="Mantenimiento">
     <option value="Operaciones">
-    <option value="Logística">
+    <option value="LogÃ­stica">
   </datalist>
 
   <label>Origen</label>
@@ -188,7 +188,7 @@
     <option value="Pirquitas">
     <option value="Exar">
     <option value="SDJ">
-    <option value="Rincón">
+    <option value="RincÃ³n">
     <option value="ARLI">
   </datalist>
 
@@ -263,7 +263,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
       fecha_regreso: fechaRegreso
     };
 
-    const res = await fetch("http://127.0.0.1:8000/viajes", {
+    const res = await fetch("/viajes", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -274,7 +274,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     const result = await res.json();
 
     document.getElementById("mensaje").innerText =
-      "✅ Viaje creado correctamente (ID: " + result.id + ")";
+      "âœ… Viaje creado correctamente (ID: " + result.id + ")";
 
     document.getElementById("form").reset();
 

@@ -1,7 +1,7 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
-  <title>Gestión de Vehículos</title>
+  <title>GestiÃ³n de VehÃ­culos</title>
   <style>
     body {
       margin: 0;
@@ -262,7 +262,7 @@
 <div class="bg-blur"></div>
 <div class="page">
 
-<h2>🚛 Vehículos</h2>
+<h2>ðŸš› VehÃ­culos</h2>
 
 <section class="stats-grid">
   <article class="stat-card">
@@ -290,7 +290,7 @@
   </article>
 
   <article class="stat-card">
-    <h3 class="stat-title">Vehículos por Proyecto</h3>
+    <h3 class="stat-title">VehÃ­culos por Proyecto</h3>
     <div class="chart-box">
       <canvas id="chart-proyectos"></canvas>
     </div>
@@ -307,7 +307,7 @@
 <section class="conclusion-card conclusion">
   <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
   <p id="conclusion-main" class="conclusion-main">
-    Cargando conclusión operativa...
+    Cargando conclusiÃ³n operativa...
   </p>
   <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
   <ul id="conclusion-list" class="conclusion-list"></ul>
@@ -317,13 +317,13 @@
 
 <div id="panel-form-vehiculos" class="panel-form">
 
-<input id="codigo" placeholder="Código">
+<input id="codigo" placeholder="CÃ³digo">
 <input id="propiedad" placeholder="Propiedad">
 <input id="marca" placeholder="Marca">
 <input id="tipo" placeholder="Tipo">
 <input id="modelo" placeholder="Modelo">
 <input id="dominio" placeholder="Dominio">
-<input id="anio" placeholder="Año">
+<input id="anio" placeholder="AÃ±o">
 <input id="motor" placeholder="Motor">
 <input id="chasis" placeholder="Chasis">
 <input id="sector" placeholder="Sector">
@@ -332,7 +332,7 @@
   <option value="Pirquitas">Pirquitas</option>
   <option value="Exar">Exar</option>
   <option value="SDJ">SDJ</option>
-  <option value="Rincón">Rincón</option>
+  <option value="RincÃ³n">RincÃ³n</option>
   <option value="ARLI">ARLI</option>
 </select>
 
@@ -342,28 +342,28 @@
 </select>
 
 <select id="habilitacion_pirquitas">
-  <option value="NO" selected>Habilitación Pirquitas: NO</option>
-  <option value="SI">Habilitación Pirquitas: SI</option>
+  <option value="NO" selected>HabilitaciÃ³n Pirquitas: NO</option>
+  <option value="SI">HabilitaciÃ³n Pirquitas: SI</option>
 </select>
 
 <select id="habilitacion_exar">
-  <option value="NO" selected>Habilitación Exar: NO</option>
-  <option value="SI">Habilitación Exar: SI</option>
+  <option value="NO" selected>HabilitaciÃ³n Exar: NO</option>
+  <option value="SI">HabilitaciÃ³n Exar: SI</option>
 </select>
 
 <select id="habilitacion_sdj">
-  <option value="NO" selected>Habilitación SDJ: NO</option>
-  <option value="SI">Habilitación SDJ: SI</option>
+  <option value="NO" selected>HabilitaciÃ³n SDJ: NO</option>
+  <option value="SI">HabilitaciÃ³n SDJ: SI</option>
 </select>
 
 <select id="habilitacion_rincon">
-  <option value="NO" selected>Habilitación Rincón: NO</option>
-  <option value="SI">Habilitación Rincón: SI</option>
+  <option value="NO" selected>HabilitaciÃ³n RincÃ³n: NO</option>
+  <option value="SI">HabilitaciÃ³n RincÃ³n: SI</option>
 </select>
 
 <select id="habilitacion_arli">
-  <option value="NO" selected>Habilitación ARLI: NO</option>
-  <option value="SI">Habilitación ARLI: SI</option>
+  <option value="NO" selected>HabilitaciÃ³n ARLI: NO</option>
+  <option value="SI">HabilitaciÃ³n ARLI: SI</option>
 </select>
 
 <button onclick="agregar()">Guardar</button>
@@ -375,13 +375,13 @@
   <table id="lista">
     <thead>
       <tr>
-        <th>Código</th>
+        <th>CÃ³digo</th>
         <th>Propiedad</th>
         <th>Marca</th>
         <th>Tipo</th>
         <th>Modelo</th>
         <th>Dominio</th>
-        <th>Año</th>
+        <th>AÃ±o</th>
         <th>Motor</th>
         <th>Chasis</th>
         <th>Sector</th>
@@ -390,9 +390,9 @@
         <th>Pirquitas</th>
         <th>Exar</th>
         <th>SDJ</th>
-        <th>Rincón</th>
+        <th>RincÃ³n</th>
         <th>ARLI</th>
-        <th>Acción</th>
+        <th>AcciÃ³n</th>
       </tr>
     </thead>
     <tbody id="lista-body"></tbody>
@@ -614,7 +614,7 @@ function generarConclusion(data) {
   let texto = "";
 
   if (data.flota < 60) {
-    texto += "⚠️ Baja disponibilidad de flota. ";
+    texto += "âš ï¸ Baja disponibilidad de flota. ";
   }
 
   if (data.no_operativos > data.operativos) {
@@ -622,11 +622,11 @@ function generarConclusion(data) {
   }
 
   if (data.proyecto_principal === "TALLER" || data.sector_principal === "TALLER") {
-    texto += "Alta concentración en Taller. ";
+    texto += "Alta concentraciÃ³n en Taller. ";
   }
 
   if (!texto) {
-    texto = "Operación estable con indicadores controlados y disponibilidad de flota adecuada.";
+    texto = "OperaciÃ³n estable con indicadores controlados y disponibilidad de flota adecuada.";
   }
 
   return texto.trim();
@@ -676,15 +676,15 @@ async function actualizarConclusiones(data) {
 
   const recomendaciones = [
     `Total equipos: ${resumen.total}. Operativos: ${resumen.operativos}. No operativos: ${resumen.no_operativos}.`,
-    `Mayor concentración en proyecto ${resumen.proyecto_principal} (${resumen.proyecto_top_cantidad} equipos, ${resumen.proyecto_top_pct}% del total).`,
-    `Nivel global de habilitaciones: ${resumen.pct_habilitaciones}% sobre los checks de Pirquitas, Exar, SDJ, Rincón y ARLI.`
+    `Mayor concentraciÃ³n en proyecto ${resumen.proyecto_principal} (${resumen.proyecto_top_cantidad} equipos, ${resumen.proyecto_top_pct}% del total).`,
+    `Nivel global de habilitaciones: ${resumen.pct_habilitaciones}% sobre los checks de Pirquitas, Exar, SDJ, RincÃ³n y ARLI.`
   ];
 
   if (resumen.no_operativos > resumen.operativos) {
-    recomendaciones.push("La cantidad de no operativos supera a los operativos: activar plan de recuperación de flota de corto plazo.");
+    recomendaciones.push("La cantidad de no operativos supera a los operativos: activar plan de recuperaciÃ³n de flota de corto plazo.");
   }
   if (resumen.pct_habilitaciones < 50) {
-    recomendaciones.push("El nivel de habilitaciones es bajo: revisar documentación, vencimientos y gestión por proyecto.");
+    recomendaciones.push("El nivel de habilitaciones es bajo: revisar documentaciÃ³n, vencimientos y gestiÃ³n por proyecto.");
   }
 
   const main = document.getElementById("conclusion-main");
@@ -753,7 +753,7 @@ function actualizarGraficos(data) {
     data: {
       labels: labelsProyectos,
       datasets: [{
-        label: "Vehículos",
+        label: "VehÃ­culos",
         data: valoresProyectos,
         backgroundColor: "rgba(56,189,248,0.7)",
         borderColor: "rgba(56,189,248,1)",
@@ -777,7 +777,7 @@ function actualizarGraficos(data) {
     { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
     { etiqueta: "Exar", campo: "habilitacion_exar" },
     { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-    { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+    { etiqueta: "RincÃ³n", campo: "habilitacion_rincon" },
     { etiqueta: "ARLI", campo: "habilitacion_arli" }
   ];
   const labelsHab = habilitaciones.map(h => h.etiqueta);
@@ -816,13 +816,13 @@ function actualizarGraficos(data) {
 }
 
 async function cargar() {
-  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  const res = await fetch("/vehiculos");
   const data = await res.json();
 
   actualizarGraficos(data);
 
   const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
-  const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
+  const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "RincÃ³n", "ARLI", "GEMAR", "VIAP"];
 
   const tbody = document.getElementById("lista-body");
   tbody.innerHTML = "";
@@ -864,7 +864,7 @@ async function cargar() {
 }
 
 async function actualizarHabilitacionVehiculo(codigo, campo, valor) {
-  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+  await fetch(`/vehiculos/${codigo}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -876,7 +876,7 @@ async function actualizarHabilitacionVehiculo(codigo, campo, valor) {
 }
 
 async function actualizarOperativo(codigo, operativo) {
-  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+  await fetch(`/vehiculos/${codigo}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -888,7 +888,7 @@ async function actualizarOperativo(codigo, operativo) {
 }
 
 async function actualizarCampoVehiculo(codigo, campo, valor) {
-  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+  await fetch(`/vehiculos/${codigo}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -902,12 +902,12 @@ async function actualizarCampoVehiculo(codigo, campo, valor) {
 async function agregar() {
   const codigo = document.getElementById("codigo").value;
 
-  // Verificar si el vehículo ya existe
-  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  // Verificar si el vehÃ­culo ya existe
+  const res = await fetch("/vehiculos");
   const vehiculos = await res.json();
 
   if (vehiculos.some(v => v.codigo === codigo)) {
-    alert("❌ El vehículo con código " + codigo + " ya existe en la base de datos");
+    alert("âŒ El vehÃ­culo con cÃ³digo " + codigo + " ya existe en la base de datos");
     return;
   }
 
@@ -931,7 +931,7 @@ async function agregar() {
     habilitacion_arli: document.getElementById("habilitacion_arli").value
   };
 
-  await fetch("http://127.0.0.1:8000/vehiculos", {
+  await fetch("/vehiculos", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -944,7 +944,7 @@ async function agregar() {
 }
 
 async function eliminar(codigo) {
-  await fetch(`http://127.0.0.1:8000/vehiculos/${codigo}`, {
+  await fetch(`/vehiculos/${codigo}`, {
     method: "DELETE"
   });
 
@@ -958,3 +958,4 @@ cargar();
 
 </body>
 </html>
+

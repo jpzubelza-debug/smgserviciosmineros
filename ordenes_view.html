@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -652,7 +652,7 @@ function renderAcompanantesConViaticos(recursos) {
   if (acomp.length === 0) {
     return `
       <div class="viaticos-row">
-        <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompañante">
+        <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompaÃ±ante">
         <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
         <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
       </div>
@@ -662,7 +662,7 @@ function renderAcompanantesConViaticos(recursos) {
   return acomp
     .map((nombre) => `
       <div class="viaticos-row">
-        <input type="text" class="nombre-editable" value="${esc(nombre || "")}" placeholder="Nombre del acompañante">
+        <input type="text" class="nombre-editable" value="${esc(nombre || "")}" placeholder="Nombre del acompaÃ±ante">
         <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
         <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
       </div>
@@ -679,7 +679,7 @@ function agregarAcompanante() {
   const fila = document.createElement("div");
   fila.className = "viaticos-row";
   fila.innerHTML = `
-    <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompañante">
+    <input type="text" class="nombre-editable" value="" placeholder="Nombre del acompaÃ±ante">
     <input type="number" min="0" step="0.01" class="viatico-acompanante" value="0.00">
     <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)">Quitar</button>
   `;
@@ -743,9 +743,9 @@ function renderDatosAsignacion(recursos) {
       </div>
 
       <div class="asignacion-field asignacion-span-2">
-        <label>Acompañantes y Viaticos</label>
+        <label>AcompaÃ±antes y Viaticos</label>
         <div id="lista-acompanantes-editable" class="viaticos-list">${renderAcompanantesConViaticos(recursos)}</div>
-        <button type="button" class="btn-add-acomp" onclick="agregarAcompanante()">+ Agregar Acompañante</button>
+        <button type="button" class="btn-add-acomp" onclick="agregarAcompanante()">+ Agregar AcompaÃ±ante</button>
       </div>
 
       <div class="asignacion-field">
@@ -775,7 +775,7 @@ function renderDatosAsignacion(recursos) {
       </div>
 
       <div class="asignacion-field">
-        <label>Comprobación Taller</label>
+        <label>ComprobaciÃ³n Taller</label>
         <select id="asig-comp-taller">
           <option value="SI" ${(comp.taller || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.taller || "") === "NO" ? "selected" : ""}>NO</option>
@@ -784,7 +784,7 @@ function renderDatosAsignacion(recursos) {
       </div>
 
       <div class="asignacion-field">
-        <label>Comprobación RRHH</label>
+        <label>ComprobaciÃ³n RRHH</label>
         <select id="asig-comp-rrhh">
           <option value="SI" ${(comp.rrhh || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.rrhh || "") === "NO" ? "selected" : ""}>NO</option>
@@ -793,7 +793,7 @@ function renderDatosAsignacion(recursos) {
       </div>
 
       <div class="asignacion-field">
-        <label>Comprobación Administración</label>
+        <label>ComprobaciÃ³n AdministraciÃ³n</label>
         <select id="asig-comp-admin">
           <option value="SI" ${(comp.administracion || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.administracion || "") === "NO" ? "selected" : ""}>NO</option>
@@ -802,7 +802,7 @@ function renderDatosAsignacion(recursos) {
       </div>
 
       <div class="asignacion-field">
-        <label>Comprobación Logística y Operaciones</label>
+        <label>ComprobaciÃ³n LogÃ­stica y Operaciones</label>
         <select id="asig-comp-logistica">
           <option value="SI" ${(comp.logistica_operaciones || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.logistica_operaciones || "") === "NO" ? "selected" : ""}>NO</option>
@@ -962,7 +962,7 @@ async function guardarCierreLogistica() {
 
   if (!orden || !orden.nro_orden) {
     if (msg) {
-      msg.textContent = "No hay una Orden de Salida válida seleccionada.";
+      msg.textContent = "No hay una Orden de Salida vÃ¡lida seleccionada.";
     }
     return;
   }
@@ -982,10 +982,10 @@ async function guardarCierreLogistica() {
 
   try {
     if (msg) {
-      msg.textContent = "Guardando cierre logístico...";
+      msg.textContent = "Guardando cierre logÃ­stico...";
     }
 
-    const res = await fetch(`http://127.0.0.1:8000/ordenes/${encodeURIComponent(orden.nro_orden)}/cierre`, {
+    const res = await fetch(`/ordenes/${encodeURIComponent(orden.nro_orden)}/cierre`, {
       method: "POST",
       body: formData,
     });
@@ -999,7 +999,7 @@ async function guardarCierreLogistica() {
     }
 
     if (msg) {
-      msg.textContent = "Cierre logístico guardado correctamente.";
+      msg.textContent = "Cierre logÃ­stico guardado correctamente.";
     }
 
     await cargarOrdenes();
@@ -1011,7 +1011,7 @@ async function guardarCierreLogistica() {
     }
   } catch (error) {
     if (msg) {
-      msg.textContent = "No se pudo guardar el cierre logístico.";
+      msg.textContent = "No se pudo guardar el cierre logÃ­stico.";
     }
     console.error(error);
   }
@@ -1044,7 +1044,7 @@ function renderOrdenSeleccionada(orden) {
       </div>
 
       <div class="bloque">
-        <h3>Datos de la Asignación</h3>
+        <h3>Datos de la AsignaciÃ³n</h3>
         ${renderDatosAsignacion(recursos)}
       </div>
 
@@ -1139,7 +1139,7 @@ function poblarSelector(ordenes) {
 }
 
 async function cargarOrdenes() {
-  const res = await fetch("http://127.0.0.1:8000/ordenes");
+  const res = await fetch("/ordenes");
   const ordenes = await res.json();
 
   ordenesCache = Array.isArray(ordenes) ? ordenes.slice().reverse() : [];
@@ -1162,3 +1162,4 @@ cargarOrdenes().catch((err) => {
 </script>
 </body>
 </html>
+

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -345,12 +345,12 @@
 
   <div class="section-title">Acompanantes y viaticos</div>
   <div class="acomp-actions">
-    <button class="btn-small" type="button" id="btn-add-acomp">+ Agregar acompañante</button>
+    <button class="btn-small" type="button" id="btn-add-acomp">+ Agregar acompaÃ±ante</button>
   </div>
   <div id="acompanantes-container"></div>
 
   <label>Total Viaticos</label>
-  <input type="number" id="viaticos" placeholder="Viáticos" min="0" step="0.01" readonly>
+  <input type="number" id="viaticos" placeholder="ViÃ¡ticos" min="0" step="0.01" readonly>
 
   <datalist id="lista-acompanantes"></datalist>
 
@@ -454,8 +454,8 @@ function actualizarListasPersonal() {
 
 async function cargarViajes() {
   const [resViajes, resOrdenes] = await Promise.all([
-    fetch("http://127.0.0.1:8000/viajes"),
-    fetch("http://127.0.0.1:8000/ordenes")
+    fetch("/viajes"),
+    fetch("/ordenes")
   ]);
   const data = await resViajes.json();
   const ordenes = await resOrdenes.json();
@@ -530,7 +530,7 @@ function crearFilaAcompanante(nombre = "", viatico = "") {
   if (cantidadActual >= MAX_ACOMPANANTES) {
     const mensaje = document.getElementById("mensaje");
     mensaje.style.color = "#ffb3b3";
-    mensaje.textContent = `Máximo ${MAX_ACOMPANANTES} acompañantes.`;
+    mensaje.textContent = `MÃ¡ximo ${MAX_ACOMPANANTES} acompaÃ±antes.`;
     return;
   }
 
@@ -539,7 +539,7 @@ function crearFilaAcompanante(nombre = "", viatico = "") {
   fila.innerHTML = `
     <div>
       <label>Acompanante</label>
-      <input type="text" class="input-acomp" list="lista-acompanantes" placeholder="Nombre del acompañante" value="${nombre}">
+      <input type="text" class="input-acomp" list="lista-acompanantes" placeholder="Nombre del acompaÃ±ante" value="${nombre}">
     </div>
     <div>
       <label>Viatico</label>
@@ -611,7 +611,7 @@ function generarPDF(data, nroOrden) {
 }
 
 async function cargarVehiculos() {
-  const res = await fetch("http://127.0.0.1:8000/vehiculos");
+  const res = await fetch("/vehiculos");
   const data = await res.json();
 
   const listaVehiculos = document.getElementById("lista-vehiculos");
@@ -629,7 +629,7 @@ async function cargarVehiculos() {
 }
 
 async function cargarChoferes() {
-  const res = await fetch("http://127.0.0.1:8000/personal");
+  const res = await fetch("/personal");
   personalData = await res.json();
   actualizarListasPersonal();
 }
@@ -697,7 +697,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
       }
     };
 
-    const res = await fetch("http://127.0.0.1:8000/recursos", {
+    const res = await fetch("/recursos", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

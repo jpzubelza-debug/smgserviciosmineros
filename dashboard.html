@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -628,7 +628,7 @@ canvas {
 
       <div id="conclusion" class="conclusion"></div>
 
-      <h3 class="section-title">Vehículos y Equipos</h3>
+      <h3 class="section-title">VehÃ­culos y Equipos</h3>
 
       <div class="kpi-grid" id="vehiculos-kpi-grid">
         <article class="kpi-card card">
@@ -676,11 +676,11 @@ canvas {
         <article class="kpi-card card">
           <p>Total Personal</p>
           <h3 id="kpiPerTotal">0</h3>
-          <small>Dotación registrada</small>
+          <small>DotaciÃ³n registrada</small>
         </article>
 
         <article class="kpi-card card">
-          <p>Con Habilitación</p>
+          <p>Con HabilitaciÃ³n</p>
           <h3 id="kpiPerCon">0</h3>
           <small>Al menos una en SI</small>
         </article>
@@ -780,7 +780,7 @@ Chart.defaults.color = "#eef4ff";
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 
 function ir(ruta) {
-  window.location.href = "http://127.0.0.1:8000" + ruta;
+  window.location.href = "" + ruta;
 }
 
 function configurarLogo() {
@@ -793,7 +793,7 @@ function configurarLogo() {
     "/Imagenes/09-smg.png",
     "Imagenes/09-smg.png",
     "./Imagenes/09-smg.png",
-    "http://127.0.0.1:8000/Imagenes/09-smg.png"
+    "/Imagenes/09-smg.png"
   ];
 
   let indiceRuta = 0;
@@ -815,7 +815,7 @@ function configurarFondoDashboard() {
     "/Imagenes/fondo_de_pantalla_dashboard.PNG",
     "Imagenes/fondo_de_pantalla_dashboard.PNG",
     "./Imagenes/fondo_de_pantalla_dashboard.PNG",
-    "http://127.0.0.1:8000/Imagenes/fondo_de_pantalla_dashboard.PNG"
+    "/Imagenes/fondo_de_pantalla_dashboard.PNG"
   ];
 
   const probar = (idx) => {
@@ -1017,7 +1017,7 @@ async function actualizarEstadoViaje(idViaje, nuevoEstado) {
   status.textContent = `Actualizando solicitud ${idViaje} a ${nuevoEstado}...`;
 
   try {
-    const res = await fetch(`http://127.0.0.1:8000/estado/${idViaje}?estado=${encodeURIComponent(nuevoEstado)}`, {
+    const res = await fetch(`/estado/${idViaje}?estado=${encodeURIComponent(nuevoEstado)}`, {
       method: "PUT"
     });
     const result = await res.json();
@@ -1291,7 +1291,7 @@ function construirResumenVehiculos(vehiculos) {
   const noOperativos = total - operativos;
   const flota = total > 0 ? Math.round((operativos / total) * 100) : 0;
 
-  const proyectos = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP", "SIN DATO"];
+  const proyectos = ["Pirquitas", "Exar", "SDJ", "RincÃ³n", "ARLI", "GEMAR", "VIAP", "SIN DATO"];
   const porProyecto = {};
   proyectos.forEach(p => { porProyecto[p] = 0; });
 
@@ -1307,7 +1307,7 @@ function construirResumenVehiculos(vehiculos) {
     { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
     { etiqueta: "Exar", campo: "habilitacion_exar" },
     { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-    { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+    { etiqueta: "RincÃ³n", campo: "habilitacion_rincon" },
     { etiqueta: "ARLI", campo: "habilitacion_arli" }
   ];
 
@@ -1434,7 +1434,7 @@ async function obtenerConclusionVehiculos(resumen) {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/analisis_vehiculos", {
+    const res = await fetch("/analisis_vehiculos", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1444,7 +1444,7 @@ async function obtenerConclusionVehiculos(resumen) {
     const data = await res.json();
     caja.innerText = data.conclusion || "Flota estable sin alertas relevantes.";
   } catch (error) {
-    caja.innerText = "No se pudo obtener la conclusión de Vehículos y Equipos.";
+    caja.innerText = "No se pudo obtener la conclusiÃ³n de VehÃ­culos y Equipos.";
   }
 }
 
@@ -1454,7 +1454,7 @@ function construirResumenPersonal(personal) {
     { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
     { etiqueta: "Exar", campo: "habilitacion_exar" },
     { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-    { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+    { etiqueta: "RincÃ³n", campo: "habilitacion_rincon" },
     { etiqueta: "ARLI", campo: "habilitacion_arli" }
   ];
 
@@ -1582,7 +1582,7 @@ async function obtenerConclusionPersonal(resumen) {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/analisis_personal", {
+    const res = await fetch("/analisis_personal", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1592,7 +1592,7 @@ async function obtenerConclusionPersonal(resumen) {
     const data = await res.json();
     caja.innerText = data.conclusion || "Personal con cobertura de habilitaciones estable.";
   } catch (error) {
-    caja.innerText = "No se pudo obtener la conclusión de Personal.";
+    caja.innerText = "No se pudo obtener la conclusiÃ³n de Personal.";
   }
 }
 
@@ -1625,7 +1625,7 @@ async function obtenerConclusion(datos) {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/analisis", {
+    const res = await fetch("/analisis", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1634,9 +1634,9 @@ async function obtenerConclusion(datos) {
     });
 
     const data = await res.json();
-    caja.innerText = data.conclusion || "Operación estable sin alertas relevantes.";
+    caja.innerText = data.conclusion || "OperaciÃ³n estable sin alertas relevantes.";
   } catch (error) {
-    caja.innerText = "No se pudo obtener la conclusión automática.";
+    caja.innerText = "No se pudo obtener la conclusiÃ³n automÃ¡tica.";
   }
 }
 
@@ -1699,10 +1699,10 @@ async function cargarDashboard() {
 
   try {
     const [resViajes, resVehiculos, resOrdenes, resPersonal] = await Promise.all([
-      fetch("http://127.0.0.1:8000/viajes"),
-      fetch("http://127.0.0.1:8000/vehiculos"),
-      fetch("http://127.0.0.1:8000/ordenes"),
-      fetch("http://127.0.0.1:8000/personal")
+      fetch("/viajes"),
+      fetch("/vehiculos"),
+      fetch("/ordenes"),
+      fetch("/personal")
     ]);
 
     const viajes = normalizarArray(await resViajes.json());
@@ -1727,3 +1727,4 @@ cargarDashboard();
 
 </body>
 </html>
+

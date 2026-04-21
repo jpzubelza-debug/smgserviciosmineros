@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Gestión de Personal</title>
+  <title>GestiÃ³n de Personal</title>
   <style>
     body {
       margin: 0;
@@ -247,7 +247,7 @@
 
 <div class="page">
 
-<h2>👥 Gestión de Personal</h2>
+<h2>ðŸ‘¥ GestiÃ³n de Personal</h2>
 
 <section class="stats-grid">
   <article class="stat-card">
@@ -258,7 +258,7 @@
         <span id="kpi-total" class="kpi-value">0</span>
       </div>
       <div class="kpi-pill">
-        <span class="kpi-label">Con Alguna Habilitación</span>
+        <span class="kpi-label">Con Alguna HabilitaciÃ³n</span>
         <span id="kpi-con" class="kpi-value">0</span>
       </div>
       <div class="kpi-pill kpi-alerta">
@@ -282,7 +282,7 @@
 
 <section class="conclusion-card conclusion">
   <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
-  <p id="conclusion-main" class="conclusion-main">Cargando conclusión operativa...</p>
+  <p id="conclusion-main" class="conclusion-main">Cargando conclusiÃ³n operativa...</p>
   <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
   <ul id="conclusion-list" class="conclusion-list"></ul>
 </section>
@@ -293,32 +293,32 @@
 
 <div id="form-wrapper" class="form-wrapper">
   <form id="form">
-    <input type="text" id="legajo" placeholder="N° de Legajo" required>
+    <input type="text" id="legajo" placeholder="NÂ° de Legajo" required>
     <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
     <input type="text" id="cuil" placeholder="CUIL" required>
 
     <select id="habilitacion_pirquitas">
-      <option value="">Habilitación Pirquitas</option>
+      <option value="">HabilitaciÃ³n Pirquitas</option>
       <option value="SI">SI</option>
       <option value="NO">NO</option>
     </select>
     <select id="habilitacion_exar">
-      <option value="">Habilitación Exar</option>
+      <option value="">HabilitaciÃ³n Exar</option>
       <option value="SI">SI</option>
       <option value="NO">NO</option>
     </select>
     <select id="habilitacion_sdj">
-      <option value="">Habilitación SDJ</option>
+      <option value="">HabilitaciÃ³n SDJ</option>
       <option value="SI">SI</option>
       <option value="NO">NO</option>
     </select>
     <select id="habilitacion_rincon">
-      <option value="">Habilitación Rincón</option>
+      <option value="">HabilitaciÃ³n RincÃ³n</option>
       <option value="SI">SI</option>
       <option value="NO">NO</option>
     </select>
     <select id="habilitacion_arli">
-      <option value="">Habilitación ARLI</option>
+      <option value="">HabilitaciÃ³n ARLI</option>
       <option value="SI">SI</option>
       <option value="NO">NO</option>
     </select>
@@ -339,7 +339,7 @@
         <th>Pirquitas</th>
         <th>Exar</th>
         <th>SDJ</th>
-        <th>Rincón</th>
+        <th>RincÃ³n</th>
         <th>ARLI</th>
       </tr>
     </thead>
@@ -359,7 +359,7 @@ const camposHabilitacion = [
   { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
   { etiqueta: "Exar", campo: "habilitacion_exar" },
   { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-  { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+  { etiqueta: "RincÃ³n", campo: "habilitacion_rincon" },
   { etiqueta: "ARLI", campo: "habilitacion_arli" }
 ];
 
@@ -472,7 +472,7 @@ function renderGraficosPersonal(resumen) {
   chartResumen = new Chart(document.getElementById("chart-resumen"), {
     type: "doughnut",
     data: {
-      labels: ["Con alguna habilitación", "Sin habilitaciones"],
+      labels: ["Con alguna habilitaciÃ³n", "Sin habilitaciones"],
       datasets: [{
         data: [resumen.con_alguna, resumen.sin_habilitaciones],
         backgroundColor: ["rgba(34,197,94,0.82)", "rgba(239,68,68,0.82)"],
@@ -560,13 +560,13 @@ function renderGraficosPersonal(resumen) {
 function generarConclusionLocal(resumen) {
   let texto = "";
   if (resumen.pct_cobertura < 50) {
-    texto += "Cobertura de habilitaciones baja para la dotación actual. ";
+    texto += "Cobertura de habilitaciones baja para la dotaciÃ³n actual. ";
   }
   if (resumen.sin_habilitaciones > resumen.con_alguna) {
     texto += "Predomina personal sin habilitaciones registradas. ";
   }
   if (!texto) {
-    texto = "La dotación presenta un nivel de habilitación aceptable para la operación.";
+    texto = "La dotaciÃ³n presenta un nivel de habilitaciÃ³n aceptable para la operaciÃ³n.";
   }
   return texto.trim();
 }
@@ -597,15 +597,15 @@ async function actualizarConclusiones(resumen) {
   }
 
   const recomendaciones = [
-    `Total personal: ${resumen.total}. Con habilitación: ${resumen.con_alguna}. Sin habilitaciones: ${resumen.sin_habilitaciones}.`,
+    `Total personal: ${resumen.total}. Con habilitaciÃ³n: ${resumen.con_alguna}. Sin habilitaciones: ${resumen.sin_habilitaciones}.`,
     `Cobertura global de habilitaciones: ${resumen.pct_cobertura}%.`,
-    `Proyecto con mayor dotación habilitada: ${resumen.proyecto_principal}.`
+    `Proyecto con mayor dotaciÃ³n habilitada: ${resumen.proyecto_principal}.`
   ];
   if (resumen.pct_cobertura < 50) {
-    recomendaciones.push("Reforzar carga documental y regularización de habilitaciones críticas.");
+    recomendaciones.push("Reforzar carga documental y regularizaciÃ³n de habilitaciones crÃ­ticas.");
   }
   if (resumen.sin_habilitaciones > 0) {
-    recomendaciones.push("Priorizar plan de habilitación para personal sin cobertura.");
+    recomendaciones.push("Priorizar plan de habilitaciÃ³n para personal sin cobertura.");
   }
 
   document.getElementById("conclusion-main").textContent = conclusion;
@@ -619,7 +619,7 @@ async function actualizarHabilitacion(legajo, campo, valor) {
   const mensaje = document.getElementById("mensaje");
 
   try {
-    const res = await fetch(`http://127.0.0.1:8000/personal/${encodeURIComponent(legajo)}`, {
+    const res = await fetch(`/personal/${encodeURIComponent(legajo)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [campo]: valor })
@@ -633,18 +633,18 @@ async function actualizarHabilitacion(legajo, campo, valor) {
     }
 
     mensaje.style.color = "#86efac";
-    mensaje.textContent = `Habilitación actualizada (${legajo})`;
+    mensaje.textContent = `HabilitaciÃ³n actualizada (${legajo})`;
     cargarPersonal();
   } catch (error) {
-    console.error("Error actualizando habilitación:", error);
+    console.error("Error actualizando habilitaciÃ³n:", error);
     mensaje.style.color = "#fca5a5";
-    mensaje.textContent = "No se pudo actualizar la habilitación";
+    mensaje.textContent = "No se pudo actualizar la habilitaciÃ³n";
   }
 }
 
 async function cargarPersonal() {
   try {
-    const res = await fetch("http://127.0.0.1:8000/personal");
+    const res = await fetch("/personal");
     const data = await res.json();
 
     const tbody = document.getElementById("personal-body");
@@ -689,7 +689,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     habilitacion_arli: document.getElementById("habilitacion_arli").value
   };
 
-  const res = await fetch("http://127.0.0.1:8000/personal", {
+  const res = await fetch("/personal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(empleado)
@@ -714,7 +714,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
 cargarPersonal().catch(err => {
   const mensaje = document.getElementById("mensaje");
   mensaje.style.color = "#fca5a5";
-  mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté en http://127.0.0.1:8000";
+  mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor estÃ© en ";
   console.error(err);
 });
 </script>
@@ -723,3 +723,4 @@ cargarPersonal().catch(err => {
 
 </body>
 </html>
+
