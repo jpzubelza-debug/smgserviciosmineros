@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: dashboard-operaciones
+    env: python
+    buildCommand: bash ./build.sh
+    startCommand: bash ./start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
