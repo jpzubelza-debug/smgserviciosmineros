@@ -275,7 +275,7 @@
     </header>
 
     <section class="menu-grid">
-      <a class="menu-btn logistica" href="/dashboard">
+      <a class="menu-btn logistica" href="/dashboard" onclick="return abrirDashboard(event)">
         <strong>Logistica</strong>
         <span>Acceso al dashboard completo de viajes, personal, vehiculos y ordenes.</span>
       </a>
@@ -308,6 +308,20 @@
 
     <p class="footnote">Solo Logistica se encuentra habilitado en esta version.</p>
   </main>
+  <script>
+    function abrirDashboard(event) {
+      event.preventDefault();
+
+      if (window.location.protocol === "file:") {
+        window.location.href = "http://127.0.0.1:8000/dashboard";
+        return false;
+      }
+
+      const destino = `${window.location.origin}/dashboard`;
+      window.location.href = destino;
+      return false;
+    }
+  </script>
 </body>
 </html>
 
