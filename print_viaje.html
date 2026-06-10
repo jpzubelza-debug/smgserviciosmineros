@@ -102,10 +102,16 @@ body {
 <table class="table">
 <tr><td colspan="4" class="title">DATOS DEL SOLICITANTE</td></tr>
 <tr>
+  <td class="label">Nro Orden</td>
+  <td class="value" id="nro_orden"></td>
   <td class="label">Quién solicita</td>
   <td class="value" id="solicitante"></td>
+</tr>
+<tr>
   <td class="label">Área</td>
   <td class="value" id="area"></td>
+  <td class="label">Centro de costo</td>
+  <td class="value" id="centro_costo"></td>
 </tr>
 </table>
 
@@ -128,6 +134,26 @@ body {
   <td class="label">Fecha regreso</td>
   <td id="fregreso"></td>
 </tr>
+<tr>
+  <td class="label">Hora ingreso base</td>
+  <td id="h_ingreso_base"></td>
+  <td class="label">Duracion jornadas</td>
+  <td id="duracion_jornadas"></td>
+</tr>
+<tr>
+  <td class="label">Hora salida</td>
+  <td id="h_salida"></td>
+  <td class="label">Hora regreso</td>
+  <td id="h_regreso"></td>
+</tr>
+<tr>
+  <td class="label">Itinerario</td>
+  <td colspan="3" id="itinerario"></td>
+</tr>
+<tr>
+  <td class="label">Rutas</td>
+  <td colspan="3" id="rutas"></td>
+</tr>
 </table>
 
 <!-- RECURSOS HUMANOS -->
@@ -138,6 +164,12 @@ body {
   <td id="chofer"></td>
   <td class="label">Acompañantes</td>
   <td id="acompanantes"></td>
+</tr>
+<tr>
+  <td class="label">Viatico chofer</td>
+  <td id="chofer_viatico"></td>
+  <td class="label">Acomp. con viatico</td>
+  <td id="acompanantes_viatico"></td>
 </tr>
 </table>
 
@@ -164,8 +196,30 @@ body {
 <tr>
   <td class="label">Viáticos ($)</td>
   <td id="viaticos"></td>
+  <td class="label">Medio pago</td>
+  <td id="medio_pago"></td>
+</tr>
+<tr>
+  <td class="label">Otros gastos ($)</td>
+  <td id="otros_gastos"></td>
   <td class="label">Alojamiento</td>
   <td id="alojamiento"></td>
+</tr>
+</table>
+
+<table class="table">
+<tr><td colspan="4" class="title">COMPROBACION OPERACIONES Y LOGISTICA</td></tr>
+<tr>
+  <td class="label">Taller</td>
+  <td id="comp_taller"></td>
+  <td class="label">RRHH</td>
+  <td id="comp_rrhh"></td>
+</tr>
+<tr>
+  <td class="label">Administracion</td>
+  <td id="comp_administracion"></td>
+  <td class="label">Logistica y Operaciones</td>
+  <td id="comp_logistica_operaciones"></td>
 </tr>
 </table>
 
@@ -189,8 +243,10 @@ body {
 const data = JSON.parse(localStorage.getItem("viaje_pdf"));
 
 if (data) {
+  document.getElementById("nro_orden").innerText = data.nro_orden || "";
   document.getElementById("id").innerText = data.id || "";
   document.getElementById("fecha").innerText = data.fecha || "";
+  document.getElementById("centro_costo").innerText = data.centro_costo || "";
 
   document.getElementById("solicitante").innerText = data.solicitante || "";
   document.getElementById("area").innerText = data.area || "";
@@ -200,9 +256,20 @@ if (data) {
   document.getElementById("motivo").innerText = data.motivo || "";
   document.getElementById("fsalida").innerText = data.fecha_salida || "";
   document.getElementById("fregreso").innerText = data.fecha_regreso || "";
+  document.getElementById("h_ingreso_base").innerText = data.hora_ingreso_base || "";
+  document.getElementById("h_salida").innerText = data.hora_salida || "";
+  document.getElementById("h_regreso").innerText = data.hora_regreso || "";
+  document.getElementById("duracion_jornadas").innerText = data.duracion_jornadas || "";
+  document.getElementById("itinerario").innerText = data.itinerario || "";
+  document.getElementById("rutas").innerText = data.rutas || "";
 
   document.getElementById("chofer").innerText = data.chofer || "";
   document.getElementById("acompanantes").innerText = data.acompanantes || "";
+  document.getElementById("chofer_viatico").innerText = data.chofer_viatico || "";
+  const acompViatico = Array.isArray(data.acompanantes_con_viatico)
+    ? data.acompanantes_con_viatico.map(a => `${a.nombre || ""}: $${a.viatico || 0}`).join(" | ")
+    : "";
+  document.getElementById("acompanantes_viatico").innerText = acompViatico;
 
   document.getElementById("vehiculo").innerText = data.vehiculo || "";
   document.getElementById("dominio").innerText = data.dominio || "";
@@ -210,7 +277,15 @@ if (data) {
   document.getElementById("modelo").innerText = data.modelo || "";
 
   document.getElementById("viaticos").innerText = data.viaticos || "";
+  document.getElementById("medio_pago").innerText = data.medio_pago || "";
+  document.getElementById("otros_gastos").innerText = data.otros_gastos || "";
   document.getElementById("alojamiento").innerText = data.alojamiento || "";
+
+  const comp = data.comprobacion_operaciones_logistica || {};
+  document.getElementById("comp_taller").innerText = comp.taller || "";
+  document.getElementById("comp_rrhh").innerText = comp.rrhh || "";
+  document.getElementById("comp_administracion").innerText = comp.administracion || "";
+  document.getElementById("comp_logistica_operaciones").innerText = comp.logistica_operaciones || "";
 }
 
 window.print();

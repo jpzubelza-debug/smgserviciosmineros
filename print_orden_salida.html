@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orden de Salida - Impresión</title>
+<style>
+  :root {
+    --line: #000;
+    --text: #111;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Times New Roman", serif;
+    color: var(--text);
+    background: #f3f3f3;
+  }
+
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 6mm auto;
+    background: #fff;
+    padding: 4mm;
+    border: 1px solid #cfcfcf;
+  }
+
+  .head {
+    display: grid;
+    grid-template-columns: 30mm 1fr;
+    gap: 2.5mm;
+    border: 1px solid var(--line);
+    padding: 2mm;
+    align-items: center;
+  }
+
+  .logo {
+    width: 100%;
+    max-height: 13.5mm;
+    object-fit: contain;
+  }
+
+  .head-title {
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  .head-title h1 {
+    margin: 0;
+    font-size: 13pt;
+    letter-spacing: 0.4px;
+  }
+
+  .head-title h2 {
+    margin: 1mm 0 0;
+    font-size: 11.3pt;
+    letter-spacing: 0.6px;
+  }
+
+  .meta {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.7mm;
+  }
+
+  .meta td {
+    border: 1px solid var(--line);
+    padding: 1.1mm 1.4mm;
+    font-size: 8.9pt;
+  }
+
+  .section {
+    margin-top: 1.6mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .section-title {
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    font-size: 8.8pt;
+    font-weight: 700;
+    padding: 1.1mm 1.4mm;
+    background: #f2f2f2;
+    text-transform: uppercase;
+    letter-spacing: 0.25px;
+  }
+
+  table.doc {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  table.doc td,
+  table.doc th {
+    border: 1px solid var(--line);
+    padding: 1.0mm 1.3mm;
+    font-size: 8.25pt;
+    vertical-align: top;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  table.doc th {
+    background: #f2f2f2;
+    text-align: left;
+    font-weight: 700;
+    font-size: 8.15pt;
+  }
+
+  .label {
+    width: 20%;
+    font-weight: 700;
+    background: #f7f7f7;
+  }
+
+  .right { text-align: right; }
+  .center { text-align: center; }
+
+  .empty {
+    color: #666;
+    font-style: italic;
+  }
+
+  .firmas {
+    margin-top: 2.3mm;
+  }
+
+  .firmas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 46mm);
+    justify-content: center;
+    gap: 2.2mm;
+    margin-top: 2.2mm;
+  }
+
+  .firma-box {
+    border: 1px solid var(--line);
+    padding: 1.4mm 1.2mm;
+    height: 19mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    text-align: center;
+    font-size: 8.1pt;
+  }
+
+  .firma-line {
+    border-top: 1px solid #000;
+    height: 8.4mm;
+    margin-bottom: 0.9mm;
+  }
+
+  .anexo {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .anexo .section {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .anexo table.doc tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4;
+    margin: 4mm;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .sheet {
+      margin: 0;
+      border: 0;
+      width: auto;
+      min-height: auto;
+      padding: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="sheet" id="print-sheet">
+  <div class="head">
+    <img src="/Imagenes/09-smg.png" alt="Logo SMG" class="logo">
+    <div class="head-title">
+      <h1>Departamento de Logística y Operaciones</h1>
+      <h2>ORDEN DE SALIDA</h2>
+    </div>
+  </div>
+
+  <table class="meta">
+    <tr>
+      <td><strong>Número de Orden:</strong> <span id="meta-numero"></span></td>
+      <td><strong>Fecha de Emisión:</strong> <span id="meta-fecha"></span></td>
+      <td><strong>Estado:</strong> <span id="meta-estado"></span></td>
+    </tr>
+  </table>
+
+  <section class="section">
+    <div class="section-title">Datos Generales</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Solicitante</td><td id="gen-solicitante"></td>
+        <td class="label">Área</td><td id="gen-area"></td>
+      </tr>
+      <tr>
+        <td class="label">Centro de Costos</td><td id="gen-centro-costos"></td>
+        <td class="label">ID Viaje</td><td id="gen-id-viaje"></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Datos del Viaje y Motivo</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Partida</td><td id="viaje-partida"></td>
+        <td class="label">Destino</td><td id="viaje-destino"></td>
+      </tr>
+      <tr>
+        <td class="label">Fecha de Salida</td><td id="viaje-fecha-salida"></td>
+        <td class="label">Fecha de Llegada</td><td id="viaje-fecha-llegada"></td>
+      </tr>
+      <tr>
+        <td class="label">Hora Salida</td><td id="viaje-hora-salida"></td>
+        <td class="label">Hora Regreso</td><td id="viaje-hora-regreso"></td>
+      </tr>
+      <tr>
+        <td class="label">Duración Jornadas</td><td id="eco-jornadas"></td>
+        <td class="label">Motivo</td><td id="viaje-motivo"></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Datos de Transporte</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Vehículo</td><td id="transporte-vehiculo"></td>
+        <td class="label">Alojamiento</td><td id="transporte-alojamiento"></td>
+      </tr>
+      <tr>
+        <td class="label">Detalle de Ruta</td>
+        <td colspan="3" id="transporte-detalle"></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Personal Asignado</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Chofer</td><td id="personal-chofer"></td>
+        <td class="label">Acompañantes</td><td id="personal-acompanantes"></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Recursos Económicos</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Viático Chofer</td><td id="eco-chofer" class="right"></td>
+        <td class="label">Viático Acompañantes</td><td id="eco-acompanantes" class="right"></td>
+      </tr>
+      <tr>
+        <td class="label">Otros Gastos</td><td id="eco-otros" class="right"></td>
+        <td class="label">Total</td><td id="eco-total" class="right"></td>
+      </tr>
+      <tr>
+        <td class="label">Medio de Pago</td><td id="eco-medio"></td>
+        <td class="label">Moneda</td><td>ARS</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Comprobaciones</div>
+    <table class="doc">
+      <tr>
+        <td class="label">Taller</td><td id="comp-taller"></td>
+        <td class="label">RRHH</td><td id="comp-rrhh"></td>
+      </tr>
+      <tr>
+        <td class="label">Administración</td><td id="comp-admin"></td>
+        <td class="label">Logística y Operaciones</td><td id="comp-logistica"></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section firmas">
+    <div class="section-title">Firmas</div>
+    <div class="firmas-grid">
+      <div class="firma-box"><div class="firma-line"></div>Solicitante</div>
+      <div class="firma-box"><div class="firma-line"></div>Logística y Operaciones</div>
+      <div class="firma-box"><div class="firma-line"></div>Chofer</div>
+    </div>
+  </section>
+
+  <section class="anexo">
+    <div class="head" style="margin-bottom:1.6mm;">
+      <img src="/Imagenes/09-smg.png" alt="Logo SMG" class="logo">
+      <div class="head-title">
+        <h1>Departamento de Logística y Operaciones</h1>
+        <h2>ANEXO I - CONTROL Y SEGUIMIENTO</h2>
+      </div>
+    </div>
+
+    <table class="meta" style="margin-top:0;">
+      <tr>
+        <td><strong>Número de Orden:</strong> <span id="anexo-numero"></span></td>
+        <td><strong>Fecha de Emisión:</strong> <span id="anexo-fecha"></span></td>
+        <td><strong>Estado:</strong> <span id="anexo-estado"></span></td>
+      </tr>
+    </table>
+
+    <section class="section" style="margin-top:1.5mm;">
+      <table class="doc" id="tabla-seguimiento">
+        <thead>
+          <tr>
+            <th style="width:7%;">Día</th>
+            <th style="width:13%;">Fecha</th>
+            <th style="width:11%;">Hs Inicio</th>
+            <th style="width:11%;">Hs Final</th>
+            <th>Observaciones</th>
+            <th style="width:24%;">Hs Acumuladas / Extra</th>
+          </tr>
+        </thead>
+        <tbody id="seguimiento-body"></tbody>
+      </table>
+
+      <table class="doc" style="margin-top:1.2mm;">
+        <tr>
+          <td class="label">Total Extra Horas</td><td id="seg-total-extra"></td>
+          <td class="label">Cumple Procedimiento</td><td id="seg-cumple"></td>
+        </tr>
+        <tr>
+          <td class="label">Nota Desvíos</td><td id="seg-desvios"></td>
+          <td class="label">Aplica Sanciones</td><td id="seg-sanciones"></td>
+        </tr>
+      </table>
+    </section>
+  </section>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = "os_print_payload";
+
+  const esc = (v) => {
+    const div = document.createElement("div");
+    div.textContent = v == null ? "" : String(v);
+    return div.innerHTML;
+  };
+
+  const txt = (v) => String(v == null ? "" : v).trim();
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const t = txt(value);
+    el.innerHTML = t ? esc(t) : '<span class="empty">-</span>';
+  };
+
+  const money = (n) => {
+    const num = Number(n || 0);
+    return Number.isFinite(num)
+      ? new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)
+      : "0,00";
+  };
+
+  function parseData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  function mergeData(payload) {
+    const orden = payload?.orden || {};
+    const viaje = orden?.viaje || {};
+    const recursos = orden?.recursos || {};
+    const cierre = (orden?.cierre_logistica && typeof orden.cierre_logistica === "object") ? orden.cierre_logistica : {};
+    const cierreDatos = (cierre?.datos && typeof cierre.datos === "object") ? cierre.datos : {};
+    const snapshot = (payload?.cierre_snapshot && typeof payload.cierre_snapshot === "object") ? payload.cierre_snapshot : {};
+
+    const solicitud = {
+      ...(cierreDatos?.solicitud || {}),
+      ...(snapshot?.solicitud || {}),
+    };
+    const asignacion = {
+      ...(cierreDatos?.asignacion || {}),
+      ...(snapshot?.asignacion || {}),
+    };
+    const control = {
+      ...(snapshot?.control_y_seguimiento || {}),
+      ...(cierreDatos?.control_y_seguimiento || {}),
+    };
+
+    return { orden, viaje, recursos, solicitud, asignacion, control };
+  }
+
+  function render() {
+    const payload = parseData();
+    if (!payload?.orden) {
+      document.getElementById("print-sheet").innerHTML = "<p>No se encontraron datos para imprimir la Orden de Salida.</p>";
+      return;
+    }
+
+    const { orden, viaje, recursos, solicitud, asignacion, control } = mergeData(payload);
+    const comp = {
+      ...(recursos?.comprobacion_operaciones_logistica || {}),
+      ...(asignacion?.comprobaciones || {}),
+    };
+
+    const acompanantesDet = Array.isArray(asignacion?.acompanantes_con_viatico)
+      ? asignacion.acompanantes_con_viatico
+      : (Array.isArray(recursos?.acompanantes_con_viatico) ? recursos.acompanantes_con_viatico : []);
+
+    const acompNombres = acompanantesDet.length
+      ? acompanantesDet.map((a) => txt(a?.nombre)).filter(Boolean)
+      : (Array.isArray(asignacion?.acompanantes) ? asignacion.acompanantes : (Array.isArray(recursos?.acompanantes) ? recursos.acompanantes : []));
+
+    const viaticoAcomp = acompanantesDet.reduce((acc, a) => acc + Number(a?.viatico || 0), 0);
+    const viaticoChofer = Number(asignacion?.viatico_chofer ?? recursos?.chofer_viatico ?? 0);
+    const otros = Number(asignacion?.otros_gastos ?? recursos?.otros_gastos ?? 0);
+    const total = Number(asignacion?.total ?? (viaticoChofer + viaticoAcomp + otros));
+
+    const rutaIntegrada = [
+      txt(recursos?.itinerario || ""),
+      txt(recursos?.rutas || ""),
+      txt(recursos?.paradas || ""),
+    ].filter(Boolean).join(" | ");
+
+    const nro = orden?.nro_orden || "";
+    const fecha = orden?.fecha_orden || solicitud?.fecha_emision || "";
+    const estado = orden?.estado || viaje?.estado || "ABIERTO";
+
+    setText("meta-numero", nro);
+    setText("meta-fecha", fecha);
+    setText("meta-estado", estado);
+
+    setText("anexo-numero", nro);
+    setText("anexo-fecha", fecha);
+    setText("anexo-estado", estado);
+
+    setText("gen-solicitante", solicitud?.quien_solicita || recursos?.datos_solicitante || viaje?.solicitante || "");
+    setText("gen-area", solicitud?.area_solicita || recursos?.area_solicitante || viaje?.area || "");
+    setText("gen-centro-costos", solicitud?.centro_costos || recursos?.centro_costo || "");
+    setText("gen-id-viaje", orden?.id_viaje || viaje?.id || "");
+
+    setText("viaje-partida", solicitud?.partida || recursos?.partida || viaje?.origen || "");
+    setText("viaje-destino", solicitud?.destino || recursos?.destino || viaje?.destino || "");
+    setText("viaje-fecha-salida", solicitud?.fecha_salida || recursos?.fecha_salida_viaje || viaje?.fecha_salida || "");
+    setText("viaje-fecha-llegada", solicitud?.fecha_llegada || recursos?.fecha_regreso_viaje || viaje?.fecha_regreso || "");
+    setText("viaje-hora-salida", solicitud?.hora_salida || recursos?.hora_salida || "");
+    setText("viaje-hora-regreso", solicitud?.hora_regreso || recursos?.hora_regreso || "");
+    setText("viaje-motivo", solicitud?.motivo || recursos?.motivo_viaje || viaje?.motivo || "");
+
+    setText("transporte-vehiculo", recursos?.vehiculo || "");
+    setText("transporte-alojamiento", asignacion?.alojamiento || recursos?.alojamiento || "");
+    setText("transporte-detalle", rutaIntegrada || "");
+
+    setText("personal-chofer", recursos?.chofer || "");
+    setText("personal-acompanantes", (acompNombres || []).filter(Boolean).join(", "));
+
+    setText("eco-chofer", money(viaticoChofer));
+    setText("eco-acompanantes", money(viaticoAcomp));
+    setText("eco-otros", money(otros));
+    setText("eco-total", money(total));
+    setText("eco-medio", asignacion?.medio_pago || recursos?.medio_pago || "");
+    setText("eco-jornadas", solicitud?.duracion_jornadas || recursos?.duracion_jornadas || "");
+
+    setText("comp-taller", comp?.taller || "");
+    setText("comp-rrhh", comp?.rrhh || "");
+    setText("comp-admin", comp?.administracion || "");
+    setText("comp-logistica", comp?.logistica_operaciones || "");
+
+    const detalleDias = Array.isArray(control?.detalle_dias) ? control.detalle_dias : [];
+    const tbody = document.getElementById("seguimiento-body");
+    if (tbody) {
+      if (!detalleDias.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="center empty">Sin registros de seguimiento</td></tr>';
+      } else {
+        tbody.innerHTML = detalleDias.map((d, i) => `
+          <tr>
+            <td class="center">${esc(d?.dia || (i + 1))}</td>
+            <td>${esc(d?.fecha || "")}</td>
+            <td>${esc(d?.hs_inicio || "")}</td>
+            <td>${esc(d?.hs_final || "")}</td>
+            <td>${esc(d?.observaciones || "")}</td>
+            <td>${esc(d?.resumen_horas || "")}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    setText("seg-total-extra", control?.total_extra_horas || "0.00 hs");
+    setText("seg-cumple", control?.cumple_procedimiento || "NO");
+    setText("seg-desvios", control?.nota_desvios || "NO");
+    setText("seg-sanciones", control?.aplica_sanciones || "NO");
+
+    setTimeout(() => {
+      window.print();
+    }, 220);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

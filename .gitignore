@@ -2,3 +2,27 @@
 .venv/
 .venv-1/
 __pycache__/
+
+# Python caches/build
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Local databases and backups
+*.db
+dashboard_backup_*.db
+
+# Runtime/generated folders
+Doc_Almacen/
+Doc_Log_Viajes/
+
+# Local office/docs assets
+*.doc
+*.docx
+*.pdf
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

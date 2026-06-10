@@ -12,7 +12,7 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -27,7 +27,7 @@
       inset: 0;
       z-index: 0;
       background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-      opacity: 0.76;
+      opacity: 0.66;
       pointer-events: none;
     }
 
@@ -37,8 +37,8 @@
       z-index: 1;
       pointer-events: none;
       background:
-        radial-gradient(circle at 20% 30%, rgba(255, 0, 150, 0.18), transparent 55%),
-        radial-gradient(circle at 80% 70%, rgba(0, 200, 255, 0.18), transparent 58%);
+        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
+        radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
     }
 
     .card {
@@ -48,17 +48,14 @@
       max-width: 560px;
       padding: 25px;
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255,255,255,0.2);
-      transition: 0.3s;
+      background: rgba(15, 23, 42, 0.66);
+      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      transition: none;
     }
 
     .card:hover {
-      transform: scale(1.03);
-      transition: 0.3s;
+      transform: none;
     }
 
     .logo-corner {
@@ -76,9 +73,7 @@
       height: auto;
     }
 
-    .logo-box img {
-      filter: drop-shadow(0 0 8px rgba(255,255,255,0.45));
-    }
+    .logo-box img { filter: none; }
 
     .logo-text {
       color: #ffffff;
@@ -105,20 +100,40 @@
       padding: 12px;
       margin: 8px 0 15px 0;
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(2, 6, 23, 0.55);
       color: white;
       outline: none;
       font-size: 14px;
-      transition: 0.3s;
+      transition: border-color 0.2s ease;
+    }
+
+    select option,
+    select optgroup {
+      background: #0f2237;
+      color: #eef4ff;
+    }
+
+    select option:checked {
+      background: #2f6fca;
+      color: #ffffff;
+    }
+
+    select[multiple] {
+      min-height: 120px;
+    }
+
+    .helper-text {
+      margin-top: -10px;
+      margin-bottom: 12px;
+      color: #d6e7ff;
+      font-size: 12px;
+      opacity: 0.9;
     }
 
     input:focus, select:focus, textarea:focus {
-      border-color: rgba(168,199,246,0.9);
-      box-shadow: 0 0 0 3px rgba(119,163,231,0.25), 0 8px 32px rgba(0,0,0,0.3);
+      border-color: rgba(147, 197, 253, 0.85);
+      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
     }
 
     input::placeholder,
@@ -139,8 +154,8 @@
     }
 
     button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 12px rgba(59,130,246,0.6);
+      transform: none;
+      box-shadow: none;
     }
 
     #mensaje {
@@ -171,12 +186,12 @@
   <label>Solicitante</label>
   <input type="text" id="solicitante" placeholder="Solicitante" required>
 
-  <label>Ãrea</label>
+  <label>Área</label>
   <input type="text" id="area" list="areas" required>
   <datalist id="areas">
     <option value="Mantenimiento">
     <option value="Operaciones">
-    <option value="LogÃ­stica">
+    <option value="Logística">
   </datalist>
 
   <label>Origen</label>
@@ -188,7 +203,7 @@
     <option value="Pirquitas">
     <option value="Exar">
     <option value="SDJ">
-    <option value="RincÃ³n">
+    <option value="Rincón">
     <option value="ARLI">
   </datalist>
 
@@ -201,12 +216,35 @@
   <label>Fecha regreso</label>
   <input type="date" id="fecha_regreso" required>
 
+  <label>Chofer</label>
+  <select id="chofer" required>
+    <option value="">Seleccione un chofer</option>
+  </select>
+
+  <label>Vehiculo</label>
+  <select id="vehiculo" required>
+    <option value="">Seleccione un vehiculo</option>
+  </select>
+
+  <label>Acompanantes</label>
+  <select id="acompanantes" multiple>
+  </select>
+  <div class="helper-text">Mantener Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</div>
+
+  <label>Requiere alojamiento</label>
+  <select id="alojamiento" required>
+    <option value="NO" selected>NO</option>
+    <option value="SI">SI</option>
+  </select>
+
   <button type="submit">Enviar</button>
 
   <p id="mensaje"></p>
 </form>
 
 <script>
+let personalBase = [];
+
 function obtenerHoyLocal() {
   const hoy = new Date();
   const year = hoy.getFullYear();
@@ -224,6 +262,89 @@ function configurarRestriccionesFechas() {
   fechaRegresoInput.min = fechaSalidaInput.value || hoy;
 }
 
+function etiquetaPersona(persona) {
+  const nombre = (persona?.nombre || "").toString().trim();
+  const legajo = (persona?.legajo || "").toString().trim();
+  if (!nombre) {
+    return "";
+  }
+  return legajo ? `${nombre} (Legajo ${legajo})` : nombre;
+}
+
+function etiquetaVehiculo(vehiculo) {
+  const codigo = (vehiculo?.codigo || "").toString().trim();
+  const descripcion = (
+    vehiculo?.descripcion ||
+    vehiculo?.equipo ||
+    vehiculo?.modelo ||
+    vehiculo?.marca ||
+    ""
+  ).toString().trim();
+  return descripcion ? `${codigo} - ${descripcion}` : codigo;
+}
+
+function actualizarOpcionesAcompanantes() {
+  const selectChofer = document.getElementById("chofer");
+  const selectAcompanantes = document.getElementById("acompanantes");
+  const choferSeleccionado = (selectChofer.value || "").trim().toLowerCase();
+
+  const seleccionPrev = new Set(Array.from(selectAcompanantes.selectedOptions).map(o => o.value));
+  selectAcompanantes.innerHTML = "";
+
+  personalBase
+    .map(p => (p?.nombre || "").toString().trim())
+    .filter(Boolean)
+    .filter(nombre => nombre.toLowerCase() !== choferSeleccionado)
+    .forEach(nombre => {
+      const op = document.createElement("option");
+      op.value = nombre;
+      op.textContent = nombre;
+      if (seleccionPrev.has(nombre)) {
+        op.selected = true;
+      }
+      selectAcompanantes.appendChild(op);
+    });
+}
+
+async function cargarPersonalYVehiculos() {
+  const [resPersonal, resVehiculos] = await Promise.all([
+    fetch("/personal"),
+    fetch("/vehiculos")
+  ]);
+
+  const personal = await resPersonal.json();
+  const vehiculos = await resVehiculos.json();
+
+  personalBase = Array.isArray(personal) ? personal : [];
+
+  const selectChofer = document.getElementById("chofer");
+  const selectVehiculo = document.getElementById("vehiculo");
+
+  personalBase.forEach(persona => {
+    const nombre = (persona?.nombre || "").toString().trim();
+    if (!nombre) {
+      return;
+    }
+    const op = document.createElement("option");
+    op.value = nombre;
+    op.textContent = etiquetaPersona(persona);
+    selectChofer.appendChild(op);
+  });
+
+  (Array.isArray(vehiculos) ? vehiculos : []).forEach(vehiculo => {
+    const codigo = (vehiculo?.codigo || "").toString().trim();
+    if (!codigo) {
+      return;
+    }
+    const op = document.createElement("option");
+    op.value = etiquetaVehiculo(vehiculo);
+    op.textContent = etiquetaVehiculo(vehiculo);
+    selectVehiculo.appendChild(op);
+  });
+
+  actualizarOpcionesAcompanantes();
+}
+
 document.getElementById("fecha_salida").addEventListener("change", function() {
   const fechaRegresoInput = document.getElementById("fecha_regreso");
   const hoy = obtenerHoyLocal();
@@ -234,6 +355,8 @@ document.getElementById("fecha_salida").addEventListener("change", function() {
     fechaRegresoInput.value = minRegreso;
   }
 });
+
+document.getElementById("chofer").addEventListener("change", actualizarOpcionesAcompanantes);
 
 document.getElementById("form").addEventListener("submit", async function(e) {
   e.preventDefault();
@@ -260,7 +383,11 @@ document.getElementById("form").addEventListener("submit", async function(e) {
       destino: document.getElementById("destino").value,
       motivo: document.getElementById("motivo").value,
       fecha_salida: fechaSalida,
-      fecha_regreso: fechaRegreso
+      fecha_regreso: fechaRegreso,
+      chofer: document.getElementById("chofer").value,
+      vehiculo: document.getElementById("vehiculo").value,
+      acompanantes: Array.from(document.getElementById("acompanantes").selectedOptions).map(o => o.value),
+      alojamiento: document.getElementById("alojamiento").value
     };
 
     const res = await fetch("/viajes", {
@@ -274,9 +401,10 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     const result = await res.json();
 
     document.getElementById("mensaje").innerText =
-      "âœ… Viaje creado correctamente (ID: " + result.id + ")";
+      "Viaje creado correctamente (ID: " + result.id + ")";
 
     document.getElementById("form").reset();
+    actualizarOpcionesAcompanantes();
 
   } catch (error) {
     console.error("ERROR:", error);
@@ -291,6 +419,10 @@ document.getElementById("motivo").addEventListener("input", function() {
 });
 
 configurarRestriccionesFechas();
+cargarPersonalYVehiculos().catch(error => {
+  console.error("No se pudieron cargar Personal/Vehiculos:", error);
+  document.getElementById("mensaje").innerText = "No se pudieron cargar opciones de chofer y vehiculo";
+});
 </script>
 
 </div>

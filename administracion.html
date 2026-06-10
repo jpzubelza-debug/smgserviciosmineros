@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administracion de Usuarios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111c34;
+      --panel-2: #152545;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #233458;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Outfit", sans-serif;
+      background: radial-gradient(circle at 20% 10%, #12345f 0, transparent 35%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .head h1 { margin: 0; font-size: 1.6rem; }
+    .head .actions { display: flex; gap: 8px; }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn.primary { border-color: #2563eb; background: #1d4ed8; }
+    .btn.warn { border-color: #b45309; background: #92400e; }
+    .btn.danger { border-color: #991b1b; background: #b91c1c; }
+    .layout {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(21,37,69,0.95), rgba(17,28,52,0.95));
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+    }
+    .grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr 1fr;
+    }
+    label { font-size: 0.86rem; color: var(--muted); }
+    input, select {
+      width: 100%;
+      background: #0b1328;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 9px;
+      outline: none;
+    }
+    .full { grid-column: 1 / -1; }
+    .checks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .checks label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      font-size: 0.86rem;
+    }
+    .checks input { width: auto; }
+    .table-wrap { overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+      font-size: 0.88rem;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: #bfdbfe; font-weight: 600; }
+    .badge {
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      margin-right: 4px;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+    .muted { color: var(--muted); }
+    .msg { min-height: 20px; margin-top: 8px; font-size: 0.86rem; }
+    .ok { color: #86efac; }
+    .err { color: #fca5a5; }
+    @media (max-width: 1000px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="head">
+      <h1>Modulo Administracion</h1>
+      <div class="actions">
+        <button class="btn" onclick="window.location.href='/'">Volver al menu</button>
+        <button class="btn" onclick="window.location.href='/logout'">Salir</button>
+      </div>
+    </header>
+
+    <section class="layout">
+      <article class="card">
+        <h2>Gestion de Usuarios</h2>
+        <form id="user-form" class="grid">
+          <div class="full">
+            <label>Nombre y Apellido</label>
+            <input id="f_nombre" required />
+          </div>
+          <div>
+            <label>DNI</label>
+            <input id="f_dni" />
+          </div>
+          <div>
+            <label>Legajo</label>
+            <input id="f_legajo" />
+          </div>
+          <div class="full">
+            <label>Correo (usuario de acceso)</label>
+            <input id="f_correo" required />
+          </div>
+          <div>
+            <label>Contrasena (si vacio, se genera temporal)</label>
+            <input id="f_password" />
+          </div>
+          <div>
+            <label>Estado</label>
+            <select id="f_estado">
+              <option value="ACTIVO">ACTIVO</option>
+              <option value="INACTIVO">INACTIVO</option>
+            </select>
+          </div>
+          <div class="full">
+            <label>Tipo de Usuario</label>
+            <select id="f_tipo">
+              <option>ADMINISTRADOR</option>
+              <option>SUPERVISOR</option>
+              <option>ASISTENTE</option>
+              <option>OPERADOR</option>
+              <option selected>CONSULTOR</option>
+            </select>
+          </div>
+          <div class="full">
+            <label>Permisos por modulo</label>
+            <div class="checks" id="modulos-box"></div>
+          </div>
+          <div class="full">
+            <label>Roles funcionales</label>
+            <div class="checks" id="roles-box"></div>
+          </div>
+          <div class="full" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn primary" type="submit" id="btn-save">Crear usuario</button>
+            <button class="btn" type="button" id="btn-cancel" style="display:none;">Cancelar edicion</button>
+          </div>
+          <div id="form-msg" class="msg full"></div>
+        </form>
+      </article>
+
+      <article class="card">
+        <h2>Usuarios y Accesos</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Usuario</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Modulos</th>
+                <th>Roles</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+        <h2 style="margin-top:12px;">Historial de accesos</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Evento</th>
+                <th>Usuario</th>
+                <th>Detalle</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody id="access-body"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    const MODULOS = [
+      ["logistica", "Logistica"],
+      ["almacen", "Almacen"],
+      ["operaciones", "Operaciones"],
+      ["compras", "Compras"],
+      ["rrhh", "Recursos Humanos"],
+      ["mantenimiento", "Mantenimiento"],
+      ["dashboard_ejecutivo", "Dashboard Ejecutivo"],
+      ["administracion", "Administracion"],
+    ];
+
+    const state = {
+      me: null,
+      users: [],
+      roles: [],
+      editId: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function setMsg(text, ok = false) {
+      const el = $("form-msg");
+      el.textContent = text || "";
+      el.className = `msg full ${ok ? "ok" : "err"}`;
+    }
+
+    async function api(path, opts = {}) {
+      const resp = await fetch(path, {
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+        ...opts,
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || `HTTP ${resp.status}`);
+      }
+      return resp.json();
+    }
+
+    function renderModulos() {
+      const box = $("modulos-box");
+      box.innerHTML = MODULOS.map(([k, lbl]) =>
+        `<label><input type="checkbox" data-modulo="${k}" /> ${lbl}</label>`
+      ).join("");
+    }
+
+    function renderRoles() {
+      const box = $("roles-box");
+      box.innerHTML = state.roles.map((r) =>
+        `<label><input type="checkbox" data-rol="${r.id}" /> ${r.nombre}</label>`
+      ).join("");
+    }
+
+    function selectedModulos() {
+      return Array.from(document.querySelectorAll("input[data-modulo]:checked")).map((el) => el.getAttribute("data-modulo"));
+    }
+
+    function selectedRoles() {
+      return Array.from(document.querySelectorAll("input[data-rol]:checked")).map((el) => Number(el.getAttribute("data-rol")));
+    }
+
+    function fillForm(u = null) {
+      state.editId = u ? u.id : null;
+      $("f_nombre").value = u?.nombre_apellido || "";
+      $("f_dni").value = u?.dni || "";
+      $("f_legajo").value = u?.legajo || "";
+      $("f_correo").value = u?.correo || "";
+      $("f_password").value = "";
+      $("f_estado").value = u?.estado || "ACTIVO";
+      $("f_tipo").value = u?.tipo_usuario || "CONSULTOR";
+
+      document.querySelectorAll("input[data-modulo]").forEach((el) => {
+        el.checked = !!u?.modulos?.includes(el.getAttribute("data-modulo"));
+      });
+      document.querySelectorAll("input[data-rol]").forEach((el) => {
+        const id = Number(el.getAttribute("data-rol"));
+        el.checked = !!u?.roles?.some((r) => Number(r.id) === id);
+      });
+
+      $("btn-save").textContent = u ? "Guardar cambios" : "Crear usuario";
+      $("btn-cancel").style.display = u ? "inline-block" : "none";
+      setMsg("");
+    }
+
+    function badges(items) {
+      return (items || []).map((x) => `<span class="badge">${x}</span>`).join("");
+    }
+
+    function renderUsers() {
+      const tb = $("users-body");
+      tb.innerHTML = state.users.map((u) => {
+        const modulos = badges(u.modulos || []);
+        const roles = badges((u.roles || []).map((r) => r.nombre));
+        return `
+          <tr>
+            <td>${u.id}</td>
+            <td>
+              <div><strong>${u.nombre_apellido || ""}</strong></div>
+              <div class="muted">${u.correo || ""}</div>
+              <div class="muted">Legajo: ${u.legajo || "-"} | DNI: ${u.dni || "-"}</div>
+            </td>
+            <td>${u.tipo_usuario || ""}</td>
+            <td>${u.estado || ""}${u.bloqueado ? " / BLOQUEADO" : ""}</td>
+            <td>${modulos}</td>
+            <td>${roles}</td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn" onclick="editUser(${u.id})">Editar</button>
+                <button class="btn warn" onclick="toggleBlock(${u.id}, ${u.bloqueado ? "false" : "true"})">${u.bloqueado ? "Desbloquear" : "Bloquear"}</button>
+                <button class="btn" onclick="toggleState(${u.id}, '${u.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO"}')">${u.estado === "ACTIVO" ? "Desactivar" : "Activar"}</button>
+                <button class="btn danger" onclick="resetPwd(${u.id})">Restablecer clave</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderAccess(rows) {
+      const tb = $("access-body");
+      tb.innerHTML = rows.map((r) => `
+        <tr>
+          <td>${r.created_at || ""}</td>
+          <td>${r.evento || ""}</td>
+          <td>${r.nombre_apellido || r.username_input || ""}</td>
+          <td>${r.detalle || ""}</td>
+          <td>${r.ip || ""}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadAll() {
+      const me = await api("/me", { method: "GET", headers: {} });
+      if (!me.autenticado || me.tipo_usuario !== "ADMINISTRADOR") {
+        window.location.href = "/";
+        return;
+      }
+      state.me = me;
+      state.roles = await api("/admin/roles_funcionales", { method: "GET", headers: {} });
+      renderRoles();
+      state.users = await api("/admin/usuarios", { method: "GET", headers: {} });
+      renderUsers();
+      renderAccess(await api("/admin/accesos?limit=100", { method: "GET", headers: {} }));
+      fillForm(null);
+    }
+
+    async function editUser(id) {
+      const u = state.users.find((x) => x.id === id);
+      if (!u) return;
+      fillForm(u);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function toggleState(id, estado) {
+      await api(`/admin/usuarios/${id}/estado`, { method: "POST", body: JSON.stringify({ estado }) });
+      await loadAll();
+    }
+
+    async function toggleBlock(id, bloqueado) {
+      await api(`/admin/usuarios/${id}/bloqueo`, { method: "POST", body: JSON.stringify({ bloqueado }) });
+      await loadAll();
+    }
+
+    async function resetPwd(id) {
+      const password = prompt("Nueva contrasena (vacio para generar temporal):", "");
+      const data = await api(`/admin/usuarios/${id}/reset_password`, {
+        method: "POST",
+        body: JSON.stringify({ password: password || "", generar_automatica: !password }),
+      });
+      alert(`Contrasena restablecida: ${data.password || "(sin retorno)"}`);
+      await loadAll();
+    }
+
+    window.editUser = editUser;
+    window.toggleState = toggleState;
+    window.toggleBlock = toggleBlock;
+    window.resetPwd = resetPwd;
+
+    $("btn-cancel").addEventListener("click", () => fillForm(null));
+
+    $("user-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      setMsg("");
+      const payload = {
+        nombre_apellido: $("f_nombre").value.trim(),
+        dni: $("f_dni").value.trim(),
+        legajo: $("f_legajo").value.trim(),
+        correo: $("f_correo").value.trim(),
+        password: $("f_password").value,
+        estado: $("f_estado").value,
+        tipo_usuario: $("f_tipo").value,
+        modulos: selectedModulos(),
+        roles: selectedRoles(),
+      };
+
+      try {
+        let r;
+        if (state.editId) {
+          r = await api(`/admin/usuarios/${state.editId}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+          if (r.error) throw new Error(r.error);
+          setMsg("Usuario actualizado", true);
+        } else {
+          r = await api("/admin/usuarios", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          if (r.error) throw new Error(r.error);
+          setMsg(r.password_temporal ? `Usuario creado. Clave temporal: ${r.password_temporal}` : "Usuario creado", true);
+        }
+        await loadAll();
+      } catch (err) {
+        setMsg(String(err.message || err));
+      }
+    });
+
+    renderModulos();
+    loadAll().catch(() => { window.location.href = "/"; });
+  </script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion Operativa</title>
+<style>
+  :root {
+    --bg-1: #0f172a;
+    --bg-2: #1e293b;
+    --bg-3: #0b1120;
+    --panel: rgba(15, 23, 42, 0.66);
+    --panel-soft: rgba(15, 23, 42, 0.45);
+    --line: rgba(148, 163, 184, 0.35);
+    --text: #e2e8f0;
+    --muted: #93c5fd;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+  }
+
+  .bg-photo {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center/cover no-repeat;
+    opacity: 0.66;
+    pointer-events: none;
+  }
+
+  .bg-blur {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
+      radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
+  }
+
+  .app-shell {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 14px;
+    min-height: 100vh;
+    padding: 14px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
+  }
+
+  .sidebar {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
+    background: var(--panel-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .brand img {
+    width: 78%;
+    max-width: 170px;
+    object-fit: contain;
+  }
+
+  .menu {
+    display: grid;
+    gap: 8px;
+  }
+
+  .menu button {
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.55);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .menu button.active {
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    border-color: rgba(147, 197, 253, 0.8);
+  }
+
+  .main {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .top { padding: 14px; }
+  .top h1 { margin: 0; font-size: 24px; }
+  .top p { margin: 6px 0 0; color: #bfdbfe; font-size: 13px; }
+
+  .filters {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(120px, 1fr));
+    gap: 8px;
+    align-items: end;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; text-transform: uppercase; color: #bfdbfe; font-weight: 700; letter-spacing: 0.05em; }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  input, select, button {
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(2, 6, 23, 0.55);
+    color: var(--text);
+    padding: 9px;
+  }
+
+  button { cursor: pointer; font-weight: 700; }
+  .btn-accent { background: linear-gradient(135deg, #1d4ed8, #0284c7); }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+  }
+
+  .kpi-card { padding: 12px; }
+  .kpi-card small {
+    color: #bfdbfe;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+  }
+  .kpi-card h3 { margin: 8px 0 0; font-size: 24px; }
+
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .chart-card {
+    padding: 12px;
+    min-height: 220px;
+  }
+
+  .chart-card h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+
+  .bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 160px;
+    overflow: auto;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 64px;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  .bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #dbeafe; }
+  .bar-track { height: 10px; border-radius: 999px; background: rgba(148, 163, 184, 0.22); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; }
+  .bar-val { text-align: right; color: #bfdbfe; }
+
+  .table-card {
+    padding: 12px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    max-height: 360px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1200px;
+  }
+
+  th, td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    text-align: left;
+    font-size: 13px;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 2;
+    font-size: 12px;
+    color: #bfdbfe;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .right { text-align: right; }
+
+  @media (max-width: 1180px) {
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 900px) {
+    .app-shell { grid-template-columns: 1fr; }
+    .sidebar { order: 2; }
+    .main { order: 1; }
+    .kpi-grid { grid-template-columns: 1fr; }
+    .charts { grid-template-columns: 1fr; }
+    .filters { grid-template-columns: 1fr; }
+    .top h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="app-shell">
+  <aside class="sidebar card">
+    <div class="brand">
+      <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+    </div>
+    <div class="menu">
+      <button type="button" onclick="ir('/dashboard')">Dashboard</button>
+      <button type="button" onclick="ir('/form')">Solicitud de Viaje</button>
+      <button type="button" onclick="ir('/recursos_form')">Asignar Recursos</button>
+      <button type="button" onclick="ir('/vehiculos_form')">Vehiculos</button>
+      <button type="button" onclick="ir('/personal_form')">Personal</button>
+      <button type="button" onclick="ir('/ordenes_view')">Ordenes de Salida</button>
+      <button class="active" type="button">Gestion Operativa</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="top card">
+      <h1>Gestion Operativa</h1>
+      <p>Indicadores automaticos desde Ordenes de Salida y Cierre Logistico.</p>
+    </section>
+
+    <section class="filters card">
+      <div class="field">
+        <label for="f-desde">Desde</label>
+        <input id="f-desde" type="date">
+      </div>
+      <div class="field">
+        <label for="f-hasta">Hasta</label>
+        <input id="f-hasta" type="date">
+      </div>
+      <div class="field">
+        <label for="f-orden">N° de Orden</label>
+        <select id="f-orden">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-proyecto">Proyecto</label>
+        <select id="f-proyecto">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-centro">Centro de Costos</label>
+        <select id="f-centro">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-empleado">Empleado</label>
+        <select id="f-empleado">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn-accent" type="button" onclick="buscarGestionOperativa()">Buscar</button>
+        <button type="button" onclick="limpiarFiltrosGestionOperativa()">Limpiar filtros</button>
+        <button type="button" onclick="descargarGestionOperativaPdf()">Descargar PDF</button>
+        <button type="button" onclick="descargarGestionOperativaExcel()">Exportar Excel</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid">
+      <article class="kpi-card card"><small>Horas Hombre Mes</small><h3 id="kpi-hh">0</h3></article>
+      <article class="kpi-card card"><small>Horas Compensables Mes</small><h3 id="kpi-comp">0</h3></article>
+      <article class="kpi-card card"><small>Viajes Ejecutados</small><h3 id="kpi-viajes">0</h3></article>
+      <article class="kpi-card card"><small>Costo Operativo Mes</small><h3 id="kpi-costo">0</h3></article>
+      <article class="kpi-card card"><small>Jornadas (Filtro)</small><h3 id="kpi-jornadas">0</h3></article>
+    </section>
+
+    <section class="charts">
+      <article class="chart-card card"><h3>Horas por Proyecto</h3><div id="chart-horas-proyecto" class="bars"></div></article>
+      <article class="chart-card card"><h3>Horas Compensables por Mes</h3><div id="chart-comp-mes" class="bars"></div></article>
+      <article class="chart-card card"><h3>Viajes por Proyecto</h3><div id="chart-viajes-proyecto" class="bars"></div></article>
+      <article class="chart-card card"><h3>Costos por Proyecto</h3><div id="chart-costos-proyecto" class="bars"></div></article>
+    </section>
+
+    <section class="table-card card">
+      <h3 style="margin-top:0;">Resumen Operativo</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nro Orden</th>
+              <th>Empleado</th>
+              <th>Rol</th>
+              <th>Proyecto</th>
+              <th>Centro de Costos</th>
+              <th>Origen</th>
+              <th>Destino</th>
+              <th class="right">Jornadas</th>
+              <th class="right">HH</th>
+              <th class="right">Compensables</th>
+              <th class="right">Viaticos</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+function ir(url) { window.location.href = url; }
+
+function esc(v) {
+  const d = document.createElement('div');
+  d.textContent = v == null ? '' : String(v);
+  return d.innerHTML;
+}
+
+function formatNumber(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n)
+    ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+    : '0,00';
+}
+
+function formatInt(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? new Intl.NumberFormat('es-AR').format(n) : '0';
+}
+
+function construirQueryGestionOperativa(){
+  const params = new URLSearchParams();
+  const desde = document.getElementById('f-desde')?.value || '';
+  const hasta = document.getElementById('f-hasta')?.value || '';
+  const nroOrden = document.getElementById('f-orden')?.value || '';
+  const proyecto = document.getElementById('f-proyecto')?.value || '';
+  const centroCosto = document.getElementById('f-centro')?.value || '';
+  const empleado = document.getElementById('f-empleado')?.value || '';
+  if (desde) params.set('desde', desde);
+  if (hasta) params.set('hasta', hasta);
+  if (nroOrden) params.set('nro_orden', nroOrden);
+  if (proyecto) params.set('proyecto', proyecto);
+  if (centroCosto) params.set('centro_costo', centroCosto);
+  if (empleado) params.set('empleado', empleado);
+  return params.toString();
+}
+
+function descargarArchivoGestionOperativa(url){
+  const link = document.createElement('a');
+  link.href = url;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function buscarGestionOperativa(){
+  cargarGestionOperativa();
+}
+
+function limpiarFiltrosGestionOperativa(){
+  ['f-desde','f-hasta','f-orden','f-proyecto','f-centro','f-empleado'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  cargarGestionOperativa();
+}
+
+function descargarGestionOperativaPdf(){
+  const qs = construirQueryGestionOperativa();
+  descargarArchivoGestionOperativa(`/gestion_operativa/pdf${qs ? `?${qs}` : ''}`);
+}
+
+function descargarGestionOperativaExcel(){
+  const qs = construirQueryGestionOperativa();
+  descargarArchivoGestionOperativa(`/gestion_operativa/excel${qs ? `?${qs}` : ''}`);
+}
+
+function renderBars(id, data, color) {
+  const cont = document.getElementById(id);
+  if (!cont) return;
+  const rows = Array.isArray(data) ? data.slice(0, 12) : [];
+  if (!rows.length) {
+    cont.innerHTML = '<div class="bar-row"><div class="bar-label">Sin datos</div><div class="bar-track"><div class="bar-fill" style="width:0;background:' + color + '"></div></div><div class="bar-val">0</div></div>';
+    return;
+  }
+
+  const max = Math.max(...rows.map(r => Number(r.value || 0)), 1);
+  cont.innerHTML = rows.map((row) => {
+    const val = Number(row.value || 0);
+    const pct = Math.max(0, Math.min(100, (val / max) * 100));
+    return '<div class="bar-row">'
+      + '<div class="bar-label" title="' + esc(row.label || '') + '">' + esc(row.label || '') + '</div>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct.toFixed(1) + '%;background:' + color + ';"></div></div>'
+      + '<div class="bar-val">' + esc(formatNumber(val)) + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderTabla(data) {
+  const tbody = document.getElementById('tabla-body');
+  if (!tbody) return;
+  const rows = Array.isArray(data) ? data : [];
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11">Sin datos para los filtros seleccionados.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r) =>
+    '<tr>'
+    + '<td>' + esc(r.nro_orden || '') + '</td>'
+    + '<td>' + esc(r.empleado || '') + '</td>'
+    + '<td>' + esc(r.rol || '') + '</td>'
+    + '<td>' + esc(r.proyecto || '') + '</td>'
+    + '<td>' + esc(r.centro_costo || '') + '</td>'
+    + '<td>' + esc(r.origen || '') + '</td>'
+    + '<td>' + esc(r.destino || '') + '</td>'
+    + '<td class="right">' + esc(formatNumber(r.jornadas || 0)) + '</td>'
+    + '<td class="right">' + esc(formatNumber(r.hh || 0)) + '</td>'
+    + '<td class="right">' + esc(formatNumber(r.compensables || 0)) + '</td>'
+    + '<td class="right">' + esc(formatNumber(r.viaticos || 0)) + '</td>'
+    + '</tr>'
+  ).join('');
+}
+
+function cargarOpcionesSelect(id, values) {
+  const select = document.getElementById(id);
+  if (!select) return;
+
+  const selected = select.value || '';
+  const opciones = Array.isArray(values) ? values : [];
+
+  select.innerHTML = '<option value="">Todos</option>'
+    + opciones.map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+
+  if (selected && opciones.includes(selected)) {
+    select.value = selected;
+  }
+}
+
+async function cargarFiltrosGestionOperativa() {
+  try {
+    const res = await fetch('/gestion_operativa/filtros');
+    const data = await res.json();
+    cargarOpcionesSelect('f-orden', data.ordenes || []);
+    cargarOpcionesSelect('f-proyecto', data.proyectos || []);
+    cargarOpcionesSelect('f-centro', data.centros_costo || []);
+    cargarOpcionesSelect('f-empleado', data.empleados || []);
+  } catch (err) {
+    console.warn('No se pudieron cargar opciones de filtros de gestion operativa', err);
+  }
+}
+
+async function cargarGestionOperativa() {
+  const qs = construirQueryGestionOperativa();
+
+  try {
+    const res = await fetch(`/gestion_operativa/resumen${qs ? `?${qs}` : ''}`);
+    const data = await res.json();
+
+    const k = data.kpis || {};
+    document.getElementById('kpi-hh').textContent = formatNumber(k.horas_hombre_mes || 0);
+    document.getElementById('kpi-comp').textContent = formatNumber(k.horas_compensables_mes || 0);
+    document.getElementById('kpi-viajes').textContent = formatInt(k.viajes_ejecutados || 0);
+    document.getElementById('kpi-costo').textContent = formatNumber(k.costo_operativo_mes || 0);
+    document.getElementById('kpi-jornadas').textContent = formatNumber(k.jornadas_filtradas || 0);
+
+    renderTabla(data.tabla || []);
+
+    const g = data.graficos || {};
+    renderBars('chart-horas-proyecto', g.horas_por_proyecto || [], '#38bdf8');
+    renderBars('chart-comp-mes', g.horas_compensables_por_mes || [], '#f59e0b');
+    renderBars('chart-viajes-proyecto', g.viajes_por_proyecto || [], '#60a5fa');
+    renderBars('chart-costos-proyecto', g.costos_por_proyecto || [], '#fb7185');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await cargarFiltrosGestionOperativa();
+  await cargarGestionOperativa();
+});
+</script>
+</body>
+</html>

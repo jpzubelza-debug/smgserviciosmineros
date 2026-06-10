@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMG Servicios Mineros | Plataforma Operativa</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap");
+
+    :root {
+      --bg-1: #eaf1f8;
+      --bg-2: #cfdbea;
+      --ink: #102235;
+      --ink-soft: #4a5e75;
+      --brand: #0d4f8c;
+      --brand-strong: #083a68;
+      --accent: #1f7cc5;
+      --line: rgba(18, 54, 88, 0.18);
+      --card: rgba(255, 255, 255, 0.64);
+      --glass: rgba(255, 255, 255, 0.52);
+      --shadow: 0 22px 48px rgba(8, 34, 58, 0.16);
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Barlow", "Segoe UI", sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        linear-gradient(115deg, rgba(7, 49, 84, 0.82), rgba(11, 72, 123, 0.52), rgba(236, 245, 255, 0.78)),
+        url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat fixed;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.24), transparent 44%),
+        radial-gradient(circle at 82% 78%, rgba(8, 58, 104, 0.24), transparent 42%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(7, 39, 66, 0.15));
+      z-index: 0;
+    }
+
+    .site {
+      position: relative;
+      z-index: 1;
+      width: min(1240px, calc(100% - 40px));
+      margin: 22px auto 38px;
+    }
+
+    .top-nav {
+      position: sticky;
+      top: 10px;
+      z-index: 20;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      animation: slide-down 0.65s ease-out;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .logo-main {
+      height: 56px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 8px 18px rgba(8, 34, 58, 0.16));
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+      padding: 8px 10px;
+      border-radius: 10px;
+      transition: background 0.2s ease, color 0.2s ease;
+      font-size: 14px;
+    }
+
+    .nav-links a:hover {
+      background: rgba(8, 58, 104, 0.12);
+      color: var(--brand-strong);
+    }
+
+    .login-container {
+      position: relative;
+      min-width: 180px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .login-trigger {
+      border: 1px solid rgba(8, 58, 104, 0.38);
+      background: linear-gradient(135deg, var(--brand), #2d8fd8);
+      color: #ffffff;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-family: "Rajdhani", sans-serif;
+      letter-spacing: 0.05em;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-trigger:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .login-panel {
+      position: absolute;
+      top: calc(100% + 12px);
+      right: 0;
+      width: min(320px, calc(100vw - 26px));
+      border: 1px solid rgba(8, 58, 104, 0.26);
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(9px);
+      border-radius: var(--radius-md);
+      box-shadow: 0 16px 34px rgba(5, 29, 49, 0.2);
+      padding: 14px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+    }
+
+    .login-container:hover .login-panel,
+    .login-container:focus-within .login-panel,
+    .login-container.is-open .login-panel {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .login-panel h3 {
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--brand-strong);
+      margin-bottom: 8px;
+    }
+
+    .login-panel form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .login-panel label {
+      display: grid;
+      gap: 5px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
+    .login-panel input {
+      border: 1px solid rgba(8, 58, 104, 0.24);
+      border-radius: 9px;
+      padding: 9px 10px;
+      font-size: 14px;
+      font-family: "Barlow", sans-serif;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+    }
+
+    .login-panel input:focus {
+      outline: none;
+      border-color: rgba(31, 124, 197, 0.75);
+      box-shadow: 0 0 0 2px rgba(31, 124, 197, 0.18);
+    }
+
+    .login-panel button {
+      border: 1px solid rgba(8, 58, 104, 0.42);
+      border-radius: 10px;
+      padding: 9px;
+      background: linear-gradient(125deg, #0a4a83, #1e7fc7);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .error {
+      display: none;
+      margin-top: 8px;
+      background: rgba(190, 54, 54, 0.12);
+      color: #922f2f;
+      border: 1px solid rgba(190, 54, 54, 0.3);
+      border-radius: 9px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hero {
+      margin-top: 20px;
+      border-radius: 24px;
+      overflow: hidden;
+      min-height: 74vh;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      box-shadow: var(--shadow);
+      position: relative;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 42px 26px;
+      background:
+        linear-gradient(135deg, rgba(8, 37, 66, 0.82), rgba(13, 79, 140, 0.45), rgba(233, 241, 250, 0.24)),
+        url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat;
+      animation: fade-up 0.8s ease-out;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.22), transparent 32%),
+        linear-gradient(0deg, rgba(3, 24, 42, 0.35), rgba(3, 24, 42, 0.35));
+    }
+
+    .hero-content {
+      position: relative;
+      max-width: 900px;
+      color: #f6fbff;
+    }
+
+    .hero-content h1 {
+      font-family: "Rajdhani", sans-serif;
+      font-size: clamp(35px, 7vw, 72px);
+      line-height: 0.95;
+      letter-spacing: 0.01em;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    .hero-content p {
+      font-size: clamp(17px, 2.35vw, 30px);
+      line-height: 1.2;
+      color: #e8f3ff;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    .hero-content .minor {
+      font-size: clamp(14px, 1.8vw, 20px);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #d0e8ff;
+      margin-bottom: 28px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 999px;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 12px 24px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, rgba(8, 58, 104, 0.78), rgba(31, 124, 197, 0.65));
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      background: linear-gradient(135deg, rgba(8, 58, 104, 0.9), rgba(31, 124, 197, 0.78));
+    }
+
+    .section {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      padding: 28px;
+      animation: fade-up 0.7s ease both;
+    }
+
+    .showcase {
+      margin-top: 22px;
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      margin-right: calc(50% - 50vw);
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .carousel {
+      position: relative;
+      border-radius: 0;
+      overflow: hidden;
+      border-top: 1px solid rgba(8, 58, 104, 0.22);
+      border-bottom: 1px solid rgba(8, 58, 104, 0.22);
+      min-height: clamp(320px, 62vh, 760px);
+      background: rgba(10, 34, 59, 0.65);
+    }
+    .carousel-copy {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 22px;
+      pointer-events: none;
+    }
+
+    .carousel-copy .hero-content {
+      max-width: 980px;
+    }
+
+    .carousel-copy .btn-primary {
+      pointer-events: auto;
+    }
+
+    .carousel-track {
+      position: relative;
+      height: clamp(320px, 62vh, 760px);
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      display: flex;
+      align-items: flex-end;
+      padding: 14px;
+    }
+
+    .slide.active {
+      opacity: 1;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.62));
+    }
+
+    .carousel-controls {
+      position: absolute;
+      inset: auto 16px 14px auto;
+      z-index: 3;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      background: rgba(15, 23, 42, 0.55);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .dot.active {
+      background: #38bdf8;
+      border-color: #7dd3fc;
+    }
+
+    .ctrl-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 232, 240, 0.75);
+      background: rgba(8, 58, 104, 0.6);
+      color: #f0f9ff;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .section h2 {
+      font-family: "Rajdhani", sans-serif;
+      color: var(--brand-strong);
+      font-size: clamp(30px, 4vw, 44px);
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .section-intro {
+      color: var(--ink-soft);
+      font-size: 17px;
+      margin-bottom: 18px;
+      max-width: 980px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid rgba(18, 54, 88, 0.14);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 28px rgba(8, 34, 58, 0.12);
+    }
+
+    .card h3 {
+      font-size: 20px;
+      color: var(--brand);
+      margin-bottom: 9px;
+      font-family: "Rajdhani", sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .card p,
+    .card li {
+      color: var(--ink-soft);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .card ul {
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+    }
+
+      min-height: clamp(420px, 78vh, 980px);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(8, 58, 104, 0.2);
+      background:
+        linear-gradient(120deg, rgba(13, 79, 140, 0.1), rgba(255, 255, 255, 0.4)),
+        rgba(255, 255, 255, 0.8);
+      height: clamp(420px, 78vh, 980px);
+      display: grid;
+      gap: 14px;
+    }
+
+    .logistics-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .logistics-list li {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(8, 58, 104, 0.16);
+      border-radius: 10px;
+      padding: 10px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+
+    .btn-secondary {
+      width: fit-content;
+      border: 1px solid rgba(8, 58, 104, 0.35);
+      border-radius: 999px;
+      padding: 11px 18px;
+      text-decoration: none;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0a4a83, #2789d1);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: transform 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+    }
+
+    footer {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(8, 35, 60, 0.86);
+      color: #e7f3ff;
+      padding: 26px;
+      box-shadow: var(--shadow);
+    }
+
+    footer h2 {
+      font-family: "Rajdhani", sans-serif;
+      letter-spacing: 0.04em;
+      font-size: 30px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .footer-block p,
+    .footer-block a {
+      display: block;
+      color: #cfe4f7;
+      text-decoration: none;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .footer-block a:hover {
+      color: #ffffff;
+    }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slide-down {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1120px) {
+      .top-nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .login-container {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .login-panel {
+        right: auto;
+        left: 0;
+      }
+
+      .logo-main {
+        height: 50px;
+      }
+    }
+
+    @media (max-width: 880px) {
+      .site {
+        width: calc(100% - 24px);
+      }
+
+      .hero {
+        min-height: 62vh;
+      }
+
+      .grid-3,
+      .grid-2,
+      .logistics-list,
+      .footer-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 22px;
+      }
+
+      .carousel,
+      .carousel-track {
+        min-height: clamp(320px, 62vh, 700px);
+        height: clamp(320px, 62vh, 700px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay"></div>
+
+  <main class="site">
+    <header class="top-nav" id="inicio">
+      <a class="logo" href="#inicio">
+        <img class="logo-main" src="/Imagenes/image001.png" alt="Logo SMG" />
+      </a>
+
+      <nav aria-label="Navegacion principal">
+        <ul class="nav-links">
+          <li><a href="#inicio">Inicio</a></li>
+          <li><a href="#nosotros">Nosotros</a></li>
+          <li><a href="#servicios">Servicios</a></li>
+          <li><a href="#experiencia">Proyectos</a></li>
+          <li><a href="#logistica">Logistica</a></li>
+          <li><a href="#servicios">Campamentos</a></li>
+          <li><a href="#servicios">I+D</a></li>
+          <li><a href="#contacto">Contacto</a></li>
+        </ul>
+      </nav>
+
+      <div class="login-container" id="acceso-plataforma">
+        <a class="login-trigger" href="#acceso-plataforma" aria-haspopup="true" aria-expanded="false">Acceso Usuarios</a>
+
+        <div class="login-panel" role="dialog" aria-label="Formulario de acceso">
+          <h3>Acceso</h3>
+          <form method="post" action="/login">
+            <label>
+              Usuario
+              <input id="username" type="text" name="username" autocomplete="username" required>
+            </label>
+
+            <label>
+              Contrasena
+              <input type="password" name="password" autocomplete="current-password" required>
+            </label>
+
+            <button type="submit">Ingresar</button>
+          </form>
+          <div id="error-msg" class="error">Usuario o contrasena incorrectos.</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="showcase" id="galeria" aria-label="Galeria Operativa">
+      <div class="carousel" aria-label="Carrusel de imagenes">
+        <div class="carousel-track" id="carousel-track">
+        </div>
+          <div class="carousel-copy" aria-hidden="false">
+            <div class="hero-content">
+              <p>Soluciones Integrales para la<br>Industria Minera e Industrial</p>
+              <p class="minor">Construccion • Logistica • Rental • Campamentos</p>
+              <a class="btn-primary" href="#servicios">Conocer Servicios</a>
+            </div>
+          </div>
+        <div class="carousel-controls" id="carousel-controls">
+          <button class="ctrl-btn" id="prev-slide" type="button" aria-label="Anterior">&lt;</button>
+          <div id="carousel-dots" style="display:flex; gap:6px;"></div>
+          <button class="ctrl-btn" id="next-slide" type="button" aria-label="Siguiente">&gt;</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="nosotros">
+      <h2>Nosotros</h2>
+      <p class="section-intro">SMG impulsa operaciones mineras e industriales con enfoque en productividad, seguridad y continuidad operativa en la region de la Puna.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Mision</h3>
+          <p>Ser la principal empresa proveedora de servicios mineros del norte argentino.</p>
+        </article>
+        <article class="card">
+          <h3>Vision</h3>
+          <p>Desarrollar capacidad productiva minera sustentable para la region Puna.</p>
+        </article>
+        <article class="card">
+          <h3>Valores</h3>
+          <ul>
+            <li>Integridad</li>
+            <li>Trabajo en equipo</li>
+            <li>Compromiso</li>
+            <li>Solidaridad</li>
+            <li>Confianza</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="servicios">
+      <h2>Servicios</h2>
+      <p class="section-intro">Portafolio integral basado en capacidades de construccion, logistica, rental, campamentos y desarrollo tecnico aplicado a operaciones mineras.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Construccion</h3>
+          <ul>
+            <li>Movimiento de suelo</li>
+            <li>Obras civiles</li>
+            <li>Topografia</li>
+            <li>Galpones</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Rental</h3>
+          <ul>
+            <li>Excavadoras</li>
+            <li>Topadoras</li>
+            <li>Cargadoras</li>
+            <li>Camiones</li>
+            <li>Hidrogruas</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Campamentos</h3>
+          <ul>
+            <li>Venta</li>
+            <li>Alquiler</li>
+            <li>Montaje</li>
+            <li>Mantenimiento</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Logistica y Transporte</h3>
+          <ul>
+            <li>Personal</li>
+            <li>Equipos</li>
+            <li>Cargas generales</li>
+            <li>Cargas a granel</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Investigacion y Desarrollo</h3>
+          <ul>
+            <li>Exploracion</li>
+            <li>Evaluacion de yacimientos</li>
+            <li>Quimica de procesos</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Tratamiento de Agua</h3>
+          <ul>
+            <li>Hipoclorito de calcio</li>
+            <li>Hipoclorito de sodio</li>
+            <li>Gas cloro</li>
+            <li>Sulfato de aluminio</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="experiencia">
+      <h2>Experiencia</h2>
+      <p class="section-intro">Proyectos ejecutados con escala operativa, precision tecnica y resultados medibles en terreno.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Salar del Rincon</h3>
+          <ul>
+            <li>120 Ha de pozas solares</li>
+            <li>Terraplenes</li>
+            <li>Caminos</li>
+            <li>Consolidacion de terrenos</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Salar de Olaroz</h3>
+          <ul>
+            <li>500 Ha de pozas</li>
+            <li>Canales de guarda</li>
+            <li>Plataformas</li>
+            <li>Terraplenes</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Sales de Jujuy</h3>
+          <ul>
+            <li>Campamento para 200 personas</li>
+            <li>Montaje integral</li>
+            <li>Servicios generales</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="logistica">
+      <h2>Gestion Operativa en Tiempo Real</h2>
+      <p class="section-intro">Nuestra plataforma centraliza toda la operacion logistica para dar trazabilidad y control continuo sobre viajes, recursos y cumplimiento.</p>
+      <div class="logistics-panel">
+        <ul class="logistics-list">
+          <li>Planificacion de viajes</li>
+          <li>Ordenes de salida</li>
+          <li>Control de flota</li>
+          <li>Habilitacion de personal</li>
+          <li>Gestion de recursos</li>
+          <li>Dashboard operativo</li>
+        </ul>
+        <a class="btn-secondary" id="open-login" href="#acceso-plataforma">Acceso Usuarios</a>
+      </div>
+    </section>
+
+    <section class="section" id="contacto">
+      <h2>Contacto</h2>
+      <p class="section-intro">Estamos listos para acompanar tus operaciones mineras con soluciones a medida y soporte continuo.</p>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Ubicacion</h3>
+          <p>Santa Catalina 551</p>
+          <p>Palpala - Jujuy</p>
+        </article>
+        <article class="card">
+          <h3>Canales</h3>
+          <p>+54 XXX</p>
+          <p>info@smgminera.com</p>
+          <p>LinkedIn • Instagram • Facebook</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      <h2>SMG Servicios Mineros</h2>
+      <div class="footer-grid">
+        <div class="footer-block">
+          <p>Santa Catalina 551</p>
+          <p>Palpala - Jujuy</p>
+          <p>+54 XXX</p>
+          <p>info@smgminera.com</p>
+        </div>
+        <div class="footer-block">
+          <a href="#" aria-label="LinkedIn">LinkedIn</a>
+          <a href="#" aria-label="Instagram">Instagram</a>
+          <a href="#" aria-label="Facebook">Facebook</a>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const query = new URLSearchParams(window.location.search);
+    if (query.get("error") === "1") {
+      const error = document.getElementById("error-msg");
+      if (error) {
+        error.style.display = "block";
+      }
+    }
+
+    const opener = document.getElementById("open-login");
+    const container = document.getElementById("acceso-plataforma");
+    const userInput = document.getElementById("username");
+    const trigger = document.querySelector(".login-trigger");
+
+    if (opener && container && userInput && trigger) {
+      opener.addEventListener("click", function () {
+        container.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+        setTimeout(function () {
+          userInput.focus();
+        }, 120);
+      });
+
+      document.addEventListener("click", function (event) {
+        if (!container.contains(event.target)) {
+          container.classList.remove("is-open");
+          trigger.setAttribute("aria-expanded", "false");
+        }
+      });
+    }
+
+    (async function initCarousel() {
+      const track = document.getElementById("carousel-track");
+      const dotsWrap = document.getElementById("carousel-dots");
+      const prevBtn = document.getElementById("prev-slide");
+      const nextBtn = document.getElementById("next-slide");
+      if (!track || !dotsWrap || !prevBtn || !nextBtn) {
+        return;
+      }
+
+      let fotos = [];
+      try {
+        const resp = await fetch("/imagenes/editadas/listado", { credentials: "same-origin" });
+        const data = await resp.json();
+        fotos = Array.isArray(data.imagenes) ? data.imagenes : [];
+      } catch (_) {
+        fotos = [];
+      }
+
+      if (!fotos.length) {
+        const empty = document.createElement("div");
+        empty.style.position = "absolute";
+        empty.style.inset = "0";
+        empty.style.display = "grid";
+        empty.style.placeItems = "center";
+        empty.style.color = "#e2e8f0";
+        empty.style.background = "rgba(2, 6, 23, 0.45)";
+        empty.textContent = "No hay imagenes disponibles en /Imagenes/Editadas.";
+        track.appendChild(empty);
+        document.getElementById("carousel-controls").style.display = "none";
+        return;
+      }
+
+      const slides = [];
+      track.querySelectorAll(".slide").forEach((s) => s.remove());
+      fotos.forEach((img, i) => {
+        const slide = document.createElement("div");
+        slide.className = "slide" + (i === 0 ? " active" : "");
+        const src = String(img.url || "").replace(/ /g, "%20");
+        slide.style.backgroundImage = `url('${src}')`;
+        track.appendChild(slide);
+        slides.push(slide);
+      });
+
+      let idx = 0;
+      let timer = null;
+
+      function paint(i) {
+        idx = (i + slides.length) % slides.length;
+        slides.forEach((s, p) => s.classList.toggle("active", p === idx));
+        Array.from(dotsWrap.children).forEach((d, p) => d.classList.toggle("active", p === idx));
+      }
+
+      slides.forEach((_, i) => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "dot" + (i === 0 ? " active" : "");
+        dot.setAttribute("aria-label", `Ir a imagen ${i + 1}`);
+        dot.addEventListener("click", function () {
+          paint(i);
+          restart();
+        });
+        dotsWrap.appendChild(dot);
+      });
+
+      function next() {
+        paint(idx + 1);
+      }
+
+      function prev() {
+        paint(idx - 1);
+      }
+
+      function restart() {
+        if (timer) {
+          clearInterval(timer);
+        }
+        timer = setInterval(next, 4300);
+      }
+
+      nextBtn.addEventListener("click", function () {
+        next();
+        restart();
+      });
+
+      prevBtn.addEventListener("click", function () {
+        prev();
+        restart();
+      });
+
+      paint(0);
+      restart();
+    })();
+  </script>
+</body>
+</html>
