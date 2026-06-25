@@ -1216,6 +1216,171 @@ def obtener_ordenes_data():
         ordenes.append(orden)
     return ordenes
 
+
+def generar_numero_orden_sql(conn):
+    rows = conn.execute("SELECT nro_orden FROM ordenes_salida").fetchall()
+    max_num = 0
+    for r in rows:
+        nro = str(r["nro_orden"] or "").strip()
+        if nro.startswith("OS-"):
+            try:
+                max_num = max(max_num, int(nro.split("-")[1]))
+            except Exception:
+                continue
+    return f"OS-{max_num + 1:06d}"
+
+
+def guardar_viaje_sql(conn, viaje_data):
+    if not isinstance(viaje_data, dict):
+        viaje_data = {}
+
+    acompanantes = viaje_data.get("acompanantes")
+    if isinstance(acompanantes, list):
+        acompanantes = json.dumps(acompanantes, ensure_ascii=False)
+
+    conn.execute(
+        """
+        INSERT INTO viajes (
+            id, solicitante, area, origen, destino, motivo,
+            fecha_salida, fecha_regreso, chofer, vehiculo, acompanantes, alojamiento,
+            estado, fecha_creacion,
+            orden_salida_generada, nro_orden_salida, raw_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            solicitante = excluded.solicitante,
+            area = excluded.area,
+            origen = excluded.origen,
+            destino = excluded.destino,
+            motivo = excluded.motivo,
+            fecha_salida = excluded.fecha_salida,
+            fecha_regreso = excluded.fecha_regreso,
+            chofer = excluded.chofer,
+            vehiculo = excluded.vehiculo,
+            acompanantes = excluded.acompanantes,
+            alojamiento = excluded.alojamiento,
+            estado = excluded.estado,
+            fecha_creacion = excluded.fecha_creacion,
+            orden_salida_generada = excluded.orden_salida_generada,
+            nro_orden_salida = excluded.nro_orden_salida,
+            raw_json = excluded.raw_json
+        """,
+        (
+            viaje_data.get("id"),
+            viaje_data.get("solicitante"),
+            viaje_data.get("area"),
+            viaje_data.get("origen"),
+            viaje_data.get("destino"),
+            viaje_data.get("motivo"),
+            viaje_data.get("fecha_salida"),
+            viaje_data.get("fecha_regreso"),
+            viaje_data.get("chofer"),
+            viaje_data.get("vehiculo"),
+            acompanantes,
+            viaje_data.get("alojamiento"),
+            viaje_data.get("estado"),
+            viaje_data.get("fecha_creacion"),
+            1 if viaje_data.get("orden_salida_generada") else 0,
+            viaje_data.get("nro_orden_salida"),
+            json.dumps(viaje_data, ensure_ascii=False),
+        ),
+    )
+
+
+def guardar_recursos_sql(conn, id_viaje, recursos_data):
+    if not isinstance(recursos_data, dict):
+        recursos_data = {}
+
+    conn.execute(
+        """
+        INSERT INTO recursos_viaje (
+            id_viaje, fecha, centro_costo, datos_solicitante, area_solicitante, partida,
+            destino, motivo_viaje, fecha_salida_viaje, fecha_regreso_viaje,
+            hora_ingreso_base, hora_salida, hora_regreso, duracion_jornadas,
+            itinerario, rutas, paradas, chofer, chofer_viatico, vehiculo,
+            vehiculo_fuera_flota, viaticos, medio_pago, alojamiento, otros_gastos,
+            verificado_administracion, comprobacion_operaciones_logistica_json, raw_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id_viaje) DO UPDATE SET
+            fecha = excluded.fecha,
+            centro_costo = excluded.centro_costo,
+            datos_solicitante = excluded.datos_solicitante,
+            area_solicitante = excluded.area_solicitante,
+            partida = excluded.partida,
+            destino = excluded.destino,
+            motivo_viaje = excluded.motivo_viaje,
+            fecha_salida_viaje = excluded.fecha_salida_viaje,
+            fecha_regreso_viaje = excluded.fecha_regreso_viaje,
+            hora_ingreso_base = excluded.hora_ingreso_base,
+            hora_salida = excluded.hora_salida,
+            hora_regreso = excluded.hora_regreso,
+            duracion_jornadas = excluded.duracion_jornadas,
+            itinerario = excluded.itinerario,
+            rutas = excluded.rutas,
+            paradas = excluded.paradas,
+            chofer = excluded.chofer,
+            chofer_viatico = excluded.chofer_viatico,
+            vehiculo = excluded.vehiculo,
+            vehiculo_fuera_flota = excluded.vehiculo_fuera_flota,
+            viaticos = excluded.viaticos,
+            medio_pago = excluded.medio_pago,
+            alojamiento = excluded.alojamiento,
+            otros_gastos = excluded.otros_gastos,
+            verificado_administracion = excluded.verificado_administracion,
+            comprobacion_operaciones_logistica_json = excluded.comprobacion_operaciones_logistica_json,
+            raw_json = excluded.raw_json
+        """,
+        (
+            id_viaje,
+            recursos_data.get("fecha"),
+            recursos_data.get("centro_costo"),
+            recursos_data.get("datos_solicitante"),
+            recursos_data.get("area_solicitante"),
+            recursos_data.get("partida"),
+            recursos_data.get("destino"),
+            recursos_data.get("motivo_viaje"),
+            recursos_data.get("fecha_salida_viaje"),
+            recursos_data.get("fecha_regreso_viaje"),
+            recursos_data.get("hora_ingreso_base"),
+            recursos_data.get("hora_salida"),
+            recursos_data.get("hora_regreso"),
+            recursos_data.get("duracion_jornadas"),
+            recursos_data.get("itinerario"),
+            recursos_data.get("rutas"),
+            recursos_data.get("paradas"),
+            recursos_data.get("chofer"),
+            float(recursos_data.get("chofer_viatico", 0) or 0),
+            recursos_data.get("vehiculo"),
+            1 if recursos_data.get("vehiculo_fuera_flota") else 0,
+            float(recursos_data.get("viaticos", 0) or 0),
+            recursos_data.get("medio_pago"),
+            recursos_data.get("alojamiento"),
+            float(recursos_data.get("otros_gastos", 0) or 0),
+            recursos_data.get("verificado_administracion"),
+            json.dumps(recursos_data.get("comprobacion_operaciones_logistica", {}), ensure_ascii=False),
+            json.dumps(recursos_data, ensure_ascii=False),
+        ),
+    )
+
+    conn.execute("DELETE FROM recurso_acompanantes WHERE id_viaje = ?", (id_viaje,))
+    nombres = recursos_data.get("acompanantes") or []
+    viaticos = recursos_data.get("acompanantes_con_viatico") or []
+    viaticos_map = {}
+    for item in viaticos:
+        if isinstance(item, dict):
+            nombre = str(item.get("nombre", "")).strip()
+            if nombre:
+                viaticos_map[nombre] = float(item.get("viatico", 0) or 0)
+    for nombre in nombres:
+        nombre_txt = str(nombre or "").strip()
+        if not nombre_txt:
+            continue
+        conn.execute(
+            "INSERT INTO recurso_acompanantes (id_viaje, nombre, viatico) VALUES (?, ?, ?)",
+            (id_viaje, nombre_txt, viaticos_map.get(nombre_txt, 0.0)),
+        )
+
 async def guardar_adjunto_logistico(upload: UploadFile | None, nro_orden: str, nombre_base: str):
     if upload is None or not upload.filename:
         return None
