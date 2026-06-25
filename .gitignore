@@ -1,6 +1,7 @@
 .env
 .venv/
 .venv-1/
+.venv311/
 __pycache__/
 
 # Python caches/build
@@ -13,6 +14,7 @@ __pycache__/
 # Local databases and backups
 *.db
 dashboard_backup_*.db
+backups/
 
 # Runtime/generated folders
 Doc_Almacen/
