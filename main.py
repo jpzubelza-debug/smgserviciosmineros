@@ -1064,9 +1064,6 @@ def init_sqlite():
         with get_sqlite_connection() as conn:
             with open(schema_target, "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
-            migrar_gestion_operativa(conn)
-            migrar_usuarios_admin(conn)
-            sembrar_configuracion_almacen(conn)
             conn.commit()
         return
 
