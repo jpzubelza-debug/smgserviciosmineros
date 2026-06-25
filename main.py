@@ -39,6 +39,7 @@ DOC_ALMACEN_ADJ_DIR = os.path.join(DOC_ALMACEN_DIR, "adjuntos")
 IMAGENES_EDITADAS_DIR = os.path.join(BASE_DIR, "Imagenes", "Editadas")
 SQLITE_DB_PATH = os.path.join(BASE_DIR, "dashboard.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "schema.sql")
+SCHEMA_PG_PATH = os.path.join(BASE_DIR, "schema_pg.sql")
 MEMBRETE_LOGO_PATH = os.path.join(BASE_DIR, "Imagenes", "09-smg.png")
 
 EMPRESA_MEMBRETE = {
@@ -1055,6 +1056,20 @@ def migrar_usuarios_admin(conn):
 
 
 def init_sqlite():
+    if _DATABASE_URL:
+        # En Render (PostgreSQL) no ejecutar migraciones destructivas de SQLite.
+        schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
+        if not os.path.exists(schema_target):
+            return
+        with get_sqlite_connection() as conn:
+            with open(schema_target, "r", encoding="utf-8") as f:
+                conn.executescript(f.read())
+            migrar_gestion_operativa(conn)
+            migrar_usuarios_admin(conn)
+            sembrar_configuracion_almacen(conn)
+            conn.commit()
+        return
+
     if not os.path.exists(SCHEMA_PATH):
         return
     max_intentos = 6
