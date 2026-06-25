@@ -312,6 +312,24 @@ CREATE TABLE IF NOT EXISTS remitos_entrega_detalle (
     FOREIGN KEY (producto_id) REFERENCES productos (id) ON DELETE RESTRICT
 );
 
+-- Compatibilidad para bases PostgreSQL existentes creadas con versiones previas
+-- del esquema que no incluian columnas de autorizacion/referencia.
+ALTER TABLE IF EXISTS remitos_ingreso
+    ADD COLUMN IF NOT EXISTS nro_remito_referencia TEXT;
+
+ALTER TABLE IF EXISTS remitos_entrega
+    ADD COLUMN IF NOT EXISTS estado_autorizacion TEXT DEFAULT 'AUTORIZADO';
+ALTER TABLE IF EXISTS remitos_entrega
+    ADD COLUMN IF NOT EXISTS fecha_autorizacion TEXT;
+ALTER TABLE IF EXISTS remitos_entrega
+    ADD COLUMN IF NOT EXISTS autorizado_por TEXT;
+ALTER TABLE IF EXISTS remitos_entrega
+    ADD COLUMN IF NOT EXISTS observaciones_autorizacion TEXT;
+
+UPDATE remitos_entrega
+   SET estado_autorizacion = COALESCE(NULLIF(TRIM(estado_autorizacion), ''), 'AUTORIZADO')
+ WHERE COALESCE(NULLIF(TRIM(estado_autorizacion), ''), '') = '';
+
 CREATE TABLE IF NOT EXISTS movimientos_stock (
     id SERIAL PRIMARY KEY,
     fecha TEXT,
