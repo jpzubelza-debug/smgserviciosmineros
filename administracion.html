@@ -99,6 +99,40 @@
       font-size: 0.86rem;
     }
     .checks input { width: auto; }
+    .paneles-box {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .paneles-group {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(11, 19, 40, 0.55);
+    }
+    .paneles-group h4 {
+      margin: 0 0 8px;
+      font-size: 0.86rem;
+      color: #bfdbfe;
+      font-weight: 600;
+    }
+    .acciones-box {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .acciones-group {
+      border: 1px dashed #365081;
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(8, 15, 33, 0.52);
+    }
+    .acciones-group h5 {
+      margin: 0 0 8px;
+      font-size: 0.84rem;
+      color: #93c5fd;
+      font-weight: 600;
+    }
     .table-wrap { overflow: auto; }
     table {
       width: 100%;
@@ -188,6 +222,14 @@
             <div class="checks" id="modulos-box"></div>
           </div>
           <div class="full">
+            <label>Permisos por panel</label>
+            <div class="paneles-box" id="paneles-box"></div>
+          </div>
+          <div class="full">
+            <label>Permisos por accion (Logistica)</label>
+            <div class="acciones-box" id="acciones-box"></div>
+          </div>
+          <div class="full">
             <label>Roles funcionales</label>
             <div class="checks" id="roles-box"></div>
           </div>
@@ -209,9 +251,12 @@
                 <th>Usuario</th>
                 <th>Tipo</th>
                 <th>Estado</th>
+                <th>Contrasena</th>
                 <th>Modulos</th>
+                <th>Paneles</th>
+                <th>Acciones panel</th>
                 <th>Roles</th>
-                <th>Acciones</th>
+                <th>Operaciones</th>
               </tr>
             </thead>
             <tbody id="users-body"></tbody>
@@ -248,6 +293,103 @@
       ["administracion", "Administracion"],
     ];
 
+    const PANELES_POR_MODULO = {
+      logistica: [
+        ["dashboard", "Dashboard"],
+        ["solicitud_viaje", "Solicitud de Viaje"],
+        ["asignar_recursos", "Asignar Recursos"],
+        ["vehiculos", "Vehiculos"],
+        ["personal", "Personal"],
+        ["ordenes_salida", "Ordenes de Salida"],
+        ["gestion_operativa", "Gestion Operativa"],
+      ],
+      almacen: [
+        ["dashboard", "Dashboard"],
+        ["catalogos", "Catalogos"],
+        ["productos", "Productos"],
+        ["ingresos_salidas", "Ingresos / Salidas"],
+        ["documentos", "Documentos"],
+        ["movimientos", "Movimientos"],
+        ["inventario", "Inventario"],
+      ],
+    };
+
+    const ACCIONES_POR_MODULO_PANEL = {
+      logistica: {
+        dashboard: [
+          ["ver", "Ver datos de dashboard"],
+          ["aprobar_solicitud", "Aprobar solicitud de viaje"],
+          ["rechazar_solicitud", "Rechazar solicitud de viaje"],
+        ],
+        solicitud_viaje: [
+          ["crear_solicitud", "Crear solicitud"],
+          ["gestionar_estado", "Aprobar / cambiar estado"],
+        ],
+        asignar_recursos: [
+          ["asignar", "Asignar recursos"],
+        ],
+        vehiculos: [
+          ["crear", "Crear vehiculo"],
+          ["editar", "Editar vehiculo"],
+          ["eliminar", "Eliminar vehiculo"],
+        ],
+        personal: [
+          ["crear", "Crear personal"],
+          ["editar", "Editar personal"],
+        ],
+        ordenes_salida: [
+          ["ver", "Ver panel de ordenes"],
+          ["guardar_cierre", "Guardar cierre logistico"],
+          ["imprimir", "Imprimir"],
+          ["cerrar_orden", "(Legado) Cerrar orden"],
+        ],
+        gestion_operativa: [
+          ["consultar", "Buscar / consultar resumen"],
+          ["exportar_pdf", "Exportar PDF"],
+          ["exportar_excel", "Exportar Excel"],
+        ],
+      },
+      almacen: {
+        dashboard: [
+          ["ver", "Ver dashboard de almacen"],
+        ],
+        catalogos: [
+          ["consultar", "Consultar catalogos"],
+          ["crear", "Crear en catalogos"],
+          ["eliminar", "Eliminar en catalogos"],
+        ],
+        productos: [
+          ["consultar", "Consultar productos"],
+          ["crear", "Crear producto"],
+          ["editar", "Editar producto"],
+          ["eliminar", "Eliminar producto"],
+        ],
+        ingresos_salidas: [
+          ["consultar", "Consultar pendientes / historial"],
+          ["generar_remito", "Generar remito / documento"],
+          ["autorizar_remito", "Autorizar remito"],
+          ["no_autorizar_remito", "No autorizar remito"],
+        ],
+        documentos: [
+          ["consultar", "Consultar documentos"],
+          ["ver_pdf", "Ver / descargar PDF"],
+        ],
+        movimientos: [
+          ["consultar", "Consultar movimientos"],
+          ["exportar_pdf", "Exportar PDF"],
+          ["exportar_excel", "Exportar Excel"],
+        ],
+        inventario: [
+          ["consultar", "Consultar inventario"],
+          ["crear_inventario", "Crear inventario"],
+          ["guardar_conteo", "Guardar conteo"],
+          ["ver_ajustes", "Ver ajustes"],
+          ["exportar_pdf", "Exportar PDF"],
+          ["exportar_excel", "Exportar Excel"],
+        ],
+      },
+    };
+
     const state = {
       me: null,
       users: [],
@@ -281,6 +423,81 @@
       box.innerHTML = MODULOS.map(([k, lbl]) =>
         `<label><input type="checkbox" data-modulo="${k}" /> ${lbl}</label>`
       ).join("");
+      document.querySelectorAll("input[data-modulo]").forEach((el) => {
+        el.addEventListener("change", () => renderPaneles());
+      });
+      renderPaneles();
+    }
+
+    function renderPaneles() {
+      // Guardar estado actual de paneles antes de re-renderizar
+      const estadoPaneles = {};
+      document.querySelectorAll("input[data-panel-modulo][data-panel]").forEach((el) => {
+        const key = `${el.getAttribute("data-panel-modulo")}::${el.getAttribute("data-panel")}`;
+        estadoPaneles[key] = el.checked;
+      });
+
+      const box = $("paneles-box");
+      const modulosSeleccionados = selectedModulos();
+      const html = modulosSeleccionados
+        .filter((m) => !!PANELES_POR_MODULO[m])
+        .map((modulo) => {
+          const checks = PANELES_POR_MODULO[modulo]
+            .map(([k, lbl]) => `<label><input type="checkbox" data-panel-modulo="${modulo}" data-panel="${k}" /> ${lbl}</label>`)
+            .join("");
+          return `<div class="paneles-group"><h4>${modulo.toUpperCase()}</h4><div class="checks">${checks}</div></div>`;
+        })
+        .join("");
+
+      box.innerHTML = html || '<div class="muted">Seleccione modulo(s) para configurar paneles.</div>';
+
+      // Restaurar estado previo de paneles
+      document.querySelectorAll("input[data-panel-modulo][data-panel]").forEach((el) => {
+        const key = `${el.getAttribute("data-panel-modulo")}::${el.getAttribute("data-panel")}`;
+        if (estadoPaneles[key]) el.checked = true;
+        el.addEventListener("change", () => renderAcciones());
+      });
+
+      renderAcciones();
+    }
+
+    function renderAcciones() {
+      // Guardar estado actual de acciones antes de re-renderizar
+      const estadoAcciones = {};
+      document.querySelectorAll("input[data-accion-modulo][data-accion-panel][data-accion]").forEach((el) => {
+        const key = `${el.getAttribute("data-accion-modulo")}::${el.getAttribute("data-accion-panel")}::${el.getAttribute("data-accion")}`;
+        estadoAcciones[key] = el.checked;
+      });
+
+      const box = $("acciones-box");
+      const modulosSeleccionados = selectedModulos();
+      const html = modulosSeleccionados
+        .filter((modulo) => !!ACCIONES_POR_MODULO_PANEL[modulo])
+        .map((modulo) => {
+          const panelesSeleccionados = Array.from(document.querySelectorAll(`input[data-panel-modulo="${modulo}"]:checked`))
+            .map((el) => el.getAttribute("data-panel"));
+
+          const bloquesPanel = panelesSeleccionados
+            .filter((panel) => !!ACCIONES_POR_MODULO_PANEL[modulo][panel])
+            .map((panel) => {
+              const checks = ACCIONES_POR_MODULO_PANEL[modulo][panel]
+                .map(([accion, lbl]) => `<label><input type="checkbox" data-accion-modulo="${modulo}" data-accion-panel="${panel}" data-accion="${accion}" /> ${lbl}</label>`)
+                .join("");
+              return `<div class="acciones-group"><h5>${modulo} / ${panel}</h5><div class="checks">${checks}</div></div>`;
+            })
+            .join("");
+
+          return bloquesPanel;
+        })
+        .join("");
+
+      box.innerHTML = html || '<div class="muted">Seleccione paneles para configurar acciones.</div>';
+
+      // Restaurar estado previo de acciones
+      document.querySelectorAll("input[data-accion-modulo][data-accion-panel][data-accion]").forEach((el) => {
+        const key = `${el.getAttribute("data-accion-modulo")}::${el.getAttribute("data-accion-panel")}::${el.getAttribute("data-accion")}`;
+        if (estadoAcciones[key]) el.checked = true;
+      });
     }
 
     function renderRoles() {
@@ -298,6 +515,40 @@
       return Array.from(document.querySelectorAll("input[data-rol]:checked")).map((el) => Number(el.getAttribute("data-rol")));
     }
 
+    function selectedPaneles() {
+      const resultado = {};
+      selectedModulos().forEach((modulo) => {
+        if (!PANELES_POR_MODULO[modulo]) return;
+        const marcados = Array.from(document.querySelectorAll(`input[data-panel-modulo="${modulo}"]:checked`))
+          .map((el) => el.getAttribute("data-panel"));
+        resultado[modulo] = marcados;
+      });
+      return resultado;
+    }
+
+    function selectedAcciones() {
+      const out = {};
+      const paneles = selectedPaneles();
+      Object.keys(paneles || {}).forEach((modulo) => {
+        if (!ACCIONES_POR_MODULO_PANEL[modulo]) return;
+        const panelesModulo = paneles[modulo] || [];
+        out[modulo] = {};
+        panelesModulo.forEach((panel) => {
+          if (!ACCIONES_POR_MODULO_PANEL[modulo][panel]) return;
+          const marcadas = Array.from(
+            document.querySelectorAll(`input[data-accion-modulo="${modulo}"][data-accion-panel="${panel}"]:checked`)
+          ).map((el) => el.getAttribute("data-accion"));
+          if (marcadas.length > 0) {
+            out[modulo][panel] = marcadas;
+          }
+        });
+        if (Object.keys(out[modulo]).length === 0) {
+          delete out[modulo];
+        }
+      });
+      return out;
+    }
+
     function fillForm(u = null) {
       state.editId = u ? u.id : null;
       $("f_nombre").value = u?.nombre_apellido || "";
@@ -310,6 +561,24 @@
 
       document.querySelectorAll("input[data-modulo]").forEach((el) => {
         el.checked = !!u?.modulos?.includes(el.getAttribute("data-modulo"));
+      });
+      renderPaneles();
+      Object.entries(u?.paneles || {}).forEach(([modulo, paneles]) => {
+        (paneles || []).forEach((panel) => {
+          const el = document.querySelector(`input[data-panel-modulo="${modulo}"][data-panel="${panel}"]`);
+          if (el) el.checked = true;
+        });
+      });
+      renderAcciones();
+      Object.entries(u?.acciones || {}).forEach(([modulo, porPanel]) => {
+        Object.entries(porPanel || {}).forEach(([panel, acciones]) => {
+          (acciones || []).forEach((accion) => {
+            const el = document.querySelector(
+              `input[data-accion-modulo="${modulo}"][data-accion-panel="${panel}"][data-accion="${accion}"]`
+            );
+            if (el) el.checked = true;
+          });
+        });
       });
       document.querySelectorAll("input[data-rol]").forEach((el) => {
         const id = Number(el.getAttribute("data-rol"));
@@ -325,10 +594,58 @@
       return (items || []).map((x) => `<span class="badge">${x}</span>`).join("");
     }
 
+    function mascaraPassword(raw) {
+      const txt = String(raw || "");
+      if (!txt) return "-";
+      return "*".repeat(Math.max(8, txt.length));
+    }
+
+    function togglePwd(uid) {
+      const user = state.users.find((x) => Number(x.id) === Number(uid));
+      if (!user) return;
+      const valor = String(user.password_visible || "");
+      const out = document.getElementById(`pwd-${uid}`);
+      const btn = document.getElementById(`btn-pwd-${uid}`);
+      if (!out || !btn) return;
+
+      const visible = btn.dataset.visible === "1";
+      if (visible) {
+        out.textContent = mascaraPassword(valor);
+        btn.dataset.visible = "0";
+        btn.textContent = "Ver";
+      } else {
+        out.textContent = valor || "-";
+        btn.dataset.visible = "1";
+        btn.textContent = "Ocultar";
+      }
+    }
+
+    window.togglePwd = togglePwd;
+
+    function badgesPaneles(paneles) {
+      const chunks = [];
+      Object.entries(paneles || {}).forEach(([modulo, lista]) => {
+        chunks.push(`<span class="badge">${modulo}: ${(lista || []).length}</span>`);
+      });
+      return chunks.join("");
+    }
+
+    function badgesAcciones(acciones) {
+      const chunks = [];
+      Object.entries(acciones || {}).forEach(([modulo, porPanel]) => {
+        Object.entries(porPanel || {}).forEach(([panel, lista]) => {
+          chunks.push(`<span class="badge">${modulo}/${panel}: ${(lista || []).length}</span>`);
+        });
+      });
+      return chunks.join("");
+    }
+
     function renderUsers() {
       const tb = $("users-body");
       tb.innerHTML = state.users.map((u) => {
         const modulos = badges(u.modulos || []);
+        const paneles = badgesPaneles(u.paneles || {});
+        const acciones = badgesAcciones(u.acciones || {});
         const roles = badges((u.roles || []).map((r) => r.nombre));
         return `
           <tr>
@@ -340,7 +657,13 @@
             </td>
             <td>${u.tipo_usuario || ""}</td>
             <td>${u.estado || ""}${u.bloqueado ? " / BLOQUEADO" : ""}</td>
+            <td>
+              <div id="pwd-${u.id}" class="muted">${mascaraPassword(u.password_visible || "")}</div>
+              <button class="btn" id="btn-pwd-${u.id}" data-visible="0" onclick="togglePwd(${u.id})">Ver</button>
+            </td>
             <td>${modulos}</td>
+            <td>${paneles}</td>
+            <td>${acciones}</td>
             <td>${roles}</td>
             <td>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -429,6 +752,8 @@
         estado: $("f_estado").value,
         tipo_usuario: $("f_tipo").value,
         modulos: selectedModulos(),
+        paneles: selectedPaneles(),
+        acciones: selectedAcciones(),
         roles: selectedRoles(),
       };
 

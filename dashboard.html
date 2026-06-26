@@ -675,13 +675,13 @@ canvas {
     </div>
 
     <div class="menu">
-      <button class="active" type="button">Dashboard</button>
-      <button type="button" onclick="ir('/form')">Solicitud de Viaje</button>
-      <button type="button" onclick="ir('/recursos_form')">Asignar Recursos</button>
-      <button type="button" onclick="ir('/vehiculos_form')">Vehiculos</button>
-      <button type="button" onclick="ir('/personal_form')">Personal</button>
-      <button type="button" onclick="ir('/ordenes_view')">Ordenes de Salida</button>
-      <button type="button" onclick="ir('/gestion_operativa')">Gestion Operativa</button>
+      <button class="active" type="button" data-panel="dashboard">Dashboard</button>
+      <button type="button" data-panel="solicitud_viaje" onclick="ir('/form')">Solicitud de Viaje</button>
+      <button type="button" data-panel="asignar_recursos" onclick="ir('/recursos_form')">Asignar Recursos</button>
+      <button type="button" data-panel="vehiculos" onclick="ir('/vehiculos_form')">Vehiculos</button>
+      <button type="button" data-panel="personal" onclick="ir('/personal_form')">Personal</button>
+      <button type="button" data-panel="ordenes_salida" onclick="ir('/ordenes_view')">Ordenes de Salida</button>
+      <button type="button" data-panel="gestion_operativa" onclick="ir('/gestion_operativa')">Gestion Operativa</button>
     </div>
   </aside>
 
@@ -927,7 +927,34 @@ Chart.defaults.color = "#eef4ff";
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 
 function ir(ruta) {
-  window.location.href = "" + ruta;
+  const destino = String(ruta || "").trim();
+  if (!destino) {
+    return;
+  }
+
+  // Compatibilidad al abrir la app como file:///C:/... sin backend HTTP.
+  if (window.location.protocol === "file:") {
+    const mapaLocal = {
+      "/": "menu_principal.html",
+      "/dashboard": "dashboard.html",
+      "/form": "form_viaje.html",
+      "/recursos_form": "form_recursos.html",
+      "/vehiculos_form": "vehiculos.html",
+      "/personal_form": "personal.html",
+      "/ordenes_view": "ordenes_view.html",
+      "/gestion_operativa": "gestion_operativa.html",
+      "/almacen": "almacen_v2.html",
+      "/administracion": "administracion.html"
+    };
+
+    const archivo = mapaLocal[destino];
+    if (archivo) {
+      window.location.href = archivo;
+      return;
+    }
+  }
+
+  window.location.href = destino;
 }
 
 function configurarLogo() {
@@ -981,6 +1008,30 @@ function configurarFondoDashboard() {
   };
 
   probar(0);
+}
+
+async function aplicarPermisosPanelLogistica() {
+  try {
+    const res = await fetch("/me", { credentials: "same-origin" });
+    if (!res.ok) {
+      return;
+    }
+    const me = await res.json();
+    const tipo = String(me?.tipo_usuario || "").trim().toUpperCase();
+    if (tipo === "ADMINISTRADOR") {
+      return;
+    }
+
+    const permitidos = new Set((me?.paneles?.logistica || []).map((p) => String(p || "").trim().toLowerCase()));
+    document.querySelectorAll(".menu [data-panel]").forEach((btn) => {
+      const panel = String(btn.getAttribute("data-panel") || "").trim().toLowerCase();
+      if (!permitidos.has(panel)) {
+        btn.style.display = "none";
+      }
+    });
+  } catch (_error) {
+    // Si falla /me, se conserva la UI actual.
+  }
 }
 
 function normalizarArray(data) {
@@ -1970,7 +2021,9 @@ async function cargarDashboard() {
 
 configurarFondoDashboard();
 configurarLogo();
-cargarDashboard();
+aplicarPermisosPanelLogistica().finally(() => {
+  cargarDashboard();
+});
 </script>
 
 </body>

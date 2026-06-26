@@ -330,6 +330,13 @@ UPDATE remitos_entrega
    SET estado_autorizacion = COALESCE(NULLIF(TRIM(estado_autorizacion), ''), 'AUTORIZADO')
  WHERE COALESCE(NULLIF(TRIM(estado_autorizacion), ''), '') = '';
 
+ALTER TABLE IF EXISTS usuarios
+    ADD COLUMN IF NOT EXISTS paneles_json TEXT;
+ALTER TABLE IF EXISTS usuarios
+    ADD COLUMN IF NOT EXISTS acciones_json TEXT;
+ALTER TABLE IF EXISTS usuarios
+    ADD COLUMN IF NOT EXISTS password_visible TEXT;
+
 CREATE TABLE IF NOT EXISTS movimientos_stock (
     id SERIAL PRIMARY KEY,
     fecha TEXT,
@@ -428,6 +435,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
     estado TEXT DEFAULT 'ACTIVO',
     tipo_usuario TEXT DEFAULT 'CONSULTOR',
     modulos_json TEXT,
+    paneles_json TEXT,
+    acciones_json TEXT,
+    password_visible TEXT,
     bloqueado INTEGER DEFAULT 0,
     intentos_fallidos INTEGER DEFAULT 0,
     password_temporal INTEGER DEFAULT 1,

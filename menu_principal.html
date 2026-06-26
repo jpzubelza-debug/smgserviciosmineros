@@ -149,84 +149,6 @@
       gap: 14px;
     }
 
-    .carousel {
-      position: relative;
-      margin: 0 0 16px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      overflow: hidden;
-      background: rgba(15, 23, 42, 0.45);
-      min-height: 180px;
-      box-shadow: var(--shadow);
-    }
-
-    .carousel-track {
-      position: relative;
-      height: clamp(180px, 28vw, 260px);
-    }
-
-    .slide {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.55s ease;
-      background-position: center;
-      background-size: cover;
-      background-repeat: no-repeat;
-      display: flex;
-      align-items: flex-end;
-      padding: 14px;
-    }
-
-    .slide.active {
-      opacity: 1;
-    }
-
-    .slide::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.62));
-    }
-
-    .slide-caption {
-      position: relative;
-      z-index: 1;
-      background: rgba(15, 23, 42, 0.58);
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      color: #e2e8f0;
-      font-size: 0.86rem;
-      border-radius: 10px;
-      padding: 8px 10px;
-      max-width: min(560px, 95%);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-    }
-
-    .carousel-dots {
-      position: absolute;
-      right: 10px;
-      bottom: 10px;
-      display: flex;
-      gap: 6px;
-      z-index: 2;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
-      background: rgba(15, 23, 42, 0.55);
-      cursor: pointer;
-      padding: 0;
-    }
-
-    .dot.active {
-      background: #38bdf8;
-      border-color: #7dd3fc;
-    }
-
     .menu-btn {
       display: block;
       width: 100%;
@@ -393,16 +315,6 @@
       </div>
     </header>
 
-    <section class="carousel" aria-label="Galeria operativa">
-      <div class="carousel-track" id="carousel-track">
-        <div class="slide active" data-caption="Operaciones en campo - Cobertura y despliegue" style="background-image: url('/Imagenes/IMG_20231229_094037702.jpg');"></div>
-        <div class="slide" data-caption="Infraestructura y equipamiento operativo" style="background-image: url('/Imagenes/IMG-20191206-WA0040.jpg');"></div>
-        <div class="slide" data-caption="Seguimiento visual de instalaciones y recursos" style="background-image: url('/Imagenes/508334f4-5726-40db-82d2-307d84bc5611.jpg');"></div>
-        <div class="slide-caption" id="slide-caption">Operaciones en campo - Cobertura y despliegue</div>
-      </div>
-      <div class="carousel-dots" id="carousel-dots" aria-label="Selector de imagen"></div>
-    </section>
-
     <section class="menu-grid" id="menu-grid">
     </section>
 
@@ -488,51 +400,6 @@
       return btn;
     }
 
-    function initCarousel() {
-      const slides = Array.from(document.querySelectorAll(".slide"));
-      const dotsWrap = document.getElementById("carousel-dots");
-      const caption = document.getElementById("slide-caption");
-      if (!slides.length || !dotsWrap || !caption) {
-        return;
-      }
-
-      let idx = 0;
-      let timer = null;
-
-      function pintar(i) {
-        idx = (i + slides.length) % slides.length;
-        slides.forEach((s, p) => s.classList.toggle("active", p === idx));
-        Array.from(dotsWrap.children).forEach((d, p) => d.classList.toggle("active", p === idx));
-        caption.textContent = slides[idx].dataset.caption || "";
-      }
-
-      slides.forEach((_, i) => {
-        const dot = document.createElement("button");
-        dot.type = "button";
-        dot.className = "dot" + (i === 0 ? " active" : "");
-        dot.setAttribute("aria-label", `Ir a imagen ${i + 1}`);
-        dot.addEventListener("click", () => {
-          pintar(i);
-          reiniciar();
-        });
-        dotsWrap.appendChild(dot);
-      });
-
-      function avanzar() {
-        pintar(idx + 1);
-      }
-
-      function reiniciar() {
-        if (timer) {
-          clearInterval(timer);
-        }
-        timer = setInterval(avanzar, 4200);
-      }
-
-      pintar(0);
-      reiniciar();
-    }
-
     async function cargarMenu() {
       try {
         const resp = await fetch("/me", { credentials: "same-origin" });
@@ -564,7 +431,6 @@
     }
 
     cargarMenu();
-    initCarousel();
   </script>
 </body>
 </html>

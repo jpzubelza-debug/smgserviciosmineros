@@ -506,9 +506,19 @@
 </div>
 
 <script>
-const state = { productos: [], personal: [], vehiculos: [], proyectos: [], instalaciones: [], categorias: [], familias: [], unidades: [], marcas: [], modelos: [], invActual: null, documentosListado: [], movimientosListado: [], inventariosListado: [], remitosPendientesRE: [], usuarioActual: '' };
+const state = { productos: [], personal: [], vehiculos: [], proyectos: [], instalaciones: [], categorias: [], familias: [], unidades: [], marcas: [], modelos: [], invActual: null, documentosListado: [], movimientosListado: [], inventariosListado: [], remitosPendientesRE: [], usuarioActual: '', panelesAlmacenPermitidos: null };
 let iosItems = [];
 let iosGenerando = false;
+
+const TAB_TO_PANEL_ALMACEN = {
+  dash: 'dashboard',
+  catalogos: 'catalogos',
+  productos: 'productos',
+  'ingreso-salida': 'ingresos_salidas',
+  documentos: 'documentos',
+  mov: 'movimientos',
+  inv: 'inventario'
+};
 
 function esc(t){ return (t||"").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"','&quot;'); }
 function localDateInputValue(){
@@ -662,6 +672,32 @@ function setTabs(){
     btn.classList.add('active');
     document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
   });
+}
+
+function aplicarPermisosPanelAlmacenUI(){
+  const permitidos = state.panelesAlmacenPermitidos;
+  if (!(permitidos instanceof Set)) return;
+
+  const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+  tabs.forEach((btn) => {
+    const tab = String(btn.dataset.tab || '').trim();
+    const panelClave = TAB_TO_PANEL_ALMACEN[tab];
+    if (!panelClave || permitidos.has(panelClave)) {
+      btn.style.display = '';
+      return;
+    }
+    btn.style.display = 'none';
+  });
+
+  const primerVisible = tabs.find((btn) => btn.style.display !== 'none');
+  if (!primerVisible) {
+    return;
+  }
+
+  const activaVisible = tabs.some((btn) => btn.classList.contains('active') && btn.style.display !== 'none');
+  if (!activaVisible) {
+    primerVisible.click();
+  }
 }
 
 function setOptions(id, arr, getter){
@@ -1750,6 +1786,11 @@ async function init(){
   try {
     const me = await api('/me');
     state.usuarioActual = me.usuario || '';
+    const tipo = (me?.tipo_usuario || '').toString().trim().toUpperCase();
+    if (tipo !== 'ADMINISTRADOR') {
+      state.panelesAlmacenPermitidos = new Set((me?.paneles?.almacen || []).map((p) => (p || '').toString().trim().toLowerCase()));
+      aplicarPermisosPanelAlmacenUI();
+    }
   } catch { state.usuarioActual = ''; }
   await loadMaster();
   await Promise.all([loadDashboard(), cargarCatalogo(), cargarProductos(), cargarIngresoSalida(), cargarDocumentos(), cargarMovimientos(), cargarInventarios(), cargarPendientesRemitosEntrega()]);
