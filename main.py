@@ -240,7 +240,7 @@ def _modulo_requerido_para_path(path: str):
     if p == "/almacen" or p.startswith("/almacen/"):
         return "almacen"
     if p == "/gestion_operativa" or p.startswith("/gestion_operativa/"):
-        return "operaciones"
+        return "logistica"
     if (
         p in {
             "/dashboard",
