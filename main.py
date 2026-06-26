@@ -1522,7 +1522,13 @@ def migrar_usuarios_admin(conn):
 
 def init_sqlite():
     if _DATABASE_URL:
-        # En Render (PostgreSQL) no ejecutar migraciones destructivas de SQLite.
+        # En Render/PG evitar ejecutar todo el schema en cada boot porque puede
+        # demorar el readiness y provocar timeout de deploy.
+        # Si se necesita forzar la aplicacion del schema al iniciar, habilitar:
+        # APP_RUN_PG_SCHEMA_ON_STARTUP=1
+        run_pg_schema = str(os.getenv("APP_RUN_PG_SCHEMA_ON_STARTUP", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
+        if not run_pg_schema:
+            return
         schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
         if not os.path.exists(schema_target):
             return
