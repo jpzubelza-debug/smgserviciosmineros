@@ -572,3 +572,70 @@ CREATE INDEX IF NOT EXISTS idx_mov_v2_fecha ON movimientos (fecha);
 CREATE INDEX IF NOT EXISTS idx_mov_v2_producto ON movimientos (id_producto);
 CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON auditoria (tabla, registro);
 CREATE INDEX IF NOT EXISTS idx_adj_doc ON adjuntos (id_documento);
+
+CREATE TABLE IF NOT EXISTS fleetcare_checklists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT,
+    correo_operador TEXT,
+    proyecto TEXT,
+    nro_checklist TEXT,
+    nro_parte_diario TEXT,
+    horometro_actual TEXT,
+    kilometro_actual TEXT,
+    codigo_equipo TEXT,
+    operador TEXT,
+    supervisor TEXT,
+    tipo_equipo TEXT,
+    estado_general TEXT,
+    observaciones TEXT,
+    fotos_json TEXT,
+    raw_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS fleetcare_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    checklist_id INTEGER NOT NULL,
+    categoria TEXT,
+    item_key TEXT,
+    item_label TEXT,
+    estado TEXT,
+    comentario TEXT,
+    foto_url TEXT,
+    genera_incidencia INTEGER DEFAULT 0,
+    raw_json TEXT,
+    FOREIGN KEY (checklist_id) REFERENCES fleetcare_checklists (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS fleetcare_incidencias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    checklist_id INTEGER,
+    fecha_deteccion TEXT,
+    codigo_equipo TEXT,
+    proyecto TEXT,
+    categoria TEXT,
+    item_key TEXT,
+    item_label TEXT,
+    estado_detectado TEXT,
+    observacion TEXT,
+    evidencia_json TEXT,
+    prioridad TEXT,
+    estado TEXT DEFAULT 'Pendiente',
+    responsable TEXT,
+    fecha_asignacion TEXT,
+    fecha_resolucion TEXT,
+    tiempo_respuesta TEXT,
+    accion_correctiva TEXT,
+    costo_reparacion REAL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT,
+    FOREIGN KEY (checklist_id) REFERENCES fleetcare_checklists (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fleetcare_checklists_equipo ON fleetcare_checklists (codigo_equipo);
+CREATE INDEX IF NOT EXISTS idx_fleetcare_checklists_proyecto ON fleetcare_checklists (proyecto);
+CREATE INDEX IF NOT EXISTS idx_fleetcare_items_checklist ON fleetcare_items (checklist_id);
+CREATE INDEX IF NOT EXISTS idx_fleetcare_incidencias_equipo ON fleetcare_incidencias (codigo_equipo);
+CREATE INDEX IF NOT EXISTS idx_fleetcare_incidencias_estado ON fleetcare_incidencias (estado);
+CREATE INDEX IF NOT EXISTS idx_fleetcare_incidencias_prioridad ON fleetcare_incidencias (prioridad);

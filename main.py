@@ -2,10 +2,11 @@
 from fastapi import FastAPI, UploadFile, File, Form, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
+from typing import Optional, Any
 from dotenv import load_dotenv
 from typing import Optional
 import io
@@ -32,6 +33,7 @@ PRINT_ORDEN_SALIDA_PATH = os.path.join(BASE_DIR, "print_orden_salida.html")
 ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
+FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
 ADMINISTRACION_PATH = os.path.join(BASE_DIR, "administracion.html")
 DOC_LOG_VIAJES_DIR = os.path.join(BASE_DIR, "Doc_Log_Viajes")
 DOC_ALMACEN_DIR = os.path.join(BASE_DIR, "Doc_Almacen")
@@ -83,7 +85,7 @@ MODULOS_VALIDOS = {
     "dashboard_ejecutivo",
     "administracion",
 }
-MODULOS_ACTIVOS = {"logistica", "almacen", "administracion"}
+MODULOS_ACTIVOS = {"logistica", "almacen", "administracion", "mantenimiento"}
 
 PANELES_POR_MODULO = {
     "logistica": {
@@ -103,6 +105,12 @@ PANELES_POR_MODULO = {
         "documentos",
         "movimientos",
         "inventario",
+    },
+    "mantenimiento": {
+        "dashboard",
+        "checklists",
+        "incidencias",
+        "historial_equipo",
     },
 }
 
@@ -124,6 +132,12 @@ ACCIONES_POR_PANEL = {
         "documentos": {"consultar", "ver_pdf"},
         "movimientos": {"consultar", "exportar_pdf", "exportar_excel"},
         "inventario": {"consultar", "crear_inventario", "guardar_conteo", "ver_ajustes", "exportar_pdf", "exportar_excel"},
+    },
+    "mantenimiento": {
+        "dashboard": {"ver"},
+        "checklists": {"consultar", "crear"},
+        "incidencias": {"consultar", "editar", "asignar", "cerrar"},
+        "historial_equipo": {"consultar"},
     },
 }
 
@@ -463,6 +477,8 @@ def _modulo_requerido_para_path(path: str):
         return "almacen"
     if p == "/gestion_operativa" or p.startswith("/gestion_operativa/"):
         return "logistica"
+    if p == "/mantenimiento" or p.startswith("/mantenimiento"):
+        return "mantenimiento"
     if (
         p in {
             "/dashboard",
@@ -509,6 +525,12 @@ def _panel_requerido_para_path(path: str):
         return ("logistica", "ordenes_salida")
     if p == "/gestion_operativa" or p.startswith("/gestion_operativa/"):
         return ("logistica", "gestion_operativa")
+    if p == "/mantenimiento" or p.startswith("/mantenimiento/checklists"):
+        return ("mantenimiento", "checklists")
+    if p == "/mantenimiento/incidencias" or p.startswith("/mantenimiento/incidencias/"):
+        return ("mantenimiento", "incidencias")
+    if p.startswith("/mantenimiento/equipos/"):
+        return ("mantenimiento", "historial_equipo")
 
     # Almacen
     if p == "/almacen" or p in {"/almacen/dashboard_data", "/almacen/v2/dashboard"}:
@@ -578,6 +600,19 @@ def _accion_requerida_para_request(method: str, path: str, query_params=None):
         return ("logistica", "gestion_operativa", "exportar_pdf")
     if m == "GET" and p == "/gestion_operativa/excel":
         return ("logistica", "gestion_operativa", "exportar_excel")
+
+    if m == "GET" and p == "/mantenimiento":
+        return ("mantenimiento", "dashboard", "ver")
+    if m == "GET" and p.startswith("/mantenimiento/checklists"):
+        return ("mantenimiento", "checklists", "consultar")
+    if m == "POST" and p == "/mantenimiento/checklists":
+        return ("mantenimiento", "checklists", "crear")
+    if m == "GET" and p.startswith("/mantenimiento/incidencias"):
+        return ("mantenimiento", "incidencias", "consultar")
+    if m == "PUT" and p.startswith("/mantenimiento/incidencias/"):
+        return ("mantenimiento", "incidencias", "editar")
+    if m == "GET" and p.startswith("/mantenimiento/equipos/"):
+        return ("mantenimiento", "historial_equipo", "consultar")
 
     # Almacen
     if m == "GET" and p in {"/almacen", "/almacen/dashboard_data", "/almacen/v2/dashboard"}:
@@ -796,6 +831,204 @@ def parse_json_list(texto):
         return []
 
 
+FLEETCARE_INCIDENCIA_ESTADOS = {
+    "regular",
+    "malo",
+    "no",
+    "fuera de servicio",
+    "no conforme",
+}
+
+
+def _normalize_text(texto: Any) -> str:
+    if texto is None:
+        return ""
+    return str(texto).strip()
+
+
+def _to_label(texto: str) -> str:
+    if not texto:
+        return ""
+    return texto.replace("_", " ").replace("-", " ").title()
+
+
+def _genera_incidencia(estado: str) -> bool:
+    estado_norm = _normalize_text(estado).strip().lower()
+    return estado_norm in FLEETCARE_INCIDENCIA_ESTADOS
+
+
+def _prioridad_por_estado(estado: str) -> str:
+    estado_norm = _normalize_text(estado).strip().lower()
+    if estado_norm in {"malo", "no", "fuera de servicio", "no conforme"}:
+        return "Alta"
+    if estado_norm == "regular":
+        return "Media"
+    return "Baja"
+
+
+def crear_incidencia_fleetcare(conn, checklist_id: int, checklist: dict, item: dict):
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    evidencia = {
+        "foto_url": item.get("foto_url", ""),
+        "item_key": item.get("item_key", ""),
+    }
+    conn.execute(
+        """
+        INSERT INTO fleetcare_incidencias (
+            checklist_id,
+            fecha_deteccion,
+            codigo_equipo,
+            proyecto,
+            categoria,
+            item_key,
+            item_label,
+            estado_detectado,
+            observacion,
+            evidencia_json,
+            prioridad,
+            estado,
+            responsable,
+            fecha_asignacion,
+            fecha_resolucion,
+            tiempo_respuesta,
+            accion_correctiva,
+            costo_reparacion,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            checklist_id,
+            _normalize_text(checklist.get("fecha")) or ahora,
+            _normalize_text(checklist.get("codigo_equipo")),
+            _normalize_text(checklist.get("proyecto")),
+            _normalize_text(item.get("categoria")),
+            _normalize_text(item.get("item_key")),
+            _normalize_text(item.get("item_label")),
+            _normalize_text(item.get("estado")),
+            _normalize_text(item.get("comentario")) or f"Estado detectado: {item.get('estado', '')}",
+            json.dumps(evidencia, ensure_ascii=False),
+            _prioridad_por_estado(item.get("estado")),
+            "Pendiente",
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            ahora,
+            ahora,
+        ),
+    )
+
+
+def guardar_checklist_fleetcare(conn, payload: dict) -> int:
+    general = payload.get("general") or {}
+    inspeccion = payload.get("inspeccion") or {}
+    observaciones = _normalize_text(payload.get("observaciones"))
+    fotos = payload.get("fotos") or {}
+
+    datos = {
+        "fecha": _normalize_text(general.get("fecha")),
+        "correo_operador": _normalize_text(general.get("correo_operador") or general.get("correo") or general.get("correo del operador")),
+        "proyecto": _normalize_text(general.get("proyecto")),
+        "nro_checklist": _normalize_text(general.get("nro_checklist") or general.get("n° checklist") or general.get("número checklist")),
+        "nro_parte_diario": _normalize_text(general.get("nro_parte_diario") or general.get("n° parte diario") or general.get("número parte diario")),
+        "horometro_actual": _normalize_text(general.get("horometro_actual") or general.get("horómetro actual")),
+        "kilometro_actual": _normalize_text(general.get("kilometro_actual") or general.get("kilómetro actual")),
+        "codigo_equipo": _normalize_text(general.get("codigo") or general.get("codigo_interno_del_equipo") or general.get("codigo interno del equipo")),
+        "operador": _normalize_text(general.get("operador")),
+        "supervisor": _normalize_text(general.get("supervisor")),
+        "tipo_equipo": _normalize_text(general.get("tipo") or general.get("tipo_de_equipo") or general.get("tipo equipo")),
+        "estado_general": _normalize_text(general.get("estado")),
+        "observaciones": observaciones,
+        "fotos_json": json.dumps(fotos, ensure_ascii=False),
+        "raw_json": json.dumps(payload, ensure_ascii=False),
+    }
+
+    cursor = conn.execute(
+        """
+        INSERT INTO fleetcare_checklists (
+            fecha, correo_operador, proyecto, nro_checklist, nro_parte_diario,
+            horometro_actual, kilometro_actual, codigo_equipo, operador, supervisor,
+            tipo_equipo, estado_general, observaciones, fotos_json, raw_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        (
+            datos["fecha"],
+            datos["correo_operador"],
+            datos["proyecto"],
+            datos["nro_checklist"],
+            datos["nro_parte_diario"],
+            datos["horometro_actual"],
+            datos["kilometro_actual"],
+            datos["codigo_equipo"],
+            datos["operador"],
+            datos["supervisor"],
+            datos["tipo_equipo"],
+            datos["estado_general"],
+            datos["observaciones"],
+            datos["fotos_json"],
+            datos["raw_json"],
+        ),
+    )
+
+    checklist_id = getattr(cursor, "lastrowid", None)
+    if checklist_id is None:
+        checklist_id = conn.execute("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM fleetcare_checklists").fetchone()[0]
+
+    for categoria, items in inspeccion.items():
+        if not isinstance(items, dict):
+            continue
+        for item_key, item_value in items.items():
+            if isinstance(item_value, dict):
+                estado = _normalize_text(item_value.get("estado") or item_value.get("valor"))
+                comentario = _normalize_text(item_value.get("comentario") or item_value.get("observacion") or item_value.get("detalle"))
+                foto_url = _normalize_text(item_value.get("foto") or item_value.get("url") or item_value.get("foto_url"))
+                raw_item = json.dumps(item_value, ensure_ascii=False)
+            else:
+                estado = _normalize_text(item_value)
+                comentario = ""
+                foto_url = ""
+                raw_item = ""
+
+            item = {
+                "categoria": _normalize_text(categoria),
+                "item_key": _normalize_text(item_key),
+                "item_label": _to_label(_normalize_text(item_key)),
+                "estado": estado,
+                "comentario": comentario,
+                "foto_url": foto_url,
+                "raw_json": raw_item,
+                "genera_incidencia": 1 if _genera_incidencia(estado) else 0,
+            }
+
+            conn.execute(
+                """
+                INSERT INTO fleetcare_items (
+                    checklist_id, categoria, item_key, item_label,
+                    estado, comentario, foto_url, genera_incidencia, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    checklist_id,
+                    item["categoria"],
+                    item["item_key"],
+                    item["item_label"],
+                    item["estado"],
+                    item["comentario"],
+                    item["foto_url"],
+                    item["genera_incidencia"],
+                    item["raw_json"],
+                ),
+            )
+
+            if item["genera_incidencia"]:
+                crear_incidencia_fleetcare(conn, checklist_id, datos, item)
+
+    return checklist_id
+
+
 def get_sqlite_connection():
     return _db_get_connection(SQLITE_DB_PATH, timeout=20)
 
@@ -901,6 +1134,60 @@ def migrar_tabla_viajes(conn):
     conn.execute("DROP TABLE viajes")
     conn.execute("ALTER TABLE viajes_new RENAME TO viajes")
     conn.execute("PRAGMA foreign_keys = ON")
+
+
+def migrar_usuarios_postgres(conn):
+    """Asegura que la tabla usuarios tenga las columnas requeridas en PostgreSQL."""
+    if not _DATABASE_URL:
+        return
+
+    columnas_requeridas = [
+        "modulos_json",
+        "paneles_json",
+        "acciones_json",
+        "password_visible",
+    ]
+    for columna in columnas_requeridas:
+        conn.execute(
+            f"ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS {columna} TEXT"
+        )
+
+
+def init_sqlite():
+    if _DATABASE_URL:
+        schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
+        if not os.path.exists(schema_target):
+            return
+        with get_sqlite_connection() as conn:
+            with open(schema_target, "r", encoding="utf-8") as f:
+                conn.executescript(f.read())
+            migrar_usuarios_postgres(conn)
+            conn.commit()
+        return
+
+    if not os.path.exists(SCHEMA_PATH):
+        return
+    max_intentos = 6
+    espera_segundos = 0.6
+    for intento in range(1, max_intentos + 1):
+        try:
+            with get_sqlite_connection() as conn:
+                with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+                    conn.executescript(f.read())
+                try:
+                    migrar_tabla_viajes(conn)
+                except sqlite3.OperationalError as exc:
+                    if "no such table" in str(exc).lower():
+                        pass
+                    else:
+                        raise
+                break
+        except sqlite3.OperationalError:
+            if intento < max_intentos:
+                time.sleep(espera_segundos)
+                espera_segundos *= 2
+            else:
+                raise
 
 
 def sembrar_configuracion_almacen(conn):
@@ -1522,13 +1809,6 @@ def migrar_usuarios_admin(conn):
 
 def init_sqlite():
     if _DATABASE_URL:
-        # En Render/PG evitar ejecutar todo el schema en cada boot porque puede
-        # demorar el readiness y provocar timeout de deploy.
-        # Si se necesita forzar la aplicacion del schema al iniciar, habilitar:
-        # APP_RUN_PG_SCHEMA_ON_STARTUP=1
-        run_pg_schema = str(os.getenv("APP_RUN_PG_SCHEMA_ON_STARTUP", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
-        if not run_pg_schema:
-            return
         schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
         if not os.path.exists(schema_target):
             return
@@ -2758,6 +3038,32 @@ class AdminRolPayload(BaseModel):
     nombre: str
 
 
+class FleetCareItemPayload(BaseModel):
+    categoria: str = ""
+    item_key: str
+    item_label: str
+    estado: str
+    comentario: str = ""
+    foto_url: str = ""
+
+
+class FleetCareChecklistPayload(BaseModel):
+    general: dict[str, Any]
+    inspeccion: dict[str, Any]
+    observaciones: str = ""
+    fotos: dict[str, str] = {}
+
+
+class FleetCareIncidenciaUpdatePayload(BaseModel):
+    estado: Optional[str] = None
+    responsable: Optional[str] = None
+    accion_correctiva: Optional[str] = None
+    costo_reparacion: Optional[float] = None
+    fecha_asignacion: Optional[str] = None
+    fecha_resolucion: Optional[str] = None
+    prioridad: Optional[str] = None
+
+
 @app.get("/me")
 def get_me(request: Request):
     usuario = _buscar_usuario_por_cookie(request)
@@ -3101,7 +3407,110 @@ def gestion_operativa_view(request: Request):
     if redirect is not None:
         return redirect
     return _leer_html(GESTION_OPERATIVA_PATH)
-    
+
+@app.get("/mantenimiento", response_class=HTMLResponse)
+def mantenimiento_view(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    return _leer_html(FLEETCARE_PATH)
+
+@app.post("/mantenimiento/checklists")
+def crear_checklist_mantenimiento(payload: FleetCareChecklistPayload):
+    with get_sqlite_connection() as conn:
+        checklist_id = guardar_checklist_fleetcare(conn, payload.dict())
+        conn.commit()
+    return {"ok": True, "checklist_id": checklist_id}
+
+@app.get("/mantenimiento/checklists")
+def obtener_checklists_mantenimiento():
+    with get_sqlite_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, fecha, codigo_equipo, proyecto, tipo_equipo, operador, supervisor, nro_checklist, estado_general FROM fleetcare_checklists ORDER BY fecha DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+@app.get("/mantenimiento/checklists/{checklist_id}")
+def obtener_checklist_mantenimiento(checklist_id: int):
+    with get_sqlite_connection() as conn:
+        checklist = conn.execute(
+            "SELECT * FROM fleetcare_checklists WHERE id = ?",
+            (checklist_id,),
+        ).fetchone()
+        if checklist is None:
+            return JSONResponse({"error": "Checklist no encontrado"}, status_code=404)
+        items = conn.execute(
+            "SELECT * FROM fleetcare_items WHERE checklist_id = ? ORDER BY id",
+            (checklist_id,),
+        ).fetchall()
+    return {"checklist": dict(checklist), "items": [dict(r) for r in items]}
+
+@app.get("/mantenimiento/incidencias")
+def obtener_incidencias_mantenimiento():
+    with get_sqlite_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, fecha_deteccion, codigo_equipo, proyecto, categoria, item_label, estado, prioridad, responsable FROM fleetcare_incidencias ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+@app.get("/mantenimiento/equipos/{equipo_codigo}/historial")
+def historial_equipo_mantenimiento(equipo_codigo: str):
+    with get_sqlite_connection() as conn:
+        checklists = conn.execute(
+            "SELECT id, fecha, proyecto, tipo_equipo, estado_general FROM fleetcare_checklists WHERE codigo_equipo = ? ORDER BY fecha DESC",
+            (equipo_codigo,),
+        ).fetchall()
+        incidencias = conn.execute(
+            "SELECT id, fecha_deteccion, categoria, item_label, estado, prioridad, responsable, fecha_resolucion FROM fleetcare_incidencias WHERE codigo_equipo = ? ORDER BY created_at DESC",
+            (equipo_codigo,),
+        ).fetchall()
+    return {
+        "checklists": [dict(r) for r in checklists],
+        "incidencias": [dict(r) for r in incidencias],
+    }
+
+@app.put("/mantenimiento/incidencias/{incidencia_id}")
+def actualizar_incidencia_mantenimiento(incidencia_id: int, payload: FleetCareIncidenciaUpdatePayload):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_sqlite_connection() as conn:
+        incidencia = conn.execute(
+            "SELECT * FROM fleetcare_incidencias WHERE id = ?",
+            (incidencia_id,),
+        ).fetchone()
+        if incidencia is None:
+            return JSONResponse({"error": "Incidencia no encontrada"}, status_code=404)
+
+        values = {
+            "estado": payload.estado if payload.estado is not None else incidencia["estado"],
+            "responsable": payload.responsable if payload.responsable is not None else incidencia["responsable"],
+            "accion_correctiva": payload.accion_correctiva if payload.accion_correctiva is not None else incidencia["accion_correctiva"],
+            "costo_reparacion": payload.costo_reparacion if payload.costo_reparacion is not None else incidencia["costo_reparacion"],
+            "fecha_asignacion": payload.fecha_asignacion if payload.fecha_asignacion is not None else incidencia["fecha_asignacion"],
+            "fecha_resolucion": payload.fecha_resolucion if payload.fecha_resolucion is not None else incidencia["fecha_resolucion"],
+            "prioridad": payload.prioridad if payload.prioridad is not None else incidencia["prioridad"],
+        }
+
+        conn.execute(
+            """
+            UPDATE fleetcare_incidencias
+               SET estado = ?, responsable = ?, accion_correctiva = ?, costo_reparacion = ?, fecha_asignacion = ?, fecha_resolucion = ?, prioridad = ?, updated_at = ?
+             WHERE id = ?
+            """,
+            (
+                values["estado"],
+                values["responsable"],
+                values["accion_correctiva"],
+                values["costo_reparacion"],
+                values["fecha_asignacion"],
+                values["fecha_resolucion"],
+                values["prioridad"],
+                now,
+                incidencia_id,
+            ),
+        )
+        conn.commit()
+    return {"ok": True}
+
 @app.put("/estado/{id_viaje}")
 def cambiar_estado(id_viaje: int, estado: str):
     with get_sqlite_connection() as conn:
