@@ -1153,43 +1153,6 @@ def migrar_usuarios_postgres(conn):
         )
 
 
-def init_sqlite():
-    if _DATABASE_URL:
-        schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
-        if not os.path.exists(schema_target):
-            return
-        with get_sqlite_connection() as conn:
-            with open(schema_target, "r", encoding="utf-8") as f:
-                conn.executescript(f.read())
-            migrar_usuarios_postgres(conn)
-            conn.commit()
-        return
-
-    if not os.path.exists(SCHEMA_PATH):
-        return
-    max_intentos = 6
-    espera_segundos = 0.6
-    for intento in range(1, max_intentos + 1):
-        try:
-            with get_sqlite_connection() as conn:
-                with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
-                    conn.executescript(f.read())
-                try:
-                    migrar_tabla_viajes(conn)
-                except sqlite3.OperationalError as exc:
-                    if "no such table" in str(exc).lower():
-                        pass
-                    else:
-                        raise
-                break
-        except sqlite3.OperationalError:
-            if intento < max_intentos:
-                time.sleep(espera_segundos)
-                espera_segundos *= 2
-            else:
-                raise
-
-
 def sembrar_configuracion_almacen(conn):
     categorias = [
         "Tecnologia",
