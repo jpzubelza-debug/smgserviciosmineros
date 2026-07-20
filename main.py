@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, UploadFile, File, Form, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, Query, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import os
+import secrets
 import sqlite3
 import time
 
@@ -21,6 +22,7 @@ client = OpenAI(api_key=api_key) if api_key else None
 DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.html")
 MENU_PRINCIPAL_PATH = os.path.join(BASE_DIR, "menu_principal.html")
 LOGIN_PATH = os.path.join(BASE_DIR, "login.html")
+ADMINISTRACION_PATH = os.path.join(BASE_DIR, "administracion.html")
 FORM_VIAJE_PATH = os.path.join(BASE_DIR, "form_viaje.html")
 FORM_RECURSOS_PATH = os.path.join(BASE_DIR, "form_recursos.html")
 PERSONAL_FORM_PATH = os.path.join(BASE_DIR, "personal.html")
@@ -29,6 +31,7 @@ PRINT_ORDEN_SALIDA_PATH = os.path.join(BASE_DIR, "print_orden_salida.html")
 ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
+FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
 DOC_LOG_VIAJES_DIR = os.path.join(BASE_DIR, "Doc_Log_Viajes")
 DOC_ALMACEN_DIR = os.path.join(BASE_DIR, "Doc_Almacen")
 DOC_ALMACEN_ADJ_DIR = os.path.join(DOC_ALMACEN_DIR, "adjuntos")
@@ -65,12 +68,63 @@ app.add_middleware(
 AUTH_USER = os.getenv("APP_LOGIN_USER", "admin")
 AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "admin123")
 AUTH_COOKIE_NAME = "dash_auth_user"
+ALL_MODULES = [
+    "logistica", "almacen", "operaciones", "compras", "rrhh",
+    "mantenimiento", "dashboard_ejecutivo", "administracion",
+]
+
+
+def _usuario_autenticado(request: Request):
+    """Devuelve el perfil de la sesión vigente o None si no es válida."""
+    usuario = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
+    if not usuario:
+        return None
+
+    # Cuenta de contingencia configurada por variables de entorno.
+    if usuario == AUTH_USER:
+        return {
+            "usuario": AUTH_USER,
+            "nombre_apellido": "Administrador",
+            "tipo_usuario": "ADMINISTRADOR",
+            "modulos": ALL_MODULES,
+        }
+
+    try:
+        with get_sqlite_connection() as conn:
+            fila = conn.execute(
+                """
+                SELECT correo, nombre_apellido, tipo_usuario, modulos_json
+                FROM usuarios
+                WHERE lower(correo) = lower(?)
+                  AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO'
+                  AND COALESCE(bloqueado, 0) = 0
+                """,
+                (usuario,),
+            ).fetchone()
+    except sqlite3.Error:
+        return None
+
+    if not fila:
+        return None
+    return {
+        "usuario": fila["correo"],
+        "nombre_apellido": fila["nombre_apellido"],
+        "tipo_usuario": fila["tipo_usuario"],
+        "modulos": parse_json_list(fila["modulos_json"]),
+    }
 
 
 def _requiere_login(request: Request):
-    if request.cookies.get(AUTH_COOKIE_NAME) == AUTH_USER:
+    if _usuario_autenticado(request) is not None:
         return None
     return RedirectResponse("/login", status_code=302)
+
+
+def _requiere_administrador(request: Request):
+    perfil = _usuario_autenticado(request)
+    if perfil is None or str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR":
+        raise HTTPException(status_code=403, detail="Se requiere perfil ADMINISTRADOR")
+    return perfil
 
 
 def _leer_html(path: str):
@@ -156,11 +210,16 @@ def admin_crear_usuario(payload):
         estado = str(_payload_value(payload, "estado", "ACTIVO")).strip().upper() or "ACTIVO"
         tipo_usuario = str(_payload_value(payload, "tipo_usuario", "CONSULTOR")).strip().upper() or "CONSULTOR"
         modulos = _payload_value(payload, "modulos", [])
+        paneles = _payload_value(payload, "paneles", {})
+        acciones = _payload_value(payload, "acciones", {})
+        roles = _payload_value(payload, "roles", [])
 
         if not nombre_apellido or not correo:
             return {"ok": False, "error": "nombre_apellido y correo son obligatorios"}
 
         modulos_json = json.dumps(modulos if isinstance(modulos, list) else [], ensure_ascii=False)
+        paneles_json = json.dumps(paneles if isinstance(paneles, dict) else {}, ensure_ascii=False)
+        acciones_json = json.dumps(acciones if isinstance(acciones, dict) else {}, ensure_ascii=False)
         password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
         cur = conn.execute(
@@ -174,12 +233,14 @@ def admin_crear_usuario(payload):
                 estado,
                 tipo_usuario,
                 modulos_json,
+                paneles_json,
+                acciones_json,
                 bloqueado,
                 intentos_fallidos,
                 password_temporal,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, datetime('now'), datetime('now'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, datetime('now'), datetime('now'))
             """,
             (
                 nombre_apellido,
@@ -190,10 +251,21 @@ def admin_crear_usuario(payload):
                 estado,
                 tipo_usuario,
                 modulos_json,
+                paneles_json,
+                acciones_json,
             ),
         )
+        usuario_id = cur.lastrowid
+        for rol_id in roles if isinstance(roles, list) else []:
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO usuario_roles_funcionales (usuario_id, rol_id) VALUES (?, ?)",
+                    (usuario_id, int(rol_id)),
+                )
+            except (TypeError, ValueError):
+                continue
         conn.commit()
-        return {"ok": True, "id": cur.lastrowid}
+        return {"ok": True, "id": usuario_id}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
     finally:
@@ -745,6 +817,22 @@ def migrar_gestion_operativa(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_go_proyecto ON gestion_operativa (proyecto)")
 
 
+def migrar_usuarios_administracion(conn):
+    """Añade la configuración granular usada por el módulo Administración."""
+    columnas = {r[1] for r in conn.execute("PRAGMA table_info(usuarios)").fetchall()}
+    for nombre, definicion in {
+        "paneles_json": "TEXT",
+        "acciones_json": "TEXT",
+    }.items():
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE usuarios ADD COLUMN {nombre} {definicion}")
+    for nombre in ("ADMINISTRADOR", "SUPERVISOR", "ASISTENTE", "OPERADOR", "CONSULTOR"):
+        conn.execute(
+            "INSERT OR IGNORE INTO roles_funcionales (nombre, activo) VALUES (?, 1)",
+            (nombre,),
+        )
+
+
 def init_sqlite():
     if not os.path.exists(SCHEMA_PATH):
         return
@@ -792,6 +880,7 @@ def init_sqlite():
                     if "database is locked" not in str(exc).lower():
                         raise
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
+                migrar_usuarios_administracion(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -1797,6 +1886,18 @@ def asignar_recursos(data: Recursos):
 
     return {"mensaje": "Recursos asignados", "nro_orden": nro_orden}
 
+@app.get("/imagenes/editadas/listado")
+def imagenes_editadas_listado():
+    editadas_dir = os.path.join(BASE_DIR, "Imagenes", "Editadas")
+    extensiones_validas = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+    imagenes = []
+    if os.path.isdir(editadas_dir):
+        for nombre in sorted(os.listdir(editadas_dir)):
+            if nombre.lower().endswith(extensiones_validas):
+                imagenes.append({"url": f"/Imagenes/Editadas/{nombre}"})
+    return {"imagenes": imagenes}
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_view(request: Request):
     return HTMLResponse(
@@ -1813,17 +1914,265 @@ def login_view(request: Request):
 def login_submit(request: Request, username: str = Form(""), password: str = Form("")):
     user = str(username or "").strip()
     pwd = str(password or "")
+
     if user == AUTH_USER and pwd == AUTH_PASS:
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(AUTH_COOKIE_NAME, user, httponly=True, samesite="lax")
         return response
+
+    # Usuarios administrados desde el módulo Administración. El nombre de
+    # usuario es el correo y la contraseña se guarda como SHA-256, formato que
+    # ya utiliza la tabla usuarios existente.
+    try:
+        with get_sqlite_connection() as conn:
+            fila = conn.execute(
+                """
+                SELECT id, password_hash FROM usuarios
+                WHERE lower(correo) = lower(?)
+                  AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO'
+                  AND COALESCE(bloqueado, 0) = 0
+                """,
+                (user,),
+            ).fetchone()
+            password_hash = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
+            if fila and fila["password_hash"] == password_hash:
+                conn.execute(
+                    """
+                    UPDATE usuarios
+                    SET intentos_fallidos = 0, ultimo_acceso = datetime('now'),
+                        updated_at = datetime('now')
+                    WHERE id = ?
+                    """,
+                    (fila["id"],),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO historial_accesos
+                    (usuario_id, username_input, evento, detalle, ip, user_agent)
+                    VALUES (?, ?, 'LOGIN_EXITOSO', '', ?, ?)
+                    """,
+                    (fila["id"], user, request.client.host if request.client else "", request.headers.get("user-agent", "")),
+                )
+                conn.commit()
+                response = RedirectResponse("/", status_code=302)
+                response.set_cookie(AUTH_COOKIE_NAME, user, httponly=True, samesite="lax")
+                return response
+            if fila:
+                conn.execute(
+                    "UPDATE usuarios SET intentos_fallidos = COALESCE(intentos_fallidos, 0) + 1, updated_at = datetime('now') WHERE id = ?",
+                    (fila["id"],),
+                )
+                conn.commit()
+    except sqlite3.Error:
+        # La respuesta no revela si el usuario existe ni detalles internos.
+        pass
     return RedirectResponse("/login?error=1", status_code=302)
 
 
 @app.get("/me")
 def get_me(request: Request):
-    usuario = request.cookies.get(AUTH_COOKIE_NAME, "")
-    return {"usuario": usuario}
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        return {"autenticado": False}
+    return {"autenticado": True, **perfil}
+
+
+def _admin_usuario_a_dict(conn, fila):
+    usuario = dict(fila)
+    usuario["modulos"] = parse_json_list(usuario.pop("modulos_json", ""))
+    usuario["paneles"] = parse_json_dict(usuario.pop("paneles_json", ""), default={})
+    usuario["acciones"] = parse_json_dict(usuario.pop("acciones_json", ""), default={})
+    roles = conn.execute(
+        """
+        SELECT r.id, r.nombre FROM roles_funcionales r
+        JOIN usuario_roles_funcionales ur ON ur.rol_id = r.id
+        WHERE ur.usuario_id = ? ORDER BY r.nombre
+        """,
+        (usuario["id"],),
+    ).fetchall()
+    usuario["roles"] = [dict(rol) for rol in roles]
+    # Las contraseñas nunca se devuelven ni se almacenan en texto plano.
+    usuario["password_visible"] = ""
+    return usuario
+
+
+def _registrar_acceso_admin(conn, request: Request, evento: str, detalle: str = ""):
+    perfil = _usuario_autenticado(request) or {}
+    conn.execute(
+        """
+        INSERT INTO historial_accesos (username_input, evento, detalle, ip, user_agent)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            perfil.get("usuario", ""), evento, detalle,
+            request.client.host if request.client else "",
+            request.headers.get("user-agent", ""),
+        ),
+    )
+
+
+@app.get("/administracion", response_class=HTMLResponse)
+def administracion_view(request: Request):
+    try:
+        _requiere_administrador(request)
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    return _leer_html(ADMINISTRACION_PATH)
+
+
+@app.get("/mantenimiento", response_class=HTMLResponse)
+def mantenimiento_view(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    return _leer_html(FLEETCARE_PATH)
+
+
+@app.get("/admin/roles_funcionales")
+def admin_listar_roles(request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        return [dict(fila) for fila in conn.execute(
+            "SELECT id, nombre, activo FROM roles_funcionales WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+        ).fetchall()]
+
+
+@app.get("/admin/usuarios")
+def admin_listar_usuarios(request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            """
+            SELECT id, nombre_apellido, dni, legajo, correo, estado, tipo_usuario,
+                   modulos_json, paneles_json, acciones_json, bloqueado,
+                   intentos_fallidos, password_temporal, ultimo_acceso, created_at
+            FROM usuarios ORDER BY nombre_apellido, correo
+            """
+        ).fetchall()
+        return [_admin_usuario_a_dict(conn, fila) for fila in filas]
+
+
+@app.post("/admin/usuarios")
+def admin_crear_usuario_endpoint(request: Request, payload: dict):
+    _requiere_administrador(request)
+    datos = dict(payload or {})
+    password_temporal = ""
+    if not str(datos.get("password", "")):
+        password_temporal = secrets.token_urlsafe(9)
+        datos["password"] = password_temporal
+    resultado = admin_crear_usuario(datos)
+    if not resultado.get("ok"):
+        raise HTTPException(status_code=400, detail=resultado.get("error", "No se pudo crear el usuario"))
+    with get_sqlite_connection() as conn:
+        _registrar_acceso_admin(conn, request, "USUARIO_CREADO", f"usuario_id={resultado['id']}")
+        conn.commit()
+    return {**resultado, "password_temporal": password_temporal}
+
+
+@app.put("/admin/usuarios/{usuario_id}")
+def admin_actualizar_usuario(usuario_id: int, request: Request, payload: dict):
+    _requiere_administrador(request)
+    datos = dict(payload or {})
+    nombre = str(datos.get("nombre_apellido", "")).strip()
+    correo = str(datos.get("correo", "")).strip()
+    if not nombre or not correo:
+        raise HTTPException(status_code=400, detail="nombre_apellido y correo son obligatorios")
+    modulos = datos.get("modulos", []) if isinstance(datos.get("modulos", []), list) else []
+    paneles = datos.get("paneles", {}) if isinstance(datos.get("paneles", {}), dict) else {}
+    acciones = datos.get("acciones", {}) if isinstance(datos.get("acciones", {}), dict) else {}
+    roles = datos.get("roles", []) if isinstance(datos.get("roles", []), list) else []
+    try:
+        with get_sqlite_connection() as conn:
+            existente = conn.execute("SELECT id FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+            if not existente:
+                raise HTTPException(status_code=404, detail="Usuario no encontrado")
+            campos = [
+                "nombre_apellido = ?", "dni = ?", "legajo = ?", "correo = ?", "estado = ?",
+                "tipo_usuario = ?", "modulos_json = ?", "paneles_json = ?", "acciones_json = ?",
+                "updated_at = datetime('now')",
+            ]
+            valores = [
+                nombre, str(datos.get("dni", "")).strip(), str(datos.get("legajo", "")).strip(), correo,
+                str(datos.get("estado", "ACTIVO")).strip().upper() or "ACTIVO",
+                str(datos.get("tipo_usuario", "CONSULTOR")).strip().upper() or "CONSULTOR",
+                json.dumps(modulos, ensure_ascii=False), json.dumps(paneles, ensure_ascii=False), json.dumps(acciones, ensure_ascii=False),
+            ]
+            if str(datos.get("password", "")):
+                campos.extend(["password_hash = ?", "password_temporal = 0"])
+                valores.append(hashlib.sha256(str(datos["password"]).encode("utf-8")).hexdigest())
+            valores.append(usuario_id)
+            conn.execute(f"UPDATE usuarios SET {', '.join(campos)} WHERE id = ?", valores)
+            conn.execute("DELETE FROM usuario_roles_funcionales WHERE usuario_id = ?", (usuario_id,))
+            for rol_id in roles:
+                try:
+                    conn.execute("INSERT OR IGNORE INTO usuario_roles_funcionales (usuario_id, rol_id) VALUES (?, ?)", (usuario_id, int(rol_id)))
+                except (TypeError, ValueError):
+                    continue
+            _registrar_acceso_admin(conn, request, "USUARIO_ACTUALIZADO", f"usuario_id={usuario_id}")
+            conn.commit()
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="El correo ya está asignado a otro usuario")
+    return {"ok": True, "id": usuario_id}
+
+
+@app.post("/admin/usuarios/{usuario_id}/estado")
+def admin_cambiar_estado_usuario(usuario_id: int, request: Request, payload: dict):
+    _requiere_administrador(request)
+    estado = str((payload or {}).get("estado", "")).strip().upper()
+    if estado not in {"ACTIVO", "INACTIVO"}:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    with get_sqlite_connection() as conn:
+        cur = conn.execute("UPDATE usuarios SET estado = ?, updated_at = datetime('now') WHERE id = ?", (estado, usuario_id))
+        if not cur.rowcount:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        _registrar_acceso_admin(conn, request, "USUARIO_ESTADO", f"usuario_id={usuario_id}; estado={estado}")
+        conn.commit()
+    return {"ok": True}
+
+
+@app.post("/admin/usuarios/{usuario_id}/bloqueo")
+def admin_cambiar_bloqueo_usuario(usuario_id: int, request: Request, payload: dict):
+    _requiere_administrador(request)
+    bloqueado = 1 if bool((payload or {}).get("bloqueado")) else 0
+    with get_sqlite_connection() as conn:
+        cur = conn.execute("UPDATE usuarios SET bloqueado = ?, updated_at = datetime('now') WHERE id = ?", (bloqueado, usuario_id))
+        if not cur.rowcount:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        _registrar_acceso_admin(conn, request, "USUARIO_BLOQUEO", f"usuario_id={usuario_id}; bloqueado={bloqueado}")
+        conn.commit()
+    return {"ok": True}
+
+
+@app.post("/admin/usuarios/{usuario_id}/reset_password")
+def admin_resetear_password(usuario_id: int, request: Request, payload: dict):
+    _requiere_administrador(request)
+    password = str((payload or {}).get("password", "")) or secrets.token_urlsafe(9)
+    with get_sqlite_connection() as conn:
+        cur = conn.execute(
+            """UPDATE usuarios SET password_hash = ?, password_temporal = 1,
+               intentos_fallidos = 0, updated_at = datetime('now') WHERE id = ?""",
+            (hashlib.sha256(password.encode("utf-8")).hexdigest(), usuario_id),
+        )
+        if not cur.rowcount:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        _registrar_acceso_admin(conn, request, "PASSWORD_RESTABLECIDA", f"usuario_id={usuario_id}")
+        conn.commit()
+    return {"ok": True, "password": password}
+
+
+@app.get("/admin/accesos")
+def admin_listar_accesos(request: Request, limit: int = Query(100, ge=1, le=500)):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            """
+            SELECT h.created_at, h.evento, h.username_input, h.detalle, h.ip, u.nombre_apellido
+            FROM historial_accesos h LEFT JOIN usuarios u ON u.id = h.usuario_id
+            ORDER BY h.id DESC LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(fila) for fila in filas]
 
 
 @app.get("/logout")

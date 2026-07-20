@@ -342,91 +342,17 @@
       min-height: clamp(320px, 62vh, 760px);
       background: rgba(10, 34, 59, 0.65);
     }
-    .carousel-copy {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 22px;
-      pointer-events: none;
-    }
-
-    .carousel-copy .hero-content {
-      max-width: 980px;
-    }
-
-    .carousel-copy .btn-primary {
-      pointer-events: auto;
-    }
-
-    .carousel-track {
-      position: relative;
-      height: clamp(320px, 62vh, 760px);
-    }
-
-    .slide {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.5s ease;
-      background-position: center;
-      background-size: cover;
-      background-repeat: no-repeat;
-      display: flex;
-      align-items: flex-end;
-      padding: 14px;
-    }
-
-    .slide.active {
-      opacity: 1;
-    }
-
-    .slide::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.62));
-    }
-
-    .carousel-controls {
-      position: absolute;
-      inset: auto 16px 14px auto;
-      z-index: 3;
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
-      background: rgba(15, 23, 42, 0.55);
-      cursor: pointer;
-      padding: 0;
-    }
-
-    .dot.active {
-      background: #38bdf8;
-      border-color: #7dd3fc;
-    }
-
-    .ctrl-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      border: 1px solid rgba(226, 232, 240, 0.75);
-      background: rgba(8, 58, 104, 0.6);
-      color: #f0f9ff;
-      cursor: pointer;
-      line-height: 1;
-      padding: 0;
-      font-size: 14px;
-      font-weight: 700;
-    }
+    .carousel-copy { position:absolute; inset:0; z-index:2; display:grid; place-items:center; text-align:center; padding:22px; pointer-events:none; }
+    .carousel-copy .hero-content { max-width: 980px; }
+    .carousel-copy .btn-primary { pointer-events: auto; }
+    .carousel-track { position: relative; height: clamp(320px, 62vh, 760px); }
+    .slide { position:absolute; inset:0; opacity:0; transition:opacity .5s ease; background-position:center; background-size:cover; background-repeat:no-repeat; display:flex; align-items:flex-end; padding:14px; }
+    .slide.active { opacity: 1; }
+    .slide::before { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,6,23,.08), rgba(2,6,23,.62)); }
+    .carousel-controls { position:absolute; inset:auto 16px 14px auto; z-index:3; display:flex; gap:6px; align-items:center; }
+    .dot { width:10px; height:10px; border-radius:999px; border:1px solid rgba(226,232,240,.8); background:rgba(15,23,42,.55); cursor:pointer; padding:0; }
+    .dot.active { background:#38bdf8; border-color:#7dd3fc; }
+    .ctrl-btn { width:32px; height:32px; border-radius:999px; border:1px solid rgba(226,232,240,.75); background:rgba(8,58,104,.6); color:#f0f9ff; cursor:pointer; line-height:1; padding:0; font-size:14px; font-weight:700; }
 
     .section h2 {
       font-family: "Rajdhani", sans-serif;
@@ -491,13 +417,13 @@
       gap: 4px;
     }
 
-      min-height: clamp(420px, 78vh, 980px);
+    .logistics-panel {
       border-radius: var(--radius-md);
       border: 1px solid rgba(8, 58, 104, 0.2);
       background:
         linear-gradient(120deg, rgba(13, 79, 140, 0.1), rgba(255, 255, 255, 0.4)),
         rgba(255, 255, 255, 0.8);
-      height: clamp(420px, 78vh, 980px);
+      padding: 20px;
       display: grid;
       gap: 14px;
     }
@@ -610,10 +536,6 @@
         right: auto;
         left: 0;
       }
-
-      .logo-main {
-        height: 50px;
-      }
     }
 
     @media (max-width: 880px) {
@@ -691,15 +613,14 @@
 
     <section class="showcase" id="galeria" aria-label="Galeria Operativa">
       <div class="carousel" aria-label="Carrusel de imagenes">
-        <div class="carousel-track" id="carousel-track">
-        </div>
-          <div class="carousel-copy" aria-hidden="false">
-            <div class="hero-content">
-              <p>Soluciones Integrales para la<br>Industria Minera e Industrial</p>
-              <p class="minor">Construccion • Logistica • Rental • Campamentos</p>
-              <a class="btn-primary" href="#servicios">Conocer Servicios</a>
-            </div>
+        <div class="carousel-track" id="carousel-track"></div>
+        <div class="carousel-copy">
+          <div class="hero-content">
+            <p>Soluciones Integrales para la<br>Industria Minera e Industrial</p>
+            <p class="minor">Construccion • Logistica • Rental • Campamentos</p>
+            <a class="btn-primary" href="#servicios">Conocer Servicios</a>
           </div>
+        </div>
         <div class="carousel-controls" id="carousel-controls">
           <button class="ctrl-btn" id="prev-slide" type="button" aria-label="Anterior">&lt;</button>
           <div id="carousel-dots" style="display:flex; gap:6px;"></div>
@@ -915,91 +836,48 @@
       const dotsWrap = document.getElementById("carousel-dots");
       const prevBtn = document.getElementById("prev-slide");
       const nextBtn = document.getElementById("next-slide");
-      if (!track || !dotsWrap || !prevBtn || !nextBtn) {
-        return;
-      }
+      const controls = document.getElementById("carousel-controls");
+      if (!track || !dotsWrap || !prevBtn || !nextBtn || !controls) return;
 
       let fotos = [];
       try {
         const resp = await fetch("/imagenes/editadas/listado", { credentials: "same-origin" });
         const data = await resp.json();
         fotos = Array.isArray(data.imagenes) ? data.imagenes : [];
-      } catch (_) {
-        fotos = [];
-      }
+      } catch (_) { /* Se muestra el estado vacío abajo. */ }
 
       if (!fotos.length) {
         const empty = document.createElement("div");
-        empty.style.position = "absolute";
-        empty.style.inset = "0";
-        empty.style.display = "grid";
-        empty.style.placeItems = "center";
-        empty.style.color = "#e2e8f0";
-        empty.style.background = "rgba(2, 6, 23, 0.45)";
+        Object.assign(empty.style, { position: "absolute", inset: "0", display: "grid", placeItems: "center", color: "#e2e8f0", background: "rgba(2, 6, 23, 0.45)" });
         empty.textContent = "No hay imagenes disponibles en /Imagenes/Editadas.";
         track.appendChild(empty);
-        document.getElementById("carousel-controls").style.display = "none";
+        controls.style.display = "none";
         return;
       }
 
-      const slides = [];
-      track.querySelectorAll(".slide").forEach((s) => s.remove());
-      fotos.forEach((img, i) => {
+      const slides = fotos.map((img, i) => {
         const slide = document.createElement("div");
         slide.className = "slide" + (i === 0 ? " active" : "");
-        const src = String(img.url || "").replace(/ /g, "%20");
-        slide.style.backgroundImage = `url('${src}')`;
+        slide.style.backgroundImage = `url('${String(img.url || "").replace(/ /g, "%20")}')`;
         track.appendChild(slide);
-        slides.push(slide);
-      });
-
-      let idx = 0;
-      let timer = null;
-
-      function paint(i) {
-        idx = (i + slides.length) % slides.length;
-        slides.forEach((s, p) => s.classList.toggle("active", p === idx));
-        Array.from(dotsWrap.children).forEach((d, p) => d.classList.toggle("active", p === idx));
-      }
-
-      slides.forEach((_, i) => {
         const dot = document.createElement("button");
         dot.type = "button";
         dot.className = "dot" + (i === 0 ? " active" : "");
         dot.setAttribute("aria-label", `Ir a imagen ${i + 1}`);
-        dot.addEventListener("click", function () {
-          paint(i);
-          restart();
-        });
         dotsWrap.appendChild(dot);
+        return slide;
       });
-
-      function next() {
-        paint(idx + 1);
+      let idx = 0;
+      let timer;
+      function paint(i) {
+        idx = (i + slides.length) % slides.length;
+        slides.forEach((slide, pos) => slide.classList.toggle("active", pos === idx));
+        Array.from(dotsWrap.children).forEach((dot, pos) => dot.classList.toggle("active", pos === idx));
       }
-
-      function prev() {
-        paint(idx - 1);
-      }
-
-      function restart() {
-        if (timer) {
-          clearInterval(timer);
-        }
-        timer = setInterval(next, 4300);
-      }
-
-      nextBtn.addEventListener("click", function () {
-        next();
-        restart();
-      });
-
-      prevBtn.addEventListener("click", function () {
-        prev();
-        restart();
-      });
-
-      paint(0);
+      function restart() { clearInterval(timer); timer = setInterval(() => paint(idx + 1), 4300); }
+      Array.from(dotsWrap.children).forEach((dot, i) => dot.addEventListener("click", () => { paint(i); restart(); }));
+      nextBtn.addEventListener("click", () => { paint(idx + 1); restart(); });
+      prevBtn.addEventListener("click", () => { paint(idx - 1); restart(); });
       restart();
     })();
   </script>

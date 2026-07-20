@@ -594,34 +594,6 @@
       return (items || []).map((x) => `<span class="badge">${x}</span>`).join("");
     }
 
-    function mascaraPassword(raw) {
-      const txt = String(raw || "");
-      if (!txt) return "-";
-      return "*".repeat(Math.max(8, txt.length));
-    }
-
-    function togglePwd(uid) {
-      const user = state.users.find((x) => Number(x.id) === Number(uid));
-      if (!user) return;
-      const valor = String(user.password_visible || "");
-      const out = document.getElementById(`pwd-${uid}`);
-      const btn = document.getElementById(`btn-pwd-${uid}`);
-      if (!out || !btn) return;
-
-      const visible = btn.dataset.visible === "1";
-      if (visible) {
-        out.textContent = mascaraPassword(valor);
-        btn.dataset.visible = "0";
-        btn.textContent = "Ver";
-      } else {
-        out.textContent = valor || "-";
-        btn.dataset.visible = "1";
-        btn.textContent = "Ocultar";
-      }
-    }
-
-    window.togglePwd = togglePwd;
-
     function badgesPaneles(paneles) {
       const chunks = [];
       Object.entries(paneles || {}).forEach(([modulo, lista]) => {
@@ -657,10 +629,7 @@
             </td>
             <td>${u.tipo_usuario || ""}</td>
             <td>${u.estado || ""}${u.bloqueado ? " / BLOQUEADO" : ""}</td>
-            <td>
-              <div id="pwd-${u.id}" class="muted">${mascaraPassword(u.password_visible || "")}</div>
-              <button class="btn" id="btn-pwd-${u.id}" data-visible="0" onclick="togglePwd(${u.id})">Ver</button>
-            </td>
+            <td><span class="muted">Protegida</span></td>
             <td>${modulos}</td>
             <td>${paneles}</td>
             <td>${acciones}</td>

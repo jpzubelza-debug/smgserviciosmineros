@@ -142,6 +142,27 @@
       white-space: nowrap;
     }
 
+    .logout-btn {
+      appearance: none;
+      text-decoration: none;
+      border: 1px solid rgba(248, 113, 113, 0.55);
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: rgba(127, 29, 29, 0.32);
+      color: #fee2e2;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .logout-btn:hover {
+      background: rgba(185, 28, 28, 0.55);
+      transform: translateY(-1px);
+    }
+
     .menu-grid {
       margin-top: 6px;
       display: grid;
@@ -312,6 +333,7 @@
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <div class="user-chip" id="user-chip">Usuario</div>
         <div class="live-chip">Sistema Operativo Activo</div>
+        <a class="logout-btn" href="/logout">Cerrar sesión</a>
       </div>
     </header>
 
