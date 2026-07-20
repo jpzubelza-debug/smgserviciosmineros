@@ -1,21 +1,17 @@
 
 from fastapi import FastAPI, UploadFile, File, Form, Query, Request
-from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
-from typing import Optional, Any
 from dotenv import load_dotenv
-from typing import Optional
-import io
 import hashlib
+import io
 import json
 import os
-import secrets
 import sqlite3
-from db_adapter import get_connection as _db_get_connection, DATABASE_URL as _DATABASE_URL
 import time
 
 BASE_DIR = os.path.dirname(__file__)
@@ -33,15 +29,11 @@ PRINT_ORDEN_SALIDA_PATH = os.path.join(BASE_DIR, "print_orden_salida.html")
 ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
-FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
-ADMINISTRACION_PATH = os.path.join(BASE_DIR, "administracion.html")
 DOC_LOG_VIAJES_DIR = os.path.join(BASE_DIR, "Doc_Log_Viajes")
 DOC_ALMACEN_DIR = os.path.join(BASE_DIR, "Doc_Almacen")
 DOC_ALMACEN_ADJ_DIR = os.path.join(DOC_ALMACEN_DIR, "adjuntos")
-IMAGENES_EDITADAS_DIR = os.path.join(BASE_DIR, "Imagenes", "Editadas")
 SQLITE_DB_PATH = os.path.join(BASE_DIR, "dashboard.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "schema.sql")
-SCHEMA_PG_PATH = os.path.join(BASE_DIR, "schema_pg.sql")
 MEMBRETE_LOGO_PATH = os.path.join(BASE_DIR, "Imagenes", "09-smg.png")
 
 EMPRESA_MEMBRETE = {
@@ -73,705 +65,10 @@ app.add_middleware(
 AUTH_USER = os.getenv("APP_LOGIN_USER", "admin")
 AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "admin123")
 AUTH_COOKIE_NAME = "dash_auth_user"
-AUTH_IDLE_TIMEOUT_SECONDS = int(os.getenv("APP_IDLE_TIMEOUT_SECONDS", "3600") or "3600")
-TIPOS_USUARIO_VALIDOS = {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE", "OPERADOR", "CONSULTOR"}
-MODULOS_VALIDOS = {
-    "logistica",
-    "almacen",
-    "operaciones",
-    "compras",
-    "rrhh",
-    "mantenimiento",
-    "dashboard_ejecutivo",
-    "administracion",
-}
-MODULOS_ACTIVOS = {"logistica", "almacen", "administracion", "mantenimiento"}
-
-PANELES_POR_MODULO = {
-    "logistica": {
-        "dashboard",
-        "solicitud_viaje",
-        "asignar_recursos",
-        "vehiculos",
-        "personal",
-        "ordenes_salida",
-        "gestion_operativa",
-    },
-    "almacen": {
-        "dashboard",
-        "catalogos",
-        "productos",
-        "ingresos_salidas",
-        "documentos",
-        "movimientos",
-        "inventario",
-    },
-    "mantenimiento": {
-        "dashboard",
-        "checklists",
-        "incidencias",
-        "historial_equipo",
-    },
-}
-
-ACCIONES_POR_PANEL = {
-    "logistica": {
-        "dashboard": {"ver", "aprobar_solicitud", "rechazar_solicitud"},
-        "solicitud_viaje": {"crear_solicitud", "gestionar_estado"},
-        "asignar_recursos": {"asignar"},
-        "vehiculos": {"crear", "editar", "eliminar"},
-        "personal": {"crear", "editar"},
-        "ordenes_salida": {"ver", "guardar_cierre", "imprimir", "cerrar_orden"},
-        "gestion_operativa": {"consultar", "exportar_pdf", "exportar_excel"},
-    },
-    "almacen": {
-        "dashboard": {"ver"},
-        "catalogos": {"consultar", "crear", "eliminar"},
-        "productos": {"consultar", "crear", "editar", "eliminar"},
-        "ingresos_salidas": {"generar_remito", "autorizar_remito", "no_autorizar_remito", "consultar"},
-        "documentos": {"consultar", "ver_pdf"},
-        "movimientos": {"consultar", "exportar_pdf", "exportar_excel"},
-        "inventario": {"consultar", "crear_inventario", "guardar_conteo", "ver_ajustes", "exportar_pdf", "exportar_excel"},
-    },
-    "mantenimiento": {
-        "dashboard": {"ver"},
-        "checklists": {"consultar", "crear"},
-        "incidencias": {"consultar", "editar", "asignar", "cerrar"},
-        "historial_equipo": {"consultar"},
-    },
-}
-
-
-def _modulos_default_por_tipo(tipo_usuario: str):
-    tipo = str(tipo_usuario or "").strip().upper()
-    if tipo == "ADMINISTRADOR":
-        return sorted(MODULOS_VALIDOS)
-    if tipo == "SUPERVISOR":
-        return ["logistica", "almacen", "operaciones", "compras"]
-    if tipo == "ASISTENTE":
-        return ["logistica", "almacen", "operaciones"]
-    if tipo == "OPERADOR":
-        return ["logistica", "almacen"]
-    return ["logistica"]
-
-
-def _normalizar_tipo_usuario(tipo_usuario: str):
-    tipo = str(tipo_usuario or "").strip().upper()
-    if tipo in TIPOS_USUARIO_VALIDOS:
-        return tipo
-    return "CONSULTOR"
-
-
-def _normalizar_modulos(modulos):
-    if not isinstance(modulos, list):
-        return []
-    normalizados = []
-    for item in modulos:
-        nombre = str(item or "").strip().lower()
-        if nombre in MODULOS_VALIDOS and nombre not in normalizados:
-            normalizados.append(nombre)
-    return normalizados
-
-
-def _paneles_default_por_modulos(modulos):
-    salida = {}
-    for modulo in sorted(set(modulos or [])):
-        if modulo in PANELES_POR_MODULO:
-            salida[modulo] = sorted(PANELES_POR_MODULO[modulo])
-    return salida
-
-
-def _normalizar_paneles_por_modulo(paneles, modulos):
-    modulos_validos = set(modulos or [])
-    if not isinstance(paneles, dict):
-        paneles = {}
-
-    salida = {}
-    for modulo_raw, paneles_raw in paneles.items():
-        modulo = str(modulo_raw or "").strip().lower()
-        if modulo not in modulos_validos or modulo not in PANELES_POR_MODULO:
-            continue
-        if not isinstance(paneles_raw, list):
-            continue
-        vistos = []
-        for panel_item in paneles_raw:
-            panel = str(panel_item or "").strip().lower()
-            if panel in PANELES_POR_MODULO[modulo] and panel not in vistos:
-                vistos.append(panel)
-        salida[modulo] = vistos
-
-    # Compatibilidad: si no viene configuración para un módulo con paneles,
-    # se habilitan todos por defecto.
-    for modulo in sorted(modulos_validos):
-        if modulo in PANELES_POR_MODULO and modulo not in salida:
-            salida[modulo] = sorted(PANELES_POR_MODULO[modulo])
-
-    return salida
-
-
-def _acciones_default_por_paneles(modulos, paneles):
-    salida = {}
-    modulos_validos = set(modulos or [])
-    paneles_validos = paneles if isinstance(paneles, dict) else {}
-
-    for modulo in sorted(modulos_validos):
-        if modulo not in ACCIONES_POR_PANEL:
-            continue
-        salida_mod = {}
-        for panel in paneles_validos.get(modulo, []):
-            if panel in ACCIONES_POR_PANEL[modulo]:
-                salida_mod[panel] = sorted(ACCIONES_POR_PANEL[modulo][panel])
-        if salida_mod:
-            salida[modulo] = salida_mod
-    return salida
-
-
-def _normalizar_acciones_por_panel(acciones, paneles, modulos):
-    if not isinstance(acciones, dict):
-        acciones = {}
-    paneles_norm = paneles if isinstance(paneles, dict) else {}
-    modulos_validos = set(modulos or [])
-
-    salida = {}
-    for modulo_raw, paneles_cfg in acciones.items():
-        modulo = str(modulo_raw or "").strip().lower()
-        if modulo not in modulos_validos or modulo not in ACCIONES_POR_PANEL:
-            continue
-        if not isinstance(paneles_cfg, dict):
-            continue
-
-        salida_mod = {}
-        paneles_habilitados = set(paneles_norm.get(modulo, []) if isinstance(paneles_norm.get(modulo, []), list) else [])
-        for panel_raw, acciones_cfg in paneles_cfg.items():
-            panel = str(panel_raw or "").strip().lower()
-            if panel not in paneles_habilitados:
-                continue
-            if panel not in ACCIONES_POR_PANEL[modulo]:
-                continue
-            if not isinstance(acciones_cfg, list):
-                continue
-
-            acciones_validas = []
-            for accion_item in acciones_cfg:
-                accion = str(accion_item or "").strip().lower()
-                if accion in ACCIONES_POR_PANEL[modulo][panel] and accion not in acciones_validas:
-                    acciones_validas.append(accion)
-            salida_mod[panel] = acciones_validas
-
-        for panel in paneles_habilitados:
-            if panel in ACCIONES_POR_PANEL[modulo] and panel not in salida_mod:
-                salida_mod[panel] = sorted(ACCIONES_POR_PANEL[modulo][panel])
-
-        if salida_mod:
-            salida[modulo] = salida_mod
-
-    for modulo in sorted(modulos_validos):
-        if modulo not in ACCIONES_POR_PANEL:
-            continue
-        if modulo not in salida:
-            salida[modulo] = {}
-        paneles_habilitados = paneles_norm.get(modulo, []) if isinstance(paneles_norm.get(modulo, []), list) else []
-        for panel in paneles_habilitados:
-            if panel in ACCIONES_POR_PANEL[modulo] and panel not in salida[modulo]:
-                salida[modulo][panel] = sorted(ACCIONES_POR_PANEL[modulo][panel])
-
-    return salida
-
-
-def _hash_password(password: str):
-    salt = secrets.token_hex(16)
-    rounds = 120000
-    digest = hashlib.pbkdf2_hmac("sha256", str(password or "").encode("utf-8"), salt.encode("utf-8"), rounds).hex()
-    return f"pbkdf2_sha256${rounds}${salt}${digest}"
-
-
-def _verify_password(password: str, password_hash: str):
-    raw = str(password_hash or "")
-    if not raw.startswith("pbkdf2_sha256$"):
-        return str(password or "") == raw
-    try:
-        _, rounds_txt, salt, expected = raw.split("$", 3)
-        rounds = int(rounds_txt)
-        digest = hashlib.pbkdf2_hmac("sha256", str(password or "").encode("utf-8"), salt.encode("utf-8"), rounds).hex()
-        return secrets.compare_digest(digest, expected)
-    except Exception:
-        return False
-
-
-def _generar_password_temporal(longitud: int = 10):
-    abc = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
-    return "".join(secrets.choice(abc) for _ in range(max(8, longitud)))
-
-
-def _registrar_historial_acceso(conn, usuario_id: Optional[int], username_input: str, evento: str, detalle: str = "", ip: str = "", user_agent: str = ""):
-    conn.execute(
-        """
-        INSERT INTO historial_accesos (usuario_id, username_input, evento, detalle, ip, user_agent, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            usuario_id,
-            username_input,
-            evento,
-            detalle,
-            ip,
-            user_agent,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        ),
-    )
-
-
-def _obtener_roles_usuario(conn, usuario_id: int):
-    rows = conn.execute(
-        """
-        SELECT rf.nombre
-        FROM usuario_roles_funcionales urf
-        JOIN roles_funcionales rf ON rf.id = urf.rol_id
-        WHERE urf.usuario_id = ?
-          AND COALESCE(rf.activo, 1) = 1
-        ORDER BY rf.nombre
-        """,
-        (usuario_id,),
-    ).fetchall()
-    return [str(r["nombre"] or "").strip() for r in rows if str(r["nombre"] or "").strip()]
-
-
-def _serializar_usuario(conn, row, incluir_password: bool = False, incluir_password_visible: bool = False):
-    modulos = parse_json_list(row["modulos_json"])
-    tipo = _normalizar_tipo_usuario(row["tipo_usuario"])
-    if tipo == "ADMINISTRADOR":
-        modulos = sorted(MODULOS_VALIDOS)
-    elif not modulos:
-        modulos = _modulos_default_por_tipo(tipo)
-    paneles_raw = row["paneles_json"] if "paneles_json" in row.keys() else ""
-    paneles = _normalizar_paneles_por_modulo(
-        parse_json_dict(paneles_raw, default={}),
-        modulos,
-    )
-    acciones_raw = row["acciones_json"] if "acciones_json" in row.keys() else ""
-    acciones = _normalizar_acciones_por_panel(
-        parse_json_dict(acciones_raw, default={}),
-        paneles,
-        modulos,
-    )
-    usuario = {
-        "id": int(row["id"]),
-        "nombre_apellido": str(row["nombre_apellido"] or ""),
-        "dni": str(row["dni"] or ""),
-        "legajo": str(row["legajo"] or ""),
-        "correo": str(row["correo"] or ""),
-        "estado": str(row["estado"] or "ACTIVO"),
-        "tipo_usuario": tipo,
-        "modulos": modulos,
-        "paneles": paneles,
-        "acciones": acciones,
-        "bloqueado": bool(row["bloqueado"]),
-        "password_temporal": bool(row["password_temporal"]),
-        "intentos_fallidos": int(row["intentos_fallidos"] or 0),
-        "ultimo_acceso": str(row["ultimo_acceso"] or ""),
-        "created_at": str(row["created_at"] or ""),
-        "updated_at": str(row["updated_at"] or ""),
-        "roles": _obtener_roles_usuario(conn, int(row["id"])),
-    }
-    if incluir_password:
-        usuario["password_hash"] = str(row["password_hash"] or "")
-    if incluir_password_visible:
-        usuario["password_visible"] = str(row["password_visible"] or "") if "password_visible" in row.keys() else ""
-    return usuario
-
-
-def _buscar_usuario_por_cookie(request: Request):
-    username = str(request.cookies.get(AUTH_COOKIE_NAME, "") or "").strip()
-    if not username:
-        return None
-    with get_sqlite_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM usuarios
-            WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))
-              AND UPPER(COALESCE(estado, '')) = 'ACTIVO'
-              AND COALESCE(bloqueado, 0) = 0
-            LIMIT 1
-            """,
-            (username,),
-        ).fetchone()
-        if row is None:
-            return None
-        return _serializar_usuario(conn, row)
-
-
-def _usuario_tiene_modulo(usuario, modulo: str):
-    if not isinstance(usuario, dict):
-        return False
-    tipo = _normalizar_tipo_usuario(usuario.get("tipo_usuario", ""))
-    if tipo == "ADMINISTRADOR":
-        return True
-    return str(modulo or "").strip().lower() in set(usuario.get("modulos") or [])
-
-
-def _usuario_tiene_panel(usuario, modulo: str, panel: str):
-    if not isinstance(usuario, dict):
-        return False
-    tipo = _normalizar_tipo_usuario(usuario.get("tipo_usuario", ""))
-    if tipo == "ADMINISTRADOR":
-        return True
-    modulo_norm = str(modulo or "").strip().lower()
-    panel_norm = str(panel or "").strip().lower()
-    paneles = usuario.get("paneles") or {}
-    permitidos = paneles.get(modulo_norm)
-    if not isinstance(permitidos, list):
-        return False
-    return panel_norm in set(permitidos)
-
-
-def _usuario_tiene_accion(usuario, modulo: str, panel: str, accion: str):
-    if not isinstance(usuario, dict):
-        return False
-    tipo = _normalizar_tipo_usuario(usuario.get("tipo_usuario", ""))
-    if tipo == "ADMINISTRADOR":
-        return True
-
-    modulo_norm = str(modulo or "").strip().lower()
-    panel_norm = str(panel or "").strip().lower()
-    accion_norm = str(accion or "").strip().lower()
-
-    acciones = usuario.get("acciones") or {}
-    if not isinstance(acciones, dict):
-        return True  # Sin configuracion de acciones: compatibilidad, permitir todo
-    mod = acciones.get(modulo_norm) or {}
-    if not isinstance(mod, dict):
-        return True  # Modulo sin acciones configuradas: compatibilidad, permitir todo
-    lista = mod.get(panel_norm)
-    if not isinstance(lista, list) or len(lista) == 0:
-        # Panel sin acciones configuradas: compatibilidad hacia atras, permitir
-        return True
-
-    if accion_norm in set(lista):
-        return True
-
-    # Compatibilidad con permisos previos: gestionar estado en solicitud_viaje.
-    if modulo_norm == "logistica" and panel_norm == "dashboard" and accion_norm in {"aprobar_solicitud", "rechazar_solicitud"}:
-        mod_legacy = acciones.get("logistica") or {}
-        if isinstance(mod_legacy, dict):
-            lista_legacy = mod_legacy.get("solicitud_viaje")
-            if isinstance(lista_legacy, list) and "gestionar_estado" in set(lista_legacy):
-                return True
-
-    # Compatibilidad con permiso legado de cierre en Ordenes de Salida.
-    if modulo_norm == "logistica" and panel_norm == "ordenes_salida" and accion_norm == "guardar_cierre":
-        mod_legacy = acciones.get("logistica") or {}
-        if isinstance(mod_legacy, dict):
-            lista_legacy = mod_legacy.get("ordenes_salida")
-            if isinstance(lista_legacy, list) and "cerrar_orden" in set(lista_legacy):
-                return True
-
-    return False
-
-
-def _modulo_requerido_para_path(path: str):
-    p = str(path or "").strip()
-    if p == "/administracion" or p.startswith("/admin/"):
-        return "administracion"
-    if p == "/almacen" or p.startswith("/almacen/"):
-        return "almacen"
-    if p == "/gestion_operativa" or p.startswith("/gestion_operativa/"):
-        return "logistica"
-    if p == "/mantenimiento" or p.startswith("/mantenimiento"):
-        return "mantenimiento"
-    if (
-        p in {
-            "/dashboard",
-            "/dashboard.html",
-            "/form",
-            "/recursos_form",
-            "/ordenes",
-            "/ordenes_view",
-            "/print_viaje",
-            "/print_orden_salida",
-            "/personal",
-            "/personal_form",
-            "/vehiculos",
-            "/vehiculos_form",
-            "/choferes",
-            "/recursos",
-            "/viajes",
-        }
-        or p.startswith("/estado/")
-        or p.startswith("/ordenes/")
-        or p.startswith("/personal/")
-        or p.startswith("/vehiculos/")
-        or p.startswith("/analisis")
-    ):
-        return "logistica"
-    return None
-
-
-def _panel_requerido_para_path(path: str):
-    p = str(path or "").strip()
-
-    # Logistica
-    if p in {"/dashboard", "/dashboard.html"}:
-        return ("logistica", "dashboard")
-    if p == "/form":
-        return ("logistica", "solicitud_viaje")
-    if p in {"/recursos_form", "/recursos"}:
-        return ("logistica", "asignar_recursos")
-    if p in {"/vehiculos_form", "/vehiculos", "/choferes"}:
-        return ("logistica", "vehiculos")
-    if p in {"/personal_form", "/personal"}:
-        return ("logistica", "personal")
-    if p == "/ordenes_view" or p == "/ordenes" or p.startswith("/ordenes/"):
-        return ("logistica", "ordenes_salida")
-    if p == "/gestion_operativa" or p.startswith("/gestion_operativa/"):
-        return ("logistica", "gestion_operativa")
-    if p == "/mantenimiento" or p.startswith("/mantenimiento/checklists"):
-        return ("mantenimiento", "checklists")
-    if p == "/mantenimiento/incidencias" or p.startswith("/mantenimiento/incidencias/"):
-        return ("mantenimiento", "incidencias")
-    if p.startswith("/mantenimiento/equipos/"):
-        return ("mantenimiento", "historial_equipo")
-
-    # Almacen
-    if p == "/almacen" or p in {"/almacen/dashboard_data", "/almacen/v2/dashboard"}:
-        return ("almacen", "dashboard")
-    if p.startswith("/almacen/v2/catalogos/") or p.startswith("/almacen/categorias") or p.startswith("/almacen/tipos") or p.startswith("/almacen/unidades") or p.startswith("/almacen/ubicaciones"):
-        return ("almacen", "catalogos")
-    if p.startswith("/almacen/v2/productos") or p.startswith("/almacen/productos"):
-        return ("almacen", "productos")
-    if p.startswith("/almacen/remitos_ingreso") or p.startswith("/almacen/remitos_entrega"):
-        return ("almacen", "ingresos_salidas")
-    if p == "/almacen/documentos" or p.startswith("/almacen/v2/documentos/"):
-        return ("almacen", "documentos")
-    if p.startswith("/almacen/movimientos") or p.startswith("/almacen/v2/movimientos"):
-        return ("almacen", "movimientos")
-    if p.startswith("/almacen/inventarios") or p.startswith("/almacen/ajustes") or p.startswith("/almacen/v2/inventarios") or p.startswith("/almacen/v2/ajustes"):
-        return ("almacen", "inventario")
-
-    return None
-
-
-def _accion_requerida_para_request(method: str, path: str, query_params=None):
-    m = str(method or "").strip().upper()
-    p = str(path or "").strip()
-
-    if m == "POST" and p == "/viajes":
-        return ("logistica", "solicitud_viaje", "crear_solicitud")
-    if m == "PUT" and p.startswith("/estado/"):
-        estado_obj = ""
-        if query_params is not None:
-            try:
-                estado_obj = str(query_params.get("estado", "") or "").strip().upper()
-            except Exception:
-                estado_obj = ""
-        if estado_obj == "APROBADO":
-            return ("logistica", "dashboard", "aprobar_solicitud")
-        if estado_obj == "RECHAZADO":
-            return ("logistica", "dashboard", "rechazar_solicitud")
-        return ("logistica", "solicitud_viaje", "gestionar_estado")
-    if m == "POST" and p == "/recursos":
-        return ("logistica", "asignar_recursos", "asignar")
-
-    if m == "POST" and p == "/vehiculos":
-        return ("logistica", "vehiculos", "crear")
-    if m == "PUT" and p.startswith("/vehiculos/"):
-        return ("logistica", "vehiculos", "editar")
-    if m == "DELETE" and p.startswith("/vehiculos/"):
-        return ("logistica", "vehiculos", "eliminar")
-
-    if m == "POST" and p == "/personal":
-        return ("logistica", "personal", "crear")
-    if m == "PUT" and p.startswith("/personal/"):
-        return ("logistica", "personal", "editar")
-
-    if m == "POST" and p.startswith("/ordenes/") and p.endswith("/cierre"):
-        return ("logistica", "ordenes_salida", "guardar_cierre")
-    if m == "GET" and p in {"/ordenes_view"}:
-        return ("logistica", "ordenes_salida", "ver")
-    if m == "GET" and p in {"/print_orden_salida", "/print_viaje"}:
-        return ("logistica", "ordenes_salida", "imprimir")
-
-    if m == "GET" and p in {"/gestion_operativa"}:
-        return ("logistica", "gestion_operativa", "consultar")
-    if m == "GET" and p in {"/gestion_operativa/resumen", "/gestion_operativa/filtros"}:
-        return ("logistica", "gestion_operativa", "consultar")
-
-    if m == "GET" and p == "/gestion_operativa/pdf":
-        return ("logistica", "gestion_operativa", "exportar_pdf")
-    if m == "GET" and p == "/gestion_operativa/excel":
-        return ("logistica", "gestion_operativa", "exportar_excel")
-
-    if m == "GET" and p == "/mantenimiento":
-        return ("mantenimiento", "dashboard", "ver")
-    if m == "GET" and p.startswith("/mantenimiento/checklists"):
-        return ("mantenimiento", "checklists", "consultar")
-    if m == "POST" and p == "/mantenimiento/checklists":
-        return ("mantenimiento", "checklists", "crear")
-    if m == "GET" and p.startswith("/mantenimiento/incidencias"):
-        return ("mantenimiento", "incidencias", "consultar")
-    if m == "PUT" and p.startswith("/mantenimiento/incidencias/"):
-        return ("mantenimiento", "incidencias", "editar")
-    if m == "GET" and p.startswith("/mantenimiento/equipos/"):
-        return ("mantenimiento", "historial_equipo", "consultar")
-
-    # Almacen
-    if m == "GET" and p in {"/almacen", "/almacen/dashboard_data", "/almacen/v2/dashboard"}:
-        return ("almacen", "dashboard", "ver")
-
-    if m == "GET" and (
-        p.startswith("/almacen/v2/catalogos/")
-        or p.startswith("/almacen/categorias")
-        or p.startswith("/almacen/tipos")
-        or p.startswith("/almacen/unidades")
-        or p.startswith("/almacen/ubicaciones")
-    ):
-        return ("almacen", "catalogos", "consultar")
-    if m == "POST" and (
-        p.startswith("/almacen/v2/catalogos/")
-        or p in {"/almacen/categorias", "/almacen/tipos", "/almacen/unidades", "/almacen/ubicaciones"}
-    ):
-        return ("almacen", "catalogos", "crear")
-    if m == "DELETE" and (
-        p.startswith("/almacen/v2/catalogos/")
-        or p.startswith("/almacen/categorias/")
-        or p.startswith("/almacen/tipos_producto/")
-        or p.startswith("/almacen/unidades_medida/")
-        or p.startswith("/almacen/ubicaciones/")
-    ):
-        return ("almacen", "catalogos", "eliminar")
-
-    if m == "GET" and (p in {"/almacen/productos", "/almacen/v2/productos"}):
-        return ("almacen", "productos", "consultar")
-    if m == "POST" and (p in {"/almacen/productos", "/almacen/v2/productos"}):
-        return ("almacen", "productos", "crear")
-    if m == "PUT" and (p.startswith("/almacen/productos/") or p.startswith("/almacen/v2/productos/")):
-        return ("almacen", "productos", "editar")
-    if m == "DELETE" and (p.startswith("/almacen/productos/") or p.startswith("/almacen/v2/productos/")):
-        return ("almacen", "productos", "eliminar")
-
-    if m == "POST" and (p in {"/almacen/remitos_ingreso", "/almacen/remitos_entrega", "/almacen/v2/documentos"}):
-        return ("almacen", "ingresos_salidas", "generar_remito")
-    if m == "GET" and p in {"/almacen/remitos_entrega/pendientes"}:
-        return ("almacen", "ingresos_salidas", "consultar")
-    if m == "POST" and p.startswith("/almacen/remitos_entrega/") and p.endswith("/autorizar"):
-        return ("almacen", "ingresos_salidas", "autorizar_remito")
-    if m == "POST" and p.startswith("/almacen/remitos_entrega/") and p.endswith("/no_autorizar"):
-        return ("almacen", "ingresos_salidas", "no_autorizar_remito")
-
-    if m == "GET" and (p in {"/almacen/v2/documentos", "/almacen/remitos_ingreso", "/almacen/remitos_entrega"} or p.startswith("/almacen/v2/documentos/") and p.endswith("/detalle")):
-        return ("almacen", "documentos", "consultar")
-    if m == "GET" and (
-        p.startswith("/almacen/v2/documentos/") and p.endswith("/pdf")
-        or p.startswith("/almacen/remitos_ingreso/") and p.endswith("/pdf")
-        or p.startswith("/almacen/remitos_entrega/") and p.endswith("/pdf")
-    ):
-        return ("almacen", "documentos", "ver_pdf")
-
-    if m == "GET" and p in {"/almacen/movimientos", "/almacen/v2/movimientos"}:
-        return ("almacen", "movimientos", "consultar")
-    if m == "GET" and p == "/almacen/v2/movimientos/pdf":
-        return ("almacen", "movimientos", "exportar_pdf")
-    if m == "GET" and p == "/almacen/v2/movimientos/excel":
-        return ("almacen", "movimientos", "exportar_excel")
-
-    if m == "GET" and p in {"/almacen/stock", "/almacen/v2/stock", "/almacen/v2/inventarios", "/almacen/v2/inventarios/", "/almacen/v2/inventarios/{inventario_id}/detalle"}:
-        return ("almacen", "inventario", "consultar")
-    if m == "GET" and p.startswith("/almacen/v2/inventarios/") and p.endswith("/detalle"):
-        return ("almacen", "inventario", "consultar")
-    if m == "POST" and p in {"/almacen/inventarios", "/almacen/v2/inventarios"}:
-        return ("almacen", "inventario", "crear_inventario")
-    if m == "PUT" and (p.startswith("/almacen/inventarios/detalle/") or p.startswith("/almacen/v2/inventarios/detalle/")):
-        return ("almacen", "inventario", "guardar_conteo")
-    if m == "GET" and p in {"/almacen/ajustes", "/almacen/v2/ajustes"}:
-        return ("almacen", "inventario", "ver_ajustes")
-    if m == "GET" and p == "/almacen/v2/inventarios/pdf":
-        return ("almacen", "inventario", "exportar_pdf")
-    if m == "GET" and p == "/almacen/v2/inventarios/excel":
-        return ("almacen", "inventario", "exportar_excel")
-
-    return None
-
-
-def _es_ruta_publica(path: str):
-    p = str(path or "").strip()
-    if p in {"/login", "/logout", "/openapi.json", "/docs", "/redoc", "/favicon.ico", "/imagenes/editadas/listado"}:
-        return True
-    return p.startswith("/Imagenes") or p.startswith("/Doc_Log_Viajes") or p.startswith("/Doc_Almacen") or p.startswith("/Doc_Almacen_Adjuntos")
-
-
-@app.middleware("http")
-async def authz_middleware(request: Request, call_next):
-    path = request.url.path
-    if _es_ruta_publica(path):
-        return await call_next(request)
-
-    if path == "/":
-        usuario = _buscar_usuario_por_cookie(request)
-        if usuario is None:
-            return RedirectResponse("/login", status_code=302)
-        return await call_next(request)
-
-    usuario = _buscar_usuario_por_cookie(request)
-    
-    if usuario is None:
-        accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-        if accepts_html:
-            return RedirectResponse("/login", status_code=302)
-        return JSONResponse({"error": "No autenticado"}, status_code=401)
-
-    modulo = _modulo_requerido_para_path(path)
-    if modulo:
-        if modulo not in MODULOS_ACTIVOS:
-            accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-            if accepts_html:
-                return RedirectResponse("/", status_code=302)
-            return JSONResponse({"error": f"Modulo {modulo} no habilitado"}, status_code=403)
-
-        tipo_usuario = _normalizar_tipo_usuario(usuario.get("tipo_usuario", ""))
-        if modulo == "administracion" and tipo_usuario != "ADMINISTRADOR":
-            accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-            if accepts_html:
-                return RedirectResponse("/", status_code=302)
-            return JSONResponse({"error": "Sin permisos para Administracion"}, status_code=403)
-
-        if not _usuario_tiene_modulo(usuario, modulo):
-            accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-            if accepts_html:
-                return RedirectResponse("/", status_code=302)
-            return JSONResponse({"error": f"Sin permisos para el modulo {modulo}"}, status_code=403)
-
-    panel_req = _panel_requerido_para_path(path)
-    if panel_req is not None:
-        modulo_panel, panel = panel_req
-        if not _usuario_tiene_panel(usuario, modulo_panel, panel):
-            accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-            if accepts_html:
-                return RedirectResponse("/", status_code=302)
-            return JSONResponse({"error": f"Sin permisos para el panel {panel}"}, status_code=403)
-
-    accion_req = _accion_requerida_para_request(request.method, path, request.query_params)
-    if accion_req is not None:
-        modulo_accion, panel_accion, accion = accion_req
-        if not _usuario_tiene_accion(usuario, modulo_accion, panel_accion, accion):
-            accepts_html = "text/html" in str(request.headers.get("accept", "")).lower()
-            if accepts_html:
-                return RedirectResponse("/", status_code=302)
-            return JSONResponse({"error": f"Sin permisos para la accion {accion}"}, status_code=403)
-
-    response = await call_next(request)
-    # Sesion deslizante: cada request autenticado renueva la expiracion por inactividad.
-    response.set_cookie(
-        AUTH_COOKIE_NAME,
-        str(usuario.get("correo", "")),
-        httponly=True,
-        samesite="lax",
-        max_age=AUTH_IDLE_TIMEOUT_SECONDS,
-    )
-    return response
 
 
 def _requiere_login(request: Request):
-    if _buscar_usuario_por_cookie(request) is not None:
+    if request.cookies.get(AUTH_COOKIE_NAME) == AUTH_USER:
         return None
     return RedirectResponse("/login", status_code=302)
 
@@ -831,206 +128,76 @@ def parse_json_list(texto):
         return []
 
 
-FLEETCARE_INCIDENCIA_ESTADOS = {
-    "regular",
-    "malo",
-    "no",
-    "fuera de servicio",
-    "no conforme",
-}
-
-
-def _normalize_text(texto: Any) -> str:
-    if texto is None:
-        return ""
-    return str(texto).strip()
-
-
-def _to_label(texto: str) -> str:
-    if not texto:
-        return ""
-    return texto.replace("_", " ").replace("-", " ").title()
-
-
-def _genera_incidencia(estado: str) -> bool:
-    estado_norm = _normalize_text(estado).strip().lower()
-    return estado_norm in FLEETCARE_INCIDENCIA_ESTADOS
-
-
-def _prioridad_por_estado(estado: str) -> str:
-    estado_norm = _normalize_text(estado).strip().lower()
-    if estado_norm in {"malo", "no", "fuera de servicio", "no conforme"}:
-        return "Alta"
-    if estado_norm == "regular":
-        return "Media"
-    return "Baja"
-
-
-def crear_incidencia_fleetcare(conn, checklist_id: int, checklist: dict, item: dict):
-    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    evidencia = {
-        "foto_url": item.get("foto_url", ""),
-        "item_key": item.get("item_key", ""),
-    }
-    conn.execute(
-        """
-        INSERT INTO fleetcare_incidencias (
-            checklist_id,
-            fecha_deteccion,
-            codigo_equipo,
-            proyecto,
-            categoria,
-            item_key,
-            item_label,
-            estado_detectado,
-            observacion,
-            evidencia_json,
-            prioridad,
-            estado,
-            responsable,
-            fecha_asignacion,
-            fecha_resolucion,
-            tiempo_respuesta,
-            accion_correctiva,
-            costo_reparacion,
-            created_at,
-            updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            checklist_id,
-            _normalize_text(checklist.get("fecha")) or ahora,
-            _normalize_text(checklist.get("codigo_equipo")),
-            _normalize_text(checklist.get("proyecto")),
-            _normalize_text(item.get("categoria")),
-            _normalize_text(item.get("item_key")),
-            _normalize_text(item.get("item_label")),
-            _normalize_text(item.get("estado")),
-            _normalize_text(item.get("comentario")) or f"Estado detectado: {item.get('estado', '')}",
-            json.dumps(evidencia, ensure_ascii=False),
-            _prioridad_por_estado(item.get("estado")),
-            "Pendiente",
-            None,
-            None,
-            None,
-            None,
-            None,
-            0,
-            ahora,
-            ahora,
-        ),
-    )
-
-
-def guardar_checklist_fleetcare(conn, payload: dict) -> int:
-    general = payload.get("general") or {}
-    inspeccion = payload.get("inspeccion") or {}
-    observaciones = _normalize_text(payload.get("observaciones"))
-    fotos = payload.get("fotos") or {}
-
-    datos = {
-        "fecha": _normalize_text(general.get("fecha")),
-        "correo_operador": _normalize_text(general.get("correo_operador") or general.get("correo") or general.get("correo del operador")),
-        "proyecto": _normalize_text(general.get("proyecto")),
-        "nro_checklist": _normalize_text(general.get("nro_checklist") or general.get("n° checklist") or general.get("número checklist")),
-        "nro_parte_diario": _normalize_text(general.get("nro_parte_diario") or general.get("n° parte diario") or general.get("número parte diario")),
-        "horometro_actual": _normalize_text(general.get("horometro_actual") or general.get("horómetro actual")),
-        "kilometro_actual": _normalize_text(general.get("kilometro_actual") or general.get("kilómetro actual")),
-        "codigo_equipo": _normalize_text(general.get("codigo") or general.get("codigo_interno_del_equipo") or general.get("codigo interno del equipo")),
-        "operador": _normalize_text(general.get("operador")),
-        "supervisor": _normalize_text(general.get("supervisor")),
-        "tipo_equipo": _normalize_text(general.get("tipo") or general.get("tipo_de_equipo") or general.get("tipo equipo")),
-        "estado_general": _normalize_text(general.get("estado")),
-        "observaciones": observaciones,
-        "fotos_json": json.dumps(fotos, ensure_ascii=False),
-        "raw_json": json.dumps(payload, ensure_ascii=False),
-    }
-
-    cursor = conn.execute(
-        """
-        INSERT INTO fleetcare_checklists (
-            fecha, correo_operador, proyecto, nro_checklist, nro_parte_diario,
-            horometro_actual, kilometro_actual, codigo_equipo, operador, supervisor,
-            tipo_equipo, estado_general, observaciones, fotos_json, raw_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        (
-            datos["fecha"],
-            datos["correo_operador"],
-            datos["proyecto"],
-            datos["nro_checklist"],
-            datos["nro_parte_diario"],
-            datos["horometro_actual"],
-            datos["kilometro_actual"],
-            datos["codigo_equipo"],
-            datos["operador"],
-            datos["supervisor"],
-            datos["tipo_equipo"],
-            datos["estado_general"],
-            datos["observaciones"],
-            datos["fotos_json"],
-            datos["raw_json"],
-        ),
-    )
-
-    checklist_id = getattr(cursor, "lastrowid", None)
-    if checklist_id is None:
-        checklist_id = conn.execute("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM fleetcare_checklists").fetchone()[0]
-
-    for categoria, items in inspeccion.items():
-        if not isinstance(items, dict):
-            continue
-        for item_key, item_value in items.items():
-            if isinstance(item_value, dict):
-                estado = _normalize_text(item_value.get("estado") or item_value.get("valor"))
-                comentario = _normalize_text(item_value.get("comentario") or item_value.get("observacion") or item_value.get("detalle"))
-                foto_url = _normalize_text(item_value.get("foto") or item_value.get("url") or item_value.get("foto_url"))
-                raw_item = json.dumps(item_value, ensure_ascii=False)
-            else:
-                estado = _normalize_text(item_value)
-                comentario = ""
-                foto_url = ""
-                raw_item = ""
-
-            item = {
-                "categoria": _normalize_text(categoria),
-                "item_key": _normalize_text(item_key),
-                "item_label": _to_label(_normalize_text(item_key)),
-                "estado": estado,
-                "comentario": comentario,
-                "foto_url": foto_url,
-                "raw_json": raw_item,
-                "genera_incidencia": 1 if _genera_incidencia(estado) else 0,
-            }
-
-            conn.execute(
-                """
-                INSERT INTO fleetcare_items (
-                    checklist_id, categoria, item_key, item_label,
-                    estado, comentario, foto_url, genera_incidencia, raw_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    checklist_id,
-                    item["categoria"],
-                    item["item_key"],
-                    item["item_label"],
-                    item["estado"],
-                    item["comentario"],
-                    item["foto_url"],
-                    item["genera_incidencia"],
-                    item["raw_json"],
-                ),
-            )
-
-            if item["genera_incidencia"]:
-                crear_incidencia_fleetcare(conn, checklist_id, datos, item)
-
-    return checklist_id
-
-
 def get_sqlite_connection():
-    return _db_get_connection(SQLITE_DB_PATH, timeout=20)
+    conn = sqlite3.connect(SQLITE_DB_PATH, timeout=20)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 20000")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def _payload_value(payload, key, default=""):
+    if payload is None:
+        return default
+    if isinstance(payload, dict):
+        return payload.get(key, default)
+    return getattr(payload, key, default)
+
+
+def admin_crear_usuario(payload):
+    conn = get_sqlite_connection()
+    try:
+        nombre_apellido = str(_payload_value(payload, "nombre_apellido", "")).strip()
+        dni = str(_payload_value(payload, "dni", "")).strip()
+        legajo = str(_payload_value(payload, "legajo", "")).strip()
+        correo = str(_payload_value(payload, "correo", "")).strip()
+        password = str(_payload_value(payload, "password", "")).strip()
+        estado = str(_payload_value(payload, "estado", "ACTIVO")).strip().upper() or "ACTIVO"
+        tipo_usuario = str(_payload_value(payload, "tipo_usuario", "CONSULTOR")).strip().upper() or "CONSULTOR"
+        modulos = _payload_value(payload, "modulos", [])
+
+        if not nombre_apellido or not correo:
+            return {"ok": False, "error": "nombre_apellido y correo son obligatorios"}
+
+        modulos_json = json.dumps(modulos if isinstance(modulos, list) else [], ensure_ascii=False)
+        password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+        cur = conn.execute(
+            """
+            INSERT INTO usuarios (
+                nombre_apellido,
+                dni,
+                legajo,
+                correo,
+                password_hash,
+                estado,
+                tipo_usuario,
+                modulos_json,
+                bloqueado,
+                intentos_fallidos,
+                password_temporal,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, datetime('now'), datetime('now'))
+            """,
+            (
+                nombre_apellido,
+                dni,
+                legajo,
+                correo,
+                password_hash,
+                estado,
+                tipo_usuario,
+                modulos_json,
+            ),
+        )
+        conn.commit()
+        return {"ok": True, "id": cur.lastrowid}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    finally:
+        conn.close()
 
 
 def migrar_tabla_viajes(conn):
@@ -1134,23 +301,6 @@ def migrar_tabla_viajes(conn):
     conn.execute("DROP TABLE viajes")
     conn.execute("ALTER TABLE viajes_new RENAME TO viajes")
     conn.execute("PRAGMA foreign_keys = ON")
-
-
-def migrar_usuarios_postgres(conn):
-    """Asegura que la tabla usuarios tenga las columnas requeridas en PostgreSQL."""
-    if not _DATABASE_URL:
-        return
-
-    columnas_requeridas = [
-        "modulos_json",
-        "paneles_json",
-        "acciones_json",
-        "password_visible",
-    ]
-    for columna in columnas_requeridas:
-        conn.execute(
-            f"ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS {columna} TEXT"
-        )
 
 
 def sembrar_configuracion_almacen(conn):
@@ -1595,192 +745,7 @@ def migrar_gestion_operativa(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_go_proyecto ON gestion_operativa (proyecto)")
 
 
-def migrar_usuarios_admin(conn):
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre_apellido TEXT NOT NULL,
-            dni TEXT,
-            legajo TEXT,
-            correo TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            estado TEXT DEFAULT 'ACTIVO',
-            tipo_usuario TEXT DEFAULT 'CONSULTOR',
-            modulos_json TEXT,
-            password_visible TEXT,
-            bloqueado INTEGER DEFAULT 0,
-            intentos_fallidos INTEGER DEFAULT 0,
-            password_temporal INTEGER DEFAULT 1,
-            ultimo_acceso TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_correo ON usuarios (correo)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estado ON usuarios (estado)")
-
-    columnas_usuarios = {r[1] for r in conn.execute("PRAGMA table_info(usuarios)").fetchall()}
-    if "paneles_json" not in columnas_usuarios:
-        conn.execute("ALTER TABLE usuarios ADD COLUMN paneles_json TEXT")
-    if "acciones_json" not in columnas_usuarios:
-        conn.execute("ALTER TABLE usuarios ADD COLUMN acciones_json TEXT")
-    if "password_visible" not in columnas_usuarios:
-        conn.execute("ALTER TABLE usuarios ADD COLUMN password_visible TEXT")
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS roles_funcionales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL UNIQUE,
-            activo INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS usuario_roles_funcionales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER NOT NULL,
-            rol_id INTEGER NOT NULL,
-            UNIQUE(usuario_id, rol_id),
-            FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
-            FOREIGN KEY (rol_id) REFERENCES roles_funcionales (id) ON DELETE CASCADE
-        )
-        """
-    )
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS historial_accesos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER,
-            username_input TEXT,
-            evento TEXT,
-            detalle TEXT,
-            ip TEXT,
-            user_agent TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL
-        )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_historial_fecha ON historial_accesos (created_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_historial_usuario ON historial_accesos (usuario_id)")
-
-    roles_base = [
-        "Jefe de Logistica",
-        "Coordinador",
-        "Responsable de Almacen",
-        "Comprador",
-        "Supervisor de Operaciones",
-        "Recursos Humanos",
-        "HSE",
-        "Gerencia",
-    ]
-    for nombre in roles_base:
-        conn.execute("INSERT OR IGNORE INTO roles_funcionales (nombre, activo) VALUES (?, 1)", (nombre,))
-
-    row_admin = conn.execute(
-        "SELECT id FROM usuarios WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))",
-        (AUTH_USER,),
-    ).fetchone()
-
-    if row_admin is None:
-        conn.execute(
-            """
-            INSERT INTO usuarios (
-                nombre_apellido, dni, legajo, correo, password_hash, estado, tipo_usuario,
-                modulos_json, paneles_json, acciones_json, password_visible, bloqueado, intentos_fallidos, password_temporal, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, 'ACTIVO', 'ADMINISTRADOR', ?, ?, ?, ?, 0, 0, 0, ?, ?)
-            """,
-            (
-                "Administrador del Sistema",
-                "",
-                "ADMIN",
-                AUTH_USER,
-                _hash_password(AUTH_PASS),
-                json.dumps(sorted(MODULOS_VALIDOS), ensure_ascii=False),
-                json.dumps(_paneles_default_por_modulos(sorted(MODULOS_VALIDOS)), ensure_ascii=False),
-                json.dumps(
-                    _acciones_default_por_paneles(
-                        sorted(MODULOS_VALIDOS),
-                        _paneles_default_por_modulos(sorted(MODULOS_VALIDOS)),
-                    ),
-                    ensure_ascii=False,
-                ),
-                AUTH_PASS,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            ),
-        )
-
-    legacy_admin = conn.execute(
-        "SELECT id, password_hash FROM usuarios WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))",
-        (AUTH_USER,),
-    ).fetchone()
-    if legacy_admin is not None and not str(legacy_admin["password_hash"] or "").startswith("pbkdf2_sha256$"):
-        conn.execute(
-            """
-            UPDATE usuarios
-               SET password_hash = ?,
-                   updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                _hash_password(AUTH_PASS),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                int(legacy_admin["id"]),
-            ),
-        )
-
-    paneles_admin = conn.execute(
-        "SELECT id, paneles_json, acciones_json, modulos_json, tipo_usuario FROM usuarios WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))",
-        (AUTH_USER,),
-    ).fetchone()
-    if paneles_admin is not None:
-        modulos_admin = parse_json_list(paneles_admin["modulos_json"] if "modulos_json" in paneles_admin.keys() else "")
-        tipo_admin = _normalizar_tipo_usuario(paneles_admin["tipo_usuario"] if "tipo_usuario" in paneles_admin.keys() else "")
-        if tipo_admin == "ADMINISTRADOR":
-            modulos_admin = sorted(MODULOS_VALIDOS)
-        paneles_actuales = parse_json_dict(paneles_admin["paneles_json"] if "paneles_json" in paneles_admin.keys() else "", default={})
-        if not paneles_actuales:
-            paneles_actuales = _paneles_default_por_modulos(modulos_admin)
-            conn.execute(
-                "UPDATE usuarios SET paneles_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    json.dumps(paneles_actuales, ensure_ascii=False),
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    int(paneles_admin["id"]),
-                ),
-            )
-
-        acciones_actuales = parse_json_dict(paneles_admin["acciones_json"] if "acciones_json" in paneles_admin.keys() else "", default={})
-        if not acciones_actuales:
-            conn.execute(
-                "UPDATE usuarios SET acciones_json = ?, updated_at = ? WHERE id = ?",
-                (
-                    json.dumps(_acciones_default_por_paneles(modulos_admin, paneles_actuales), ensure_ascii=False),
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    int(paneles_admin["id"]),
-                ),
-            )
-
-
 def init_sqlite():
-    if _DATABASE_URL:
-        schema_target = SCHEMA_PG_PATH if os.path.exists(SCHEMA_PG_PATH) else SCHEMA_PATH
-        if not os.path.exists(schema_target):
-            return
-        with get_sqlite_connection() as conn:
-            with open(schema_target, "r", encoding="utf-8") as f:
-                conn.executescript(f.read())
-            conn.commit()
-        return
-
     if not os.path.exists(SCHEMA_PATH):
         return
     max_intentos = 6
@@ -1827,12 +792,6 @@ def init_sqlite():
                     if "database is locked" not in str(exc).lower():
                         raise
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
-                try:
-                    migrar_usuarios_admin(conn)
-                except sqlite3.OperationalError as exc:
-                    if "database is locked" not in str(exc).lower():
-                        raise
-                    print("No se pudo migrar usuarios/roles porque dashboard.db esta bloqueada por otro proceso.")
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -1929,41 +888,40 @@ def obtener_ordenes_data():
             ORDER BY fecha_orden, nro_orden
             """
         ).fetchall()
-    ordenes = []
-    for row in rows:
-        orden = parse_json_dict(row["raw_json"], default={})
-        if not isinstance(orden, dict) or not orden:
-            orden = {}
-        orden.setdefault("nro_orden", row["nro_orden"])
-        orden.setdefault("fecha_orden", row["fecha_orden"])
-        orden.setdefault("id_viaje", row["id_viaje"])
-        orden.setdefault("estado", row["estado"])
-        orden.setdefault("cierre_logistica_json", row["cierre_logistica_json"])
-        ordenes.append(orden)
-    return ordenes
+        ordenes = []
+        for row in rows:
+            orden = parse_json_dict(row["raw_json"], default={})
+            if not orden:
+                orden = {
+                    "nro_orden": row["nro_orden"],
+                    "fecha_orden": row["fecha_orden"],
+                    "id_viaje": row["id_viaje"],
+                    "estado": row["estado"],
+                }
+            if row["cierre_logistica_json"]:
+                orden["cierre_logistica"] = parse_json_dict(row["cierre_logistica_json"], default={})
+            ordenes.append(orden)
+        return ordenes
 
 
 def generar_numero_orden_sql(conn):
     rows = conn.execute("SELECT nro_orden FROM ordenes_salida").fetchall()
     max_num = 0
-    for r in rows:
-        nro = str(r["nro_orden"] or "").strip()
+    for row in rows:
+        nro = str(row["nro_orden"] or "")
         if nro.startswith("OS-"):
             try:
-                max_num = max(max_num, int(nro.split("-")[1]))
-            except Exception:
+                valor = int(nro.split("-")[1])
+                max_num = max(max_num, valor)
+            except (ValueError, IndexError):
                 continue
     return f"OS-{max_num + 1:06d}"
 
 
 def guardar_viaje_sql(conn, viaje_data):
-    if not isinstance(viaje_data, dict):
-        viaje_data = {}
-
     acompanantes = viaje_data.get("acompanantes")
     if isinstance(acompanantes, list):
         acompanantes = json.dumps(acompanantes, ensure_ascii=False)
-
     conn.execute(
         """
         INSERT INTO viajes (
@@ -2106,6 +1064,7 @@ def guardar_recursos_sql(conn, id_viaje, recursos_data):
             "INSERT INTO recurso_acompanantes (id_viaje, nombre, viatico) VALUES (?, ?, ?)",
             (id_viaje, nombre_txt, viaticos_map.get(nombre_txt, 0.0)),
         )
+
 
 async def guardar_adjunto_logistico(upload: UploadFile | None, nro_orden: str, nombre_base: str):
     if upload is None or not upload.filename:
@@ -2420,7 +1379,7 @@ class Viaje(BaseModel):
 
 @app.post("/viajes")
 def crear_viaje(viaje: Viaje):
-    nuevo = viaje.model_dump()
+    nuevo = viaje.dict()
     with get_sqlite_connection() as conn:
         row = conn.execute("SELECT COALESCE(MAX(id), 0) AS max_id FROM viajes").fetchone()
         nuevo_id = int(row["max_id"] or 0) + 1
@@ -2790,7 +1749,7 @@ def asignar_recursos(data: Recursos):
         if not viaje:
             return {"error": "Viaje no encontrado"}
 
-        recursos_data = data.model_dump()
+        recursos_data = data.dict()
         recursos_data["vehiculo"] = vehiculo_ingresado
         recursos_data["vehiculo_fuera_flota"] = vehiculo_encontrado is None
 
@@ -2850,209 +1809,25 @@ def login_view(request: Request):
     )
 
 
-@app.get("/imagenes/editadas/listado")
-def imagenes_editadas_listado():
-    extensiones = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    if not os.path.isdir(IMAGENES_EDITADAS_DIR):
-        return {"imagenes": []}
-
-    imagenes = []
-    for nombre in sorted(os.listdir(IMAGENES_EDITADAS_DIR), key=lambda n: n.lower()):
-        ruta = os.path.join(IMAGENES_EDITADAS_DIR, nombre)
-        if not os.path.isfile(ruta):
-            continue
-        _, ext = os.path.splitext(nombre)
-        if ext.lower() not in extensiones:
-            continue
-        imagenes.append({
-            "nombre": nombre,
-            "url": f"/Imagenes/Editadas/{nombre}",
-        })
-
-    return {"imagenes": imagenes}
-
-
 @app.post("/login")
 def login_submit(request: Request, username: str = Form(""), password: str = Form("")):
     user = str(username or "").strip()
     pwd = str(password or "")
-    ip = str(getattr(request.client, "host", "") or "")
-    user_agent = str(request.headers.get("user-agent", "") or "")
-
-    with get_sqlite_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM usuarios
-            WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))
-            LIMIT 1
-            """,
-            (user,),
-        ).fetchone()
-
-        if row is None:
-            _registrar_historial_acceso(conn, None, user, "LOGIN_FAIL", "usuario_no_existe", ip, user_agent)
-            conn.commit()
-            return RedirectResponse("/login?error=1", status_code=302)
-
-        if str(row["estado"] or "").strip().upper() != "ACTIVO":
-            _registrar_historial_acceso(conn, int(row["id"]), user, "LOGIN_FAIL", "usuario_inactivo", ip, user_agent)
-            conn.commit()
-            return RedirectResponse("/login?error=1", status_code=302)
-
-        if int(row["bloqueado"] or 0) == 1:
-            _registrar_historial_acceso(conn, int(row["id"]), user, "LOGIN_FAIL", "usuario_bloqueado", ip, user_agent)
-            conn.commit()
-            return RedirectResponse("/login?error=1", status_code=302)
-
-        if not _verify_password(pwd, row["password_hash"]):
-            intentos = int(row["intentos_fallidos"] or 0) + 1
-            bloqueado = 1 if intentos >= 5 else 0
-            conn.execute(
-                """
-                UPDATE usuarios
-                   SET intentos_fallidos = ?,
-                       bloqueado = ?,
-                       updated_at = ?
-                 WHERE id = ?
-                """,
-                (
-                    intentos,
-                    bloqueado,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    int(row["id"]),
-                ),
-            )
-            _registrar_historial_acceso(conn, int(row["id"]), user, "LOGIN_FAIL", "password_invalida", ip, user_agent)
-            conn.commit()
-            return RedirectResponse("/login?error=1", status_code=302)
-
-        conn.execute(
-            """
-            UPDATE usuarios
-               SET intentos_fallidos = 0,
-                   bloqueado = 0,
-                   ultimo_acceso = ?,
-                   updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                int(row["id"]),
-            ),
-        )
-        _registrar_historial_acceso(conn, int(row["id"]), user, "LOGIN_OK", "", ip, user_agent)
-        conn.commit()
-
-    response = RedirectResponse("/", status_code=302)
-    response.set_cookie(
-        AUTH_COOKIE_NAME,
-        user,
-        httponly=True,
-        samesite="lax",
-        max_age=AUTH_IDLE_TIMEOUT_SECONDS,
-    )
-    return response
-
-
-class AdminUsuarioPayload(BaseModel):
-    nombre_apellido: str
-    dni: str = ""
-    legajo: str = ""
-    correo: str
-    password: str = ""
-    estado: str = "ACTIVO"
-    tipo_usuario: str = "CONSULTOR"
-    modulos: list[str] = []
-    paneles: dict[str, list[str]] = {}
-    acciones: dict[str, dict[str, list[str]]] = {}
-    roles: list[int] = []
-
-
-class AdminUsuarioEdicionPayload(BaseModel):
-    nombre_apellido: str
-    dni: str = ""
-    legajo: str = ""
-    correo: str
-    password: str = ""
-    estado: str = "ACTIVO"
-    tipo_usuario: str = "CONSULTOR"
-    modulos: list[str] = []
-    paneles: dict[str, list[str]] = {}
-    acciones: dict[str, dict[str, list[str]]] = {}
-    roles: list[int] = []
-
-
-class AdminResetPasswordPayload(BaseModel):
-    password: str = ""
-    generar_automatica: bool = True
-
-
-class AdminEstadoPayload(BaseModel):
-    estado: str
-
-
-class AdminBloqueoPayload(BaseModel):
-    bloqueado: bool
-
-
-class AdminRolPayload(BaseModel):
-    nombre: str
-
-
-class FleetCareItemPayload(BaseModel):
-    categoria: str = ""
-    item_key: str
-    item_label: str
-    estado: str
-    comentario: str = ""
-    foto_url: str = ""
-
-
-class FleetCareChecklistPayload(BaseModel):
-    general: dict[str, Any]
-    inspeccion: dict[str, Any]
-    observaciones: str = ""
-    fotos: dict[str, str] = {}
-
-
-class FleetCareIncidenciaUpdatePayload(BaseModel):
-    estado: Optional[str] = None
-    responsable: Optional[str] = None
-    accion_correctiva: Optional[str] = None
-    costo_reparacion: Optional[float] = None
-    fecha_asignacion: Optional[str] = None
-    fecha_resolucion: Optional[str] = None
-    prioridad: Optional[str] = None
+    if user == AUTH_USER and pwd == AUTH_PASS:
+        response = RedirectResponse("/", status_code=302)
+        response.set_cookie(AUTH_COOKIE_NAME, user, httponly=True, samesite="lax")
+        return response
+    return RedirectResponse("/login?error=1", status_code=302)
 
 
 @app.get("/me")
 def get_me(request: Request):
-    usuario = _buscar_usuario_por_cookie(request)
-    if usuario is None:
-        return {"usuario": "", "autenticado": False}
-    return {
-        "autenticado": True,
-        "usuario": usuario.get("correo", ""),
-        "nombre_apellido": usuario.get("nombre_apellido", ""),
-        "tipo_usuario": usuario.get("tipo_usuario", ""),
-        "estado": usuario.get("estado", ""),
-        "modulos": usuario.get("modulos", []),
-        "paneles": usuario.get("paneles", {}),
-        "acciones": usuario.get("acciones", {}),
-        "roles": usuario.get("roles", []),
-        "bloqueado": bool(usuario.get("bloqueado", False)),
-    }
+    usuario = request.cookies.get(AUTH_COOKIE_NAME, "")
+    return {"usuario": usuario}
 
 
 @app.get("/logout")
 def logout(request: Request):
-    usuario = _buscar_usuario_por_cookie(request)
-    if usuario is not None:
-        with get_sqlite_connection() as conn:
-            _registrar_historial_acceso(conn, int(usuario["id"]), usuario.get("correo", ""), "LOGOUT", "")
-            conn.commit()
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie(AUTH_COOKIE_NAME)
     return response
@@ -3064,288 +1839,6 @@ def menu_principal(request: Request):
     if redirect is not None:
         return redirect
     return _leer_html(MENU_PRINCIPAL_PATH)
-
-
-@app.get("/administracion", response_class=HTMLResponse)
-def administracion_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
-    return _leer_html(ADMINISTRACION_PATH)
-
-
-@app.get("/admin/roles_funcionales")
-def admin_listar_roles_funcionales():
-    with get_sqlite_connection() as conn:
-        rows = conn.execute("SELECT id, nombre, activo FROM roles_funcionales ORDER BY LOWER(nombre)").fetchall()
-    return [dict(r) for r in rows]
-
-
-@app.post("/admin/roles_funcionales")
-def admin_crear_rol_funcional(payload: AdminRolPayload):
-    nombre = str(payload.nombre or "").strip()
-    if not nombre:
-        return {"error": "Nombre de rol requerido"}
-    with get_sqlite_connection() as conn:
-        conn.execute("INSERT OR IGNORE INTO roles_funcionales (nombre, activo) VALUES (?, 1)", (nombre,))
-        conn.commit()
-    return {"ok": True}
-
-
-@app.get("/admin/usuarios")
-def admin_listar_usuarios():
-    with get_sqlite_connection() as conn:
-        rows = conn.execute("SELECT * FROM usuarios ORDER BY LOWER(nombre_apellido), id").fetchall()
-        return [_serializar_usuario(conn, r, incluir_password_visible=True) for r in rows]
-
-
-@app.post("/admin/usuarios")
-def admin_crear_usuario(payload: AdminUsuarioPayload):
-    nombre_apellido = str(payload.nombre_apellido or "").strip()
-    correo = str(payload.correo or "").strip().lower()
-    if not nombre_apellido:
-        return {"error": "Nombre y apellido requerido"}
-    if not correo:
-        return {"error": "Correo/usuario requerido"}
-
-    tipo = _normalizar_tipo_usuario(payload.tipo_usuario)
-    modulos = _normalizar_modulos(payload.modulos)
-    if tipo == "ADMINISTRADOR":
-        modulos = sorted(MODULOS_VALIDOS)
-    if not modulos:
-        modulos = _modulos_default_por_tipo(tipo)
-    paneles = _normalizar_paneles_por_modulo(payload.paneles, modulos)
-    acciones = _normalizar_acciones_por_panel(payload.acciones, paneles, modulos)
-
-    password = str(payload.password or "").strip() or _generar_password_temporal()
-
-    with get_sqlite_connection() as conn:
-        existente = conn.execute("SELECT id FROM usuarios WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?))", (correo,)).fetchone()
-        if existente:
-            return {"error": "Ya existe un usuario con ese correo/usuario"}
-
-        conn.execute(
-            """
-            INSERT INTO usuarios (
-                nombre_apellido, dni, legajo, correo, password_hash,
-                estado, tipo_usuario, modulos_json, paneles_json, acciones_json, password_visible,
-                bloqueado, intentos_fallidos, password_temporal, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
-            """,
-            (
-                nombre_apellido,
-                str(payload.dni or "").strip(),
-                str(payload.legajo or "").strip(),
-                correo,
-                _hash_password(password),
-                str(payload.estado or "ACTIVO").strip().upper(),
-                tipo,
-                json.dumps(modulos, ensure_ascii=False),
-                json.dumps(paneles, ensure_ascii=False),
-                json.dumps(acciones, ensure_ascii=False),
-                password,
-                0 if str(payload.password or "").strip() else 1,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            ),
-        )
-        user_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
-
-        if payload.roles:
-            for rol_id in payload.roles:
-                conn.execute(
-                    "INSERT OR IGNORE INTO usuario_roles_funcionales (usuario_id, rol_id) VALUES (?, ?)",
-                    (user_id, int(rol_id)),
-                )
-        conn.commit()
-
-    resp = {"ok": True}
-    if not str(payload.password or "").strip():
-        resp["password_temporal"] = password
-    return resp
-
-
-@app.put("/admin/usuarios/{usuario_id}")
-def admin_editar_usuario(usuario_id: int, payload: AdminUsuarioEdicionPayload):
-    nombre_apellido = str(payload.nombre_apellido or "").strip()
-    correo = str(payload.correo or "").strip().lower()
-    if not nombre_apellido:
-        return {"error": "Nombre y apellido requerido"}
-    if not correo:
-        return {"error": "Correo/usuario requerido"}
-
-    tipo = _normalizar_tipo_usuario(payload.tipo_usuario)
-    modulos = _normalizar_modulos(payload.modulos)
-    if tipo == "ADMINISTRADOR":
-        modulos = sorted(MODULOS_VALIDOS)
-    if not modulos:
-        modulos = _modulos_default_por_tipo(tipo)
-    paneles = _normalizar_paneles_por_modulo(payload.paneles, modulos)
-    acciones = _normalizar_acciones_por_panel(payload.acciones, paneles, modulos)
-    nueva_password = str(payload.password or "").strip()
-
-    with get_sqlite_connection() as conn:
-        existe = conn.execute("SELECT id FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
-        if not existe:
-            return {"error": "Usuario no encontrado"}
-        repetido = conn.execute(
-            "SELECT id FROM usuarios WHERE LOWER(TRIM(correo)) = LOWER(TRIM(?)) AND id <> ?",
-            (correo, usuario_id),
-        ).fetchone()
-        if repetido:
-            return {"error": "Ya existe otro usuario con ese correo/usuario"}
-
-        conn.execute(
-            """
-            UPDATE usuarios
-               SET nombre_apellido = ?,
-                   dni = ?,
-                   legajo = ?,
-                   correo = ?,
-                   estado = ?,
-                   tipo_usuario = ?,
-                   modulos_json = ?,
-                                     paneles_json = ?,
-                                     acciones_json = ?,
-                   updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                nombre_apellido,
-                str(payload.dni or "").strip(),
-                str(payload.legajo or "").strip(),
-                correo,
-                str(payload.estado or "ACTIVO").strip().upper(),
-                tipo,
-                json.dumps(modulos, ensure_ascii=False),
-                json.dumps(paneles, ensure_ascii=False),
-                json.dumps(acciones, ensure_ascii=False),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                usuario_id,
-            ),
-        )
-
-        if nueva_password:
-            conn.execute(
-                """
-                UPDATE usuarios
-                   SET password_hash = ?,
-                       password_visible = ?,
-                       password_temporal = 0,
-                       intentos_fallidos = 0,
-                       bloqueado = 0,
-                       updated_at = ?
-                 WHERE id = ?
-                """,
-                (
-                    _hash_password(nueva_password),
-                    nueva_password,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    usuario_id,
-                ),
-            )
-
-        conn.execute("DELETE FROM usuario_roles_funcionales WHERE usuario_id = ?", (usuario_id,))
-        if payload.roles:
-            for rol_id in payload.roles:
-                conn.execute(
-                    "INSERT OR IGNORE INTO usuario_roles_funcionales (usuario_id, rol_id) VALUES (?, ?)",
-                    (usuario_id, int(rol_id)),
-                )
-        conn.commit()
-    return {"ok": True}
-
-
-@app.post("/admin/usuarios/{usuario_id}/estado")
-def admin_estado_usuario(usuario_id: int, payload: AdminEstadoPayload):
-    estado = str(payload.estado or "").strip().upper()
-    if estado not in {"ACTIVO", "INACTIVO"}:
-        return {"error": "Estado invalido"}
-    with get_sqlite_connection() as conn:
-        conn.execute(
-            "UPDATE usuarios SET estado = ?, updated_at = ? WHERE id = ?",
-            (estado, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), usuario_id),
-        )
-        conn.commit()
-    return {"ok": True}
-
-
-@app.post("/admin/usuarios/{usuario_id}/bloqueo")
-def admin_bloqueo_usuario(usuario_id: int, payload: AdminBloqueoPayload):
-    with get_sqlite_connection() as conn:
-        conn.execute(
-            """
-            UPDATE usuarios
-               SET bloqueado = ?,
-                   intentos_fallidos = CASE WHEN ? = 1 THEN intentos_fallidos ELSE 0 END,
-                   updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                1 if payload.bloqueado else 0,
-                1 if payload.bloqueado else 0,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                usuario_id,
-            ),
-        )
-        conn.commit()
-    return {"ok": True}
-
-
-@app.post("/admin/usuarios/{usuario_id}/reset_password")
-def admin_reset_password(usuario_id: int, payload: AdminResetPasswordPayload):
-    nueva = str(payload.password or "").strip()
-    if payload.generar_automatica or not nueva:
-        nueva = _generar_password_temporal()
-        temporal = 1
-    else:
-        temporal = 0
-
-    with get_sqlite_connection() as conn:
-        existe = conn.execute("SELECT id FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
-        if not existe:
-            return {"error": "Usuario no encontrado"}
-
-        conn.execute(
-            """
-            UPDATE usuarios
-               SET password_hash = ?,
-                   password_visible = ?,
-                   password_temporal = ?,
-                   intentos_fallidos = 0,
-                   bloqueado = 0,
-                   updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                _hash_password(nueva),
-                nueva,
-                temporal,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                usuario_id,
-            ),
-        )
-        conn.commit()
-
-    return {"ok": True, "password": nueva}
-
-
-@app.get("/admin/accesos")
-def admin_historial_accesos(limit: int = Query(100, ge=1, le=1000)):
-    with get_sqlite_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT h.id, h.usuario_id, h.username_input, h.evento, h.detalle, h.ip, h.user_agent, h.created_at,
-                   u.nombre_apellido, u.correo
-            FROM historial_accesos h
-            LEFT JOIN usuarios u ON u.id = h.usuario_id
-            ORDER BY h.id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -3370,110 +1863,7 @@ def gestion_operativa_view(request: Request):
     if redirect is not None:
         return redirect
     return _leer_html(GESTION_OPERATIVA_PATH)
-
-@app.get("/mantenimiento", response_class=HTMLResponse)
-def mantenimiento_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
-    return _leer_html(FLEETCARE_PATH)
-
-@app.post("/mantenimiento/checklists")
-def crear_checklist_mantenimiento(payload: FleetCareChecklistPayload):
-    with get_sqlite_connection() as conn:
-        checklist_id = guardar_checklist_fleetcare(conn, payload.dict())
-        conn.commit()
-    return {"ok": True, "checklist_id": checklist_id}
-
-@app.get("/mantenimiento/checklists")
-def obtener_checklists_mantenimiento():
-    with get_sqlite_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, fecha, codigo_equipo, proyecto, tipo_equipo, operador, supervisor, nro_checklist, estado_general FROM fleetcare_checklists ORDER BY fecha DESC"
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-@app.get("/mantenimiento/checklists/{checklist_id}")
-def obtener_checklist_mantenimiento(checklist_id: int):
-    with get_sqlite_connection() as conn:
-        checklist = conn.execute(
-            "SELECT * FROM fleetcare_checklists WHERE id = ?",
-            (checklist_id,),
-        ).fetchone()
-        if checklist is None:
-            return JSONResponse({"error": "Checklist no encontrado"}, status_code=404)
-        items = conn.execute(
-            "SELECT * FROM fleetcare_items WHERE checklist_id = ? ORDER BY id",
-            (checklist_id,),
-        ).fetchall()
-    return {"checklist": dict(checklist), "items": [dict(r) for r in items]}
-
-@app.get("/mantenimiento/incidencias")
-def obtener_incidencias_mantenimiento():
-    with get_sqlite_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, fecha_deteccion, codigo_equipo, proyecto, categoria, item_label, estado, prioridad, responsable FROM fleetcare_incidencias ORDER BY created_at DESC"
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-@app.get("/mantenimiento/equipos/{equipo_codigo}/historial")
-def historial_equipo_mantenimiento(equipo_codigo: str):
-    with get_sqlite_connection() as conn:
-        checklists = conn.execute(
-            "SELECT id, fecha, proyecto, tipo_equipo, estado_general FROM fleetcare_checklists WHERE codigo_equipo = ? ORDER BY fecha DESC",
-            (equipo_codigo,),
-        ).fetchall()
-        incidencias = conn.execute(
-            "SELECT id, fecha_deteccion, categoria, item_label, estado, prioridad, responsable, fecha_resolucion FROM fleetcare_incidencias WHERE codigo_equipo = ? ORDER BY created_at DESC",
-            (equipo_codigo,),
-        ).fetchall()
-    return {
-        "checklists": [dict(r) for r in checklists],
-        "incidencias": [dict(r) for r in incidencias],
-    }
-
-@app.put("/mantenimiento/incidencias/{incidencia_id}")
-def actualizar_incidencia_mantenimiento(incidencia_id: int, payload: FleetCareIncidenciaUpdatePayload):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with get_sqlite_connection() as conn:
-        incidencia = conn.execute(
-            "SELECT * FROM fleetcare_incidencias WHERE id = ?",
-            (incidencia_id,),
-        ).fetchone()
-        if incidencia is None:
-            return JSONResponse({"error": "Incidencia no encontrada"}, status_code=404)
-
-        values = {
-            "estado": payload.estado if payload.estado is not None else incidencia["estado"],
-            "responsable": payload.responsable if payload.responsable is not None else incidencia["responsable"],
-            "accion_correctiva": payload.accion_correctiva if payload.accion_correctiva is not None else incidencia["accion_correctiva"],
-            "costo_reparacion": payload.costo_reparacion if payload.costo_reparacion is not None else incidencia["costo_reparacion"],
-            "fecha_asignacion": payload.fecha_asignacion if payload.fecha_asignacion is not None else incidencia["fecha_asignacion"],
-            "fecha_resolucion": payload.fecha_resolucion if payload.fecha_resolucion is not None else incidencia["fecha_resolucion"],
-            "prioridad": payload.prioridad if payload.prioridad is not None else incidencia["prioridad"],
-        }
-
-        conn.execute(
-            """
-            UPDATE fleetcare_incidencias
-               SET estado = ?, responsable = ?, accion_correctiva = ?, costo_reparacion = ?, fecha_asignacion = ?, fecha_resolucion = ?, prioridad = ?, updated_at = ?
-             WHERE id = ?
-            """,
-            (
-                values["estado"],
-                values["responsable"],
-                values["accion_correctiva"],
-                values["costo_reparacion"],
-                values["fecha_asignacion"],
-                values["fecha_resolucion"],
-                values["prioridad"],
-                now,
-                incidencia_id,
-            ),
-        )
-        conn.commit()
-    return {"ok": True}
-
+    
 @app.put("/estado/{id_viaje}")
 def cambiar_estado(id_viaje: int, estado: str):
     with get_sqlite_connection() as conn:
@@ -4224,39 +2614,15 @@ def vehiculos_form(request: Request):
 @app.put("/vehiculos/{codigo}")
 def actualizar_vehiculo(codigo: str, data: dict):
     with get_sqlite_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT codigo, propiedad, marca, tipo, modelo, dominio, anio, motor, chasis,
-                   sector, proyecto, operativo,
-                   habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj,
-                   habilitacion_rincon, habilitacion_arli, raw_json
-            FROM vehiculos WHERE codigo = ?
-            """,
-            (codigo,),
-        ).fetchone()
+        row = conn.execute("SELECT raw_json FROM vehiculos WHERE codigo = ?", (codigo,)).fetchone()
         if row is None:
             return {"error": "Vehículo no encontrado"}
-
-        # Las columnas reales son la fuente de verdad.
-        # raw_json puede tener valores obsoletos; se usa solo para campos
-        # extra que no tienen columna propia.
-        columnas_reales = [
-            "propiedad", "marca", "tipo", "modelo", "dominio", "anio",
-            "motor", "chasis", "sector", "proyecto", "operativo",
-            "habilitacion_pirquitas", "habilitacion_exar", "habilitacion_sdj",
-            "habilitacion_rincon", "habilitacion_arli",
-        ]
 
         base_data = {}
         try:
             base_data = json.loads(row["raw_json"] or "{}")
         except Exception:
             base_data = {}
-
-        # Sobreescribir con valores actuales de columnas (siempre prevalecen)
-        for col in columnas_reales:
-            if row[col] is not None:
-                base_data[col] = row[col]
 
         base_data.update(data)
 
