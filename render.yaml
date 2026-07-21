@@ -9,6 +9,8 @@ services:
         value: 3.11.9
       - key: DATA_DIR
         value: /var/data
+      - key: PASSWORD_ENCRYPTION_KEY
+        sync: false
     disk:
       name: dashboard-data
       mountPath: /var/data

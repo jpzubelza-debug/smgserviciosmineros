@@ -629,7 +629,10 @@
             </td>
             <td>${u.tipo_usuario || ""}</td>
             <td>${u.estado || ""}${u.bloqueado ? " / BLOQUEADO" : ""}</td>
-            <td><span class="muted">Protegida</span></td>
+            <td>
+              <span class="muted" id="pwd-${u.id}">Protegida</span>
+              <button class="btn" id="btn-pwd-${u.id}" data-visible="0" onclick="togglePwd(${u.id})">Ver</button>
+            </td>
             <td>${modulos}</td>
             <td>${paneles}</td>
             <td>${acciones}</td>
@@ -702,9 +705,32 @@
       await loadAll();
     }
 
+    async function togglePwd(id) {
+      const out = document.getElementById(`pwd-${id}`);
+      const btn = document.getElementById(`btn-pwd-${id}`);
+      if (!out || !btn) return;
+
+      if (btn.dataset.visible === "1") {
+        out.textContent = "Protegida";
+        btn.dataset.visible = "0";
+        btn.textContent = "Ver";
+        return;
+      }
+
+      const data = await api(`/admin/usuarios/${id}/password`);
+      if (!data.password) {
+        alert(data.mensaje || "No disponible");
+        return;
+      }
+      out.textContent = data.password;
+      btn.dataset.visible = "1";
+      btn.textContent = "Ocultar";
+    }
+
     window.editUser = editUser;
     window.toggleState = toggleState;
     window.toggleBlock = toggleBlock;
+    window.togglePwd = togglePwd;
     window.resetPwd = resetPwd;
 
     $("btn-cancel").addEventListener("click", () => fillForm(null));

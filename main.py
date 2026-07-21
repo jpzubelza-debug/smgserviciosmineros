@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 import io
 import json
@@ -75,6 +76,34 @@ app.add_middleware(
 AUTH_USER = os.getenv("APP_LOGIN_USER", "admin")
 AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "admin123")
 AUTH_COOKIE_NAME = "dash_auth_user"
+
+# Cifrado reversible de contraseñas para que un ADMINISTRADOR pueda consultar
+# la contraseña original de un usuario desde el módulo Administración. Esto es
+# ADEMÁS del hash SHA-256 (que sigue siendo lo único usado para validar el
+# login); si PASSWORD_ENCRYPTION_KEY no está configurada, la función de "ver
+# contraseña" queda deshabilitada pero el login sigue funcionando normalmente.
+PASSWORD_ENCRYPTION_KEY = os.getenv("PASSWORD_ENCRYPTION_KEY", "").strip()
+try:
+    _password_cipher = Fernet(PASSWORD_ENCRYPTION_KEY.encode("utf-8")) if PASSWORD_ENCRYPTION_KEY else None
+except ValueError:
+    _password_cipher = None
+
+
+def _cifrar_password(password: str) -> str:
+    if _password_cipher is None:
+        return ""
+    return _password_cipher.encrypt(password.encode("utf-8")).decode("utf-8")
+
+
+def _descifrar_password(password_cifrada: str):
+    if _password_cipher is None or not password_cifrada:
+        return None
+    try:
+        return _password_cipher.decrypt(password_cifrada.encode("utf-8")).decode("utf-8")
+    except InvalidToken:
+        return None
+
+
 SESSION_IDLE_SECONDS = 60 * 60
 ALL_MODULES = [
     "logistica", "almacen", "operaciones", "compras", "rrhh",
@@ -276,6 +305,7 @@ def admin_crear_usuario(payload):
         paneles_json = json.dumps(paneles if isinstance(paneles, dict) else {}, ensure_ascii=False)
         acciones_json = json.dumps(acciones if isinstance(acciones, dict) else {}, ensure_ascii=False)
         password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        password_cifrada = _cifrar_password(password)
 
         cur = conn.execute(
             """
@@ -285,6 +315,7 @@ def admin_crear_usuario(payload):
                 legajo,
                 correo,
                 password_hash,
+                password_cifrada,
                 estado,
                 tipo_usuario,
                 modulos_json,
@@ -295,7 +326,7 @@ def admin_crear_usuario(payload):
                 password_temporal,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, datetime('now'), datetime('now'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, datetime('now'), datetime('now'))
             """,
             (
                 nombre_apellido,
@@ -303,6 +334,7 @@ def admin_crear_usuario(payload):
                 legajo,
                 correo,
                 password_hash,
+                password_cifrada,
                 estado,
                 tipo_usuario,
                 modulos_json,
@@ -878,6 +910,7 @@ def migrar_usuarios_administracion(conn):
     for nombre, definicion in {
         "paneles_json": "TEXT",
         "acciones_json": "TEXT",
+        "password_cifrada": "TEXT",
     }.items():
         if nombre not in columnas:
             conn.execute(f"ALTER TABLE usuarios ADD COLUMN {nombre} {definicion}")
@@ -2160,8 +2193,10 @@ def admin_actualizar_usuario(usuario_id: int, request: Request, payload: dict):
                 json.dumps(modulos, ensure_ascii=False), json.dumps(paneles, ensure_ascii=False), json.dumps(acciones, ensure_ascii=False),
             ]
             if str(datos.get("password", "")):
-                campos.extend(["password_hash = ?", "password_temporal = 0"])
-                valores.append(hashlib.sha256(str(datos["password"]).encode("utf-8")).hexdigest())
+                nueva_password = str(datos["password"])
+                campos.extend(["password_hash = ?", "password_cifrada = ?", "password_temporal = 0"])
+                valores.append(hashlib.sha256(nueva_password.encode("utf-8")).hexdigest())
+                valores.append(_cifrar_password(nueva_password))
             valores.append(usuario_id)
             conn.execute(f"UPDATE usuarios SET {', '.join(campos)} WHERE id = ?", valores)
             conn.execute("DELETE FROM usuario_roles_funcionales WHERE usuario_id = ?", (usuario_id,))
@@ -2211,15 +2246,34 @@ def admin_resetear_password(usuario_id: int, request: Request, payload: dict):
     password = str((payload or {}).get("password", "")) or secrets.token_urlsafe(9)
     with get_sqlite_connection() as conn:
         cur = conn.execute(
-            """UPDATE usuarios SET password_hash = ?, password_temporal = 1,
+            """UPDATE usuarios SET password_hash = ?, password_cifrada = ?, password_temporal = 1,
                intentos_fallidos = 0, updated_at = datetime('now') WHERE id = ?""",
-            (hashlib.sha256(password.encode("utf-8")).hexdigest(), usuario_id),
+            (hashlib.sha256(password.encode("utf-8")).hexdigest(), _cifrar_password(password), usuario_id),
         )
         if not cur.rowcount:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         _registrar_acceso_admin(conn, request, "PASSWORD_RESTABLECIDA", f"usuario_id={usuario_id}")
         conn.commit()
     return {"ok": True, "password": password}
+
+
+@app.get("/admin/usuarios/{usuario_id}/password")
+def admin_ver_password(usuario_id: int, request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        fila = conn.execute("SELECT password_cifrada FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        password = _descifrar_password(fila["password_cifrada"] or "")
+        _registrar_acceso_admin(conn, request, "PASSWORD_VISUALIZADA", f"usuario_id={usuario_id}")
+        conn.commit()
+    if password is None:
+        return {
+            "password": None,
+            "mensaje": "No disponible: la contraseña se fijó antes de habilitar esta función, "
+                       "o falta configurar PASSWORD_ENCRYPTION_KEY. Usá 'Restablecer clave' para fijar una nueva.",
+        }
+    return {"password": password}
 
 
 @app.get("/admin/accesos")
