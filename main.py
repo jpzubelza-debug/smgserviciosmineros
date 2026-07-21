@@ -19,6 +19,13 @@ BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 api_key = os.getenv("OPENAI_API_KEY", "").strip()
 client = OpenAI(api_key=api_key) if api_key else None
+
+# Datos persistentes (SQLite y documentos subidos). En Render, DATA_DIR debe
+# apuntar al mountPath del disco persistente para que sobrevivan a los deploys.
+# En local (sin DATA_DIR configurada) se usa la misma carpeta del proyecto.
+DATA_DIR = os.getenv("DATA_DIR", "").strip() or BASE_DIR
+os.makedirs(DATA_DIR, exist_ok=True)
+
 DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.html")
 MENU_PRINCIPAL_PATH = os.path.join(BASE_DIR, "menu_principal.html")
 LOGIN_PATH = os.path.join(BASE_DIR, "login.html")
@@ -32,10 +39,10 @@ ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
 FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
-DOC_LOG_VIAJES_DIR = os.path.join(BASE_DIR, "Doc_Log_Viajes")
-DOC_ALMACEN_DIR = os.path.join(BASE_DIR, "Doc_Almacen")
+DOC_LOG_VIAJES_DIR = os.path.join(DATA_DIR, "Doc_Log_Viajes")
+DOC_ALMACEN_DIR = os.path.join(DATA_DIR, "Doc_Almacen")
 DOC_ALMACEN_ADJ_DIR = os.path.join(DOC_ALMACEN_DIR, "adjuntos")
-SQLITE_DB_PATH = os.path.join(BASE_DIR, "dashboard.db")
+SQLITE_DB_PATH = os.path.join(DATA_DIR, "dashboard.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "schema.sql")
 MEMBRETE_LOGO_PATH = os.path.join(BASE_DIR, "Imagenes", "09-smg.png")
 
@@ -68,6 +75,7 @@ app.add_middleware(
 AUTH_USER = os.getenv("APP_LOGIN_USER", "admin")
 AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "admin123")
 AUTH_COOKIE_NAME = "dash_auth_user"
+SESSION_IDLE_SECONDS = 60 * 60
 ALL_MODULES = [
     "logistica", "almacen", "operaciones", "compras", "rrhh",
     "mantenimiento", "dashboard_ejecutivo", "administracion",
@@ -129,7 +137,54 @@ def _requiere_administrador(request: Request):
 
 def _leer_html(path: str):
     with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+        html = f.read()
+    if path == LOGIN_PATH:
+        return html
+    session_guard = f"""
+<script>
+(() => {{
+  const idleMs = {SESSION_IDLE_SECONDS * 1000};
+  const refreshMs = 60 * 1000;
+  let timeoutId;
+  let lastServerTouch = 0;
+  let closed = false;
+  const cerrarSesion = () => {{
+    if (closed) return;
+    closed = true;
+    window.location.replace('/logout');
+  }};
+  const registrarActividad = () => {{
+    if (closed) return;
+    clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(cerrarSesion, idleMs);
+    if (Date.now() - lastServerTouch >= refreshMs) {{
+      lastServerTouch = Date.now();
+      fetch('/session/actividad', {{ credentials: 'same-origin' }})
+        .then((response) => {{ if (!response.ok) cerrarSesion(); }})
+        .catch(() => {{}});
+    }}
+  }};
+  ['pointerdown', 'mousemove', 'keydown', 'scroll', 'touchstart'].forEach((eventName) =>
+    window.addEventListener(eventName, registrarActividad, {{ passive: true }}));
+  registrarActividad();
+}})();
+</script>
+"""
+    return html.replace("</body>", f"{session_guard}</body>")
+
+
+@app.middleware("http")
+async def renovar_sesion_por_actividad(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path != "/logout" and _usuario_autenticado(request) is not None:
+        response.set_cookie(
+            AUTH_COOKIE_NAME,
+            request.cookies.get(AUTH_COOKIE_NAME, ""),
+            max_age=SESSION_IDLE_SECONDS,
+            httponly=True,
+            samesite="lax",
+        )
+    return response
 
 def normalizar_texto(texto):
     if texto is None:
@@ -1917,7 +1972,7 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
 
     if user == AUTH_USER and pwd == AUTH_PASS:
         response = RedirectResponse("/", status_code=302)
-        response.set_cookie(AUTH_COOKIE_NAME, user, httponly=True, samesite="lax")
+        response.set_cookie(AUTH_COOKIE_NAME, user, max_age=SESSION_IDLE_SECONDS, httponly=True, samesite="lax")
         return response
 
     # Usuarios administrados desde el módulo Administración. El nombre de
@@ -1955,7 +2010,7 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
                 )
                 conn.commit()
                 response = RedirectResponse("/", status_code=302)
-                response.set_cookie(AUTH_COOKIE_NAME, user, httponly=True, samesite="lax")
+                response.set_cookie(AUTH_COOKIE_NAME, user, max_age=SESSION_IDLE_SECONDS, httponly=True, samesite="lax")
                 return response
             if fila:
                 conn.execute(
@@ -1975,6 +2030,13 @@ def get_me(request: Request):
     if perfil is None:
         return {"autenticado": False}
     return {"autenticado": True, **perfil}
+
+
+@app.get("/session/actividad")
+def session_actividad(request: Request):
+    if _usuario_autenticado(request) is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+    return {"ok": True}
 
 
 def _admin_usuario_a_dict(conn, fila):

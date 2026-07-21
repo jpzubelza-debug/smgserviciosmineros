@@ -7,3 +7,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: dashboard-data
+      mountPath: /var/data
+      sizeGB: 1
