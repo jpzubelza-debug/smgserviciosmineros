@@ -103,6 +103,29 @@
     }
     td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); }
     tr:hover { background: rgba(255,255,255,0.08); }
+    #lista th:first-child, #lista td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: rgba(10, 24, 38, 0.98);
+      box-shadow: 2px 0 6px rgba(0,0,0,0.35);
+    }
+    #lista th:first-child { z-index: 4; }
+    #lista td:first-child { color: #eef4ff; }
+    .col-filter {
+      display: block;
+      width: 100%;
+      margin: 6px 0 0;
+      padding: 4px 6px;
+      font-size: 12px;
+      font-weight: normal;
+      box-sizing: border-box;
+      background: rgba(2, 6, 23, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      color: #eef4ff;
+      border-radius: 6px;
+    }
+    .col-filter::placeholder { color: rgba(238, 244, 255, 0.5); }
     #lista th:nth-child(10), #lista td:nth-child(10),
     #lista th:nth-child(11), #lista td:nth-child(11),
     #lista th:nth-child(12), #lista td:nth-child(12),
@@ -382,24 +405,24 @@
   <table id="lista">
     <thead>
       <tr>
-        <th>Código</th>
-        <th>Propiedad</th>
-        <th>Marca</th>
-        <th>Tipo</th>
-        <th>Modelo</th>
-        <th>Dominio</th>
-        <th>Año</th>
-        <th>Motor</th>
-        <th>Chasis</th>
-        <th>Sector</th>
-        <th>Proyecto</th>
-        <th>Operativo</th>
-        <th>Pirquitas</th>
-        <th>Exar</th>
-        <th>SDJ</th>
-        <th>Rincón</th>
-        <th>ARLI</th>
-        <th>Acción</th>
+        <th>Código<input class="col-filter" data-campo="codigo" placeholder="Filtrar..."></th>
+        <th>Propiedad<input class="col-filter" data-campo="propiedad" placeholder="Filtrar..."></th>
+        <th>Marca<input class="col-filter" data-campo="marca" placeholder="Filtrar..."></th>
+        <th>Tipo<input class="col-filter" data-campo="tipo" placeholder="Filtrar..."></th>
+        <th>Modelo<input class="col-filter" data-campo="modelo" placeholder="Filtrar..."></th>
+        <th>Dominio<input class="col-filter" data-campo="dominio" placeholder="Filtrar..."></th>
+        <th>Año<input class="col-filter" data-campo="anio" placeholder="Filtrar..."></th>
+        <th>Motor<input class="col-filter" data-campo="motor" placeholder="Filtrar..."></th>
+        <th>Chasis<input class="col-filter" data-campo="chasis" placeholder="Filtrar..."></th>
+        <th>Sector<input class="col-filter" data-campo="sector" placeholder="Filtrar..."></th>
+        <th>Proyecto<input class="col-filter" data-campo="proyecto" placeholder="Filtrar..."></th>
+        <th>Operativo<input class="col-filter" data-campo="operativo" placeholder="Filtrar..."></th>
+        <th>Pirquitas<input class="col-filter" data-campo="habilitacion_pirquitas" placeholder="Filtrar..."></th>
+        <th>Exar<input class="col-filter" data-campo="habilitacion_exar" placeholder="Filtrar..."></th>
+        <th>SDJ<input class="col-filter" data-campo="habilitacion_sdj" placeholder="Filtrar..."></th>
+        <th>Rincón<input class="col-filter" data-campo="habilitacion_rincon" placeholder="Filtrar..."></th>
+        <th>ARLI<input class="col-filter" data-campo="habilitacion_arli" placeholder="Filtrar..."></th>
+        <th>Acción<button type="button" class="col-filter" id="btn-limpiar-filtros" style="cursor:pointer;">Limpiar</button></th>
       </tr>
     </thead>
     <tbody id="lista-body"></tbody>
@@ -822,21 +845,19 @@ function actualizarGraficos(data) {
   });
 }
 
-async function cargar() {
-  const res = await fetch("/vehiculos");
-  const data = await res.json();
+let vehiculosData = [];
+let filtrosColumnas = {};
 
-  actualizarGraficos(data);
+const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
+const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
 
-  const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
-  const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
+const claseOperativo = (valor) => {
+  return String(valor || "").toUpperCase() === "SI" ? "estado-si" : "estado-no";
+};
 
+function renderFilas(data) {
   const tbody = document.getElementById("lista-body");
   tbody.innerHTML = "";
-
-  const claseOperativo = (valor) => {
-    return String(valor || "").toUpperCase() === "SI" ? "estado-si" : "estado-no";
-  };
 
   data.forEach(v => {
     const tr = document.createElement("tr");
@@ -868,6 +889,45 @@ async function cargar() {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function aplicarFiltros() {
+  const activos = Object.entries(filtrosColumnas).filter(([, valor]) => valor);
+  if (!activos.length) {
+    renderFilas(vehiculosData);
+    return;
+  }
+  const filtrados = vehiculosData.filter((v) =>
+    activos.every(([campo, valor]) =>
+      String(v[campo] || "").toLowerCase().includes(valor.toLowerCase())
+    )
+  );
+  renderFilas(filtrados);
+}
+
+document.querySelectorAll("#lista thead .col-filter").forEach((input) => {
+  const campo = input.dataset.campo;
+  if (!campo) return;
+  filtrosColumnas[campo] = "";
+  input.addEventListener("input", () => {
+    filtrosColumnas[campo] = input.value.trim();
+    aplicarFiltros();
+  });
+});
+
+document.getElementById("btn-limpiar-filtros").addEventListener("click", () => {
+  document.querySelectorAll("#lista thead .col-filter").forEach((input) => { input.value = ""; });
+  Object.keys(filtrosColumnas).forEach((campo) => { filtrosColumnas[campo] = ""; });
+  aplicarFiltros();
+});
+
+async function cargar() {
+  const res = await fetch("/vehiculos");
+  const data = await res.json();
+  vehiculosData = data;
+
+  actualizarGraficos(data);
+  aplicarFiltros();
 }
 
 async function actualizarHabilitacionVehiculo(codigo, campo, valor) {

@@ -131,6 +131,60 @@
       opacity: 0.9;
     }
 
+    .acompanantes-selector {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .acompanantes-selector select {
+      margin: 8px 0 0 0;
+    }
+
+    .acompanantes-selector button {
+      width: auto;
+      white-space: nowrap;
+      margin: 8px 0 0 0;
+      padding: 12px 16px;
+    }
+
+    .lista-acompanantes {
+      list-style: none;
+      margin: 0 0 15px 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .lista-acompanantes:empty::after {
+      content: "Sin acompañantes agregados";
+      color: #9fb3c8;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    .lista-acompanantes li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(59, 130, 246, 0.18);
+      border: 1px solid rgba(147, 197, 253, 0.45);
+      border-radius: 999px;
+      padding: 6px 8px 6px 14px;
+      color: #eef4ff;
+      font-size: 13px;
+    }
+
+    .lista-acompanantes .quitar-acompanante {
+      width: auto;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.85);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
     input:focus, select:focus, textarea:focus {
       border-color: rgba(147, 197, 253, 0.85);
       box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
@@ -227,9 +281,13 @@
   </select>
 
   <label>Acompanantes</label>
-  <select id="acompanantes" multiple>
-  </select>
-  <div class="helper-text">Mantener Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</div>
+  <div class="acompanantes-selector">
+    <select id="acompanante-agregar">
+      <option value="">Seleccione...</option>
+    </select>
+    <button type="button" id="btn-agregar-acompanante">Agregar</button>
+  </div>
+  <ul id="lista-acompanantes" class="lista-acompanantes"></ul>
 
   <label>Requiere alojamiento</label>
   <select id="alojamiento" required>
@@ -283,27 +341,68 @@ function etiquetaVehiculo(vehiculo) {
   return descripcion ? `${codigo} - ${descripcion}` : codigo;
 }
 
+let acompanantesSeleccionados = [];
+
+function renderListaAcompanantes() {
+  const lista = document.getElementById("lista-acompanantes");
+  lista.innerHTML = "";
+  acompanantesSeleccionados.forEach(nombre => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span>${nombre}</span>
+      <button type="button" class="quitar-acompanante" title="Quitar">&times;</button>
+    `;
+    li.querySelector(".quitar-acompanante").addEventListener("click", () => {
+      acompanantesSeleccionados = acompanantesSeleccionados.filter(n => n !== nombre);
+      renderListaAcompanantes();
+      actualizarOpcionesAcompanantes();
+    });
+    lista.appendChild(li);
+  });
+}
+
 function actualizarOpcionesAcompanantes() {
   const selectChofer = document.getElementById("chofer");
-  const selectAcompanantes = document.getElementById("acompanantes");
+  const selectAgregar = document.getElementById("acompanante-agregar");
   const choferSeleccionado = (selectChofer.value || "").trim().toLowerCase();
 
-  const seleccionPrev = new Set(Array.from(selectAcompanantes.selectedOptions).map(o => o.value));
-  selectAcompanantes.innerHTML = "";
+  // Si el chofer elegido ya estaba agregado como acompañante, se saca de la lista.
+  if (acompanantesSeleccionados.some(n => n.toLowerCase() === choferSeleccionado)) {
+    acompanantesSeleccionados = acompanantesSeleccionados.filter(n => n.toLowerCase() !== choferSeleccionado);
+    renderListaAcompanantes();
+  }
+
+  const valorPrevio = selectAgregar.value;
+  selectAgregar.innerHTML = "";
+  const opcionVacia = document.createElement("option");
+  opcionVacia.value = "";
+  opcionVacia.textContent = "Seleccione...";
+  selectAgregar.appendChild(opcionVacia);
 
   personalBase
     .map(p => (p?.nombre || "").toString().trim())
     .filter(Boolean)
     .filter(nombre => nombre.toLowerCase() !== choferSeleccionado)
+    .filter(nombre => !acompanantesSeleccionados.includes(nombre))
     .forEach(nombre => {
       const op = document.createElement("option");
       op.value = nombre;
       op.textContent = nombre;
-      if (seleccionPrev.has(nombre)) {
-        op.selected = true;
-      }
-      selectAcompanantes.appendChild(op);
+      selectAgregar.appendChild(op);
     });
+
+  selectAgregar.value = Array.from(selectAgregar.options).some(o => o.value === valorPrevio) ? valorPrevio : "";
+}
+
+function agregarAcompanante() {
+  const selectAgregar = document.getElementById("acompanante-agregar");
+  const nombre = (selectAgregar.value || "").trim();
+  if (!nombre || acompanantesSeleccionados.includes(nombre)) {
+    return;
+  }
+  acompanantesSeleccionados.push(nombre);
+  renderListaAcompanantes();
+  actualizarOpcionesAcompanantes();
 }
 
 async function cargarPersonalYVehiculos() {
@@ -357,6 +456,7 @@ document.getElementById("fecha_salida").addEventListener("change", function() {
 });
 
 document.getElementById("chofer").addEventListener("change", actualizarOpcionesAcompanantes);
+document.getElementById("btn-agregar-acompanante").addEventListener("click", agregarAcompanante);
 
 document.getElementById("form").addEventListener("submit", async function(e) {
   e.preventDefault();
@@ -386,7 +486,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
       fecha_regreso: fechaRegreso,
       chofer: document.getElementById("chofer").value,
       vehiculo: document.getElementById("vehiculo").value,
-      acompanantes: Array.from(document.getElementById("acompanantes").selectedOptions).map(o => o.value),
+      acompanantes: acompanantesSeleccionados.slice(),
       alojamiento: document.getElementById("alojamiento").value
     };
 
@@ -404,6 +504,8 @@ document.getElementById("form").addEventListener("submit", async function(e) {
       "Viaje creado correctamente (ID: " + result.id + ")";
 
     document.getElementById("form").reset();
+    acompanantesSeleccionados = [];
+    renderListaAcompanantes();
     actualizarOpcionesAcompanantes();
 
   } catch (error) {
