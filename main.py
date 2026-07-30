@@ -40,6 +40,7 @@ ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
 FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
+BASE_DATOS_PATH = os.path.join(BASE_DIR, "base_datos.html")
 DOC_LOG_VIAJES_DIR = os.path.join(DATA_DIR, "Doc_Log_Viajes")
 DOC_ALMACEN_DIR = os.path.join(DATA_DIR, "Doc_Almacen")
 DOC_ALMACEN_ADJ_DIR = os.path.join(DOC_ALMACEN_DIR, "adjuntos")
@@ -107,7 +108,7 @@ def _descifrar_password(password_cifrada: str):
 SESSION_IDLE_SECONDS = 60 * 60
 ALL_MODULES = [
     "logistica", "almacen", "operaciones", "compras", "rrhh",
-    "mantenimiento", "dashboard_ejecutivo", "administracion",
+    "mantenimiento", "dashboard_ejecutivo", "administracion", "base_datos",
 ]
 
 
@@ -921,6 +922,95 @@ def migrar_usuarios_administracion(conn):
         )
 
 
+def migrar_personal_dotacion(conn):
+    """Incorpora los campos de dotación para instalaciones ya existentes."""
+    columnas = {r[1] for r in conn.execute("PRAGMA table_info(personal)").fetchall()}
+    columnas_nuevas = {
+        "fecha_nacimiento": "TEXT",
+        "activo": "TEXT DEFAULT 'ACTIVO'",
+    }
+    agregadas = []
+    for nombre, definicion in columnas_nuevas.items():
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE personal ADD COLUMN {nombre} {definicion}")
+            agregadas.append(nombre)
+
+    if not agregadas:
+        return
+
+    # Si estos campos ya se habian guardado antes (por ejemplo, via una version
+    # anterior que solo los persistia dentro de raw_json), se recuperan de ahi
+    # para no perder datos al agregar recien ahora las columnas dedicadas.
+    filas = conn.execute("SELECT legajo, raw_json FROM personal").fetchall()
+    for fila in filas:
+        try:
+            datos = json.loads(fila["raw_json"] or "{}")
+        except Exception:
+            continue
+        if not isinstance(datos, dict):
+            continue
+        sets, valores = [], []
+        for campo in agregadas:
+            if datos.get(campo):
+                sets.append(f"{campo} = ?")
+                valores.append(datos[campo])
+        if sets:
+            valores.append(fila["legajo"])
+            conn.execute(f"UPDATE personal SET {', '.join(sets)} WHERE legajo = ?", valores)
+
+
+PROYECTOS_HABILITACION_DEFAULT = [
+    ("Pirquitas", "pirquitas"),
+    ("Exar", "exar"),
+    ("SDJ", "sdj"),
+    ("Rincón", "rincon"),
+    ("ARLI", "arli"),
+]
+
+
+def migrar_habilitaciones_personal(conn):
+    """Crea el catalogo de proyectos y migra las habilitaciones SI/NO existentes
+    a personal_habilitaciones, con una fecha de vencimiento placeholder, la
+    primera vez que se detecta que la tabla nueva esta vacia."""
+    for nombre, clave in PROYECTOS_HABILITACION_DEFAULT:
+        conn.execute(
+            "INSERT OR IGNORE INTO proyectos_habilitacion (nombre, clave) VALUES (?, ?)",
+            (nombre, clave),
+        )
+
+    ya_migrado = conn.execute("SELECT COUNT(*) FROM personal_habilitaciones").fetchone()[0]
+    if ya_migrado:
+        return
+
+    proyectos = {
+        clave: pid for pid, clave in conn.execute(
+            "SELECT id, clave FROM proyectos_habilitacion"
+        ).fetchall()
+    }
+    columnas_legacy = [
+        ("habilitacion_pirquitas", "pirquitas"),
+        ("habilitacion_exar", "exar"),
+        ("habilitacion_sdj", "sdj"),
+        ("habilitacion_rincon", "rincon"),
+        ("habilitacion_arli", "arli"),
+    ]
+    filas = conn.execute(
+        "SELECT legajo, habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj, "
+        "habilitacion_rincon, habilitacion_arli FROM personal"
+    ).fetchall()
+    for fila in filas:
+        for indice, (_columna, clave) in enumerate(columnas_legacy, start=1):
+            valor = str(fila[indice] or "").strip().upper()
+            if valor == "SI" and clave in proyectos:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO personal_habilitaciones (legajo, proyecto_id, fecha_vencimiento)
+                    VALUES (?, ?, ?)
+                    """,
+                    (fila["legajo"], proyectos[clave], "2026-08-30"),
+                )
+
+
 def init_sqlite():
     if not os.path.exists(SCHEMA_PATH):
         return
@@ -969,6 +1059,8 @@ def init_sqlite():
                         raise
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
                 migrar_usuarios_administracion(conn)
+                migrar_personal_dotacion(conn)
+                migrar_habilitaciones_personal(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -1009,18 +1101,69 @@ def obtener_choferes_data():
     return [dict(r) for r in rows]
 
 
+def _estado_habilitacion(fecha_vencimiento, dias_por_vencer=30):
+    if not fecha_vencimiento:
+        return None
+    try:
+        vencimiento = datetime.strptime(str(fecha_vencimiento)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    hoy = datetime.now().date()
+    if vencimiento < hoy:
+        return "VENCIDO"
+    if (vencimiento - hoy).days <= dias_por_vencer:
+        return "POR_VENCER"
+    return "VIGENTE"
+
+
+def obtener_proyectos_habilitacion(conn):
+    return [
+        dict(r) for r in conn.execute(
+            "SELECT id, nombre, clave FROM proyectos_habilitacion WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+        ).fetchall()
+    ]
+
+
+def obtener_habilitaciones_por_legajo(conn, legajo=None):
+    query = """
+        SELECT ph.legajo, p.clave, ph.fecha_vencimiento
+        FROM personal_habilitaciones ph
+        JOIN proyectos_habilitacion p ON p.id = ph.proyecto_id
+    """
+    params = ()
+    if legajo is not None:
+        query += " WHERE ph.legajo = ?"
+        params = (str(legajo),)
+    resultado = {}
+    for fila in conn.execute(query, params).fetchall():
+        resultado.setdefault(fila["legajo"], {})[fila["clave"]] = {
+            "vencimiento": fila["fecha_vencimiento"],
+            "estado": _estado_habilitacion(fila["fecha_vencimiento"]),
+        }
+    return resultado
+
+
 def obtener_personal_data():
     with get_sqlite_connection() as conn:
         rows = conn.execute(
             """
-            SELECT legajo, nombre, cuil,
-                   habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj,
-                   habilitacion_rincon, habilitacion_arli
+            SELECT legajo, nombre, cuil, fecha_nacimiento, activo
             FROM personal
             ORDER BY CAST(legajo AS INTEGER), legajo
             """
         ).fetchall()
-    return [dict(r) for r in rows]
+        habilitaciones = obtener_habilitaciones_por_legajo(conn)
+    personal = [dict(r) for r in rows]
+    for persona in personal:
+        persona["habilitaciones"] = habilitaciones.get(str(persona["legajo"]), {})
+    return personal
+
+
+def esta_habilitado_personal(persona, clave_proyecto):
+    hab = (persona.get("habilitaciones") or {}).get(clave_proyecto)
+    if not hab:
+        return False
+    return hab.get("estado") in {"VIGENTE", "POR_VENCER"}
 
 
 def obtener_viajes_data():
@@ -1885,6 +2028,7 @@ def asignar_recursos(data: Recursos):
     campo_habilitacion = obtener_campo_habilitacion(data.destino)
 
     if campo_habilitacion is not None:
+        clave_proyecto = campo_habilitacion.replace("habilitacion_", "")
         nombres_validar = [data.chofer] + (data.acompanantes or [])
         for nombre in nombres_validar:
             nombre_limpio = (nombre or "").strip()
@@ -1897,7 +2041,7 @@ def asignar_recursos(data: Recursos):
             )
             if persona is None:
                 return {"error": f"No se encontro en personal: {nombre_limpio}"}
-            if not esta_habilitado(persona, campo_habilitacion):
+            if not esta_habilitado_personal(persona, clave_proyecto):
                 return {"error": f"{nombre_limpio} no esta habilitado para el destino {data.destino}"}
 
     with get_sqlite_connection() as conn:
@@ -2121,6 +2265,64 @@ def mantenimiento_view(request: Request):
     if redirect is not None:
         return redirect
     return _leer_html(FLEETCARE_PATH)
+
+
+def _requiere_modulo(request: Request, modulo: str):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+    if str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR" or modulo in perfil.get("modulos", []):
+        return perfil
+    raise HTTPException(status_code=403, detail="No tiene acceso a este módulo")
+
+
+@app.get("/base_datos", response_class=HTMLResponse)
+def base_datos_view(request: Request):
+    try:
+        _requiere_modulo(request, "base_datos")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    return _leer_html(BASE_DATOS_PATH)
+
+
+def _tablas_base_datos(conn):
+    return [
+        fila["name"] for fila in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        ).fetchall()
+    ]
+
+
+@app.get("/base_datos/tablas")
+def base_datos_tablas(request: Request):
+    _requiere_modulo(request, "base_datos")
+    with get_sqlite_connection() as conn:
+        tablas = _tablas_base_datos(conn)
+        resultado = []
+        for tabla in tablas:
+            tabla_sql = tabla.replace('"', '""')
+            cantidad = conn.execute(f'SELECT COUNT(*) FROM "{tabla_sql}"').fetchone()[0]
+            resultado.append({"nombre": tabla, "registros": cantidad})
+        return resultado
+
+
+@app.get("/base_datos/tabla/{tabla}")
+def base_datos_tabla(tabla: str, request: Request):
+    _requiere_modulo(request, "base_datos")
+    with get_sqlite_connection() as conn:
+        if tabla not in _tablas_base_datos(conn):
+            raise HTTPException(status_code=404, detail="Tabla no encontrada")
+        tabla_sql = tabla.replace('"', '""')
+        columnas = [fila["name"] for fila in conn.execute(f'PRAGMA table_info("{tabla_sql}")').fetchall()]
+        filas = []
+        for fila in conn.execute(f'SELECT * FROM "{tabla_sql}"').fetchall():
+            registro = dict(fila)
+            # Las credenciales y material de autenticación nunca se exponen en una grilla.
+            for campo in ("password_hash", "password_cifrada"):
+                if campo in registro:
+                    registro[campo] = "••••••••"
+            filas.append(registro)
+        return {"tabla": tabla, "columnas": columnas, "filas": filas, "total": len(filas)}
 
 
 @app.get("/admin/roles_funcionales")
@@ -3161,16 +3363,18 @@ def crear_personal(data: dict):
         conn.execute(
             """
             INSERT INTO personal (
-                legajo, nombre, cuil,
+                legajo, nombre, cuil, fecha_nacimiento, activo,
                 habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj,
                 habilitacion_rincon, habilitacion_arli, raw_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 legajo,
                 data.get("nombre"),
                 data.get("cuil"),
+                data.get("fecha_nacimiento"),
+                data.get("activo", "ACTIVO"),
                 data.get("habilitacion_pirquitas"),
                 data.get("habilitacion_exar"),
                 data.get("habilitacion_sdj"),
@@ -3204,6 +3408,8 @@ def actualizar_personal(legajo: str, data: dict):
             UPDATE personal
                SET nombre = ?,
                    cuil = ?,
+                   fecha_nacimiento = ?,
+                   activo = ?,
                    habilitacion_pirquitas = ?,
                    habilitacion_exar = ?,
                    habilitacion_sdj = ?,
@@ -3215,6 +3421,8 @@ def actualizar_personal(legajo: str, data: dict):
             (
                 base_data.get("nombre"),
                 base_data.get("cuil"),
+                base_data.get("fecha_nacimiento"),
+                base_data.get("activo", "ACTIVO"),
                 base_data.get("habilitacion_pirquitas"),
                 base_data.get("habilitacion_exar"),
                 base_data.get("habilitacion_sdj"),
@@ -3227,6 +3435,66 @@ def actualizar_personal(legajo: str, data: dict):
         conn.commit()
 
     return {"mensaje": "Empleado actualizado"}
+
+
+@app.get("/personal/proyectos")
+def listar_proyectos_habilitacion():
+    with get_sqlite_connection() as conn:
+        return obtener_proyectos_habilitacion(conn)
+
+
+@app.get("/personal/{legajo}/habilitaciones")
+def listar_habilitaciones_personal(legajo: str):
+    with get_sqlite_connection() as conn:
+        existe = conn.execute("SELECT 1 FROM personal WHERE legajo = ?", (str(legajo),)).fetchone()
+        if not existe:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        habilitaciones = obtener_habilitaciones_por_legajo(conn, legajo)
+    return habilitaciones.get(str(legajo), {})
+
+
+class PersonalHabilitacionPayload(BaseModel):
+    proyecto_id: int
+    fecha_vencimiento: str
+
+
+@app.post("/personal/{legajo}/habilitaciones")
+def guardar_habilitacion_personal(legajo: str, payload: PersonalHabilitacionPayload):
+    fecha = (payload.fecha_vencimiento or "").strip()
+    if not fecha:
+        return {"error": "Debe indicar una fecha de vencimiento"}
+    with get_sqlite_connection() as conn:
+        existe = conn.execute("SELECT 1 FROM personal WHERE legajo = ?", (str(legajo),)).fetchone()
+        if not existe:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        proyecto = conn.execute(
+            "SELECT id FROM proyectos_habilitacion WHERE id = ?", (payload.proyecto_id,)
+        ).fetchone()
+        if not proyecto:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        conn.execute(
+            """
+            INSERT INTO personal_habilitaciones (legajo, proyecto_id, fecha_vencimiento, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(legajo, proyecto_id) DO UPDATE SET
+                fecha_vencimiento = excluded.fecha_vencimiento,
+                updated_at = datetime('now')
+            """,
+            (str(legajo), payload.proyecto_id, fecha),
+        )
+        conn.commit()
+    return {"mensaje": "Habilitación guardada"}
+
+
+@app.delete("/personal/{legajo}/habilitaciones/{proyecto_id}")
+def quitar_habilitacion_personal(legajo: str, proyecto_id: int):
+    with get_sqlite_connection() as conn:
+        conn.execute(
+            "DELETE FROM personal_habilitaciones WHERE legajo = ? AND proyecto_id = ?",
+            (str(legajo), proyecto_id),
+        )
+        conn.commit()
+    return {"mensaje": "Habilitación quitada"}
 
 
 # -------- ALMACEN --------

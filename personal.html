@@ -260,6 +260,48 @@
       margin: 0;
       font-size: 13px;
     }
+    .chip-habilitacion {
+      display: inline-block;
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+      box-sizing: border-box;
+    }
+    .chip-habilitacion:hover { filter: brightness(1.15); }
+    .chip-vigente { background: rgba(34, 197, 94, 0.22); border-color: rgba(34, 197, 94, 0.5); color: #bbf7d0; }
+    .chip-por_vencer { background: rgba(234, 179, 8, 0.22); border-color: rgba(234, 179, 8, 0.5); color: #fef08a; }
+    .chip-vencido { background: rgba(239, 68, 68, 0.22); border-color: rgba(239, 68, 68, 0.5); color: #fecaca; }
+    .chip-vacio { background: rgba(148, 163, 184, 0.12); border-color: rgba(148, 163, 184, 0.3); color: #9fb3c8; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    .modal-box {
+      background: #13213c;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 12px;
+      padding: 20px;
+      width: min(360px, 90vw);
+      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.5);
+    }
+    .modal-box h3 { margin: 0 0 12px; color: #fff; }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .modal-actions button { width: auto; flex: 1; padding: 10px 8px; font-size: 13px; }
+    .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; }
     .cell-select {
       width: 100%;
       min-width: 72px;
@@ -339,32 +381,15 @@
     <input type="text" id="legajo" placeholder="N° de Legajo" required>
     <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
     <input type="text" id="cuil" placeholder="CUIL" required>
+    <input type="date" id="fecha_nacimiento" aria-label="Fecha de nacimiento">
+    <select id="activo">
+      <option value="ACTIVO">Activo</option>
+      <option value="INACTIVO">Inactivo</option>
+    </select>
 
-    <select id="habilitacion_pirquitas">
-      <option value="">Habilitación Pirquitas</option>
-      <option value="SI">SI</option>
-      <option value="NO">NO</option>
-    </select>
-    <select id="habilitacion_exar">
-      <option value="">Habilitación Exar</option>
-      <option value="SI">SI</option>
-      <option value="NO">NO</option>
-    </select>
-    <select id="habilitacion_sdj">
-      <option value="">Habilitación SDJ</option>
-      <option value="SI">SI</option>
-      <option value="NO">NO</option>
-    </select>
-    <select id="habilitacion_rincon">
-      <option value="">Habilitación Rincón</option>
-      <option value="SI">SI</option>
-      <option value="NO">NO</option>
-    </select>
-    <select id="habilitacion_arli">
-      <option value="">Habilitación ARLI</option>
-      <option value="SI">SI</option>
-      <option value="NO">NO</option>
-    </select>
+    <p class="message" style="margin: 4px 0 0; color: #9fb3c8; font-size: 13px;">
+      Las habilitaciones por proyecto y su vencimiento se cargan despues, desde la tabla.
+    </p>
 
     <button type="submit">Guardar</button>
   </form>
@@ -378,19 +403,29 @@
 <div class="tabla-personal-wrap">
   <table id="lista-personal">
     <thead>
-      <tr>
+      <tr id="thead-personal-row">
         <th>Legajo<input class="col-filter" data-campo="legajo" placeholder="Filtrar..."></th>
         <th>Empleado<input class="col-filter" data-campo="nombre" placeholder="Filtrar..."></th>
         <th>CUIL<input class="col-filter" data-campo="cuil" placeholder="Filtrar..."></th>
-        <th>Pirquitas<input class="col-filter" data-campo="habilitacion_pirquitas" placeholder="Filtrar..."></th>
-        <th>Exar<input class="col-filter" data-campo="habilitacion_exar" placeholder="Filtrar..."></th>
-        <th>SDJ<input class="col-filter" data-campo="habilitacion_sdj" placeholder="Filtrar..."></th>
-        <th>Rincón<input class="col-filter" data-campo="habilitacion_rincon" placeholder="Filtrar..."></th>
-        <th>ARLI<input class="col-filter" data-campo="habilitacion_arli" placeholder="Filtrar..."></th>
+        <th>Fecha de nacimiento<input class="col-filter" data-campo="fecha_nacimiento" placeholder="Filtrar..."></th>
+        <th>Estado<input class="col-filter" data-campo="activo" placeholder="Filtrar..."></th>
       </tr>
     </thead>
     <tbody id="personal-body"></tbody>
   </table>
+</div>
+
+<div id="modal-habilitacion" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3 id="modal-habilitacion-titulo">Habilitación</h3>
+    <label for="modal-habilitacion-fecha">Fecha de vencimiento</label>
+    <input type="date" id="modal-habilitacion-fecha">
+    <div class="modal-actions">
+      <button type="button" id="modal-habilitacion-guardar">Guardar</button>
+      <button type="button" id="modal-habilitacion-quitar" class="btn-danger">Quitar habilitación</button>
+      <button type="button" id="modal-habilitacion-cancelar">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -401,13 +436,7 @@ let chartResumen;
 let chartSi;
 let chartNo;
 
-const camposHabilitacion = [
-  { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
-  { etiqueta: "Exar", campo: "habilitacion_exar" },
-  { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-  { etiqueta: "Rincón", campo: "habilitacion_rincon" },
-  { etiqueta: "ARLI", campo: "habilitacion_arli" }
-];
+let proyectosHabilitacion = [];
 
 function actualizarTextoBotonCarga() {
   btnCargarEmpleado.textContent = formWrapper.classList.contains("open") ? "Ocultar carga" : "Cargar empleados";
@@ -435,20 +464,14 @@ function escapeHtml(texto) {
     .replaceAll("'", "&#39;");
 }
 
-function valorSN(valor) {
-  return String(valor || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+function estadoHabilitacion(persona, clave) {
+  const hab = (persona.habilitaciones || {})[clave];
+  return hab ? hab.estado : null;
 }
 
-function selectHabilitacion(legajo, campo, valorActual) {
-  const valor = valorSN(valorActual);
-  const selectedSi = valor === "SI" ? "selected" : "";
-  const selectedNo = valor === "NO" ? "selected" : "";
-  return `
-    <select class="cell-select" onchange="actualizarHabilitacion('${escapeHtml(legajo)}', '${campo}', this.value)">
-      <option value="SI" ${selectedSi}>SI</option>
-      <option value="NO" ${selectedNo}>NO</option>
-    </select>
-  `;
+function habilitacionVigente(persona, clave) {
+  const estado = estadoHabilitacion(persona, clave);
+  return estado === "VIGENTE" || estado === "POR_VENCER";
 }
 
 function construirResumenPersonal(data) {
@@ -456,9 +479,9 @@ function construirResumenPersonal(data) {
 
   const conteoSiPorProyecto = {};
   const conteoNoPorProyecto = {};
-  camposHabilitacion.forEach(h => {
-    conteoSiPorProyecto[h.etiqueta] = 0;
-    conteoNoPorProyecto[h.etiqueta] = 0;
+  proyectosHabilitacion.forEach(pr => {
+    conteoSiPorProyecto[pr.nombre] = 0;
+    conteoNoPorProyecto[pr.nombre] = 0;
   });
 
   let conAlguna = 0;
@@ -466,14 +489,13 @@ function construirResumenPersonal(data) {
 
   data.forEach(p => {
     let tieneAlguna = false;
-    camposHabilitacion.forEach(h => {
-      const v = valorSN(p[h.campo]);
-      if (v === "SI") {
-        conteoSiPorProyecto[h.etiqueta] += 1;
+    proyectosHabilitacion.forEach(pr => {
+      if (habilitacionVigente(p, pr.clave)) {
+        conteoSiPorProyecto[pr.nombre] += 1;
         totalSiChecks += 1;
         tieneAlguna = true;
       } else {
-        conteoNoPorProyecto[h.etiqueta] += 1;
+        conteoNoPorProyecto[pr.nombre] += 1;
       }
     });
     if (tieneAlguna) {
@@ -482,7 +504,7 @@ function construirResumenPersonal(data) {
   });
 
   const sinHabilitaciones = total - conAlguna;
-  const totalChecks = total * camposHabilitacion.length;
+  const totalChecks = total * proyectosHabilitacion.length;
   const pctCobertura = totalChecks > 0 ? Math.round((totalSiChecks / totalChecks) * 100) : 0;
 
   let proyectoPrincipal = "SIN DATO";
@@ -661,32 +683,105 @@ async function actualizarConclusiones(resumen) {
     .join("");
 }
 
-async function actualizarHabilitacion(legajo, campo, valor) {
-  const mensaje = document.getElementById("mensaje");
+async function cargarProyectosHabilitacion() {
+  const res = await fetch("/personal/proyectos");
+  proyectosHabilitacion = await res.json();
 
-  try {
-    const res = await fetch(`/personal/${encodeURIComponent(legajo)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [campo]: valor })
+  const headRow = document.getElementById("thead-personal-row");
+  proyectosHabilitacion.forEach(pr => {
+    const th = document.createElement("th");
+    th.innerHTML = `${escapeHtml(pr.nombre)}<input class="col-filter" data-campo="hab_${pr.clave}" placeholder="vigente / vencido...">`;
+    headRow.appendChild(th);
+  });
+
+  document.querySelectorAll("#lista-personal thead .col-filter").forEach((input) => {
+    const campo = input.dataset.campo;
+    if (!campo || campo in filtrosPersonal) return;
+    filtrosPersonal[campo] = "";
+    input.addEventListener("input", () => {
+      filtrosPersonal[campo] = input.value.trim();
+      aplicarFiltrosPersonal();
     });
-
-    const result = await res.json();
-    if (result.error) {
-      mensaje.style.color = "#fca5a5";
-      mensaje.textContent = result.error;
-      return;
-    }
-
-    mensaje.style.color = "#86efac";
-    mensaje.textContent = `Habilitación actualizada (${legajo})`;
-    cargarPersonal();
-  } catch (error) {
-    console.error("Error actualizando habilitación:", error);
-    mensaje.style.color = "#fca5a5";
-    mensaje.textContent = "No se pudo actualizar la habilitación";
-  }
+  });
 }
+
+function formatoFechaDDMMYYYY(fecha) {
+  if (!fecha) return "";
+  const partes = String(fecha).slice(0, 10).split("-");
+  if (partes.length !== 3) return fecha;
+  const [anio, mes, dia] = partes;
+  return `${dia}/${mes}/${anio}`;
+}
+
+function chipHabilitacion(persona, proyecto) {
+  const hab = (persona.habilitaciones || {})[proyecto.clave];
+  if (!hab) {
+    return `<span class="chip-habilitacion chip-vacio" data-legajo="${escapeHtml(persona.legajo)}" data-proyecto="${proyecto.id}">Sin habilitación</span>`;
+  }
+  const fechaFormateada = formatoFechaDDMMYYYY(hab.vencimiento);
+  const etiquetas = {
+    VIGENTE: `Vigente hasta ${fechaFormateada}`,
+    POR_VENCER: `Vence ${fechaFormateada}`,
+    VENCIDO: `Vencido (${fechaFormateada})`,
+  };
+  const clase = `chip-${(hab.estado || "vacio").toLowerCase()}`;
+  const texto = etiquetas[hab.estado] || fechaFormateada;
+  return `<span class="chip-habilitacion ${clase}" data-legajo="${escapeHtml(persona.legajo)}" data-proyecto="${proyecto.id}">${escapeHtml(texto)}</span>`;
+}
+
+let modalHabilitacionActual = null;
+
+function abrirModalHabilitacion(legajo, proyectoId) {
+  const proyecto = proyectosHabilitacion.find(pr => String(pr.id) === String(proyectoId));
+  if (!proyecto) return;
+  const persona = personalData.find(p => String(p.legajo) === String(legajo));
+  const habActual = persona ? (persona.habilitaciones || {})[proyecto.clave] : null;
+
+  modalHabilitacionActual = { legajo, proyectoId: proyecto.id, tieneHabilitacion: !!habActual };
+  document.getElementById("modal-habilitacion-titulo").textContent =
+    `${persona ? persona.nombre : legajo} — ${proyecto.nombre}`;
+  document.getElementById("modal-habilitacion-fecha").value = habActual ? habActual.vencimiento : "";
+  document.getElementById("modal-habilitacion-quitar").style.display = habActual ? "" : "none";
+  document.getElementById("modal-habilitacion").style.display = "flex";
+}
+
+function cerrarModalHabilitacion() {
+  document.getElementById("modal-habilitacion").style.display = "none";
+  modalHabilitacionActual = null;
+}
+
+document.getElementById("personal-body").addEventListener("click", (ev) => {
+  const chip = ev.target.closest(".chip-habilitacion");
+  if (!chip) return;
+  abrirModalHabilitacion(chip.dataset.legajo, chip.dataset.proyecto);
+});
+
+document.getElementById("modal-habilitacion-cancelar").addEventListener("click", cerrarModalHabilitacion);
+
+document.getElementById("modal-habilitacion-guardar").addEventListener("click", async () => {
+  if (!modalHabilitacionActual) return;
+  const fecha = document.getElementById("modal-habilitacion-fecha").value;
+  if (!fecha) {
+    alert("Elegí una fecha de vencimiento");
+    return;
+  }
+  await fetch(`/personal/${encodeURIComponent(modalHabilitacionActual.legajo)}/habilitaciones`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proyecto_id: modalHabilitacionActual.proyectoId, fecha_vencimiento: fecha })
+  });
+  cerrarModalHabilitacion();
+  cargarPersonal();
+});
+
+document.getElementById("modal-habilitacion-quitar").addEventListener("click", async () => {
+  if (!modalHabilitacionActual) return;
+  await fetch(`/personal/${encodeURIComponent(modalHabilitacionActual.legajo)}/habilitaciones/${modalHabilitacionActual.proyectoId}`, {
+    method: "DELETE"
+  });
+  cerrarModalHabilitacion();
+  cargarPersonal();
+});
 
 let personalData = [];
 let filtrosPersonal = {};
@@ -698,18 +793,30 @@ function renderFilasPersonal(data) {
   data.forEach(p => {
     const fila = document.createElement("tr");
     const legajo = p.legajo || "";
+    const celdasHabilitacion = proyectosHabilitacion
+      .map(pr => `<td>${chipHabilitacion(p, pr)}</td>`)
+      .join("");
     fila.innerHTML = `
       <td>${escapeHtml(legajo)}</td>
       <td>${escapeHtml(p.nombre || "")}</td>
       <td>${escapeHtml(p.cuil || "")}</td>
-      <td>${selectHabilitacion(legajo, "habilitacion_pirquitas", p.habilitacion_pirquitas || "NO")}</td>
-      <td>${selectHabilitacion(legajo, "habilitacion_exar", p.habilitacion_exar || "NO")}</td>
-      <td>${selectHabilitacion(legajo, "habilitacion_sdj", p.habilitacion_sdj || "NO")}</td>
-      <td>${selectHabilitacion(legajo, "habilitacion_rincon", p.habilitacion_rincon || "NO")}</td>
-      <td>${selectHabilitacion(legajo, "habilitacion_arli", p.habilitacion_arli || "NO")}</td>
+      <td>${escapeHtml(formatoFechaDDMMYYYY(p.fecha_nacimiento))}</td>
+      <td>${escapeHtml(p.activo || "ACTIVO")}</td>
+      ${celdasHabilitacion}
     `;
     tbody.appendChild(fila);
   });
+}
+
+function valorFiltroPersonal(p, campo) {
+  if (campo.startsWith("hab_")) {
+    const clave = campo.slice(4);
+    return estadoHabilitacion(p, clave) || "sin habilitacion";
+  }
+  if (campo === "fecha_nacimiento") {
+    return formatoFechaDDMMYYYY(p.fecha_nacimiento);
+  }
+  return p[campo];
 }
 
 function aplicarFiltrosPersonal() {
@@ -720,7 +827,7 @@ function aplicarFiltrosPersonal() {
   }
   const filtrados = personalData.filter((p) =>
     activos.every(([campo, valor]) =>
-      String(p[campo] || "").toLowerCase().includes(valor.toLowerCase())
+      String(valorFiltroPersonal(p, campo) || "").toLowerCase().includes(valor.toLowerCase())
     )
   );
   renderFilasPersonal(filtrados);
@@ -765,11 +872,8 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     legajo: document.getElementById("legajo").value,
     nombre: document.getElementById("nombre").value,
     cuil: document.getElementById("cuil").value,
-    habilitacion_pirquitas: document.getElementById("habilitacion_pirquitas").value,
-    habilitacion_exar: document.getElementById("habilitacion_exar").value,
-    habilitacion_sdj: document.getElementById("habilitacion_sdj").value,
-    habilitacion_rincon: document.getElementById("habilitacion_rincon").value,
-    habilitacion_arli: document.getElementById("habilitacion_arli").value
+    fecha_nacimiento: document.getElementById("fecha_nacimiento").value,
+    activo: document.getElementById("activo").value
   };
 
   const res = await fetch("/personal", {
@@ -794,12 +898,14 @@ document.getElementById("form").addEventListener("submit", async function(e) {
   cargarPersonal();
 });
 
-cargarPersonal().catch(err => {
-  const mensaje = document.getElementById("mensaje");
-  mensaje.style.color = "#fca5a5";
-  mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté activo.";
-  console.error(err);
-});
+cargarProyectosHabilitacion()
+  .then(cargarPersonal)
+  .catch(err => {
+    const mensaje = document.getElementById("mensaje");
+    mensaje.style.color = "#fca5a5";
+    mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté activo.";
+    console.error(err);
+  });
 </script>
 
 </div>

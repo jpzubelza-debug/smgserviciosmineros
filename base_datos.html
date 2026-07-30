@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Base de Datos | Dashboard Operaciones</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#0f172a; --panel:#13213c; --panel2:#0b1328; --line:#30476f; --text:#e8f0fc; --muted:#9fb3d1; --accent:#38bdf8; --head:#1e3a5f; }
+    * { box-sizing:border-box; } body { margin:0; min-height:100vh; font-family:Outfit,Arial,sans-serif; color:var(--text); background:radial-gradient(circle at 12% 0,#173c70,transparent 30%),var(--bg); }
+    .page { max-width:1680px; margin:auto; padding:22px; } .head { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:16px; } h1 { margin:0; font-size:1.65rem; } .subtitle { margin:5px 0 0; color:var(--muted); }
+    .back { color:#d8f3ff; text-decoration:none; border:1px solid var(--line); padding:9px 13px; border-radius:9px; background:var(--panel); white-space:nowrap; } .back:hover { border-color:var(--accent); }
+    .book { border:1px solid var(--line); border-radius:13px; background:rgba(19,33,60,.94); overflow:hidden; } .tools { padding:12px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    .tools input { width:min(360px,100%); background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 11px; font:inherit; } .status { margin-left:auto; color:var(--muted); font-size:.88rem; }
+    .sheet-tabs { display:flex; gap:6px; padding:10px 10px 0; overflow-x:auto; border-bottom:1px solid var(--line); } .sheet { border:1px solid var(--line); border-bottom:0; background:#172b4b; color:#c9ddfa; border-radius:8px 8px 0 0; padding:8px 11px; cursor:pointer; font:inherit; white-space:nowrap; } .sheet.active { background:#216a9f; color:white; border-color:#55c7fb; } .sheet small { opacity:.8; margin-left:5px; }
+    .grid-wrap { overflow:auto; max-height:calc(100vh - 230px); background:#fff; } table { border-collapse:collapse; min-width:100%; width:max-content; color:#15233a; font-family:Arial,sans-serif; font-size:.84rem; } th,td { border:1px solid #c9d3df; padding:7px 9px; text-align:left; max-width:360px; white-space:pre-wrap; word-break:break-word; vertical-align:top; } thead th { position:sticky; top:0; z-index:2; background:var(--head); color:#fff; font-weight:600; } th.row-num, td.row-num { position:sticky; left:0; z-index:1; min-width:48px; width:48px; text-align:center; background:#e8eef5; color:#506176; } thead th.row-num { z-index:3; background:#1b304e; color:white; } tbody tr:nth-child(even) td:not(.row-num) { background:#f4f8fc; } tbody tr:hover td:not(.row-num) { background:#e2f3ff; } .empty,.error { padding:35px; text-align:center; color:var(--muted); background:var(--panel2); } .error { color:#fecaca; }
+    @media(max-width:650px) { .page { padding:14px; } .head { align-items:flex-start; } h1 { font-size:1.35rem; } .status { width:100%; margin-left:0; } .grid-wrap { max-height:calc(100vh - 280px); } }
+  </style>
+</head>
+<body>
+  <main class="page"><header class="head"><div><h1>Base de Datos</h1><p class="subtitle">Vista de consulta en hojas, filas y columnas.</p></div><a class="back" href="/">← Menú principal</a></header>
+  <section class="book"><div class="tools"><input id="filter" type="search" placeholder="Filtrar filas de la hoja actual…" /><span class="status" id="status">Cargando tablas…</span></div><nav class="sheet-tabs" id="tabs" aria-label="Hojas de datos"></nav><div class="grid-wrap" id="grid"><div class="empty">Cargando datos…</div></div></section></main>
+  <script>
+    const tabs = document.getElementById('tabs'), grid = document.getElementById('grid'), status = document.getElementById('status'), filter = document.getElementById('filter');
+    let tablas = [], hoja = null, datos = null;
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    function renderGrid() { if (!datos) return; const term = filter.value.trim().toLowerCase(); const rows = datos.filas.filter(row => !term || datos.columnas.some(c => String(row[c] ?? '').toLowerCase().includes(term)));
+      status.textContent = `${datos.tabla}: ${rows.length}${term ? ` de ${datos.total}` : ''} registros · ${datos.columnas.length} columnas`;
+      if (!rows.length) { grid.innerHTML = '<div class="empty">No hay registros que coincidan con el filtro.</div>'; return; }
+      grid.innerHTML = `<table><thead><tr><th class="row-num">#</th>${datos.columnas.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row,i) => `<tr><td class="row-num">${i + 1}</td>${datos.columnas.map(c => `<td>${esc(typeof row[c] === 'object' ? JSON.stringify(row[c]) : row[c])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    }
+    async function abrirTabla(nombre) { hoja = nombre; datos = null; filter.value = ''; [...tabs.children].forEach(b => b.classList.toggle('active', b.dataset.tabla === nombre)); grid.innerHTML = '<div class="empty">Cargando hoja…</div>'; status.textContent = `Cargando ${nombre}…`;
+      try { const r = await fetch(`/base_datos/tabla/${encodeURIComponent(nombre)}`, {credentials:'same-origin'}); if (!r.ok) throw new Error(); datos = await r.json(); renderGrid(); } catch { grid.innerHTML = '<div class="error">No se pudo cargar esta tabla.</div>'; status.textContent = 'Error de carga'; }
+    }
+    async function iniciar() { try { const r = await fetch('/base_datos/tablas', {credentials:'same-origin'}); if (!r.ok) throw new Error(); tablas = await r.json(); tabs.innerHTML = tablas.map((t,i) => `<button class="sheet${i===0?' active':''}" data-tabla="${esc(t.nombre)}">${esc(t.nombre)}<small>${t.registros}</small></button>`).join(''); tabs.addEventListener('click', e => { const b=e.target.closest('[data-tabla]'); if(b) abrirTabla(b.dataset.tabla); }); if(tablas.length) abrirTabla(tablas[0].nombre); else { grid.innerHTML='<div class="empty">No hay tablas disponibles.</div>'; status.textContent='0 tablas'; } } catch { grid.innerHTML='<div class="error">No se pudieron cargar las tablas. Verifique su sesión.</div>'; status.textContent='Sin acceso'; } }
+    filter.addEventListener('input', renderGrid); iniciar();
+  </script>
+</body>
+</html>
