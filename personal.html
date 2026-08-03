@@ -425,7 +425,13 @@
         <th>Empleado<input class="col-filter" data-campo="nombre" placeholder="Filtrar..."></th>
         <th>CUIL<input class="col-filter" data-campo="cuil" placeholder="Filtrar..."></th>
         <th>Fecha de nacimiento<input class="col-filter" data-campo="fecha_nacimiento" placeholder="Filtrar..."></th>
-        <th>Estado<input class="col-filter" data-campo="activo" placeholder="Filtrar..."></th>
+        <th>Estado
+          <select class="col-filter" data-campo="activo">
+            <option value="">Todos</option>
+            <option value="ACTIVO">ACTIVO</option>
+            <option value="INACTIVO">INACTIVO</option>
+          </select>
+        </th>
       </tr>
     </thead>
     <tbody id="personal-body"></tbody>
@@ -711,14 +717,20 @@ async function cargarProyectosHabilitacion() {
     headRow.appendChild(th);
   });
 
-  document.querySelectorAll("#lista-personal thead .col-filter").forEach((input) => {
-    const campo = input.dataset.campo;
+  configurarFiltrosPersonal();
+}
+
+function configurarFiltrosPersonal() {
+  document.querySelectorAll("#lista-personal thead .col-filter").forEach((control) => {
+    const campo = control.dataset.campo;
     if (!campo || campo in filtrosPersonal) return;
     filtrosPersonal[campo] = "";
-    input.addEventListener("input", () => {
-      filtrosPersonal[campo] = input.value.trim();
+    const manejarCambio = () => {
+      filtrosPersonal[campo] = (control.value || "").trim();
       aplicarFiltrosPersonal();
-    });
+    };
+    control.addEventListener("input", manejarCambio);
+    control.addEventListener("change", manejarCambio);
   });
 }
 
@@ -834,6 +846,9 @@ function valorFiltroPersonal(p, campo) {
   if (campo === "fecha_nacimiento") {
     return formatoFechaDDMMYYYY(p.fecha_nacimiento);
   }
+  if (campo === "activo") {
+    return (p.activo || "ACTIVO").toUpperCase();
+  }
   return p[campo];
 }
 
@@ -848,9 +863,14 @@ function aplicarFiltrosPersonal() {
     return;
   }
   const filtrados = base.filter((p) =>
-    activos.every(([campo, valor]) =>
-      String(valorFiltroPersonal(p, campo) || "").toLowerCase().includes(valor.toLowerCase())
-    )
+    activos.every(([campo, valor]) => {
+      const valorPersonal = String(valorFiltroPersonal(p, campo) || "").toLowerCase();
+      const valorFiltro = String(valor || "").toLowerCase();
+      if (campo === "activo") {
+        return valorPersonal === valorFiltro;
+      }
+      return valorPersonal.includes(valorFiltro);
+    })
   );
   renderFilasPersonal(filtrados);
 }
@@ -860,18 +880,10 @@ document.getElementById("chk-ocultar-inactivos").addEventListener("change", (ev)
   aplicarFiltrosPersonal();
 });
 
-document.querySelectorAll("#lista-personal thead .col-filter").forEach((input) => {
-  const campo = input.dataset.campo;
-  if (!campo) return;
-  filtrosPersonal[campo] = "";
-  input.addEventListener("input", () => {
-    filtrosPersonal[campo] = input.value.trim();
-    aplicarFiltrosPersonal();
-  });
-});
+configurarFiltrosPersonal();
 
 document.getElementById("btn-limpiar-filtros-personal").addEventListener("click", () => {
-  document.querySelectorAll("#lista-personal thead .col-filter").forEach((input) => { input.value = ""; });
+  document.querySelectorAll("#lista-personal thead .col-filter").forEach((control) => { control.value = ""; });
   Object.keys(filtrosPersonal).forEach((campo) => { filtrosPersonal[campo] = ""; });
   aplicarFiltrosPersonal();
 });
