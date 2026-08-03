@@ -251,6 +251,8 @@
     .col-filter::placeholder { color: rgba(238, 244, 255, 0.5); }
     .filtros-bar {
       display: flex;
+      align-items: center;
+      gap: 14px;
       justify-content: flex-end;
       margin-top: 20px;
     }
@@ -259,6 +261,18 @@
       padding: 8px 14px;
       margin: 0;
       font-size: 13px;
+    }
+    .check-ocultar-inactivos {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #dbeafe;
+      cursor: pointer;
+    }
+    .check-ocultar-inactivos input {
+      width: auto;
+      margin: 0;
     }
     .chip-habilitacion {
       display: inline-block;
@@ -398,6 +412,9 @@
 <p class="message" id="mensaje"></p>
 
 <div class="filtros-bar">
+  <label class="check-ocultar-inactivos">
+    <input type="checkbox" id="chk-ocultar-inactivos"> Ocultar inactivos
+  </label>
   <button type="button" id="btn-limpiar-filtros-personal">Limpiar filtros</button>
 </div>
 <div class="tabla-personal-wrap">
@@ -785,6 +802,7 @@ document.getElementById("modal-habilitacion-quitar").addEventListener("click", a
 
 let personalData = [];
 let filtrosPersonal = {};
+let ocultarInactivos = false;
 
 function renderFilasPersonal(data) {
   const tbody = document.getElementById("personal-body");
@@ -821,17 +839,26 @@ function valorFiltroPersonal(p, campo) {
 
 function aplicarFiltrosPersonal() {
   const activos = Object.entries(filtrosPersonal).filter(([, valor]) => valor);
+  let base = personalData;
+  if (ocultarInactivos) {
+    base = base.filter((p) => (p.activo || "ACTIVO") !== "INACTIVO");
+  }
   if (!activos.length) {
-    renderFilasPersonal(personalData);
+    renderFilasPersonal(base);
     return;
   }
-  const filtrados = personalData.filter((p) =>
+  const filtrados = base.filter((p) =>
     activos.every(([campo, valor]) =>
       String(valorFiltroPersonal(p, campo) || "").toLowerCase().includes(valor.toLowerCase())
     )
   );
   renderFilasPersonal(filtrados);
 }
+
+document.getElementById("chk-ocultar-inactivos").addEventListener("change", (ev) => {
+  ocultarInactivos = ev.target.checked;
+  aplicarFiltrosPersonal();
+});
 
 document.querySelectorAll("#lista-personal thead .col-filter").forEach((input) => {
   const campo = input.dataset.campo;

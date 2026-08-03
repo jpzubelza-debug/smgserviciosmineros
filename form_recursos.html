@@ -477,7 +477,9 @@ function actualizarListasPersonal() {
   listaChoferes.innerHTML = "";
   listaAcompanantes.innerHTML = "";
 
-  personalData.forEach(p => {
+  personalData
+    .filter(p => (p.activo || "ACTIVO") !== "INACTIVO")
+    .forEach(p => {
     const option = document.createElement("option");
     option.value = p.nombre || "";
     listaChoferes.appendChild(option);

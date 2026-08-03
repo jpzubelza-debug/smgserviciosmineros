@@ -414,7 +414,8 @@ async function cargarPersonalYVehiculos() {
   const personal = await resPersonal.json();
   const vehiculos = await resVehiculos.json();
 
-  personalBase = Array.isArray(personal) ? personal : [];
+  personalBase = (Array.isArray(personal) ? personal : [])
+    .filter(p => (p?.activo || "ACTIVO") !== "INACTIVO");
 
   const selectChofer = document.getElementById("chofer");
   const selectVehiculo = document.getElementById("vehiculo");

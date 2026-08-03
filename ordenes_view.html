@@ -709,7 +709,10 @@ async function cargarNominaPersonal() {
     const res = await fetch("/personal");
     const data = await res.json();
     const nombres = Array.isArray(data)
-      ? data.map((p) => String(p?.nombre || "").trim()).filter((n) => n.length > 0)
+      ? data
+          .filter((p) => (p?.activo || "ACTIVO") !== "INACTIVO")
+          .map((p) => String(p?.nombre || "").trim())
+          .filter((n) => n.length > 0)
       : [];
     nominaPersonal = Array.from(new Set(nombres)).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
   } catch (error) {
