@@ -724,7 +724,7 @@
       </div>
       <div class="footer-actions" style="margin-top:16px;"><button class="btn-primary" type="submit">Guardar proveedor</button><button class="btn-secondary" type="button" id="btn-reset-proveedor">Limpiar</button></div>
     </form>
-    <div class="subpanel" style="margin-top:18px;"><h3>Listado</h3><div class="field"><label for="buscar-proveedor">Buscar proveedor</label><input id="buscar-proveedor" type="search" placeholder="Nombre, CUIT, localidad, domicilio o teléfono"></div><div class="footer-actions"><input id="archivo-proveedores-importar" type="file" accept=".db,.sqlite,.sqlite3"><button class="btn-secondary" id="btn-importar-proveedores" type="button">Importar proveedores sin borrar datos</button></div><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>ID</th><th>Nombre</th><th>CUIT</th><th>Localidad</th><th>Condición</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div></div>
+    <div class="subpanel" style="margin-top:18px;"><h3>Listado</h3><div class="field"><label for="buscar-proveedor">Buscar proveedor</label><input id="buscar-proveedor" type="search" placeholder="Nombre, CUIT, localidad, domicilio o teléfono"></div><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>ID</th><th>Nombre</th><th>CUIT</th><th>Localidad</th><th>Condición</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div></div>
   </dialog>
   <dialog class="oc-dialog" id="editar-orden-compra-dialog">
     <div class="footer-actions"><div><h3>Editar orden de compra</h3><p class="empty-message">La justificación es obligatoria y quedará registrada en el historial.</p></div><button class="btn-secondary" id="btn-cerrar-editar-orden" type="button">Cerrar</button></div>
@@ -793,8 +793,6 @@
       const proveedoresBody = document.getElementById('proveedores-body');
       const proveedorForm = document.getElementById('proveedor-form');
       const buscarProveedorInput = document.getElementById('buscar-proveedor');
-      const archivoProveedoresImportar = document.getElementById('archivo-proveedores-importar');
-      const btnImportarProveedores = document.getElementById('btn-importar-proveedores');
       const proveedorIdInput = document.getElementById('proveedor-id');
       const proveedorInputs = {
         nombre: document.getElementById('prov-nombre'), cuit: document.getElementById('prov-cuit'),
@@ -1493,20 +1491,6 @@
       document.getElementById('btn-cerrar-proveedores').addEventListener('click', () => proveedoresDialog.close());
       document.getElementById('btn-reset-proveedor').addEventListener('click', resetProveedorForm);
       buscarProveedorInput.addEventListener('input', renderizarProveedores);
-      btnImportarProveedores.addEventListener('click', async () => {
-        const archivo = archivoProveedoresImportar.files[0];
-        if (!archivo) { alert('Seleccione el archivo dashboard.db local.'); return; }
-        if (!confirm('Se agregarán únicamente proveedores faltantes. No se borrará ni reemplazará ningún dato de Render. ¿Continuar?')) return;
-        const formData = new FormData();
-        formData.append('archivo', archivo);
-        const response = await fetch('/compras/proveedores/importar', { method: 'POST', credentials: 'same-origin', body: formData });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) { alert(data.detail || 'No se pudo importar la base de proveedores.'); return; }
-        archivoProveedoresImportar.value = '';
-        await recargarProveedores();
-        alert(`Importación completada. Agregados: ${data.agregados}. Ya existentes: ${data.existentes}.`);
-      });
-
       proveedorForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const payload = Object.fromEntries(Object.entries(proveedorInputs).map(([key, input]) => [key, input.value.trim()]));

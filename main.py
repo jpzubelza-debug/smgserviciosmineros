@@ -15,7 +15,6 @@ import os
 import secrets
 import sqlite3
 import time
-import tempfile
 
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -3156,77 +3155,6 @@ def compras_eliminar_proveedor(proveedor_id: int, request: Request):
     return {"mensaje": "Proveedor eliminado"}
 
 
-@app.post("/compras/proveedores/importar")
-async def compras_importar_proveedores(request: Request, archivo: UploadFile = File(...)):
-    _requiere_administrador(request)
-    extension = os.path.splitext(archivo.filename or "")[1].lower()
-    if extension not in {".db", ".sqlite", ".sqlite3"}:
-        raise HTTPException(status_code=400, detail="Seleccione un archivo SQLite (.db, .sqlite o .sqlite3).")
-
-    contenido = await archivo.read()
-    if not contenido:
-        raise HTTPException(status_code=400, detail="El archivo SQLite está vacío.")
-
-    archivo_temporal = None
-    try:
-        archivo_temporal = tempfile.NamedTemporaryFile(suffix=extension, delete=False)
-        archivo_temporal.write(contenido)
-        archivo_temporal.close()
-        origen = sqlite3.connect(archivo_temporal.name)
-        origen.row_factory = sqlite3.Row
-        columnas = {row["name"] for row in origen.execute("PRAGMA table_info(proveedores)").fetchall()}
-        requeridas = {"NOM_PROVEE", "DOMICILIO", "TELÉFONO_1", "TELÉFONO_2", "DESC_COND", "COND_IVA", "CUIT", "C_POSTAL", "LOCALIDAD"}
-        if not requeridas.issubset(columnas):
-            raise HTTPException(status_code=400, detail="El archivo no contiene la tabla proveedores compatible.")
-        proveedores_origen = origen.execute(
-            '''
-            SELECT "NOM_PROVEE", "DOMICILIO", "TELÉFONO_1", "TELÉFONO_2",
-                   "DESC_COND", "COND_IVA", "CUIT", "C_POSTAL", "LOCALIDAD"
-            FROM proveedores
-            '''
-        ).fetchall()
-    except sqlite3.Error as exc:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo SQLite: {exc}")
-    finally:
-        if 'origen' in locals():
-            origen.close()
-        if archivo_temporal is not None:
-            try:
-                os.unlink(archivo_temporal.name)
-            except OSError:
-                pass
-
-    def normalizar(valor):
-        return " ".join(str(valor or "").strip().upper().split())
-
-    agregados = 0
-    existentes = 0
-    with get_sqlite_connection() as conn:
-        filas_actuales = conn.execute('SELECT id, "NOM_PROVEE", "CUIT" FROM proveedores').fetchall()
-        por_cuit = {normalizar(fila["CUIT"]): fila for fila in filas_actuales if normalizar(fila["CUIT"])}
-        por_nombre = {normalizar(fila["NOM_PROVEE"]): fila for fila in filas_actuales if normalizar(fila["NOM_PROVEE"])}
-        for proveedor in proveedores_origen:
-            cuit = normalizar(proveedor["CUIT"])
-            nombre = normalizar(proveedor["NOM_PROVEE"])
-            if (cuit and cuit in por_cuit) or (nombre and nombre in por_nombre):
-                existentes += 1
-                continue
-            conn.execute(
-                '''
-                INSERT INTO proveedores (
-                    "NOM_PROVEE", "DOMICILIO", "TELÉFONO_1", "TELÉFONO_2",
-                    "DESC_COND", "COND_IVA", "CUIT", "C_POSTAL", "LOCALIDAD"
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                tuple(proveedor[columna] for columna in ["NOM_PROVEE", "DOMICILIO", "TELÉFONO_1", "TELÉFONO_2", "DESC_COND", "COND_IVA", "CUIT", "C_POSTAL", "LOCALIDAD"]),
-            )
-            agregados += 1
-            if cuit:
-                por_cuit[cuit] = proveedor
-            if nombre:
-                por_nombre[nombre] = proveedor
-        conn.commit()
-    return {"mensaje": "Importación completada", "agregados": agregados, "existentes": existentes, "total_origen": len(proveedores_origen)}
 
 
 def _ensure_orden_compra_solicitudes(conn):
