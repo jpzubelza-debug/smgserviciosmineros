@@ -3,7 +3,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Query, Request, HTTPExcepti
 from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -34,6 +34,7 @@ ADMINISTRACION_PATH = os.path.join(BASE_DIR, "administracion.html")
 FORM_VIAJE_PATH = os.path.join(BASE_DIR, "form_viaje.html")
 FORM_RECURSOS_PATH = os.path.join(BASE_DIR, "form_recursos.html")
 PERSONAL_FORM_PATH = os.path.join(BASE_DIR, "personal.html")
+COMPRAS_PATH = os.path.join(BASE_DIR, "compras.html")
 PRINT_VIAJE_PATH = os.path.join(BASE_DIR, "print_viaje.html")
 PRINT_ORDEN_SALIDA_PATH = os.path.join(BASE_DIR, "print_orden_salida.html")
 ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
@@ -2516,6 +2517,1537 @@ def dashboard(request: Request):
     return _leer_html(DASHBOARD_PATH)
 
 
+@app.get("/compras", response_class=HTMLResponse)
+def compras_view(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    return _leer_html(COMPRAS_PATH)
+
+
+@app.get("/compras/metadata")
+def compras_metadata(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        _ensure_prioridades_y_estados_compras(conn)
+        ultimo_registro = conn.execute(
+            "SELECT numero_solicitud FROM solicitud_compra ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if ultimo_registro and ultimo_registro["numero_solicitud"]:
+            ultimo_numero_texto = ultimo_registro["numero_solicitud"]
+            ultimo_numero_digitos = ''.join(ch for ch in ultimo_numero_texto if ch.isdigit())
+            try:
+                ultimo_id = int(ultimo_numero_digitos)
+            except ValueError:
+                ultimo_id = 0
+        else:
+            ultimo_id = 0
+
+        personal = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT legajo, nombre FROM personal WHERE UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO' ORDER BY nombre"
+            ).fetchall()
+        ]
+
+        proyectos = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, nombre FROM proyectos WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+            ).fetchall()
+        ]
+
+        centros_costos = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+            ).fetchall()
+        ]
+
+        vehiculos = [
+            {
+                "codigo": r["codigo"],
+                "nombre_equipo": ((r["marca"] or "").strip() + " " + (r["modelo"] or "").strip()).strip(),
+            }
+            for r in conn.execute(
+                "SELECT codigo, marca, modelo FROM vehiculos ORDER BY codigo"
+            ).fetchall()
+        ]
+
+        productos = [
+            {
+                "codigo": r["codigo"],
+                "descripcion": r["descripcion"],
+            }
+            for r in conn.execute(
+                "SELECT codigo, descripcion FROM productos ORDER BY codigo"
+            ).fetchall()
+        ]
+
+        unidades_medida = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, nombre FROM unidades_medida WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+            ).fetchall()
+        ]
+
+        prioridades = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, nombre FROM prioridades_compra WHERE COALESCE(activo, 1) = 1 ORDER BY CASE nombre WHEN 'Baja' THEN 1 WHEN 'Media' THEN 2 WHEN 'Alta' THEN 3 WHEN 'Urgente' THEN 4 ELSE 5 END"
+            ).fetchall()
+        ]
+
+        estados = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, nombre FROM estados_compra WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+            ).fetchall()
+        ]
+
+        if not prioridades:
+            default_prioridades = [
+                ("Baja", 1),
+                ("Media", 1),
+                ("Alta", 1),
+                ("Urgente", 1),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO prioridades_compra (nombre, activo) VALUES (?, ?)",
+                default_prioridades,
+            )
+            conn.commit()
+            prioridades = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT id, nombre FROM prioridades_compra WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+                ).fetchall()
+            ]
+
+        if not estados:
+            default_estados = [
+                ("Borrador", 1),
+                ("En revisión", 1),
+                ("Aprobada", 1),
+                ("Rechazada", 1),
+                ("Comprada", 1),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO estados_compra (nombre, activo) VALUES (?, ?)",
+                default_estados,
+            )
+            conn.commit()
+            estados = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT id, nombre FROM estados_compra WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+                ).fetchall()
+            ]
+
+    numero_solicitud = f"SC-{ultimo_id + 1:05d}"
+    return {
+        "numero_solicitud": numero_solicitud,
+        "personal": personal,
+        "proyectos": proyectos,
+        "centros_costos": centros_costos,
+        "vehiculos": vehiculos,
+        "productos": productos,
+        "unidades_medida": unidades_medida,
+        "prioridades": prioridades,
+        "estados": estados,
+    }
+
+
+@app.get("/compras/solicitudes")
+def compras_listar_solicitudes(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            """
+            SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(pr.nombre, '') AS destino_compra,
+                   COALESCE(pc.nombre, '') AS prioridad,
+                   COALESCE(ec.nombre, '') AS estado
+            FROM solicitud_compra sc
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            ORDER BY sc.id DESC
+            """
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+@app.get("/compras/dashboard")
+def compras_dashboard(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_solicitudes(conn)
+        solicitudes = conn.execute("SELECT COUNT(*) AS total FROM solicitud_compra").fetchone()["total"]
+        ordenes = conn.execute("SELECT COUNT(*) AS total FROM OrdenCompra").fetchone()["total"]
+        ordenes_anuladas = conn.execute("SELECT COUNT(*) AS total FROM OrdenCompra WHERE UPPER(COALESCE(estado, '')) = 'ANULADA'").fetchone()["total"]
+        proveedores = conn.execute("SELECT COUNT(*) AS total FROM proveedores").fetchone()["total"]
+        items_pendientes = conn.execute(
+            "SELECT COUNT(*) AS total FROM solicitud_compra_detalle WHERE UPPER(COALESCE(estado_aprobacion, 'PENDIENTE')) IN ('PENDIENTE', 'APROBADA')"
+        ).fetchone()["total"]
+        total_neto = conn.execute(
+            "SELECT COALESCE(SUM(ocd.subtotal), 0) AS total FROM OrdenCompra oc INNER JOIN OrdenCompraDetalle ocd ON ocd.orden_compra_id = oc.id WHERE UPPER(COALESCE(oc.estado, '')) <> 'ANULADA'"
+        ).fetchone()["total"]
+        solicitudes_aprobadas = conn.execute(
+            "SELECT COUNT(*) AS total FROM solicitud_compra_detalle WHERE UPPER(COALESCE(estado_aprobacion, '')) = 'APROBADA'"
+        ).fetchone()["total"]
+        estados_solicitudes = conn.execute(
+            '''
+            SELECT COALESCE(ec.nombre, 'Sin estado') AS estado, COUNT(*) AS total
+            FROM solicitud_compra sc
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            GROUP BY COALESCE(ec.nombre, 'Sin estado')
+            ORDER BY total DESC, estado
+            '''
+        ).fetchall()
+        estados_items = conn.execute(
+            '''
+            SELECT CASE
+                WHEN vinculo.id IS NOT NULL THEN 'Gestionado'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
+                ELSE 'Pendiente'
+            END AS estado, COUNT(*) AS total
+            FROM solicitud_compra_detalle d
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            GROUP BY estado
+            ORDER BY total DESC, estado
+            '''
+        ).fetchall()
+        solicitudes_plazo = conn.execute(
+            '''
+                 SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
+                     COALESCE(pc.nombre, 'Sin prioridad') AS prioridad,
+                     d.id AS detalle_id, d.descripcion_articulo, d.estado_aprobacion,
+                     vinculo.id AS vinculo_id
+            FROM solicitud_compra sc
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN solicitud_compra_detalle d ON d.id_solicitud = sc.id
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            ORDER BY sc.id
+            '''
+        ).fetchall()
+
+    prioridad_config = {
+        "BAJA": ("Baja", 30),
+        "MEDIA": ("Media", 21),
+        "ALTA": ("Alta", 14),
+        "URGENTE": ("Urgente", 7),
+        "URGENTES": ("Urgente", 7),
+    }
+    prioridad_resumen = {}
+    solicitudes_agrupadas = {}
+    for fila in solicitudes_plazo:
+        solicitud_id = fila["id"]
+        nombre_original = str(fila["prioridad"] or "Sin prioridad").strip()
+        clave = nombre_original.upper()
+        nombre, dias = prioridad_config.get(clave, (nombre_original, None))
+        solicitud = solicitudes_agrupadas.setdefault(
+            solicitud_id,
+            {"prioridad": nombre, "dias": dias, "fecha": fila["fecha_solicitud"], "numero": fila["numero_solicitud"], "pendiente": False, "productos": []},
+        )
+        if fila["detalle_id"] is not None and fila["vinculo_id"] is None and str(fila["estado_aprobacion"] or "Pendiente").upper() != "RECHAZADA":
+            solicitud["pendiente"] = True
+            descripcion = str(fila["descripcion_articulo"] or "").strip()
+            if descripcion and descripcion not in solicitud["productos"]:
+                solicitud["productos"].append(descripcion)
+
+    hoy = datetime.now().date()
+    for solicitud in solicitudes_agrupadas.values():
+        clave = solicitud["prioridad"]
+        resumen = prioridad_resumen.setdefault(clave, {"prioridad": clave, "dias": solicitud["dias"], "total": 0, "fuera_plazo": 0})
+        resumen["total"] += 1
+        if solicitud["pendiente"] and solicitud["dias"] is not None:
+            try:
+                fecha_solicitud = datetime.strptime(str(solicitud["fecha"] or "")[:10], "%Y-%m-%d").date()
+                if hoy > fecha_solicitud + timedelta(days=solicitud["dias"]):
+                    resumen["fuera_plazo"] += 1
+                    resumen.setdefault("solicitudes", []).append({
+                        "numero_solicitud": solicitud["numero"],
+                        "productos": solicitud["productos"],
+                    })
+            except ValueError:
+                pass
+    prioridades_ordenadas = ["Urgente", "Alta", "Media", "Baja"]
+    plazos_prioridad = {"Urgente": 7, "Alta": 14, "Media": 21, "Baja": 30}
+    for prioridad in prioridades_ordenadas:
+        prioridad_resumen.setdefault(
+            prioridad,
+            {"prioridad": prioridad, "dias": plazos_prioridad[prioridad], "total": 0, "fuera_plazo": 0, "solicitudes": []},
+        )
+    prioridades_dashboard = [prioridad_resumen[key] for key in prioridades_ordenadas]
+    solicitudes_fuera_plazo = sum(item["fuera_plazo"] for item in prioridades_dashboard)
+
+    return {
+        "solicitudes": solicitudes,
+        "ordenes": ordenes,
+        "ordenes_anuladas": ordenes_anuladas,
+        "proveedores": proveedores,
+        "items_pendientes": items_pendientes,
+        "solicitudes_aprobadas": solicitudes_aprobadas,
+        "total_neto": total_neto,
+        "estados_solicitudes": [dict(item) for item in estados_solicitudes],
+        "estados_items": [dict(item) for item in estados_items],
+        "prioridades": prioridades_dashboard,
+        "solicitudes_fuera_plazo": solicitudes_fuera_plazo,
+    }
+
+
+@app.get("/compras/proveedores")
+def compras_listar_proveedores(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            '''
+            SELECT id, "NOM_PROVEE" AS nombre, "DOMICILIO" AS domicilio,
+                   "TELÉFONO_1" AS telefono_1, "TELÉFONO_2" AS telefono_2,
+                   "DESC_COND" AS condicion_pago, "COND_IVA" AS condicion_iva,
+                   "CUIT" AS cuit, "C_POSTAL" AS codigo_postal, "LOCALIDAD" AS localidad
+            FROM proveedores
+            ORDER BY "NOM_PROVEE"
+            '''
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+def _ensure_orden_compra_historial(conn):
+    conn.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS OrdenCompraHistorial (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_compra_id INTEGER NOT NULL,
+            accion TEXT NOT NULL,
+            detalle TEXT NOT NULL,
+            usuario TEXT NOT NULL,
+            usuario_nombre TEXT NOT NULL,
+            fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (orden_compra_id) REFERENCES OrdenCompra (id) ON DELETE CASCADE
+        )
+        '''
+    )
+
+
+def _registrar_orden_compra_historial(conn, orden_compra_id, accion, detalle, perfil):
+    usuario = str(perfil.get("usuario") or "").strip()
+    nombre_usuario = str(perfil.get("nombre_apellido") or "").strip() or usuario
+    conn.execute(
+        '''
+        INSERT INTO OrdenCompraHistorial (orden_compra_id, accion, detalle, usuario, usuario_nombre)
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        (
+            orden_compra_id,
+            accion,
+            detalle,
+            usuario,
+            nombre_usuario,
+        ),
+    )
+
+
+@app.get("/compras/ordenes-compra")
+def compras_listar_ordenes_compra(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_historial(conn)
+        filas = conn.execute(
+            '''
+            SELECT oc.id, oc.numero_oc, oc.fecha, oc.estado,
+                   COALESCE(p."NOM_PROVEE", '') AS proveedor,
+                   COALESCE(SUM(ocd.subtotal), 0) AS total_neto,
+                   COUNT(ocd.id) AS cantidad_items
+            FROM OrdenCompra oc
+            LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+            LEFT JOIN OrdenCompraDetalle ocd ON ocd.orden_compra_id = oc.id
+            GROUP BY oc.id, oc.numero_oc, oc.fecha, oc.estado, p."NOM_PROVEE"
+            ORDER BY oc.id DESC
+            ''',
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+@app.get("/compras/ordenes-compra/{orden_compra_id}")
+def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_historial(conn)
+        cabecera = conn.execute(
+            '''
+            SELECT oc.id, oc.numero_oc, oc.fecha, oc.proveedor_id, oc.cotizacion, oc.moneda,
+                   oc.tipo_cambio, oc.forma_pago, oc.lugar_entrega, oc.transporte,
+                   oc.validez_oferta, oc.observaciones, oc.solicitante, oc.aprobador,
+                   oc.estado, oc.fecha_creacion,
+                   COALESCE(p."NOM_PROVEE", '') AS proveedor,
+                   COALESCE(p."DOMICILIO", '') AS domicilio,
+                   COALESCE(p."TELÉFONO_1", '') AS telefono_1,
+                   COALESCE(p."TELÉFONO_2", '') AS telefono_2,
+                   COALESCE(p."COND_IVA", '') AS condicion_iva,
+                   COALESCE(p."CUIT", '') AS cuit,
+                   COALESCE(p."C_POSTAL", '') AS codigo_postal,
+                   COALESCE(p."LOCALIDAD", '') AS localidad
+            FROM OrdenCompra oc
+            LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+            WHERE oc.id = ?
+            ''',
+            (orden_compra_id,),
+        ).fetchone()
+        if cabecera is None:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada.")
+
+        detalles = conn.execute(
+            '''
+                        SELECT ocd.id, ocd.codigo_proveedor, ocd.descripcion, ocd.cantidad,
+                                     ocd.centro_costo_id,
+                   ocd.precio_unitario, ocd.subtotal,
+                   COALESCE(cc.nombre, '') AS centro_costo,
+                   COALESCE(GROUP_CONCAT(sc.numero_solicitud, ', '), '') AS solicitudes
+            FROM OrdenCompraDetalle ocd
+            LEFT JOIN centros_costos cc ON cc.id = ocd.centro_costo_id
+            LEFT JOIN OrdenCompraDetalleSolicitud ocds ON ocds.orden_compra_detalle_id = ocd.id
+            LEFT JOIN solicitud_compra_detalle scd ON scd.id = ocds.solicitud_compra_detalle_id
+            LEFT JOIN solicitud_compra sc ON sc.id = scd.id_solicitud
+            WHERE ocd.orden_compra_id = ?
+            GROUP BY ocd.id, ocd.codigo_proveedor, ocd.descripcion, ocd.cantidad,
+                     ocd.centro_costo_id, ocd.precio_unitario, ocd.subtotal, cc.nombre
+            ORDER BY ocd.id
+            ''',
+            (orden_compra_id,),
+        ).fetchall()
+        historial = conn.execute(
+            '''
+            SELECT id, accion, detalle, usuario, usuario_nombre, fecha
+            FROM OrdenCompraHistorial
+            WHERE orden_compra_id = ?
+            ORDER BY id DESC
+            ''',
+            (orden_compra_id,),
+        ).fetchall()
+
+    orden = dict(cabecera)
+    orden["detalles"] = [dict(detalle) for detalle in detalles]
+    orden["historial"] = [dict(item) for item in historial]
+    return orden
+
+
+@app.get("/compras/ordenes-compra/{orden_compra_id}/pdf")
+def compras_descargar_orden_compra_pdf(orden_compra_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    orden = compras_obtener_orden_compra(orden_compra_id, request)
+    pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{orden['numero_oc']}.pdf")
+    proveedor = {
+        "nombre": orden["proveedor"], "cuit": orden["cuit"], "domicilio": orden["domicilio"],
+        "condicion_iva": orden["condicion_iva"], "codigo_postal": orden["codigo_postal"],
+        "localidad": orden["localidad"], "telefono_1": orden["telefono_1"],
+    }
+    generar_pdf_orden_compra(pdf_path, orden, proveedor, orden["detalles"], [])
+    return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
+
+
+@app.post("/compras/ordenes-compra/{orden_compra_id}/anular")
+async def compras_anular_orden_compra(orden_compra_id: int, request: Request):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        return RedirectResponse("/login", status_code=302)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    motivo = str(payload.get("motivo") or "").strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="Debe indicar el motivo de la anulación.")
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_historial(conn)
+        orden = conn.execute("SELECT estado FROM OrdenCompra WHERE id = ?", (orden_compra_id,)).fetchone()
+        if orden is None:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada.")
+        if str(orden["estado"] or "").strip().upper() == "ANULADA":
+            raise HTTPException(status_code=400, detail="La orden de compra ya está anulada.")
+        conn.execute("UPDATE OrdenCompra SET estado = 'Anulada' WHERE id = ?", (orden_compra_id,))
+        _registrar_orden_compra_historial(conn, orden_compra_id, "Anulada", motivo, perfil)
+        conn.commit()
+    return {"mensaje": "Orden de compra anulada"}
+
+
+@app.put("/compras/ordenes-compra/{orden_compra_id}/editar")
+async def compras_editar_orden_compra(orden_compra_id: int, request: Request):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        return RedirectResponse("/login", status_code=302)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    motivo = str(payload.get("motivo") or "").strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="Debe indicar el motivo de la edición.")
+    detalles = payload.get("detalles")
+    if not isinstance(detalles, list) or not detalles:
+        raise HTTPException(status_code=400, detail="La orden debe conservar al menos un artículo.")
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_historial(conn)
+        orden = conn.execute("SELECT * FROM OrdenCompra WHERE id = ?", (orden_compra_id,)).fetchone()
+        if orden is None:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada.")
+        if str(orden["estado"] or "").strip().upper() == "ANULADA":
+            raise HTTPException(status_code=400, detail="No se puede editar una orden anulada.")
+        proveedor_id = payload.get("proveedor_id") or orden["proveedor_id"]
+        if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
+            raise HTTPException(status_code=400, detail="El proveedor seleccionado no existe.")
+
+        originales = conn.execute(
+            "SELECT id, codigo_proveedor, descripcion, cantidad, precio_unitario, centro_costo_id FROM OrdenCompraDetalle WHERE orden_compra_id = ? ORDER BY id",
+            (orden_compra_id,),
+        ).fetchall()
+        if len(originales) != len(detalles) or {int(item.get("id") or 0) for item in detalles} != {int(item["id"]) for item in originales}:
+            raise HTTPException(status_code=400, detail="No se pueden agregar ni quitar artículos al editar la orden.")
+
+        anterior = {
+            "proveedor_id": orden["proveedor_id"], "cotizacion": orden["cotizacion"], "moneda": orden["moneda"],
+            "tipo_cambio": orden["tipo_cambio"], "forma_pago": orden["forma_pago"], "lugar_entrega": orden["lugar_entrega"],
+            "transporte": orden["transporte"], "validez_oferta": orden["validez_oferta"], "observaciones": orden["observaciones"],
+            "solicitante": orden["solicitante"], "aprobador": orden["aprobador"],
+            "detalles": [dict(item) for item in originales],
+        }
+        conn.execute(
+            '''
+            UPDATE OrdenCompra SET proveedor_id = ?, cotizacion = ?, moneda = ?, tipo_cambio = ?,
+                forma_pago = ?, lugar_entrega = ?, transporte = ?, validez_oferta = ?, observaciones = ?,
+                solicitante = ?, aprobador = ?
+            WHERE id = ?
+            ''',
+            (
+                proveedor_id, str(payload.get("cotizacion") or ""), str(payload.get("moneda") or ""),
+                payload.get("tipo_cambio") or None, str(payload.get("forma_pago") or ""),
+                str(payload.get("lugar_entrega") or ""), str(payload.get("transporte") or ""),
+                str(payload.get("validez_oferta") or ""), str(payload.get("observaciones") or ""),
+                str(payload.get("solicitante") or ""), str(payload.get("aprobador") or ""), orden_compra_id,
+            ),
+        )
+        for item in detalles:
+            try:
+                cantidad = float(item.get("cantidad") or 0)
+                precio = float(item.get("precio_unitario") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Cantidad y precio unitario deben ser numéricos.")
+            conn.execute(
+                '''
+                UPDATE OrdenCompraDetalle
+                SET codigo_proveedor = ?, descripcion = ?, cantidad = ?, precio_unitario = ?, subtotal = ?, centro_costo_id = ?
+                WHERE id = ? AND orden_compra_id = ?
+                ''',
+                (
+                    str(item.get("codigo_proveedor") or ""), str(item.get("descripcion") or ""), cantidad,
+                    precio, cantidad * precio, item.get("centro_costo_id") or None, item["id"], orden_compra_id,
+                ),
+            )
+        actualizado = dict(payload)
+        actualizado.pop("motivo", None)
+        _registrar_orden_compra_historial(
+            conn, orden_compra_id, "Editada",
+            json.dumps({"motivo": motivo, "anterior": anterior, "actualizado": actualizado}, ensure_ascii=False, default=str),
+            perfil,
+        )
+        conn.commit()
+    return {"mensaje": "Orden de compra actualizada"}
+
+
+def _proveedor_values(payload):
+    nombre = str(payload.get("nombre") or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre del proveedor es obligatorio.")
+    return (
+        nombre,
+        str(payload.get("domicilio") or "").strip(),
+        str(payload.get("telefono_1") or "").strip(),
+        str(payload.get("telefono_2") or "").strip(),
+        str(payload.get("condicion_pago") or "").strip(),
+        str(payload.get("condicion_iva") or "").strip(),
+        str(payload.get("cuit") or "").strip(),
+        str(payload.get("codigo_postal") or "").strip(),
+        str(payload.get("localidad") or "").strip(),
+    )
+
+
+@app.post("/compras/proveedores")
+async def compras_crear_proveedor(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    values = _proveedor_values(await request.json())
+    with get_sqlite_connection() as conn:
+        conn.execute(
+            '''
+            INSERT INTO proveedores (
+                "NOM_PROVEE", "DOMICILIO", "TELÉFONO_1", "TELÉFONO_2",
+                "DESC_COND", "COND_IVA", "CUIT", "C_POSTAL", "LOCALIDAD"
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            values,
+        )
+        conn.commit()
+    return {"mensaje": "Proveedor creado"}
+
+
+@app.put("/compras/proveedores/{proveedor_id}")
+async def compras_actualizar_proveedor(proveedor_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    values = _proveedor_values(await request.json())
+    with get_sqlite_connection() as conn:
+        if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+        conn.execute(
+            '''
+            UPDATE proveedores SET
+                "NOM_PROVEE" = ?, "DOMICILIO" = ?, "TELÉFONO_1" = ?, "TELÉFONO_2" = ?,
+                "DESC_COND" = ?, "COND_IVA" = ?, "CUIT" = ?, "C_POSTAL" = ?, "LOCALIDAD" = ?
+            WHERE id = ?
+            ''',
+            (*values, proveedor_id),
+        )
+        conn.commit()
+    return {"mensaje": "Proveedor actualizado"}
+
+
+@app.delete("/compras/proveedores/{proveedor_id}")
+def compras_eliminar_proveedor(proveedor_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    with get_sqlite_connection() as conn:
+        if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+        conn.execute("DELETE FROM proveedores WHERE id = ?", (proveedor_id,))
+        conn.commit()
+    return {"mensaje": "Proveedor eliminado"}
+
+
+def _ensure_orden_compra_solicitudes(conn):
+    conn.executescript(
+        '''
+        CREATE TABLE IF NOT EXISTS OrdenCompraDetalleSolicitud (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_compra_detalle_id INTEGER NOT NULL,
+            solicitud_compra_detalle_id INTEGER NOT NULL UNIQUE,
+            fecha_vinculacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (orden_compra_detalle_id) REFERENCES OrdenCompraDetalle (id) ON DELETE CASCADE,
+            FOREIGN KEY (solicitud_compra_detalle_id) REFERENCES solicitud_compra_detalle (id) ON DELETE RESTRICT,
+            UNIQUE (orden_compra_detalle_id, solicitud_compra_detalle_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_oc_detalle_solicitud_oc_detalle
+            ON OrdenCompraDetalleSolicitud (orden_compra_detalle_id);
+        '''
+    )
+
+
+@app.get("/compras/solicitudes-items")
+def compras_listar_items_solicitud(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    with get_sqlite_connection() as conn:
+        _ensure_estado_detalle_compra(conn)
+        _ensure_orden_compra_solicitudes(conn)
+        filas = conn.execute(
+            '''
+            SELECT d.id, sc.numero_solicitud, d.descripcion_articulo, d.cantidad,
+                   COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   COALESCE(cc.nombre, '') AS centro_costo,
+                   COALESCE(d.estado_aprobacion, 'Pendiente') AS estado_aprobacion,
+                   CASE
+                       WHEN vinculacion.id IS NOT NULL THEN 'Gestionado'
+                       WHEN COALESCE(d.estado_aprobacion, 'Pendiente') = 'Aprobada' THEN 'Pendiente de gestionar'
+                       ELSE COALESCE(d.estado_aprobacion, 'Pendiente')
+                   END AS estado_gestion,
+                   vinculacion.orden_compra_detalle_id
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            LEFT JOIN centros_costos cc ON cc.id = d.id_centro_costo
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculacion
+                   ON vinculacion.solicitud_compra_detalle_id = d.id
+            WHERE COALESCE(d.estado_aprobacion, 'Pendiente') <> 'Rechazada'
+            ORDER BY sc.fecha_solicitud DESC, d.id DESC
+            '''
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+def generar_pdf_orden_compra(path_pdf, orden, proveedor, detalles, contactos):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+
+    page_width, page_height = A4
+    margin = 22
+    content_width = page_width - (margin * 2)
+    rows_per_page = 16
+    pages = [detalles[index:index + rows_per_page] for index in range(0, len(detalles), rows_per_page)] or [[]]
+    pdf = canvas.Canvas(path_pdf, pagesize=A4)
+    pdf.setTitle(f"Orden de Compra {orden['numero_oc']}")
+
+    def text(value):
+        return str(value or "").replace("\n", " ")
+
+    def draw_text(value, x, y, max_width, font="Helvetica", size=8, italic=False):
+        value = text(value)
+        font_name = f"{font}-Oblique" if italic and font == "Helvetica" else font
+        while value and stringWidth(value, font_name, size) > max_width:
+            value = value[:-1]
+        pdf.setFont(font_name, size)
+        pdf.drawString(x, y, value)
+
+    def money(value):
+        return f"$ {float(value or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def format_date(value):
+        try:
+            return datetime.strptime(text(value), "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            return text(value)
+
+    for page_index, page_details in enumerate(pages, start=1):
+        y = page_height - margin
+        pdf.setStrokeColor(colors.black)
+        pdf.setLineWidth(0.8)
+        pdf.rect(margin, y - 48, content_width, 48)
+        pdf.line(margin + 168, y, margin + 168, y - 48)
+        pdf.line(margin + 348, y, margin + 348, y - 48)
+        if os.path.exists(MEMBRETE_LOGO_PATH):
+            pdf.drawImage(ImageReader(MEMBRETE_LOGO_PATH), margin + 12, y - 41, width=110, height=33, preserveAspectRatio=True, mask='auto')
+        pdf.setFont("Helvetica-BoldOblique", 14)
+        pdf.drawCentredString(margin + 258, y - 29, "ORDEN DE COMPRA")
+        pdf.setFont("Helvetica", 7)
+        pdf.drawString(margin + 360, y - 15, "Fecha de Rev.: 19/07/2019")
+        pdf.drawString(margin + 360, y - 26, f"Página: {page_index} de {len(pages)}")
+        pdf.drawString(margin + 360, y - 37, "Revisión: 2")
+        y -= 55
+
+        if page_index == 1:
+            pdf.setFont("Helvetica-BoldOblique", 9)
+            pdf.drawString(margin, y, EMPRESA_MEMBRETE["razon_social"])
+            pdf.setFont("Helvetica-Oblique", 8)
+            pdf.drawString(margin, y - 11, "Santa Catalina N° 551 S/Colectora Ruta 66, Palpalá CP 4612")
+            pdf.drawString(margin, y - 22, "San Salvador de Jujuy - Teléfono/Fax: 0388-4052871")
+            pdf.drawString(margin, y - 33, f"CUIT: {EMPRESA_MEMBRETE['cuit']}")
+            pdf.rect(margin + 325, y - 42, content_width - 325, 48)
+            pdf.setFont("Helvetica-BoldOblique", 8)
+            pdf.drawString(margin + 338, y - 13, "N° Orden de Compra:")
+            pdf.drawString(margin + 338, y - 29, "Fecha:")
+            pdf.drawString(margin + 338, y - 40, "N° Cotización Proveedor:")
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(margin + 470, y - 13, text(orden["numero_oc"]))
+            pdf.drawString(margin + 470, y - 29, format_date(orden["fecha"]))
+            pdf.drawString(margin + 470, y - 40, text(orden["cotizacion"]))
+            y -= 55
+
+            pdf.setFont("Helvetica-BoldOblique", 9)
+            pdf.drawString(margin, y, "Datos del Proveedor")
+            provider_top = y - 3
+            pdf.setFillColor(colors.HexColor("#eef4df"))
+            pdf.rect(margin, provider_top - 58, content_width, 58, fill=1, stroke=1)
+            pdf.setFillColor(colors.black)
+            labels = [("Nombre", proveedor["nombre"], margin + 4, provider_top - 13), ("CUIT", proveedor["cuit"], margin + 4, provider_top - 26), ("Domicilio", proveedor["domicilio"], margin + 4, provider_top - 39), ("IVA", proveedor["condicion_iva"], margin + 4, provider_top - 52), ("Código Postal", proveedor["codigo_postal"], margin + 292, provider_top - 26), ("Localidad", proveedor["localidad"], margin + 292, provider_top - 39), ("Teléfono 1", proveedor["telefono_1"], margin + 292, provider_top - 52)]
+            for label, value, x, row_y in labels:
+                pdf.setFont("Helvetica-BoldOblique", 7)
+                pdf.drawString(x, row_y, f"{label}:")
+                draw_text(value, x + 55, row_y, 205, "Helvetica-Oblique", 7)
+            y = provider_top - 70
+
+        pdf.setFont("Helvetica-Oblique", 8)
+        pdf.drawString(margin, y, "Agradeceremos nos provean de lo siguiente:")
+        y -= 4
+        columns = [("N°", 19), ("Código\nproveedor", 55), ("Cant.", 35), ("Descripción", 235), ("Precio unitario", 74), ("NETO S/IVA", 74), ("Centro de Costo", 72)]
+        header_height = 23
+        x = margin
+        pdf.setFillColor(colors.HexColor("#dce6f1"))
+        pdf.rect(margin, y - header_height, content_width, header_height, fill=1, stroke=1)
+        pdf.setFillColor(colors.black)
+        for label, width in columns:
+            pdf.rect(x, y - header_height, width, header_height, fill=0, stroke=1)
+            pdf.setFont("Helvetica-BoldOblique", 7)
+            for line_index, line in enumerate(label.split("\n")):
+                pdf.drawCentredString(x + width / 2, y - 10 - (line_index * 8), line)
+            x += width
+        y -= header_height
+        row_height = 20
+        for row_index, item in enumerate(page_details, start=(page_index - 1) * rows_per_page + 1):
+            x = margin
+            values = [str(row_index), item["codigo_proveedor"], f"{float(item['cantidad'] or 0):g}", item["descripcion"], money(item["precio_unitario"]), money(item["subtotal"]), item["centro_costo"]]
+            for (label, width), value in zip(columns, values):
+                pdf.rect(x, y - row_height, width, row_height, fill=0, stroke=1)
+                if label in {"N°", "Cant.", "Precio unitario", "NETO S/IVA"}:
+                    pdf.setFont("Helvetica", 7)
+                    pdf.drawCentredString(x + width / 2, y - 13, text(value))
+                else:
+                    draw_text(value, x + 3, y - 13, width - 6, "Helvetica-Oblique", 7)
+                x += width
+            y -= row_height
+
+        if page_index == len(pages):
+            total = sum(float(item["subtotal"] or 0) for item in detalles)
+            pdf.setFillColor(colors.HexColor("#f4dede"))
+            pdf.rect(margin + content_width - 146, y - 20, 146, 20, fill=1, stroke=1)
+            pdf.setFillColor(colors.black)
+            pdf.setFont("Helvetica-BoldOblique", 8)
+            pdf.drawCentredString(margin + content_width - 73, y - 13, money(total))
+            y -= 34
+            pdf.setFont("Helvetica-BoldOblique", 9)
+            pdf.drawString(margin, y, "NOTA:")
+            pdf.setFont("Helvetica-Oblique", 6.5)
+            notes = ["(1) SMG SRL es agente de retención del Impuesto a las Ganancias; informar situación impositiva.", "(2) Los pagos se realizarán contra factura original o proforma, remito de entrega y OC autorizada.", "(3) En factura, hacer referencia al número de Orden de Compra."]
+            for note in notes:
+                y -= 10
+                pdf.setFillColor(colors.red)
+                pdf.drawString(margin, y, note)
+            pdf.setFillColor(colors.black)
+            y -= 16
+            pdf.setFont("Helvetica-BoldOblique", 8)
+            pdf.drawString(margin, y, "Observaciones:")
+            draw_text(orden["observaciones"], margin + 82, y, content_width - 82, "Helvetica", 8)
+            y -= 18
+            for label, value in [("Moneda", orden["moneda"]), ("Tipo de cambio", orden["tipo_cambio"]), ("Forma de pago", orden["forma_pago"]), ("Lugar de entrega", orden["lugar_entrega"]), ("Transporte", orden["transporte"]), ("Validez de la oferta", orden["validez_oferta"])]:
+                pdf.setFont("Helvetica-BoldOblique", 7.5)
+                pdf.drawRightString(margin + 95, y, f"{label}:")
+                pdf.rect(margin + 100, y - 4, content_width - 100, 14, fill=0, stroke=1)
+                draw_text(value, margin + 104, y, content_width - 108, "Helvetica-Oblique", 7.5)
+                y -= 14
+            pdf.setFont("Helvetica-BoldOblique", 7.5)
+            pdf.drawString(margin, y, "Contactos:")
+            for contact in contactos[:2]:
+                pdf.setFont("Helvetica-Oblique", 7.5)
+                pdf.drawString(margin + 58, y, text(contact.get("nombre")))
+                pdf.drawString(margin + 215, y, text(contact.get("correo")))
+                pdf.drawString(margin + 390, y, text(contact.get("telefono")))
+                y -= 11
+            y -= 8
+            for label, value in [("Solicitó", orden["solicitante"]), ("Aprobó", orden["aprobador"]), ("Recepción Proveedor", "")]:
+                width = content_width / 3
+                x = margin + (["Solicitó", "Aprobó", "Recepción Proveedor"].index(label) * width)
+                pdf.rect(x, y - 43, width, 43, fill=0, stroke=1)
+                pdf.setFont("Helvetica-BoldOblique", 7)
+                pdf.drawString(x + 4, y - 9, f"{label}:")
+                pdf.setFont("Helvetica-Oblique", 8)
+                pdf.drawString(x + 5, y - 30, text(value))
+                pdf.setFont("Helvetica-Oblique", 6.5)
+                pdf.drawString(x + 5, y - 39, "Firma y Aclaración")
+        pdf.showPage()
+    pdf.save()
+
+
+@app.post("/compras/ordenes-compra")
+async def compras_guardar_orden_compra(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    perfil = _usuario_autenticado(request) or {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    proveedor_id = payload.get("proveedor_id")
+    items = payload.get("items", [])
+    if not proveedor_id:
+        raise HTTPException(status_code=400, detail="Debe seleccionar un proveedor.")
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="Debe cargar al menos un artículo.")
+    if len(items) > 25:
+        raise HTTPException(status_code=400, detail="La orden de compra admite hasta 25 artículos.")
+
+    contactos = payload.get("contactos", [])
+    if not isinstance(contactos, list):
+        contactos = []
+    contactos = [contacto for contacto in contactos if isinstance(contacto, dict)][:2]
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_solicitudes(conn)
+        _ensure_orden_compra_historial(conn)
+        proveedor = conn.execute(
+            '''
+            SELECT id, "NOM_PROVEE" AS nombre, "DOMICILIO" AS domicilio,
+                   "TELÉFONO_1" AS telefono_1, "TELÉFONO_2" AS telefono_2,
+                   "COND_IVA" AS condicion_iva, "CUIT" AS cuit,
+                   "C_POSTAL" AS codigo_postal, "LOCALIDAD" AS localidad
+            FROM proveedores WHERE id = ?
+            ''',
+            (proveedor_id,),
+        ).fetchone()
+        if proveedor is None:
+            raise HTTPException(status_code=400, detail="El proveedor seleccionado no existe.")
+        ultimo = conn.execute("SELECT numero_oc FROM OrdenCompra ORDER BY id DESC LIMIT 1").fetchone()
+        ultimo_numero = ''.join(ch for ch in str(ultimo[0] if ultimo else "") if ch.isdigit())
+        numero_oc = f"OC-{int(ultimo_numero or 0) + 1:05d}"
+        cur = conn.execute(
+            '''
+            INSERT INTO OrdenCompra (
+                numero_oc, fecha, proveedor_id, cotizacion, moneda, tipo_cambio,
+                forma_pago, lugar_entrega, transporte, validez_oferta, observaciones,
+                solicitante, aprobador, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                numero_oc, str(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")), proveedor_id,
+                str(payload.get("cotizacion") or ""), str(payload.get("moneda") or "PESOS ARGENTINOS"),
+                payload.get("tipo_cambio") or None, str(payload.get("forma_pago") or ""),
+                str(payload.get("lugar_entrega") or ""), str(payload.get("transporte") or ""),
+                str(payload.get("validez_oferta") or ""), str(payload.get("observaciones") or ""),
+                str(payload.get("solicitante") or ""), str(payload.get("aprobador") or ""), "Emitida",
+            ),
+        )
+        orden_compra_id = cur.lastrowid
+        detalles_pdf = []
+        for item in items:
+            try:
+                cantidad = float(item.get("cantidad") or 0)
+                precio_unitario = float(item.get("precio_unitario") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Cantidad y precio unitario deben ser numéricos.")
+            ids_solicitudes = item.get("solicitud_detalle_ids") or []
+            if not isinstance(ids_solicitudes, list) or len(ids_solicitudes) > 2:
+                raise HTTPException(status_code=400, detail="Cada artículo admite hasta dos ítems de solicitud.")
+            ids_solicitudes = list({int(item_id) for item_id in ids_solicitudes if str(item_id).strip()})
+            cur_detalle = conn.execute(
+                '''
+                INSERT INTO OrdenCompraDetalle (
+                    orden_compra_id, codigo_proveedor, articulo_id, descripcion, cantidad,
+                    precio_unitario, subtotal, centro_costo_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    orden_compra_id, str(item.get("codigo_proveedor") or ""), item.get("articulo_id") or None,
+                    str(item.get("descripcion") or ""), cantidad, precio_unitario,
+                    cantidad * precio_unitario, item.get("centro_costo_id") or None,
+                ),
+            )
+            detalles_pdf.append({
+                "codigo_proveedor": str(item.get("codigo_proveedor") or ""),
+                "descripcion": str(item.get("descripcion") or ""),
+                "cantidad": cantidad,
+                "precio_unitario": precio_unitario,
+                "subtotal": cantidad * precio_unitario,
+                "centro_costo": str(item.get("centro_costo_id") or ""),
+            })
+            for solicitud_detalle_id in ids_solicitudes:
+                disponible = conn.execute(
+                    '''
+                    SELECT d.id
+                    FROM solicitud_compra_detalle d
+                    LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                           ON vinculo.solicitud_compra_detalle_id = d.id
+                    WHERE d.id = ?
+                      AND COALESCE(d.estado_aprobacion, 'Pendiente') = 'Aprobada'
+                      AND vinculo.id IS NULL
+                    ''',
+                    (solicitud_detalle_id,),
+                ).fetchone()
+                if disponible is None:
+                    raise HTTPException(status_code=400, detail="Uno de los ítems de solicitud ya fue gestionado o no está aprobado.")
+                conn.execute(
+                    "INSERT INTO OrdenCompraDetalleSolicitud (orden_compra_detalle_id, solicitud_compra_detalle_id) VALUES (?, ?)",
+                    (cur_detalle.lastrowid, solicitud_detalle_id),
+                )
+                conn.execute(
+                    "UPDATE solicitud_compra_detalle SET estado_aprobacion = 'Gestionado' WHERE id = ?",
+                    (solicitud_detalle_id,),
+                )
+            _registrar_orden_compra_historial(conn, orden_compra_id, "Emitida", "Emisión inicial de la orden de compra.", perfil)
+        conn.commit()
+    orden_pdf = {
+        "numero_oc": numero_oc,
+        "fecha": str(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")),
+        "cotizacion": str(payload.get("cotizacion") or ""),
+        "moneda": str(payload.get("moneda") or "PESOS ARGENTINOS"),
+        "tipo_cambio": str(payload.get("tipo_cambio") or ""),
+        "forma_pago": str(payload.get("forma_pago") or ""),
+        "lugar_entrega": str(payload.get("lugar_entrega") or ""),
+        "transporte": str(payload.get("transporte") or ""),
+        "validez_oferta": str(payload.get("validez_oferta") or ""),
+        "observaciones": str(payload.get("observaciones") or ""),
+        "solicitante": str(payload.get("solicitante") or ""),
+        "aprobador": str(payload.get("aprobador") or ""),
+    }
+    pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{numero_oc}.pdf")
+    generar_pdf_orden_compra(pdf_path, orden_pdf, dict(proveedor), detalles_pdf, contactos)
+    return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
+
+
+@app.get("/compras/solicitudes/{solicitud_id}")
+def compras_obtener_solicitud(solicitud_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    perfil = _usuario_autenticado(request) or {}
+    with get_sqlite_connection() as conn:
+        _ensure_estado_detalle_compra(conn)
+        cabecera = conn.execute(
+            """
+            SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(pr.nombre, '') AS destino_compra,
+                   COALESCE(pc.nombre, '') AS prioridad,
+                   COALESCE(ec.nombre, '') AS estado,
+                   COALESCE(sc.observaciones, '') AS observaciones
+            FROM solicitud_compra sc
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            WHERE sc.id = ?
+            """,
+            (solicitud_id,),
+        ).fetchone()
+        if cabecera is None:
+            raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+
+        items = conn.execute(
+            """
+            SELECT d.id,
+                   COALESCE(cc.nombre, '') AS centro_costo,
+                   COALESCE(d.id_vehiculo, '') AS vehiculo,
+                   d.descripcion_articulo, d.motivo_compra, d.cantidad,
+                   COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   COALESCE(d.observacion, '') AS observacion,
+                   COALESCE(d.estado_aprobacion, 'Pendiente') AS estado_aprobacion,
+                   COALESCE(d.motivo_rechazo, '') AS motivo_rechazo,
+                   COALESCE(d.usuario_resolucion, '') AS usuario_resolucion
+            FROM solicitud_compra_detalle d
+            LEFT JOIN centros_costos cc ON cc.id = d.id_centro_costo
+            WHERE d.id_solicitud = ?
+            ORDER BY d.id
+            """,
+            (solicitud_id,),
+        ).fetchall()
+
+    solicitud = dict(cabecera)
+    solicitud["items"] = [dict(item) for item in items]
+    solicitud["puede_aprobar"] = str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR"
+    return solicitud
+
+
+@app.post("/compras/solicitudes/{solicitud_id}/resolver")
+async def compras_resolver_solicitud(solicitud_id: int, request: Request):
+    perfil = _requiere_administrador(request)
+    usuario_resolucion = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    accion = str(payload.get("accion", "")).strip().lower()
+    ids_items = payload.get("ids_items", [])
+    motivo_rechazo = str(payload.get("motivo_rechazo", "")).strip()
+    if accion not in {"aprobar", "rechazar"}:
+        raise HTTPException(status_code=400, detail="Acción de aprobación inválida.")
+    if not isinstance(ids_items, list) or not ids_items:
+        raise HTTPException(status_code=400, detail="Seleccione al menos un ítem.")
+    if accion == "rechazar" and not motivo_rechazo:
+        raise HTTPException(status_code=400, detail="Debe indicar el motivo del rechazo.")
+
+    try:
+        ids_items = sorted({int(item_id) for item_id in ids_items})
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Los ítems seleccionados no son válidos.")
+
+    with get_sqlite_connection() as conn:
+        _ensure_prioridades_y_estados_compras(conn)
+        _ensure_estado_detalle_compra(conn)
+        solicitud = conn.execute("SELECT id FROM solicitud_compra WHERE id = ?", (solicitud_id,)).fetchone()
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+
+        placeholders = ", ".join("?" for _ in ids_items)
+        items_validos = conn.execute(
+            f"SELECT id FROM solicitud_compra_detalle WHERE id_solicitud = ? AND id IN ({placeholders})",
+            (solicitud_id, *ids_items),
+        ).fetchall()
+        if len(items_validos) != len(ids_items):
+            raise HTTPException(status_code=400, detail="Hay ítems que no pertenecen a esta solicitud.")
+
+        nuevo_estado = "Aprobada" if accion == "aprobar" else "Rechazada"
+        conn.execute(
+            f"UPDATE solicitud_compra_detalle SET estado_aprobacion = ?, motivo_rechazo = ?, usuario_resolucion = ? WHERE id_solicitud = ? AND id IN ({placeholders})",
+            (nuevo_estado, "" if accion == "aprobar" else motivo_rechazo, usuario_resolucion, solicitud_id, *ids_items),
+        )
+
+        resumen = conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN estado_aprobacion = 'Aprobada' THEN 1 ELSE 0 END) AS aprobados,
+                   SUM(CASE WHEN estado_aprobacion = 'Rechazada' THEN 1 ELSE 0 END) AS rechazados
+            FROM solicitud_compra_detalle WHERE id_solicitud = ?
+            """,
+            (solicitud_id,),
+        ).fetchone()
+        total = int(resumen["total"] or 0)
+        aprobados = int(resumen["aprobados"] or 0)
+        rechazados = int(resumen["rechazados"] or 0)
+        if total and aprobados == total:
+            estado_general = "Aprobada"
+        elif total and rechazados == total:
+            estado_general = "Rechazada"
+        elif aprobados:
+            estado_general = "Aprobada parcialmente"
+        else:
+            estado_general = "En revisión"
+
+        estado = conn.execute("SELECT id FROM estados_compra WHERE nombre = ?", (estado_general,)).fetchone()
+        conn.execute(
+            "UPDATE solicitud_compra SET id_estado = ?, fecha_modificacion = datetime('now') WHERE id = ?",
+            (estado["id"], solicitud_id),
+        )
+        conn.commit()
+
+    return {"estado": estado_general}
+
+
+@app.get("/compras/solicitudes/{solicitud_id}/pdf")
+def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    perfil = _usuario_autenticado(request) or {}
+    with get_sqlite_connection() as conn:
+        _ensure_estado_detalle_compra(conn)
+        solicitud = conn.execute(
+            """
+            SELECT sc.numero_solicitud, sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(pr.nombre, '') AS destino_compra,
+                   COALESCE(pc.nombre, '') AS prioridad,
+                   COALESCE(ec.nombre, 'En revisión') AS estado,
+                   COALESCE(sc.observaciones, '') AS observaciones
+            FROM solicitud_compra sc
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            WHERE sc.id = ?
+            """,
+            (solicitud_id,),
+        ).fetchone()
+        items = conn.execute(
+            """
+            SELECT d.descripcion_articulo, d.cantidad, COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   COALESCE(d.id_centro_costo, '') AS centro_costo, COALESCE(d.id_vehiculo, '') AS vehiculo,
+                   d.motivo_compra, COALESCE(d.motivo_rechazo, '') AS motivo_rechazo,
+                   COALESCE(d.estado_aprobacion, 'Pendiente') AS estado_aprobacion,
+                   COALESCE(d.usuario_resolucion, '') AS usuario_resolucion
+            FROM solicitud_compra_detalle d
+            WHERE d.id_solicitud = ? ORDER BY d.id
+            """,
+            (solicitud_id,),
+        ).fetchall()
+
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+
+    pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{solicitud['numero_solicitud']}.pdf")
+    if False and not os.path.isfile(pdf_path):
+        raise HTTPException(status_code=404, detail="El PDF de la solicitud no está disponible.")
+
+    motivos_rechazo, detalle_pdf = [], []
+    for item in items:
+        motivo_pdf = str(item["motivo_compra"] or "").strip()
+        estado_item = str(item["estado_aprobacion"] or "Pendiente").strip()
+        usuario_item = str(item["usuario_resolucion"] or "").strip()
+        if estado_item in {"Aprobada", "Rechazada"} and usuario_item:
+            accion_item = "Aprobado" if estado_item == "Aprobada" else "Rechazado"
+            motivo_pdf = f"{motivo_pdf} | {accion_item} por: {usuario_item}".strip(" |")
+        motivo = str(item["motivo_rechazo"] or "").strip()
+        if motivo:
+            detalle_rechazo = f"{motivo} — Rechazado por: {usuario_item}" if usuario_item else motivo
+            motivos_rechazo.append(detalle_rechazo)
+        detalle_pdf.append(
+            (
+                str(item["descripcion_articulo"] or ""), str(item["cantidad"] or ""),
+                str(item["unidad_medida"] or ""), str(item["centro_costo"] or ""),
+                str(item["vehiculo"] or ""), motivo_pdf,
+            )
+        )
+    bloque_envio = [
+        ("Destino de compra", solicitud["destino_compra"]),
+        ("Observaciones", solicitud["observaciones"]),
+    ]
+    if motivos_rechazo:
+        bloque_envio.append(("Motivos de rechazo", "; ".join(motivos_rechazo)))
+
+    generar_pdf_remito(
+        pdf_path,
+        "SOLICITUD DE COMPRAS",
+        [
+            ("Solicitud Nro", solicitud["numero_solicitud"]),
+            ("Fecha", solicitud["fecha_solicitud"]),
+            ("Solicitante", solicitud["solicitante"]),
+            ("Prioridad", solicitud["prioridad"]),
+            ("Estado actual", solicitud["estado"]),
+        ],
+        detalle_pdf,
+        columnas=[("Articulo", 40), ("Cantidad", 270), ("Unidad", 320), ("C.C.", 370), ("C.I.", 415), ("Motivo", 460)],
+        incluir_firmas=True,
+        firma_entrega_nombre="Solicitante",
+        firma_recibe_nombre="Responsable",
+        bloque_envio=bloque_envio,
+        bloque_envio_titulo="Resumen de Compra",
+        bloque_pie_izq=[("Estado", solicitud["estado"])],
+        bloque_pie_der=[("Total de items", str(len(items)))],
+        observaciones_pie=solicitud["observaciones"],
+        departamento="Departamento de Compras",
+        usuario_pie=f"Usuario {str(perfil.get('usuario') or perfil.get('nombre_apellido') or '').strip()}".strip(),
+        columnas_multilinea={0, 5},
+    )
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=os.path.basename(pdf_path),
+    )
+
+
+def generar_numero_solicitud(conn):
+    ultimo_registro = conn.execute(
+        "SELECT numero_solicitud FROM solicitud_compra ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    if ultimo_registro and ultimo_registro[0]:
+        ultimo_numero_texto = ultimo_registro[0]
+        ultimo_numero_digitos = ''.join(ch for ch in ultimo_numero_texto if ch.isdigit())
+        try:
+            ultimo_id = int(ultimo_numero_digitos)
+        except ValueError:
+            ultimo_id = 0
+    else:
+        ultimo_id = 0
+    return f"SC-{ultimo_id + 1:05d}"
+
+
+def _ensure_prioridades_y_estados_compras(conn):
+    prioridades = [
+        r[0]
+        for r in conn.execute(
+            "SELECT id FROM prioridades_compra WHERE COALESCE(activo, 1) = 1"
+        ).fetchall()
+    ]
+    estados = [
+        r[0]
+        for r in conn.execute(
+            "SELECT id FROM estados_compra WHERE COALESCE(activo, 1) = 1"
+        ).fetchall()
+    ]
+
+    if not prioridades:
+        conn.executemany(
+            "INSERT OR IGNORE INTO prioridades_compra (nombre, activo) VALUES (?, ?)",
+            [
+                ("Baja", 1),
+                ("Media", 1),
+                ("Alta", 1),
+                ("Urgente", 1),
+            ],
+        )
+    if not estados:
+        conn.executemany(
+            "INSERT OR IGNORE INTO estados_compra (nombre, activo) VALUES (?, ?)",
+            [
+                ("Borrador", 1),
+                ("En revisión", 1),
+                ("Aprobada", 1),
+                ("Rechazada", 1),
+                ("Comprada", 1),
+            ],
+        )
+    if not prioridades or not estados:
+        conn.commit()
+    conn.execute(
+        "INSERT OR IGNORE INTO estados_compra (nombre, activo) VALUES (?, ?)",
+        ("Aprobada parcialmente", 1),
+    )
+    conn.commit()
+
+
+def _ensure_estado_detalle_compra(conn):
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(solicitud_compra_detalle)").fetchall()}
+    if "estado_aprobacion" not in columnas:
+        conn.execute("ALTER TABLE solicitud_compra_detalle ADD COLUMN estado_aprobacion TEXT NOT NULL DEFAULT 'Pendiente'")
+    if "motivo_rechazo" not in columnas:
+        conn.execute("ALTER TABLE solicitud_compra_detalle ADD COLUMN motivo_rechazo TEXT")
+    if "usuario_resolucion" not in columnas:
+        conn.execute("ALTER TABLE solicitud_compra_detalle ADD COLUMN usuario_resolucion TEXT")
+    conn.commit()
+
+
+def _obtener_proyecto_id_por_nombre(conn, nombre):
+    nombre_normalizado = str(nombre or "").strip()
+    if not nombre_normalizado:
+        return None
+    row = conn.execute(
+        "SELECT id FROM proyectos WHERE lower(nombre) = lower(?) LIMIT 1",
+        (nombre_normalizado,),
+    ).fetchone()
+    if row:
+        return row[0]
+    codigo = ''.join(ch for ch in nombre_normalizado.upper() if ch.isalnum())[:8] or 'PROYECTO'
+    codigo_base = codigo
+    suffix = 1
+    while conn.execute("SELECT 1 FROM proyectos WHERE codigo = ?", (codigo,)).fetchone():
+        suffix += 1
+        codigo = f"{codigo_base[:6]}{suffix}"
+    cur = conn.execute(
+        "INSERT INTO proyectos (codigo, nombre, activo) VALUES (?, ?, 1)",
+        (codigo, nombre_normalizado),
+    )
+    return cur.lastrowid
+
+
+def _ensure_detalle_compra_cc_nullable(conn):
+    info = conn.execute("PRAGMA table_info(solicitud_compra_detalle)").fetchall()
+    current_columns = {r[1]: r for r in info}
+    fk_info = conn.execute("PRAGMA foreign_key_list(solicitud_compra_detalle)").fetchall()
+
+    needs_migration = any(r[1] == 'id_centro_costo' and r[3] == 1 for r in info)
+    if not needs_migration:
+        id_maquinaria_info = current_columns.get('id_maquinaria')
+        id_vehiculo_info = current_columns.get('id_vehiculo')
+        if id_maquinaria_info is None or id_maquinaria_info[2].upper() != 'TEXT':
+            needs_migration = True
+        if id_vehiculo_info is None or id_vehiculo_info[2].upper() != 'TEXT':
+            needs_migration = True
+    if not needs_migration:
+        for fk in fk_info:
+            if fk[2] == 'vehiculos' and fk[3] in ('id_maquinaria', 'id_vehiculo') and fk[4] != 'codigo':
+                needs_migration = True
+                break
+
+    if needs_migration:
+        if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='solicitud_compra_detalle_old'").fetchone():
+            existing_rows = conn.execute("SELECT COUNT(*) FROM solicitud_compra_detalle_old").fetchone()[0]
+            if existing_rows == 0:
+                conn.execute("DROP TABLE solicitud_compra_detalle_old")
+            else:
+                raise RuntimeError(
+                    "There is already a non-empty backup table solicitud_compra_detalle_old. "
+                    "Please remove or rename it before retrying."
+                )
+        conn.execute("ALTER TABLE solicitud_compra_detalle RENAME TO solicitud_compra_detalle_old")
+        conn.execute('''
+            CREATE TABLE solicitud_compra_detalle (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_solicitud INTEGER NOT NULL,
+                id_centro_costo INTEGER,
+                id_vehiculo TEXT,
+                id_maquinaria TEXT,
+                descripcion_articulo TEXT NOT NULL,
+                motivo_compra TEXT NOT NULL,
+                cantidad REAL NOT NULL,
+                unidad_medida TEXT,
+                observacion TEXT,
+                FOREIGN KEY (id_solicitud) REFERENCES solicitud_compra (id) ON DELETE CASCADE,
+                FOREIGN KEY (id_centro_costo) REFERENCES centros_costos (id) ON DELETE RESTRICT,
+                FOREIGN KEY (id_vehiculo) REFERENCES vehiculos (codigo) ON DELETE SET NULL,
+                FOREIGN KEY (id_maquinaria) REFERENCES vehiculos (codigo) ON DELETE SET NULL
+            )
+        ''')
+        conn.execute(
+            '''
+            INSERT INTO solicitud_compra_detalle (
+                id, id_solicitud, id_centro_costo, id_vehiculo, id_maquinaria,
+                descripcion_articulo, motivo_compra, cantidad, unidad_medida, observacion
+            )
+            SELECT 
+                id, id_solicitud, id_centro_costo, id_vehiculo, id_maquinaria,
+                descripcion_articulo, motivo_compra, cantidad, unidad_medida, observacion
+            FROM solicitud_compra_detalle_old
+            '''
+        )
+        conn.execute("DROP TABLE solicitud_compra_detalle_old")
+
+
+@app.post("/compras/emitir")
+async def compras_emitir(request: Request):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+
+    perfil = _usuario_autenticado(request) or {}
+    usuario_logueado = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    numero_solicitud = str(payload.get("numero_solicitud", "")).strip()
+    fecha_solicitud = str(payload.get("fecha_solicitud", "")).strip() or datetime.now().strftime("%Y-%m-%d")
+    id_solicitante = payload.get("id_solicitante")
+    destino_compra = str(payload.get("destino_compra", "")).strip()
+    prioridad_id = payload.get("prioridad_id")
+    observaciones = str(payload.get("observaciones", "")).strip()
+    items = payload.get("items", [])
+
+    if not isinstance(items, list) or len(items) == 0:
+        raise HTTPException(status_code=400, detail="La solicitud debe contener al menos un artículo.")
+    if not destino_compra:
+        raise HTTPException(status_code=400, detail="Debe indicar el destino de compra.")
+    if not id_solicitante:
+        raise HTTPException(status_code=400, detail="Debe indicar quien solicita.")
+
+    with get_sqlite_connection() as conn:
+        _ensure_prioridades_y_estados_compras(conn)
+        _ensure_detalle_compra_cc_nullable(conn)
+        _ensure_estado_detalle_compra(conn)
+        numero_solicitud = generar_numero_solicitud(conn)
+        id_proyecto = _obtener_proyecto_id_por_nombre(conn, destino_compra)
+
+        cur = conn.execute(
+            "INSERT INTO solicitud_compra (numero_solicitud, fecha_solicitud, id_solicitante, id_proyecto, id_prioridad, observaciones, id_estado, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            (
+                numero_solicitud,
+                fecha_solicitud,
+                id_solicitante,
+                id_proyecto,
+                prioridad_id,
+                observaciones,
+                2,
+            ),
+        )
+        solicitud_id = cur.lastrowid
+
+        for item in items:
+            descripcion_articulo = str(item.get("detalle", "")).strip()
+            motivo_compra = str(item.get("motivo", "")).strip()
+            unidad_medida = str(item.get("unidad", "")).strip()
+            cantidad = item.get("cantidad")
+            try:
+                cantidad_value = float(cantidad)
+            except (TypeError, ValueError):
+                cantidad_value = 0.0
+            id_centro_costo = item.get("centroCosto") or None
+            id_vehiculo = item.get("ci") or None
+
+            conn.execute(
+                "INSERT INTO solicitud_compra_detalle (id_solicitud, id_centro_costo, id_vehiculo, descripcion_articulo, motivo_compra, cantidad, unidad_medida, observacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    solicitud_id,
+                    id_centro_costo,
+                    id_vehiculo,
+                    descripcion_articulo,
+                    motivo_compra,
+                    cantidad_value,
+                    unidad_medida,
+                    "",
+                ),
+            )
+
+        conn.commit()
+
+    with get_sqlite_connection() as conn:
+        datos_pdf = conn.execute(
+            """
+            SELECT COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(pc.nombre, '') AS prioridad,
+                   COALESCE(pr.nombre, '') AS destino_compra
+            FROM solicitud_compra sc
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
+            WHERE sc.id = ?
+            """,
+            (solicitud_id,),
+        ).fetchone()
+
+    solicitante_nombre = str(datos_pdf["solicitante"] or "").strip() if datos_pdf else ""
+    prioridad_nombre = str(datos_pdf["prioridad"] or "").strip() if datos_pdf else ""
+    destino_nombre = str(datos_pdf["destino_compra"] or "").strip() if datos_pdf else ""
+
+    pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{numero_solicitud}.pdf")
+    cabecera = [
+        ("Solicitud Nº", numero_solicitud),
+        ("Fecha", fecha_solicitud),
+        ("Solicitante", solicitante_nombre),
+        ("Prioridad", prioridad_nombre),
+    ]
+    bloque_envio = [
+        ("Destino de compra", destino_nombre),
+        ("Observaciones", observaciones),
+    ]
+    detalle_pdf = []
+    for item in items:
+        detalle_pdf.append(
+            (
+                str(item.get("detalle", "")),
+                str(item.get("cantidad", "")),
+                str(item.get("unidad", "")),
+                str(item.get("centroCosto", "")),
+                str(item.get("ci", "")),
+                str(item.get("motivo", "")),
+            )
+        )
+    columnas = [
+        ("Artículo", 40),
+        ("Cantidad", 270),
+        ("Unidad", 320),
+        ("C.C.", 370),
+        ("C.I.", 415),
+        ("Motivo", 460),
+    ]
+    generar_pdf_remito(
+        pdf_path,
+        "SOLICITUD DE COMPRAS",
+        cabecera,
+        detalle_pdf,
+        columnas=columnas,
+        incluir_firmas=True,
+        firma_entrega_nombre="Solicitante",
+        firma_recibe_nombre="Responsable",
+        bloque_envio=bloque_envio,
+        bloque_envio_titulo="Resumen de Compra",
+        bloque_pie_izq=[("Estado", "En revisión")],
+        bloque_pie_der=[("Total de ítems", str(len(items)))],
+        observaciones_pie=observaciones,
+        departamento="Departamento de Compras",
+        usuario_pie=f"Usuario {usuario_logueado}" if usuario_logueado else "Usuario",
+        columnas_multilinea={0, 5},
+    )
+
+    return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
+
+
 @app.get("/dashboard.html", response_class=HTMLResponse)
 def dashboard_html(request: Request):
     redirect = _requiere_login(request)
@@ -4161,8 +5693,12 @@ def generar_pdf_remito(
     bloque_pie_izq: list[tuple[str, str]] | None = None,
     bloque_pie_der: list[tuple[str, str]] | None = None,
     observaciones_pie: str = "",
+    departamento: str = "Departamento de Almacen",
+    usuario_pie: str = "",
+    columnas_multilinea: set[int] | None = None,
 ):
     columnas = columnas or [("Producto", 40), ("Cantidad", 250), ("Series", 330), ("Proyecto", 470)]
+    columnas_multilinea = columnas_multilinea or set()
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
@@ -4202,11 +5738,18 @@ def generar_pdf_remito(
                 else:
                     f.write("\n\nFirma de entrega: __________________________\n")
                     f.write("Firma de recepcion: ________________________\n")
+            if usuario_pie:
+                f.write(f"\n{usuario_pie}\n")
         return
 
     c = canvas.Canvas(path_pdf, pagesize=A4)
     ancho, alto = A4
     y = alto - 40
+
+    def dibujar_usuario_pie():
+        if usuario_pie:
+            c.setFont("Helvetica-Oblique", 7)
+            c.drawString(60, 18, usuario_pie)
 
     # Membrete fijo para todos los remitos
     if os.path.exists(MEMBRETE_LOGO_PATH):
@@ -4217,7 +5760,7 @@ def generar_pdf_remito(
             pass
 
     c.setFont("Helvetica-Bold", 15)
-    c.drawString(190, y, "Departamento de Almacen")
+    c.drawString(190, y, departamento)
     y -= 24
     c.setFont("Helvetica-Bold", 13)
     c.drawString(190, y, titulo)
@@ -4272,8 +5815,37 @@ def generar_pdf_remito(
     y -= 12
 
     c.setFont("Helvetica", 9)
+
+    def dividir_en_lineas(texto, ancho_disponible):
+        palabras = str(texto or "").split()
+        if not palabras:
+            return [""]
+        lineas, linea_actual = [], ""
+        for palabra in palabras:
+            candidata = f"{linea_actual} {palabra}".strip()
+            if not linea_actual or c.stringWidth(candidata, "Helvetica", 9) <= ancho_disponible:
+                linea_actual = candidata
+            else:
+                lineas.append(linea_actual)
+                linea_actual = palabra
+        if linea_actual:
+            lineas.append(linea_actual)
+        return lineas
+
     for fila in detalle:
-        if y < 280:
+        lineas_por_columna = []
+        for idx, (_, posicion) in enumerate(columnas):
+            valor = fila[idx] if idx < len(fila) else ""
+            if idx in columnas_multilinea:
+                siguiente_posicion = columnas[idx + 1][1] if idx + 1 < len(columnas) else ancho - 40
+                lineas_por_columna.append(dividir_en_lineas(valor, siguiente_posicion - posicion - 6))
+            else:
+                limite = 14 if idx == 0 else 32
+                lineas_por_columna.append([str(valor)[:limite]])
+
+        alto_fila = max(len(lineas) for lineas in lineas_por_columna) * 12
+        if y - alto_fila < 280:
+            dibujar_usuario_pie()
             c.showPage()
             y = alto - 40
             c.setFont("Helvetica-Bold", 10)
@@ -4284,10 +5856,9 @@ def generar_pdf_remito(
             y -= 12
             c.setFont("Helvetica", 9)
         for idx, (_, posicion) in enumerate(columnas):
-            valor = fila[idx] if idx < len(fila) else ""
-            limite = 14 if idx == 0 else 32
-            c.drawString(posicion, y, str(valor)[:limite])
-        y -= 12
+            for linea_idx, linea in enumerate(lineas_por_columna[idx]):
+                c.drawString(posicion, y - (linea_idx * 12), linea)
+        y -= alto_fila
 
     y_bloque_pie = 185
     if bloque_pie_izq or bloque_pie_der:
@@ -4324,6 +5895,7 @@ def generar_pdf_remito(
                 y -= 38
         else:
             if y < 120:
+                dibujar_usuario_pie()
                 c.showPage()
                 y = alto - 70
             else:
@@ -4378,6 +5950,8 @@ def generar_pdf_remito(
         c.drawString(60, y_obs, f"{prefijo}{lineas[0]}")
         if len(lineas) > 1:
             c.drawString(60, y_obs - 12, lineas[1])
+
+    dibujar_usuario_pie()
 
     c.save()
 
@@ -5924,6 +7498,24 @@ def listar_productos_v2():
     with get_sqlite_connection() as conn:
         rows = conn.execute("SELECT * FROM productos ORDER BY codigo").fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/almacen/v2/productos/sugerencias-oc")
+def sugerencias_productos_desde_ordenes_compra():
+    with get_sqlite_connection() as conn:
+        rows = conn.execute(
+            '''
+            SELECT DISTINCT TRIM(ocd.codigo_proveedor) AS codigo,
+                            TRIM(ocd.descripcion) AS descripcion
+            FROM OrdenCompraDetalle ocd
+            INNER JOIN OrdenCompra oc ON oc.id = ocd.orden_compra_id
+            WHERE UPPER(COALESCE(oc.estado, '')) <> 'ANULADA'
+              AND (TRIM(COALESCE(ocd.codigo_proveedor, '')) <> ''
+                   OR TRIM(COALESCE(ocd.descripcion, '')) <> '')
+            ORDER BY codigo, descripcion
+            '''
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 @app.post("/almacen/v2/productos")

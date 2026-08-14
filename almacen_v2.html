@@ -273,8 +273,8 @@
           <h3>Alta Productos</h3>
           <input type="hidden" id="prod-id">
           <div class="form-grid">
-            <div class="field"><label class="field-label" for="prod-codigo">Codigo</label><input id="prod-codigo" placeholder="Codigo"></div>
-            <div class="field"><label class="field-label" for="prod-desc">Descripcion</label><input id="prod-desc" placeholder="Descripcion"></div>
+            <div class="field"><label class="field-label" for="prod-codigo">Codigo</label><input id="prod-codigo" list="prod-codigo-list" placeholder="Codigo"><datalist id="prod-codigo-list"></datalist></div>
+            <div class="field"><label class="field-label" for="prod-desc">Descripcion</label><input id="prod-desc" list="prod-desc-list" placeholder="Descripcion"><datalist id="prod-desc-list"></datalist></div>
             <div class="field"><label class="field-label" for="prod-categoria">Categoria</label><select id="prod-categoria"></select></div>
             <div class="field"><label class="field-label" for="prod-familia">Familia</label><select id="prod-familia"></select></div>
             <div class="field">
@@ -817,15 +817,20 @@ async function resolveOrCreateModeloId(){
 }
 
 async function loadMaster(){
-  const [productos, personal, vehiculos, proyectos, instalaciones, cats, fams, marcs, mods, unis, ubis] = await Promise.all([
+  const [productos, personal, vehiculos, proyectos, instalaciones, cats, fams, marcs, mods, unis, ubis, sugerenciasOc] = await Promise.all([
     api('/almacen/v2/productos'), api('/personal'), api('/vehiculos'), api('/almacen/v2/catalogos/proyectos'), api('/almacen/v2/catalogos/instalaciones'),
-    api('/almacen/v2/catalogos/categorias'), api('/almacen/v2/catalogos/familias'), api('/almacen/v2/catalogos/marcas'), api('/almacen/v2/catalogos/modelos'), api('/almacen/v2/catalogos/unidades'), api('/almacen/v2/catalogos/ubicaciones')
+    api('/almacen/v2/catalogos/categorias'), api('/almacen/v2/catalogos/familias'), api('/almacen/v2/catalogos/marcas'), api('/almacen/v2/catalogos/modelos'), api('/almacen/v2/catalogos/unidades'), api('/almacen/v2/catalogos/ubicaciones'),
+    api('/almacen/v2/productos/sugerencias-oc')
   ]);
   state.productos = productos; state.personal = personal; state.vehiculos = vehiculos; state.proyectos = proyectos; state.instalaciones = instalaciones;
   state.categorias = cats || []; state.familias = fams || []; state.unidades = unis || [];
 
   setOptions('prod-categoria', cats, x=>x.nombre); setOptions('prod-familia', fams, x=>x.nombre); setMarcaEditableOptions(marcs);
   setModeloEditableOptions(mods); setOptions('prod-unidad', unis, x=>x.nombre); setOptions('prod-ubicacion', ubis, x=>x.ruta || x.nombre);
+  const codigosOc = [...new Set((sugerenciasOc || []).map(item => (item.codigo || '').trim()).filter(Boolean))];
+  const descripcionesOc = [...new Set((sugerenciasOc || []).map(item => (item.descripcion || '').trim()).filter(Boolean))];
+  document.getElementById('prod-codigo-list').innerHTML = codigosOc.map(value => `<option value="${esc(value)}"></option>`).join('');
+  document.getElementById('prod-desc-list').innerHTML = descripcionesOc.map(value => `<option value="${esc(value)}"></option>`).join('');
 
   setOptions('ios-responsable', personal, x=>`${x.nombre||'Sin nombre'} (${x.legajo})`);
   setOptions('ios-ubicacion', instalaciones, x=>`${x.codigo || ''} - ${x.nombre || ''}`);

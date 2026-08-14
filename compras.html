@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compras</title>
+<style>
+  :root {
+    --bg-1: #0f172a;
+    --bg-2: #1e293b;
+    --bg-3: #0b1120;
+    --panel: rgba(15, 23, 42, 0.66);
+    --panel-soft: rgba(15, 23, 42, 0.45);
+    --line: rgba(148, 163, 184, 0.35);
+    --text: #e2e8f0;
+    --muted: #93c5fd;
+    --accent: #38bdf8;
+    --accent-2: #22c55e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+  }
+
+  .bg-photo {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center/cover no-repeat;
+    opacity: 0.66;
+    pointer-events: none;
+  }
+
+  .bg-blur {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
+      radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
+  }
+
+  .app-shell {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 100vh;
+    padding: 14px;
+    transition: grid-template-columns 0.22s ease;
+  }
+
+  .app-shell:has(.sidebar:hover),
+  .app-shell:has(.sidebar:focus-within) {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
+  }
+
+  .sidebar {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    overflow: hidden;
+    transition: width 0.22s ease;
+  }
+
+  .sidebar:hover,
+  .sidebar:focus-within {
+    width: 250px;
+  }
+
+  .brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
+    background: var(--panel-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .brand img {
+    width: 78%;
+    max-width: 170px;
+    object-fit: contain;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .brand img {
+    width: 44px;
+  }
+
+  .menu {
+    display: grid;
+    gap: 8px;
+  }
+
+  .menu button {
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.55);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .menu button {
+    text-indent: -9999px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .menu button.active {
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    border-color: rgba(147, 197, 253, 0.8);
+  }
+
+  .main {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .top {
+    padding: 16px 18px;
+  }
+
+  .top h1 { margin: 0; font-size: 24px; }
+  .top p { margin: 6px 0 0; color: #bfdbfe; font-size: 13px; }
+
+  .content-panel {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .form-card {
+    display: grid;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .compras-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .compras-kpi { padding: 16px; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 10px; background: rgba(15, 23, 42, 0.5); }
+  .compras-kpi-label { color: #bfdbfe; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .compras-kpi-value { margin-top: 8px; color: #f8fafc; font-size: 1.65rem; font-weight: 800; }
+  .compras-kpi-note { margin-top: 5px; color: #94a3b8; font-size: 0.78rem; }
+  .compras-charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .compras-chart { padding: 16px; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 10px; background: rgba(15, 23, 42, 0.5); }
+  .compras-chart h3 { margin: 0 0 14px; }
+  .compras-chart-row { display: grid; grid-template-columns: minmax(130px, 1fr) 3fr 42px; gap: 10px; align-items: center; margin: 12px 0; }
+  .compras-chart-label { color: #e2e8f0; font-size: 0.84rem; }
+  .compras-chart-track { height: 12px; overflow: hidden; border-radius: 6px; background: rgba(148, 163, 184, 0.18); }
+  .compras-chart-bar { height: 100%; min-width: 2px; border-radius: 6px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.35s ease; }
+  .compras-chart-value { color: #f8fafc; font-weight: 800; text-align: right; }
+  .compras-deadline-panel { padding: 16px; border: 1px solid rgba(248, 113, 113, 0.3); border-radius: 10px; background: rgba(127, 29, 29, 0.16); }
+  .compras-deadline-panel h3 { margin: 0 0 12px; }
+  .compras-deadline-table { min-width: 560px; }
+  .compras-deadline-table .deadline-alert { color: #fca5a5; font-weight: 800; }
+  .compras-deadline-row { cursor: pointer; }
+  .compras-deadline-row:hover { background: rgba(248, 113, 113, 0.12); }
+  .compras-overdue-detail { margin-top: 12px; }
+
+  .hidden { display: none; }
+
+  .solicitud-row { cursor: pointer; }
+
+  .solicitud-row.selected {
+    background: rgba(34, 197, 94, 0.2);
+    outline: 1px solid rgba(74, 222, 128, 0.55);
+  }
+
+  .empty-message {
+    margin: 0;
+    padding: 16px;
+    color: #bfdbfe;
+  }
+
+  .approval-actions {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto auto;
+    gap: 12px;
+    align-items: end;
+    margin-top: 14px;
+  }
+
+  .approval-actions textarea { min-height: 46px; resize: vertical; }
+  .admin-only { display: none; }
+
+  .section-card {
+    padding: 16px;
+    min-height: 180px;
+  }
+
+  .section-card h3 { margin: 0 0 8px; font-size: 16px; }
+  .section-card p { margin: 0; color: #bfdbfe; font-size: 13px; line-height: 1.5; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 0.78rem;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font: inherit;
+  }
+
+  .field textarea {
+    min-height: 88px;
+    resize: vertical;
+  }
+
+  .form-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .form-header .brand-block {
+    display: grid;
+    gap: 6px;
+  }
+
+  .subpanel {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .detail-toolbar {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(160px, 1fr)) auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-self: end;
+  }
+
+  .detail-table-wrap {
+    overflow-x: auto;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.65);
+  }
+
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 920px;
+  }
+
+  .detail-table th,
+  .detail-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    font-size: 0.92rem;
+    color: #e2e8f0;
+  }
+
+  .detail-table th {
+    text-align: left;
+    background: rgba(15, 23, 42, 0.9);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .detail-table tbody tr:hover {
+    background: rgba(15, 23, 42, 0.8);
+  }
+
+  .oc-header { display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .oc-header h2 { margin: 0; }
+  .oc-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .oc-provider-grid input[readonly] { color: #cbd5e1; background: rgba(15, 23, 42, 0.45); }
+  .oc-lines-table { min-width: 1080px; }
+  .oc-lines-table input, .oc-lines-table select {
+    width: 100%; min-width: 80px; padding: 8px; border-radius: 7px;
+    border: 1px solid rgba(148, 163, 184, 0.25); background: rgba(15, 23, 42, 0.75); color: var(--text);
+  }
+  .oc-lines-table td { padding: 6px; }
+  .oc-total { text-align: right; font-size: 1.05rem; font-weight: 700; color: #bbf7d0; }
+  .oc-link-summary { display: block; margin-top: 4px; max-width: 180px; color: #bfdbfe; font-size: 0.75rem; }
+  dialog.oc-dialog { width: min(980px, calc(100vw - 28px)); color: var(--text); background: #0f172a; border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  dialog.oc-dialog::backdrop { background: rgba(2, 6, 23, 0.72); }
+  .oc-search-results { max-height: 380px; overflow: auto; margin-top: 12px; }
+  .oc-search-item { display: grid; grid-template-columns: auto 120px 1fr 150px; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); }
+  .oc-search-item small { color: #bfdbfe; }
+  .oc-status { font-size: 0.76rem; font-weight: 700; color: #fcd34d; }
+  .oc-status.gestionado { color: #fca5a5; }
+  .oc-contactos { display: grid; gap: 8px; }
+  .oc-contacto-fila { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; }
+  .oc-history-detail { min-width: 420px; white-space: normal; line-height: 1.35; }
+  .oc-history-block { margin: 4px 0 8px; padding: 8px 10px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 7px; background: rgba(15, 23, 42, 0.38); }
+  .oc-history-block strong { color: #bfdbfe; }
+  .oc-history-changes { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 8px; margin-top: 6px; }
+  .oc-history-changes > div { min-width: 0; }
+  .oc-history-changes ul { margin: 4px 0 0; padding-left: 18px; }
+  .oc-history-changes li { margin: 2px 0; overflow-wrap: anywhere; }
+  .oc-history-details { margin-top: 16px; }
+  .oc-history-details > summary { cursor: pointer; list-style: none; padding: 12px 14px; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 9px; background: rgba(15, 23, 42, 0.52); color: #bfdbfe; font-weight: 700; }
+  .oc-history-details > summary::-webkit-details-marker { display: none; }
+  .oc-history-details > summary::before { content: '+ '; color: #86efac; }
+  .oc-history-details[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .oc-history-details[open] > summary::before { content: '- '; }
+  .oc-history-content { padding-top: 12px; }
+
+  .btn-secondary {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.55);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .btn-primary {
+    border: none;
+    background: linear-gradient(135deg, #22c55e, #0f766e);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .note-panel {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.6;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .footer-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .footer-actions .btn-danger {
+    border: 1px solid rgba(248, 113, 113, 0.55);
+    background: rgba(127, 29, 29, 0.32);
+    color: #fee2e2;
+  }
+
+  .footer-actions .btn-danger:hover {
+    background: rgba(185, 28, 28, 0.55);
+  }
+
+  @media (max-width: 1040px) {
+    .detail-toolbar {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 900px) {
+    .app-shell { grid-template-columns: 1fr; }
+    .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 1fr; }
+    .sidebar { order: 2; width: auto; }
+    .sidebar:hover, .sidebar:focus-within { width: auto; }
+    .sidebar:not(:hover):not(:focus-within) .menu button { text-indent: 0; padding-left: 10px; padding-right: 10px; }
+    .sidebar:not(:hover):not(:focus-within) .brand img { width: 78%; }
+    .main { order: 1; }
+    .card-grid, .form-grid { grid-template-columns: 1fr; }
+    .detail-table { min-width: 700px; }
+    .oc-provider-grid { grid-template-columns: 1fr; }
+    .oc-contacto-fila { grid-template-columns: 1fr; }
+    .compras-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .compras-charts-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) { .compras-kpi-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+<div class="app-shell">
+  <aside class="sidebar card">
+    <div class="brand">
+      <img src="/Imagenes/09-smg.png" alt="Logo SMG">
+    </div>
+    <div class="menu">
+      <button id="btn-dashboard-compras" type="button">DASHBOARD</button>
+      <button class="active" id="btn-solicitud-compra" type="button">Solicitud de Compra</button>
+      <button id="btn-solicitudes-emitidas" type="button">Solicitudes Emitidas</button>
+      <button id="btn-emision-orden-compra" type="button">Emisión Orden de Compra</button>
+      <button id="btn-ordenes-compra-emitidas" type="button">OC Emitidas</button>
+      <button id="btn-gestionar-proveedores" type="button">Proveedores</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="content-panel card form-card hidden" id="dashboard-compras-panel">
+      <div class="oc-header"><div><h2>Dashboard de Compras</h2><p class="empty-message">Indicadores generales del módulo de compras.</p></div><button class="btn-secondary" id="btn-actualizar-dashboard-compras" type="button">Actualizar</button></div>
+      <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
+      <div class="compras-charts-grid">
+        <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div></div>
+        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div></div>
+      </div>
+      <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
+    </section>
+    <section class="content-panel card form-card" id="compras-formulario">
+      <div class="form-header">
+        <div class="form-grid">
+          <div class="field">
+            <label for="fecha">Fecha</label>
+            <input id="fecha" type="date" value="2026-08-04" readonly>
+          </div>
+          <div class="field">
+            <label for="numeroSolicitud">Solicitud Nº</label>
+            <input id="numeroSolicitud" type="text" value="" placeholder="SC-000001" readonly>
+          </div>
+          <div class="field">
+            <label for="solicitante">Indicar quien solicita</label>
+            <select id="solicitante">
+              <option value="">Seleccione</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="destinoCompra">Destino de compra</label>
+            <input id="destinoCompra" list="lista-proyectos" placeholder="Seleccione o escriba un proyecto">
+            <datalist id="lista-proyectos"></datalist>
+          </div>
+        </div>
+
+        <div class="note-panel">
+          <strong>Detalle de cada ítem:</strong>
+          <p>Destino de compra: describir brevemente dónde será destinado el artículo.</p>
+          <p>C.C.: Centro de Costos.</p>
+          <p>C.I.: Código Interno / Vehículo.</p>
+          <p>Detallar artículo: debe ser preciso, con código, nombre y marca.</p>
+          <p>Motivo de compra: detalle breve del motivo.</p>
+        </div>
+      </div>
+
+      <div class="subpanel">
+        <h3>Agregar artículo</h3>
+        <div class="detail-toolbar">
+          <div class="field">
+            <label for="detalleArticulo">Detallar artículo</label>
+            <input id="detalleArticulo" type="text" list="lista-productos" placeholder="Código, nombre, marca">
+            <datalist id="lista-productos"></datalist>
+          </div>
+          <div class="field">
+            <label for="motivoCompra">Motivo de compra</label>
+            <input id="motivoCompra" type="text" placeholder="Motivo breve">
+          </div>
+          <div class="field">
+            <label for="cantidad">Cantidad</label>
+            <input id="cantidad" type="number" step="0.01" placeholder="0.00">
+          </div>
+          <div class="field">
+            <label for="centroCosto">C.C.</label>
+            <select id="centroCosto">
+              <option value="">Seleccione</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ciVehiculo">C.I.</label>
+            <select id="ciVehiculo">
+              <option value="">Seleccione</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="unidadMedida">Unidad</label>
+            <input id="unidadMedida" type="text" list="lista-unidades" placeholder="kg / pares">
+            <datalist id="lista-unidades"></datalist>
+          </div>
+          <div class="detail-actions">
+            <button class="btn-primary" id="btn-agregar-item" type="button">Agregar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Nº</th>
+              <th>C.C.</th>
+              <th>C.I.</th>
+              <th>Detalle del artículo</th>
+              <th>Motivo de compra</th>
+              <th>Cantidad</th>
+              <th>Unidad</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="detalle-items-body">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="prioridadCompra">Prioridad de compra</label>
+          <select id="prioridadCompra">
+            <option value="">Seleccione</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="observaciones">Observaciones</label>
+          <textarea id="observaciones" placeholder="Observaciones breves"></textarea>
+        </div>
+      </div>
+
+      <div class="footer-actions">
+        <div class="detail-actions">
+          <button class="btn-secondary" id="cerrar-solicitud" type="button">Cancelar / Salir</button>
+          <button class="btn-primary" id="btn-emitir-solicitud" type="button">Emitir Solicitud</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-panel card form-card hidden" id="solicitudes-emitidas-panel">
+      <div>
+        <h2>Solicitudes emitidas</h2>
+        <p class="empty-message">Seleccione una solicitud para consultar su detalle.</p>
+        <div class="approval-actions admin-only" id="panel-aprobacion">
+          <div class="field">
+            <label for="motivo-rechazo">Motivo de rechazo</label>
+            <textarea id="motivo-rechazo" placeholder="Obligatorio al rechazar ítems"></textarea>
+          </div>
+          <button class="btn-primary" id="btn-aprobar-items" type="button">Aprobar seleccionados</button>
+          <button class="btn-secondary" id="btn-rechazar-items" type="button">Rechazar seleccionados</button>
+        </div>
+      </div>
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Solicitud N.º</th>
+              <th>Fecha</th>
+              <th>Solicitante</th>
+              <th>Destino</th>
+              <th>Prioridad</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="solicitudes-emitidas-body"></tbody>
+        </table>
+        <p class="empty-message hidden" id="sin-solicitudes">No hay solicitudes emitidas.</p>
+      </div>
+
+      <div class="subpanel hidden" id="solicitud-detalle-panel">
+        <div class="footer-actions">
+          <h3 id="solicitud-detalle-titulo">Detalle de solicitud</h3>
+          <button class="btn-primary" id="btn-descargar-solicitud-pdf" type="button">Descargar PDF</button>
+        </div>
+        <div class="form-grid" id="solicitud-detalle-cabecera"></div>
+        <div class="detail-table-wrap">
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>N.º</th>
+                <th>C.C.</th>
+                <th>C.I.</th>
+                <th>Detalle del artículo</th>
+                <th>Motivo de compra</th>
+                <th>Cantidad</th>
+                <th>Unidad</th>
+                <th>Observación</th>
+                <th>Estado</th>
+                <th>Motivo de rechazo</th>
+                <th>Resuelto por</th>
+                <th class="admin-only" id="th-seleccionar-items"><input id="seleccionar-todos-items" type="checkbox" aria-label="Seleccionar todos los ítems"></th>
+              </tr>
+            </thead>
+            <tbody id="solicitud-detalle-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-panel card form-card hidden" id="orden-compra-panel">
+      <div class="oc-header">
+        <div>
+          <h2>Emisión Orden de Compra</h2>
+          <p class="empty-message">Complete la cabecera, seleccione el proveedor y cargue hasta 25 artículos.</p>
+        </div>
+        <div class="field">
+          <label for="oc-fecha">Fecha</label>
+          <input id="oc-fecha" type="date">
+        </div>
+      </div>
+
+      <div class="subpanel">
+        <h3>Datos del proveedor</h3>
+        <div class="form-grid oc-provider-grid">
+          <div class="field"><label for="oc-proveedor">Proveedor</label><select id="oc-proveedor"><option value="">Seleccione un proveedor</option></select></div>
+          <div class="field"><label for="oc-cuit">CUIT</label><input id="oc-cuit" readonly></div>
+          <div class="field"><label for="oc-codigo-postal">Código postal</label><input id="oc-codigo-postal" readonly></div>
+          <div class="field"><label for="oc-domicilio">Domicilio</label><input id="oc-domicilio" readonly></div>
+          <div class="field"><label for="oc-localidad">Localidad</label><input id="oc-localidad" readonly></div>
+          <div class="field"><label for="oc-condicion-iva">Condición IVA</label><input id="oc-condicion-iva" readonly></div>
+          <div class="field"><label for="oc-telefono-1">Teléfono 1</label><input id="oc-telefono-1" readonly></div>
+          <div class="field"><label for="oc-telefono-2">Teléfono 2</label><input id="oc-telefono-2" readonly></div>
+          <div class="field"><label for="oc-cotizacion">Nº / medio de cotización</label><input id="oc-cotizacion" placeholder="Ej.: Cot. 9198 / correo"></div>
+        </div>
+      </div>
+
+      <div class="subpanel">
+        <div class="footer-actions"><h3>Artículos</h3><span class="empty-message" id="oc-lineas-contador">0 de 25 artículos</span></div>
+        <div class="detail-table-wrap"><table class="detail-table oc-lines-table"><thead><tr><th>Nº</th><th>Código proveedor</th><th>Cant.</th><th>Descripción</th><th>Precio unitario</th><th>Neto s/IVA</th><th>Centro de costo</th><th>Ítems de solicitud</th><th></th></tr></thead><tbody id="oc-lineas-body"></tbody></table></div>
+        <div class="footer-actions"><button class="btn-secondary" id="btn-oc-agregar-linea" type="button">Agregar artículo</button><div class="oc-total">Total neto s/IVA: <span id="oc-total">$ 0,00</span></div></div>
+      </div>
+
+      <div class="subpanel">
+        <h3>Contactos</h3>
+        <p class="empty-message">Información visual editable; no se almacena en la base de datos.</p>
+        <div class="oc-contactos">
+          <div class="oc-contacto-fila"><input id="oc-contacto-1-nombre" aria-label="Nombre contacto 1" value="Luciana Obando"><input id="oc-contacto-1-correo" aria-label="Correo contacto 1" value="lobando@smgminera.com"><input id="oc-contacto-1-telefono" aria-label="Teléfono contacto 1" value="Cel: 0388 155751037"></div>
+          <div class="oc-contacto-fila"><input id="oc-contacto-2-nombre" aria-label="Nombre contacto 2" value="Rodrigo Barrientos"><input id="oc-contacto-2-correo" aria-label="Correo contacto 2" value="rbarrientos@smgminera.com"><input id="oc-contacto-2-telefono" aria-label="Teléfono contacto 2" value="Cel: 0388 155120059"></div>
+        </div>
+      </div>
+      <div class="subpanel"><h3>Condiciones de la orden</h3><div class="form-grid">
+        <div class="field"><label for="oc-moneda">Moneda</label><input id="oc-moneda" value="PESOS ARGENTINOS"></div>
+        <div class="field"><label for="oc-tipo-cambio">Tipo de cambio</label><input id="oc-tipo-cambio" type="number" min="0" step="0.01"></div>
+        <div class="field"><label for="oc-forma-pago">Forma de pago</label><input id="oc-forma-pago"></div>
+        <div class="field"><label for="oc-lugar-entrega">Lugar de entrega</label><input id="oc-lugar-entrega" value="Planta Alto la Torre, Palpalá, Jujuy"></div>
+        <div class="field"><label for="oc-transporte">Transporte</label><input id="oc-transporte"></div>
+        <div class="field"><label for="oc-validez">Validez de la oferta</label><input id="oc-validez"></div>
+        <div class="field"><label for="oc-solicitante">Solicitó</label><select id="oc-solicitante"><option value="">Seleccione</option></select></div>
+        <div class="field"><label for="oc-aprobador">Aprobó</label><input id="oc-aprobador"></div>
+        <div class="field"><label for="oc-observaciones">Observaciones</label><textarea id="oc-observaciones"></textarea></div>
+      </div></div>
+      <div class="detail-actions" style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
+        <button class="btn-primary" id="btn-guardar-oc" type="button">Emitir Orden de Compra</button>
+      </div>
+    </section>
+    <section class="content-panel card form-card hidden" id="ordenes-compra-emitidas-panel">
+      <div class="oc-header">
+        <div>
+          <h2>OC Emitidas</h2>
+          <p class="empty-message">Seleccione una orden para consultar su detalle.</p>
+        </div>
+        <button class="btn-secondary" id="btn-actualizar-ordenes-compra" type="button">Actualizar</button>
+      </div>
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead><tr><th>N.º OC</th><th>Fecha</th><th>Proveedor</th><th>Estado</th><th>Ítems</th><th>Total neto s/IVA</th><th>Acciones</th></tr></thead>
+          <tbody id="ordenes-compra-emitidas-body"></tbody>
+        </table>
+      </div>
+      <p class="empty-message hidden" id="sin-ordenes-compra">No hay órdenes de compra emitidas.</p>
+      <div class="subpanel hidden" id="detalle-orden-compra-panel">
+        <div class="footer-actions"><h3 id="detalle-orden-compra-titulo">Detalle de orden</h3><div><span id="detalle-orden-compra-estado"></span> <button class="btn-secondary" id="btn-editar-orden-compra" type="button">Editar</button> <button class="btn-secondary" id="btn-anular-orden-compra" type="button">Anular</button></div></div>
+        <div class="form-grid" id="detalle-orden-compra-cabecera"></div>
+        <div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º</th><th>Código proveedor</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th>Centro de costo</th><th>Solicitudes</th></tr></thead><tbody id="detalle-orden-compra-body"></tbody></table></div>
+        <details class="oc-history-details">
+          <summary>Historial de cambios y justificaciones</summary>
+          <div class="oc-history-content"><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Detalle / justificación</th></tr></thead><tbody id="historial-orden-compra-body"></tbody></table></div></div>
+        </details>
+      </div>
+    </section>
+  </main>
+  <dialog class="oc-dialog" id="proveedores-dialog">
+    <div class="footer-actions"><div><h3>Gestión de proveedores</h3><p class="empty-message">Alta, modificación y baja de proveedores.</p></div><button class="btn-secondary" id="btn-cerrar-proveedores" type="button">Cerrar</button></div>
+    <form id="proveedor-form" class="subpanel" style="margin-top:16px;">
+      <input type="hidden" id="proveedor-id">
+      <div class="form-grid">
+        <div class="field"><label for="prov-nombre">Nombre</label><input id="prov-nombre" required></div>
+        <div class="field"><label for="prov-cuit">CUIT</label><input id="prov-cuit"></div>
+        <div class="field"><label for="prov-condicion-iva">Condición IVA</label><input id="prov-condicion-iva"></div>
+        <div class="field"><label for="prov-condicion-pago">Condición de pago</label><input id="prov-condicion-pago"></div>
+        <div class="field"><label for="prov-domicilio">Domicilio</label><input id="prov-domicilio"></div>
+        <div class="field"><label for="prov-codigo-postal">Código postal</label><input id="prov-codigo-postal"></div>
+        <div class="field"><label for="prov-localidad">Localidad</label><input id="prov-localidad"></div>
+        <div class="field"><label for="prov-telefono-1">Teléfono 1</label><input id="prov-telefono-1"></div>
+        <div class="field"><label for="prov-telefono-2">Teléfono 2</label><input id="prov-telefono-2"></div>
+      </div>
+      <div class="footer-actions" style="margin-top:16px;"><button class="btn-primary" type="submit">Guardar proveedor</button><button class="btn-secondary" type="button" id="btn-reset-proveedor">Limpiar</button></div>
+    </form>
+    <div class="subpanel" style="margin-top:18px;"><h3>Listado</h3><div class="field"><label for="buscar-proveedor">Buscar proveedor</label><input id="buscar-proveedor" type="search" placeholder="Nombre, CUIT, localidad, domicilio o teléfono"></div><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>ID</th><th>Nombre</th><th>CUIT</th><th>Localidad</th><th>Condición</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div></div>
+  </dialog>
+  <dialog class="oc-dialog" id="editar-orden-compra-dialog">
+    <div class="footer-actions"><div><h3>Editar orden de compra</h3><p class="empty-message">La justificación es obligatoria y quedará registrada en el historial.</p></div><button class="btn-secondary" id="btn-cerrar-editar-orden" type="button">Cerrar</button></div>
+    <form id="editar-orden-compra-form" class="subpanel" style="margin-top:16px;">
+      <input type="hidden" id="editar-orden-id">
+      <div class="form-grid">
+        <div class="field"><label for="editar-oc-proveedor">Proveedor</label><select id="editar-oc-proveedor" required></select></div>
+        <div class="field"><label for="editar-oc-cotizacion">Cotización</label><input id="editar-oc-cotizacion"></div>
+        <div class="field"><label for="editar-oc-moneda">Moneda</label><input id="editar-oc-moneda"></div>
+        <div class="field"><label for="editar-oc-tipo-cambio">Tipo de cambio</label><input id="editar-oc-tipo-cambio" type="number" min="0" step="0.01"></div>
+        <div class="field"><label for="editar-oc-forma-pago">Forma de pago</label><input id="editar-oc-forma-pago"></div>
+        <div class="field"><label for="editar-oc-lugar-entrega">Lugar de entrega</label><input id="editar-oc-lugar-entrega"></div>
+        <div class="field"><label for="editar-oc-transporte">Transporte</label><input id="editar-oc-transporte"></div>
+        <div class="field"><label for="editar-oc-validez">Validez de la oferta</label><input id="editar-oc-validez"></div>
+        <div class="field"><label for="editar-oc-solicitante">Solicitó</label><input id="editar-oc-solicitante"></div>
+        <div class="field"><label for="editar-oc-aprobador">Aprobó</label><input id="editar-oc-aprobador"></div>
+        <div class="field"><label for="editar-oc-observaciones">Observaciones</label><textarea id="editar-oc-observaciones"></textarea></div>
+        <div class="field"><label for="editar-oc-motivo">Motivo de la edición *</label><textarea id="editar-oc-motivo" required></textarea></div>
+      </div>
+      <div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Código proveedor</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Centro de costo</th></tr></thead><tbody id="editar-orden-detalles-body"></tbody></table></div>
+      <div class="detail-actions"><button class="btn-primary" type="submit">Guardar edición</button></div>
+    </form>
+  </dialog>
+  <dialog class="oc-dialog" id="oc-solicitudes-dialog">
+    <div class="footer-actions"><div><h3>Vincular ítems de solicitudes</h3><p class="empty-message">Seleccione hasta dos ítems aprobados y pendientes de gestionar.</p></div><button class="btn-secondary" id="btn-oc-cerrar-buscador" type="button">Cerrar</button></div>
+    <div class="field"><label for="oc-buscar-solicitud">Buscar por solicitud, descripción o centro de costo</label><input id="oc-buscar-solicitud" placeholder="Escriba para buscar"></div>
+    <div class="oc-search-results" id="oc-resultados-solicitud"></div>
+  </dialog>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const fecha = document.getElementById('fecha');
+      const numeroSolicitud = document.getElementById('numeroSolicitud');
+      const solicitante = document.getElementById('solicitante');
+      const destinoCompra = document.getElementById('destinoCompra');
+      const listaProyectos = document.getElementById('lista-proyectos');
+      const listaProductos = document.getElementById('lista-productos');
+      const listaUnidades = document.getElementById('lista-unidades');
+      const centroCostoSelect = document.getElementById('centroCosto');
+      const ciVehiculo = document.getElementById('ciVehiculo');
+      const prioridad = document.getElementById('prioridadCompra');
+      const formulario = document.getElementById('compras-formulario');
+      const dashboardComprasPanel = document.getElementById('dashboard-compras-panel');
+      const btnDashboardCompras = document.getElementById('btn-dashboard-compras');
+      const comprasKpiGrid = document.getElementById('compras-kpi-grid');
+      const comprasSolicitudesChart = document.getElementById('compras-solicitudes-chart');
+      const comprasItemsChart = document.getElementById('compras-items-chart');
+      const comprasPrioridadesBody = document.getElementById('compras-prioridades-body');
+      const comprasOverdueDetail = document.getElementById('compras-overdue-detail');
+      const comprasOverdueDetailTitle = document.getElementById('compras-overdue-detail-title');
+      const comprasOverdueDetailBody = document.getElementById('compras-overdue-detail-body');
+      let comprasPrioridades = [];
+      const solicitudesPanel = document.getElementById('solicitudes-emitidas-panel');
+      const ordenCompraPanel = document.getElementById('orden-compra-panel');
+      const btnSolicitudCompra = document.getElementById('btn-solicitud-compra');
+      const btnSolicitudesEmitidas = document.getElementById('btn-solicitudes-emitidas');
+      const btnEmisionOrdenCompra = document.getElementById('btn-emision-orden-compra');
+      const btnOrdenesCompraEmitidas = document.getElementById('btn-ordenes-compra-emitidas');
+      const ocProveedor = document.getElementById('oc-proveedor');
+      const ocLineasBody = document.getElementById('oc-lineas-body');
+      const ocLineasContador = document.getElementById('oc-lineas-contador');
+      const ocTotal = document.getElementById('oc-total');
+      const btnOcAgregarLinea = document.getElementById('btn-oc-agregar-linea');
+      const btnGuardarOc = document.getElementById('btn-guardar-oc');
+      const btnGestionarProveedores = document.getElementById('btn-gestionar-proveedores');
+      const proveedoresDialog = document.getElementById('proveedores-dialog');
+      const proveedoresBody = document.getElementById('proveedores-body');
+      const proveedorForm = document.getElementById('proveedor-form');
+      const buscarProveedorInput = document.getElementById('buscar-proveedor');
+      const proveedorIdInput = document.getElementById('proveedor-id');
+      const proveedorInputs = {
+        nombre: document.getElementById('prov-nombre'), cuit: document.getElementById('prov-cuit'),
+        condicion_iva: document.getElementById('prov-condicion-iva'), condicion_pago: document.getElementById('prov-condicion-pago'),
+        domicilio: document.getElementById('prov-domicilio'), codigo_postal: document.getElementById('prov-codigo-postal'),
+        localidad: document.getElementById('prov-localidad'), telefono_1: document.getElementById('prov-telefono-1'),
+        telefono_2: document.getElementById('prov-telefono-2'),
+      };
+      const ordenesCompraEmitidasPanel = document.getElementById('ordenes-compra-emitidas-panel');
+      const ordenesCompraEmitidasBody = document.getElementById('ordenes-compra-emitidas-body');
+      const sinOrdenesCompra = document.getElementById('sin-ordenes-compra');
+      const detalleOrdenCompraPanel = document.getElementById('detalle-orden-compra-panel');
+      const detalleOrdenCompraTitulo = document.getElementById('detalle-orden-compra-titulo');
+      const detalleOrdenCompraEstado = document.getElementById('detalle-orden-compra-estado');
+      const detalleOrdenCompraCabecera = document.getElementById('detalle-orden-compra-cabecera');
+      const detalleOrdenCompraBody = document.getElementById('detalle-orden-compra-body');
+      const historialOrdenCompraBody = document.getElementById('historial-orden-compra-body');
+      const historialOrdenCompraDetails = document.querySelector('.oc-history-details');
+      const btnEditarOrdenCompra = document.getElementById('btn-editar-orden-compra');
+      const btnAnularOrdenCompra = document.getElementById('btn-anular-orden-compra');
+      const editarOrdenCompraDialog = document.getElementById('editar-orden-compra-dialog');
+      const editarOrdenCompraForm = document.getElementById('editar-orden-compra-form');
+      const editarOrdenId = document.getElementById('editar-orden-id');
+      const editarOrdenDetallesBody = document.getElementById('editar-orden-detalles-body');
+      let ordenCompraSeleccionada = null;
+      const ocSolicitudesDialog = document.getElementById('oc-solicitudes-dialog');
+      const ocBuscarSolicitud = document.getElementById('oc-buscar-solicitud');
+      const ocResultadosSolicitud = document.getElementById('oc-resultados-solicitud');
+      const solicitudesBody = document.getElementById('solicitudes-emitidas-body');
+      const sinSolicitudes = document.getElementById('sin-solicitudes');
+      const detalleSolicitudPanel = document.getElementById('solicitud-detalle-panel');
+      const detalleSolicitudTitulo = document.getElementById('solicitud-detalle-titulo');
+      const detalleSolicitudCabecera = document.getElementById('solicitud-detalle-cabecera');
+      const detalleSolicitudBody = document.getElementById('solicitud-detalle-body');
+      const btnDescargarSolicitudPdf = document.getElementById('btn-descargar-solicitud-pdf');
+      const panelAprobacion = document.getElementById('panel-aprobacion');
+      const motivoRechazo = document.getElementById('motivo-rechazo');
+      const btnAprobarItems = document.getElementById('btn-aprobar-items');
+      const btnRechazarItems = document.getElementById('btn-rechazar-items');
+      const thSeleccionarItems = document.getElementById('th-seleccionar-items');
+      const seleccionarTodosItems = document.getElementById('seleccionar-todos-items');
+      let solicitudSeleccionadaId = null;
+      let ocProveedores = [];
+      let ocCentrosCostos = [];
+      let ocItemsSolicitud = [];
+      let ocFilaVinculando = null;
+
+      fecha.value = new Date().toISOString().slice(0, 10);
+
+      const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      })[character]);
+
+      const historialLabels = {
+        proveedor_id: 'Proveedor', cotizacion: 'Cotización', moneda: 'Moneda', tipo_cambio: 'Tipo de cambio',
+        forma_pago: 'Forma de pago', lugar_entrega: 'Lugar de entrega', transporte: 'Transporte',
+        validez_oferta: 'Validez de la oferta', observaciones: 'Observaciones', solicitante: 'Solicitó',
+        aprobador: 'Aprobó', codigo_proveedor: 'Código proveedor', descripcion: 'Descripción', cantidad: 'Cantidad',
+        precio_unitario: 'Precio unitario', centro_costo_id: 'Centro de costo', detalles: 'Artículos',
+      };
+      const renderComprasChart = (container, rows) => {
+        if (!rows.length) {
+          container.innerHTML = '<p class="empty-message">Sin datos para mostrar.</p>';
+          return;
+        }
+        const max = Math.max(...rows.map((row) => Number(row.total) || 0), 1);
+        container.innerHTML = rows.map((row) => {
+          const total = Number(row.total) || 0;
+          const width = Math.max((total / max) * 100, total ? 3 : 0);
+          return `<div class="compras-chart-row"><div class="compras-chart-label">${escapeHtml(row.estado)}</div><div class="compras-chart-track"><div class="compras-chart-bar" style="width:${width}%"></div></div><div class="compras-chart-value">${total}</div></div>`;
+        }).join('');
+      };
+      const mostrarDetalleFueraPlazo = (prioridad) => {
+        const resumen = comprasPrioridades.find((item) => item.prioridad === prioridad);
+        if (!resumen) return;
+        comprasOverdueDetailTitle.textContent = `Solicitudes vencidas: ${resumen.prioridad}`;
+        const solicitudes = resumen.solicitudes || [];
+        comprasOverdueDetailBody.innerHTML = solicitudes.length ? solicitudes.map((solicitud) => `
+          <tr><td>${escapeHtml(solicitud.numero_solicitud)}</td><td>${escapeHtml((solicitud.productos || []).join(' | '))}</td></tr>
+        `).join('') : '<tr><td colspan="2" class="empty-message">No hay solicitudes fuera de plazo para esta prioridad.</td></tr>';
+        comprasOverdueDetail.classList.remove('hidden');
+        comprasPrioridadesBody.querySelectorAll('.compras-deadline-row').forEach((row) => row.classList.toggle('selected', row.dataset.prioridad === prioridad));
+      };
+      const historialValue = (value) => {
+        if (value === null || value === undefined || value === '') return 'Sin datos';
+        if (Array.isArray(value)) {
+          return `<ul>${value.map((item) => `<li>${historialValue(item)}</li>`).join('')}</ul>`;
+        }
+        if (typeof value === 'object') {
+          return `<ul>${Object.entries(value).map(([key, item]) => `<li><strong>${escapeHtml(historialLabels[key] || key)}:</strong> ${historialValue(item)}</li>`).join('')}</ul>`;
+        }
+        return escapeHtml(value);
+      };
+      const historialDetail = (item) => {
+        if (item.accion !== 'Editada') return `<div class="oc-history-block"><strong>Justificación:</strong> ${escapeHtml(item.detalle)}</div>`;
+        try {
+          const detail = JSON.parse(item.detalle);
+          return `<div class="oc-history-block"><strong>Motivo:</strong> ${escapeHtml(detail.motivo || 'Sin motivo')}</div>
+            <div class="oc-history-changes">
+              <div class="oc-history-block"><strong>Antes</strong>${historialValue(detail.anterior)}</div>
+              <div class="oc-history-block"><strong>Después</strong>${historialValue(detail.actualizado)}</div>
+            </div>`;
+        } catch (error) {
+          return `<div class="oc-history-block"><strong>Detalle:</strong> ${escapeHtml(item.detalle)}</div>`;
+        }
+      };
+
+      const mostrarFormulario = () => {
+        formulario.classList.remove('hidden');
+        dashboardComprasPanel.classList.add('hidden');
+        solicitudesPanel.classList.add('hidden');
+        ordenCompraPanel.classList.add('hidden');
+        ordenesCompraEmitidasPanel.classList.add('hidden');
+        btnSolicitudCompra.classList.add('active');
+        btnDashboardCompras.classList.remove('active');
+        btnSolicitudesEmitidas.classList.remove('active');
+        btnEmisionOrdenCompra.classList.remove('active');
+        btnOrdenesCompraEmitidas.classList.remove('active');
+      };
+
+      const mostrarSolicitudes = async () => {
+        formulario.classList.add('hidden');
+        dashboardComprasPanel.classList.add('hidden');
+        solicitudesPanel.classList.remove('hidden');
+        ordenCompraPanel.classList.add('hidden');
+        ordenesCompraEmitidasPanel.classList.add('hidden');
+        btnSolicitudCompra.classList.remove('active');
+        btnDashboardCompras.classList.remove('active');
+        btnSolicitudesEmitidas.classList.add('active');
+        btnEmisionOrdenCompra.classList.remove('active');
+        btnOrdenesCompraEmitidas.classList.remove('active');
+        detalleSolicitudPanel.classList.add('hidden');
+        panelAprobacion.classList.add('admin-only');
+        thSeleccionarItems.classList.add('admin-only');
+        solicitudesBody.innerHTML = '';
+        sinSolicitudes.classList.add('hidden');
+
+        try {
+          const response = await fetch('/compras/solicitudes', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar las solicitudes emitidas.');
+          const solicitudes = await response.json();
+          sinSolicitudes.classList.toggle('hidden', solicitudes.length > 0);
+          solicitudes.forEach((solicitud) => {
+            const row = document.createElement('tr');
+            row.className = 'solicitud-row';
+            row.dataset.id = solicitud.id;
+            row.innerHTML = `
+              <td>${escapeHtml(solicitud.numero_solicitud)}</td>
+              <td>${escapeHtml(solicitud.fecha_solicitud)}</td>
+              <td>${escapeHtml(solicitud.solicitante)}</td>
+              <td>${escapeHtml(solicitud.destino_compra)}</td>
+              <td>${escapeHtml(solicitud.prioridad)}</td>
+              <td>${escapeHtml(solicitud.estado)}</td>`;
+            solicitudesBody.appendChild(row);
+          });
+        } catch (error) {
+          console.error(error);
+          sinSolicitudes.textContent = error.message || 'Error al cargar las solicitudes.';
+          sinSolicitudes.classList.remove('hidden');
+        }
+      };
+
+      const formatCurrency = (value) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value || 0);
+      const actualizarLineasOC = () => {
+        const rows = [...ocLineasBody.querySelectorAll('tr')];
+        let total = 0;
+        rows.forEach((row, index) => {
+          row.querySelector('.oc-line-number').textContent = index + 1;
+          const cantidad = Number(row.querySelector('.oc-cantidad').value) || 0;
+          const precio = Number(row.querySelector('.oc-precio').value) || 0;
+          const subtotal = cantidad * precio;
+          row.querySelector('.oc-subtotal').textContent = formatCurrency(subtotal);
+          total += subtotal;
+        });
+        ocTotal.textContent = formatCurrency(total);
+        ocLineasContador.textContent = `${rows.length} de 25 artículos`;
+        btnOcAgregarLinea.disabled = rows.length >= 25;
+      };
+
+      const agregarLineaOC = () => {
+        if (ocLineasBody.children.length >= 25) return;
+        const opcionesCC = ['<option value="">Seleccione</option>', ...ocCentrosCostos.map((cc) => `<option value="${cc.id}">${cc.id}</option>`)].join('');
+        const row = document.createElement('tr');
+        row.dataset.solicitudIds = '[]';
+        row.innerHTML = `<td class="oc-line-number"></td><td><input class="oc-codigo" aria-label="Código de proveedor"></td><td><input class="oc-cantidad" type="number" min="0" step="0.01" aria-label="Cantidad"></td><td><input class="oc-descripcion" aria-label="Descripción"></td><td><input class="oc-precio" type="number" min="0" step="0.01" aria-label="Precio unitario"></td><td class="oc-subtotal">$ 0,00</td><td><select class="oc-centro-costo" aria-label="Centro de costo">${opcionesCC}</select></td><td><button class="btn-secondary oc-vincular-solicitud" type="button">Solicitudes (0/2)</button><span class="oc-link-summary"></span></td><td><button class="btn-secondary oc-eliminar-linea" type="button" aria-label="Eliminar artículo">×</button></td>`;
+        ocLineasBody.appendChild(row);
+        actualizarLineasOC();
+      };
+
+      const idsSolicitudFila = (row) => JSON.parse(row.dataset.solicitudIds || '[]');
+      const actualizarResumenVinculos = (row) => {
+        const ids = idsSolicitudFila(row);
+        const vinculados = ids.map((id) => ocItemsSolicitud.find((item) => item.id === id)).filter(Boolean);
+        row.querySelector('.oc-vincular-solicitud').textContent = `Solicitudes (${ids.length}/2)`;
+        row.querySelector('.oc-link-summary').textContent = vinculados.map((item) => `${item.numero_solicitud}: ${item.descripcion_articulo}`).join(' | ');
+      };
+      const renderResultadosSolicitud = () => {
+        const search = ocBuscarSolicitud.value.trim().toLowerCase();
+        const seleccionados = new Set(ocFilaVinculando ? idsSolicitudFila(ocFilaVinculando) : []);
+        const seleccionadosEnOtrasLineas = new Set([...ocLineasBody.querySelectorAll('tr')]
+          .filter((row) => row !== ocFilaVinculando)
+          .flatMap((row) => idsSolicitudFila(row)));
+        const resultados = ocItemsSolicitud.filter((item) => {
+          const texto = `${item.numero_solicitud} ${item.descripcion_articulo} ${item.centro_costo}`.toLowerCase();
+          return !search || texto.includes(search);
+        });
+        ocResultadosSolicitud.innerHTML = resultados.length ? resultados.map((item) => {
+          const selected = seleccionados.has(item.id);
+          const disponible = (item.estado_gestion === 'Pendiente de gestionar' && !seleccionadosEnOtrasLineas.has(item.id)) || selected;
+          return `<label class="oc-search-item"><input type="checkbox" class="oc-solicitud-check" value="${item.id}" ${selected ? 'checked' : ''} ${disponible ? '' : 'disabled'}><span>${escapeHtml(item.numero_solicitud)}<br><small>${escapeHtml(item.centro_costo)}</small></span><span>${escapeHtml(item.descripcion_articulo)}<br><small>${escapeHtml(item.cantidad)} ${escapeHtml(item.unidad_medida)}</small></span><span class="oc-status ${item.estado_gestion === 'Gestionado' ? 'gestionado' : ''}">${escapeHtml(item.estado_gestion)}</span></label>`;
+        }).join('') : '<p class="empty-message">No se encontraron ítems.</p>';
+      };
+      const abrirBuscadorSolicitud = async (row) => {
+        ocFilaVinculando = row;
+        if (!ocItemsSolicitud.length) {
+          const response = await fetch('/compras/solicitudes-items', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar los ítems de solicitudes.');
+          ocItemsSolicitud = await response.json();
+        }
+        ocBuscarSolicitud.value = '';
+        renderResultadosSolicitud();
+        ocSolicitudesDialog.showModal();
+      };
+
+      const completarProveedorOC = () => {
+        const proveedor = ocProveedores.find((item) => String(item.id) === ocProveedor.value);
+        const values = {
+          'oc-cuit': proveedor?.cuit, 'oc-codigo-postal': proveedor?.codigo_postal,
+          'oc-domicilio': proveedor?.domicilio, 'oc-localidad': proveedor?.localidad,
+          'oc-condicion-iva': proveedor?.condicion_iva, 'oc-telefono-1': proveedor?.telefono_1,
+          'oc-telefono-2': proveedor?.telefono_2,
+        };
+        Object.entries(values).forEach(([id, value]) => { document.getElementById(id).value = value || ''; });
+        if (proveedor?.condicion_pago && !document.getElementById('oc-forma-pago').value) document.getElementById('oc-forma-pago').value = proveedor.condicion_pago;
+      };
+
+      const mostrarOrdenCompra = () => {
+        formulario.classList.add('hidden');
+        dashboardComprasPanel.classList.add('hidden');
+        solicitudesPanel.classList.add('hidden');
+        ordenCompraPanel.classList.remove('hidden');
+        ordenesCompraEmitidasPanel.classList.add('hidden');
+        btnSolicitudCompra.classList.remove('active');
+        btnDashboardCompras.classList.remove('active');
+        btnSolicitudesEmitidas.classList.remove('active');
+        btnEmisionOrdenCompra.classList.add('active');
+        btnOrdenesCompraEmitidas.classList.remove('active');
+      };
+
+      const mostrarOrdenesCompraEmitidas = async () => {
+        formulario.classList.add('hidden');
+        dashboardComprasPanel.classList.add('hidden');
+        solicitudesPanel.classList.add('hidden');
+        ordenCompraPanel.classList.add('hidden');
+        ordenesCompraEmitidasPanel.classList.remove('hidden');
+        btnSolicitudCompra.classList.remove('active');
+        btnDashboardCompras.classList.remove('active');
+        btnSolicitudesEmitidas.classList.remove('active');
+        btnEmisionOrdenCompra.classList.remove('active');
+        btnOrdenesCompraEmitidas.classList.add('active');
+        detalleOrdenCompraPanel.classList.add('hidden');
+        ordenesCompraEmitidasBody.innerHTML = '';
+        sinOrdenesCompra.classList.add('hidden');
+
+        try {
+          const response = await fetch('/compras/ordenes-compra', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar las órdenes de compra.');
+          const ordenes = await response.json();
+          sinOrdenesCompra.classList.toggle('hidden', ordenes.length > 0);
+          ordenesCompraEmitidasBody.innerHTML = ordenes.map((orden) => `
+            <tr class="solicitud-row orden-compra-row" data-id="${orden.id}">
+              <td>${escapeHtml(orden.numero_oc)}</td>
+              <td>${escapeHtml(orden.fecha || '')}</td>
+              <td>${escapeHtml(orden.proveedor)}</td>
+              <td>${escapeHtml(orden.estado || '')}</td>
+              <td>${escapeHtml(orden.cantidad_items)}</td>
+              <td>${formatCurrency(orden.total_neto)}</td>
+              <td><button type="button" class="btn-secondary btn-descargar-oc" data-id="${orden.id}">Descargar PDF</button></td>
+            </tr>`).join('');
+        } catch (error) {
+          console.error(error);
+          sinOrdenesCompra.textContent = error.message || 'Error al cargar las órdenes de compra.';
+          sinOrdenesCompra.classList.remove('hidden');
+        }
+      };
+
+      const mostrarDashboardCompras = async () => {
+        formulario.classList.add('hidden');
+        dashboardComprasPanel.classList.remove('hidden');
+        solicitudesPanel.classList.add('hidden');
+        ordenCompraPanel.classList.add('hidden');
+        ordenesCompraEmitidasPanel.classList.add('hidden');
+        btnDashboardCompras.classList.add('active');
+        btnSolicitudCompra.classList.remove('active');
+        btnSolicitudesEmitidas.classList.remove('active');
+        btnEmisionOrdenCompra.classList.remove('active');
+        btnOrdenesCompraEmitidas.classList.remove('active');
+        try {
+          const response = await fetch('/compras/dashboard', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar los indicadores de compras.');
+          const data = await response.json();
+          const kpis = [
+            ['Solicitudes', data.solicitudes, 'Solicitudes registradas'],
+            ['Órdenes de compra', data.ordenes, 'Órdenes emitidas'],
+            ['Órdenes anuladas', data.ordenes_anuladas, 'Incluidas en el historial'],
+            ['Proveedores', data.proveedores, 'Proveedores registrados'],
+            ['Ítems pendientes', data.items_pendientes, 'Pendientes o aprobados'],
+            ['Ítems aprobados', data.solicitudes_aprobadas, 'Listos para gestionar'],
+            ['Total neto', formatCurrency(data.total_neto), 'OC no anuladas'],
+            ['Fuera de plazo', data.solicitudes_fuera_plazo, 'Según prioridad'],
+          ];
+          comprasKpiGrid.innerHTML = kpis.map(([label, value, note]) => `
+            <div class="compras-kpi"><div class="compras-kpi-label">${escapeHtml(label)}</div><div class="compras-kpi-value">${escapeHtml(value)}</div><div class="compras-kpi-note">${escapeHtml(note)}</div></div>
+          `).join('');
+          renderComprasChart(comprasSolicitudesChart, data.estados_solicitudes || []);
+          renderComprasChart(comprasItemsChart, data.estados_items || []);
+          comprasPrioridades = data.prioridades || [];
+          comprasOverdueDetail.classList.add('hidden');
+          comprasPrioridadesBody.innerHTML = comprasPrioridades.length ? comprasPrioridades.map((item) => `
+            <tr class="compras-deadline-row" data-prioridad="${escapeHtml(item.prioridad)}"><td>${escapeHtml(item.prioridad)}</td><td>${item.dias ? `${escapeHtml(item.dias)} días` : 'Sin plazo'}</td><td>${escapeHtml(item.total)}</td><td class="${item.fuera_plazo ? 'deadline-alert' : ''}">${escapeHtml(item.fuera_plazo)}</td></tr>
+          `).join('') : '<tr><td colspan="4" class="empty-message">No hay solicitudes con prioridad.</td></tr>';
+        } catch (error) {
+          console.error(error);
+          comprasKpiGrid.innerHTML = `<p class="empty-message">${escapeHtml(error.message || 'No se pudieron cargar los indicadores.')}</p>`;
+          comprasSolicitudesChart.innerHTML = '';
+          comprasItemsChart.innerHTML = '';
+          comprasPrioridadesBody.innerHTML = '';
+          comprasOverdueDetail.classList.add('hidden');
+        }
+      };
+
+      const mostrarDetalleOrdenCompra = async (id) => {
+        try {
+          const response = await fetch(`/compras/ordenes-compra/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudo cargar el detalle de la orden.');
+          const orden = await response.json();
+          ordenCompraSeleccionada = orden;
+          historialOrdenCompraDetails.open = false;
+          detalleOrdenCompraTitulo.textContent = `Detalle de ${orden.numero_oc}`;
+          detalleOrdenCompraEstado.textContent = orden.estado || '';
+          const anulada = String(orden.estado || '').toUpperCase() === 'ANULADA';
+          btnEditarOrdenCompra.disabled = anulada;
+          btnAnularOrdenCompra.disabled = anulada;
+          detalleOrdenCompraCabecera.innerHTML = `
+            <div class="field"><label>Fecha</label><input readonly value="${escapeHtml(orden.fecha || '')}"></div>
+            <div class="field"><label>Proveedor</label><input readonly value="${escapeHtml(orden.proveedor)}"></div>
+            <div class="field"><label>CUIT</label><input readonly value="${escapeHtml(orden.cuit)}"></div>
+            <div class="field"><label>Domicilio</label><input readonly value="${escapeHtml(orden.domicilio)}"></div>
+            <div class="field"><label>Localidad</label><input readonly value="${escapeHtml(orden.localidad)}"></div>
+            <div class="field"><label>Solicitó</label><input readonly value="${escapeHtml(orden.solicitante)}"></div>
+            <div class="field"><label>Aprobó</label><input readonly value="${escapeHtml(orden.aprobador)}"></div>
+            <div class="field"><label>Cotización</label><input readonly value="${escapeHtml(orden.cotizacion)}"></div>
+            <div class="field"><label>Moneda</label><input readonly value="${escapeHtml(orden.moneda)}"></div>
+            <div class="field"><label>Forma de pago</label><input readonly value="${escapeHtml(orden.forma_pago)}"></div>
+            <div class="field"><label>Lugar de entrega</label><input readonly value="${escapeHtml(orden.lugar_entrega)}"></div>
+            <div class="field"><label>Observaciones</label><textarea readonly>${escapeHtml(orden.observaciones)}</textarea></div>`;
+          detalleOrdenCompraBody.innerHTML = orden.detalles.map((detalle, index) => `
+            <tr>
+              <td>${index + 1}</td><td>${escapeHtml(detalle.codigo_proveedor)}</td>
+              <td>${escapeHtml(detalle.descripcion)}</td><td>${escapeHtml(detalle.cantidad)}</td>
+              <td>${formatCurrency(detalle.precio_unitario)}</td><td>${formatCurrency(detalle.subtotal)}</td>
+              <td>${escapeHtml(detalle.centro_costo_id ?? '')}</td><td>${escapeHtml(detalle.solicitudes)}</td>
+            </tr>`).join('');
+          historialOrdenCompraBody.innerHTML = orden.historial.length ? orden.historial.map((item) => `
+            <tr><td>${escapeHtml(item.fecha)}</td><td>${escapeHtml(item.accion)}</td><td>${escapeHtml(item.usuario_nombre || item.usuario)}</td><td class="oc-history-detail">${historialDetail(item)}</td></tr>
+          `).join('') : '<tr><td colspan="4" class="empty-message">Sin movimientos registrados.</td></tr>';
+          detalleOrdenCompraPanel.classList.remove('hidden');
+          ordenesCompraEmitidasBody.querySelectorAll('.orden-compra-row').forEach((row) => row.classList.toggle('selected', row.dataset.id === String(id)));
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Error al cargar el detalle de la orden.');
+        }
+      };
+
+      const descargarOrdenCompraPdf = async (id) => {
+        try {
+          const response = await fetch(`/compras/ordenes-compra/${encodeURIComponent(id)}/pdf`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudo generar el PDF de la orden.');
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1] || 'orden_compra.pdf';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'No se pudo descargar el PDF.');
+        }
+      };
+
+      const abrirEdicionOrdenCompra = () => {
+        if (!ordenCompraSeleccionada || String(ordenCompraSeleccionada.estado || '').toUpperCase() === 'ANULADA') return;
+        editarOrdenId.value = ordenCompraSeleccionada.id;
+        document.getElementById('editar-oc-proveedor').innerHTML = '<option value="">Seleccione un proveedor</option>' + ocProveedores.map((proveedor) => `<option value="${proveedor.id}">${escapeHtml(proveedor.nombre)}</option>`).join('');
+        document.getElementById('editar-oc-proveedor').value = ordenCompraSeleccionada.proveedor_id || '';
+        document.getElementById('editar-oc-cotizacion').value = ordenCompraSeleccionada.cotizacion || '';
+        document.getElementById('editar-oc-moneda').value = ordenCompraSeleccionada.moneda || '';
+        document.getElementById('editar-oc-tipo-cambio').value = ordenCompraSeleccionada.tipo_cambio || '';
+        document.getElementById('editar-oc-forma-pago').value = ordenCompraSeleccionada.forma_pago || '';
+        document.getElementById('editar-oc-lugar-entrega').value = ordenCompraSeleccionada.lugar_entrega || '';
+        document.getElementById('editar-oc-transporte').value = ordenCompraSeleccionada.transporte || '';
+        document.getElementById('editar-oc-validez').value = ordenCompraSeleccionada.validez_oferta || '';
+        document.getElementById('editar-oc-solicitante').value = ordenCompraSeleccionada.solicitante || '';
+        document.getElementById('editar-oc-aprobador').value = ordenCompraSeleccionada.aprobador || '';
+        document.getElementById('editar-oc-observaciones').value = ordenCompraSeleccionada.observaciones || '';
+        document.getElementById('editar-oc-motivo').value = '';
+        editarOrdenDetallesBody.innerHTML = ordenCompraSeleccionada.detalles.map((detalle) => `
+          <tr data-id="${detalle.id}" data-centro-costo-id="${detalle.centro_costo_id || ''}">
+            <td><input class="editar-oc-codigo" value="${escapeHtml(detalle.codigo_proveedor)}"></td>
+            <td><input class="editar-oc-descripcion" value="${escapeHtml(detalle.descripcion)}"></td>
+            <td><input class="editar-oc-cantidad" type="number" min="0" step="0.01" value="${escapeHtml(detalle.cantidad)}"></td>
+            <td><input class="editar-oc-precio" type="number" min="0" step="0.01" value="${escapeHtml(detalle.precio_unitario)}"></td>
+            <td><input class="editar-oc-centro" value="${escapeHtml(detalle.centro_costo_id ?? '')}" disabled title="El centro de costo no se modifica desde esta pantalla"></td>
+          </tr>`).join('');
+        editarOrdenCompraDialog.showModal();
+      };
+
+      btnEditarOrdenCompra.addEventListener('click', abrirEdicionOrdenCompra);
+      document.getElementById('btn-cerrar-editar-orden').addEventListener('click', () => editarOrdenCompraDialog.close());
+      btnAnularOrdenCompra.addEventListener('click', async () => {
+        if (!ordenCompraSeleccionada || !confirm(`¿Desea anular la orden ${ordenCompraSeleccionada.numero_oc}?`)) return;
+        const motivo = prompt('Describa el motivo de la anulación:');
+        if (!motivo || !motivo.trim()) { alert('Debe indicar el motivo de la anulación.'); return; }
+        const response = await fetch(`/compras/ordenes-compra/${encodeURIComponent(ordenCompraSeleccionada.id)}/anular`, {
+          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motivo: motivo.trim() }),
+        });
+        if (!response.ok) { const data = await response.json().catch(() => ({})); alert(data.detail || 'No se pudo anular la orden.'); return; }
+        await mostrarDetalleOrdenCompra(ordenCompraSeleccionada.id);
+        await mostrarOrdenesCompraEmitidas();
+        await mostrarDetalleOrdenCompra(ordenCompraSeleccionada.id);
+      });
+
+      editarOrdenCompraForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const motivo = document.getElementById('editar-oc-motivo').value.trim();
+        if (!motivo) { alert('Debe indicar el motivo de la edición.'); return; }
+        const detalles = [...editarOrdenDetallesBody.querySelectorAll('tr')].map((row) => ({
+          id: Number(row.dataset.id), codigo_proveedor: row.querySelector('.editar-oc-codigo').value.trim(),
+          descripcion: row.querySelector('.editar-oc-descripcion').value.trim(), cantidad: row.querySelector('.editar-oc-cantidad').value,
+          precio_unitario: row.querySelector('.editar-oc-precio').value, centro_costo_id: row.dataset.centroCostoId || null,
+        }));
+        const payload = {
+          motivo, proveedor_id: document.getElementById('editar-oc-proveedor').value,
+          cotizacion: document.getElementById('editar-oc-cotizacion').value.trim(), moneda: document.getElementById('editar-oc-moneda').value.trim(),
+          tipo_cambio: document.getElementById('editar-oc-tipo-cambio').value, forma_pago: document.getElementById('editar-oc-forma-pago').value.trim(),
+          lugar_entrega: document.getElementById('editar-oc-lugar-entrega').value.trim(), transporte: document.getElementById('editar-oc-transporte').value.trim(),
+          validez_oferta: document.getElementById('editar-oc-validez').value.trim(), solicitante: document.getElementById('editar-oc-solicitante').value.trim(),
+          aprobador: document.getElementById('editar-oc-aprobador').value.trim(), observaciones: document.getElementById('editar-oc-observaciones').value.trim(), detalles,
+        };
+        const response = await fetch(`/compras/ordenes-compra/${encodeURIComponent(editarOrdenId.value)}/editar`, {
+          method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!response.ok) { const data = await response.json().catch(() => ({})); alert(data.detail || 'No se pudo editar la orden.'); return; }
+        editarOrdenCompraDialog.close();
+        await mostrarOrdenesCompraEmitidas();
+        await mostrarDetalleOrdenCompra(editarOrdenId.value);
+        alert('Orden de compra editada y registrada en el historial.');
+      });
+
+      const mostrarDetalleSolicitud = async (id) => {
+        try {
+          const response = await fetch(`/compras/solicitudes/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudo cargar el detalle de la solicitud.');
+          const solicitud = await response.json();
+          solicitudSeleccionadaId = solicitud.id;
+          const puedeAprobar = Boolean(solicitud.puede_aprobar);
+          panelAprobacion.classList.toggle('admin-only', !puedeAprobar);
+          thSeleccionarItems.classList.toggle('admin-only', !puedeAprobar);
+          seleccionarTodosItems.checked = false;
+          detalleSolicitudTitulo.textContent = `Detalle de ${solicitud.numero_solicitud}`;
+          detalleSolicitudCabecera.innerHTML = `
+            <div class="field"><label>Solicitante</label><input readonly value="${escapeHtml(solicitud.solicitante)}"></div>
+            <div class="field"><label>Destino de compra</label><input readonly value="${escapeHtml(solicitud.destino_compra)}"></div>
+            <div class="field"><label>Prioridad</label><input readonly value="${escapeHtml(solicitud.prioridad)}"></div>
+            <div class="field"><label>Estado</label><input readonly value="${escapeHtml(solicitud.estado)}"></div>
+            <div class="field"><label>Observaciones</label><textarea readonly>${escapeHtml(solicitud.observaciones)}</textarea></div>`;
+          detalleSolicitudBody.innerHTML = solicitud.items.map((item, index) => `
+            <tr>
+              <td>${index + 1}</td><td>${escapeHtml(item.centro_costo)}</td><td>${escapeHtml(item.vehiculo)}</td>
+              <td>${escapeHtml(item.descripcion_articulo)}</td><td>${escapeHtml(item.motivo_compra)}</td>
+              <td>${escapeHtml(item.cantidad)}</td><td>${escapeHtml(item.unidad_medida)}</td><td>${escapeHtml(item.observacion)}</td>
+              <td>${escapeHtml(item.estado_aprobacion)}</td><td>${escapeHtml(item.motivo_rechazo)}</td><td>${escapeHtml(item.usuario_resolucion)}</td>
+              ${puedeAprobar ? `<td><input class="item-aprobacion-check" type="checkbox" value="${item.id}" aria-label="Seleccionar ítem ${index + 1}"></td>` : ''}
+            </tr>`).join('');
+          detalleSolicitudPanel.classList.remove('hidden');
+          solicitudesBody.querySelectorAll('.solicitud-row').forEach((row) => row.classList.toggle('selected', row.dataset.id === String(id)));
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Error al cargar el detalle de la solicitud.');
+        }
+      };
+
+      btnDashboardCompras.addEventListener('click', mostrarDashboardCompras);
+      document.getElementById('btn-actualizar-dashboard-compras').addEventListener('click', mostrarDashboardCompras);
+      comprasPrioridadesBody.addEventListener('click', (event) => {
+        const row = event.target.closest('.compras-deadline-row');
+        if (row) mostrarDetalleFueraPlazo(row.dataset.prioridad);
+      });
+      btnSolicitudCompra.addEventListener('click', mostrarFormulario);
+      btnSolicitudesEmitidas.addEventListener('click', mostrarSolicitudes);
+      btnEmisionOrdenCompra.addEventListener('click', mostrarOrdenCompra);
+      btnOrdenesCompraEmitidas.addEventListener('click', mostrarOrdenesCompraEmitidas);
+      document.getElementById('btn-actualizar-ordenes-compra').addEventListener('click', mostrarOrdenesCompraEmitidas);
+      ordenesCompraEmitidasBody.addEventListener('click', (event) => {
+        const downloadButton = event.target.closest('.btn-descargar-oc');
+        if (downloadButton) {
+          event.stopPropagation();
+          descargarOrdenCompraPdf(downloadButton.dataset.id);
+          return;
+        }
+        const row = event.target.closest('.orden-compra-row');
+        if (row) mostrarDetalleOrdenCompra(row.dataset.id);
+      });
+      btnOcAgregarLinea.addEventListener('click', agregarLineaOC);
+      ocProveedor.addEventListener('change', completarProveedorOC);
+      ocLineasBody.addEventListener('input', actualizarLineasOC);
+      ocLineasBody.addEventListener('click', (event) => {
+        if (event.target.closest('.oc-vincular-solicitud')) {
+          abrirBuscadorSolicitud(event.target.closest('tr')).catch((error) => alert(error.message));
+          return;
+        }
+        if (event.target.closest('.oc-eliminar-linea')) {
+          event.target.closest('tr').remove();
+          actualizarLineasOC();
+        }
+      });
+      document.getElementById('btn-oc-cerrar-buscador').addEventListener('click', () => ocSolicitudesDialog.close());
+      ocBuscarSolicitud.addEventListener('input', renderResultadosSolicitud);
+      ocResultadosSolicitud.addEventListener('change', (event) => {
+        if (!event.target.classList.contains('oc-solicitud-check') || !ocFilaVinculando) return;
+        const id = Number(event.target.value);
+        let ids = idsSolicitudFila(ocFilaVinculando);
+        if (event.target.checked) {
+          if (ids.length >= 2) { event.target.checked = false; alert('Puede vincular hasta dos ítems de solicitud por artículo.'); return; }
+          ids.push(id);
+        } else ids = ids.filter((itemId) => itemId !== id);
+        ocFilaVinculando.dataset.solicitudIds = JSON.stringify(ids);
+        actualizarResumenVinculos(ocFilaVinculando);
+        renderResultadosSolicitud();
+      });
+
+      btnGuardarOc.addEventListener('click', async () => {
+        const itemsOc = [...ocLineasBody.querySelectorAll('tr')].map((row) => ({
+          codigo_proveedor: row.querySelector('.oc-codigo').value.trim(),
+          cantidad: row.querySelector('.oc-cantidad').value,
+          descripcion: row.querySelector('.oc-descripcion').value.trim(),
+          precio_unitario: row.querySelector('.oc-precio').value,
+          centro_costo_id: row.querySelector('.oc-centro-costo').value || null,
+          solicitud_detalle_ids: idsSolicitudFila(row),
+        })).filter((item) => item.descripcion || item.codigo_proveedor || item.cantidad || item.precio_unitario);
+        if (!ocProveedor.value || !itemsOc.length) { alert('Seleccione un proveedor y cargue al menos un artículo.'); return; }
+        const payloadOc = {
+          proveedor_id: ocProveedor.value, fecha: document.getElementById('oc-fecha').value,
+          cotizacion: document.getElementById('oc-cotizacion').value.trim(), moneda: document.getElementById('oc-moneda').value.trim(),
+          tipo_cambio: document.getElementById('oc-tipo-cambio').value, forma_pago: document.getElementById('oc-forma-pago').value.trim(),
+          lugar_entrega: document.getElementById('oc-lugar-entrega').value.trim(), transporte: document.getElementById('oc-transporte').value.trim(),
+          validez_oferta: document.getElementById('oc-validez').value.trim(), observaciones: document.getElementById('oc-observaciones').value.trim(),
+          solicitante: document.getElementById('oc-solicitante').value.trim(), aprobador: document.getElementById('oc-aprobador').value.trim(), items: itemsOc,
+          contactos: [
+            { nombre: document.getElementById('oc-contacto-1-nombre').value.trim(), correo: document.getElementById('oc-contacto-1-correo').value.trim(), telefono: document.getElementById('oc-contacto-1-telefono').value.trim() },
+            { nombre: document.getElementById('oc-contacto-2-nombre').value.trim(), correo: document.getElementById('oc-contacto-2-correo').value.trim(), telefono: document.getElementById('oc-contacto-2-telefono').value.trim() },
+          ],
+        };
+        try {
+          const response = await fetch('/compras/ordenes-compra', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadOc) });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || 'No se pudo emitir la orden de compra.');
+          }
+          const blob = await response.blob();
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          const filename = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1];
+          link.download = filename || 'orden_compra.pdf';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(downloadUrl);
+          alert('Orden de compra emitida y PDF descargado correctamente.');
+          window.location.reload();
+        } catch (error) { alert(error.message || 'Error al emitir la orden de compra.'); }
+      });
+      solicitudesBody.addEventListener('click', (event) => {
+        const row = event.target.closest('.solicitud-row');
+        if (row) mostrarDetalleSolicitud(row.dataset.id);
+      });
+
+      seleccionarTodosItems.addEventListener('change', () => {
+        detalleSolicitudBody.querySelectorAll('.item-aprobacion-check').forEach((check) => {
+          check.checked = seleccionarTodosItems.checked;
+        });
+      });
+
+      const resolverItems = async (accion) => {
+        const idsItems = [...detalleSolicitudBody.querySelectorAll('.item-aprobacion-check:checked')].map((check) => Number(check.value));
+        if (!idsItems.length) {
+          alert('Seleccione al menos un ítem. Para una resolución completa, seleccione todos.');
+          return;
+        }
+        if (accion === 'rechazar' && !motivoRechazo.value.trim()) {
+          alert('Debe indicar el motivo de rechazo.');
+          motivoRechazo.focus();
+          return;
+        }
+        try {
+          const response = await fetch(`/compras/solicitudes/${encodeURIComponent(solicitudSeleccionadaId)}/resolver`, {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accion, ids_items: idsItems, motivo_rechazo: motivoRechazo.value.trim() }),
+          });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || 'No se pudieron actualizar los ítems.');
+          }
+          motivoRechazo.value = '';
+          await mostrarSolicitudes();
+          await mostrarDetalleSolicitud(solicitudSeleccionadaId);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'No se pudieron actualizar los ítems.');
+        }
+      };
+
+      btnAprobarItems.addEventListener('click', () => resolverItems('aprobar'));
+      btnRechazarItems.addEventListener('click', () => resolverItems('rechazar'));
+
+      btnDescargarSolicitudPdf.addEventListener('click', async () => {
+        if (!solicitudSeleccionadaId) return;
+        try {
+          const response = await fetch(`/compras/solicitudes/${encodeURIComponent(solicitudSeleccionadaId)}/pdf`, {
+            credentials: 'same-origin',
+          });
+          if (!response.ok) throw new Error('El PDF de esta solicitud no está disponible.');
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'solicitud-compra.pdf';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'No se pudo descargar el PDF.');
+        }
+      });
+
+      const resetProveedorForm = () => {
+        proveedorForm.reset();
+        proveedorIdInput.value = '';
+      };
+
+      const normalizarBusquedaProveedor = (value) => String(value || '').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const renderizarProveedores = () => {
+        const termino = normalizarBusquedaProveedor(buscarProveedorInput.value.trim());
+        const proveedoresFiltrados = ocProveedores.filter((proveedor) => normalizarBusquedaProveedor([
+          proveedor.nombre, proveedor.cuit, proveedor.localidad, proveedor.domicilio,
+          proveedor.telefono_1, proveedor.telefono_2, proveedor.condicion_pago, proveedor.condicion_iva,
+        ].join(' ')).includes(termino));
+        proveedoresBody.innerHTML = proveedoresFiltrados.length ? proveedoresFiltrados.map((proveedor) => `
+          <tr>
+            <td>${escapeHtml(proveedor.id)}</td><td>${escapeHtml(proveedor.nombre)}</td>
+            <td>${escapeHtml(proveedor.cuit || '')}</td><td>${escapeHtml(proveedor.localidad || '')}</td>
+            <td>${escapeHtml(proveedor.condicion_pago || proveedor.condicion_iva || '')}</td>
+            <td><button type="button" class="btn-secondary btn-editar-proveedor" data-id="${proveedor.id}">Editar</button>
+              <button type="button" class="btn-secondary btn-eliminar-proveedor" data-id="${proveedor.id}">Eliminar</button></td>
+          </tr>`).join('') : '<tr><td colspan="6" class="empty-message">No se encontraron proveedores.</td></tr>';
+      };
+
+      const recargarProveedores = async () => {
+        const response = await fetch('/compras/proveedores', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('No se pudieron cargar los proveedores.');
+        ocProveedores = await response.json();
+        ocProveedor.innerHTML = '<option value="">Seleccione un proveedor</option>';
+        ocProveedores.forEach((proveedor) => {
+          const option = document.createElement('option');
+          option.value = proveedor.id;
+          option.textContent = proveedor.nombre;
+          ocProveedor.appendChild(option);
+        });
+        renderizarProveedores();
+      };
+
+      btnGestionarProveedores.addEventListener('click', async () => {
+        try {
+          resetProveedorForm();
+          buscarProveedorInput.value = '';
+          await recargarProveedores();
+          proveedoresDialog.showModal();
+        } catch (error) { alert(error.message || 'No se pudieron cargar los proveedores.'); }
+      });
+      document.getElementById('btn-cerrar-proveedores').addEventListener('click', () => proveedoresDialog.close());
+      document.getElementById('btn-reset-proveedor').addEventListener('click', resetProveedorForm);
+      buscarProveedorInput.addEventListener('input', renderizarProveedores);
+
+      proveedorForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const payload = Object.fromEntries(Object.entries(proveedorInputs).map(([key, input]) => [key, input.value.trim()]));
+        if (!payload.nombre) { alert('El nombre del proveedor es obligatorio.'); return; }
+        const proveedorId = proveedorIdInput.value;
+        const response = await fetch(proveedorId ? `/compras/proveedores/${encodeURIComponent(proveedorId)}` : '/compras/proveedores', {
+          method: proveedorId ? 'PUT' : 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!response.ok) { const data = await response.json().catch(() => ({})); alert(data.detail || 'No se pudo guardar el proveedor.'); return; }
+        resetProveedorForm();
+        await recargarProveedores();
+        alert(proveedorId ? 'Proveedor actualizado correctamente.' : 'Proveedor creado correctamente.');
+      });
+
+      proveedoresBody.addEventListener('click', async (event) => {
+        const editButton = event.target.closest('.btn-editar-proveedor');
+        const deleteButton = event.target.closest('.btn-eliminar-proveedor');
+        if (editButton) {
+          const proveedor = ocProveedores.find((item) => String(item.id) === editButton.dataset.id);
+          if (!proveedor) return;
+          proveedorIdInput.value = proveedor.id;
+          Object.entries(proveedorInputs).forEach(([key, input]) => { input.value = proveedor[key] || ''; });
+          proveedorInputs.nombre.focus();
+        }
+        if (deleteButton && confirm('¿Seguro que desea eliminar este proveedor?')) {
+          const response = await fetch(`/compras/proveedores/${encodeURIComponent(deleteButton.dataset.id)}`, { method: 'DELETE', credentials: 'same-origin' });
+          if (!response.ok) { const data = await response.json().catch(() => ({})); alert(data.detail || 'No se pudo eliminar el proveedor.'); return; }
+          await recargarProveedores();
+          alert('Proveedor eliminado correctamente.');
+        }
+      });
+
+      try {
+        const response = await fetch('/compras/metadata', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('No se pudieron cargar los datos de compras');
+        if (response.redirected || !response.headers.get('content-type')?.includes('application/json')) {
+          throw new Error('La respuesta de metadata no es JSON válido. Inicie sesión o recargue la página.');
+        }
+        const data = await response.json();
+        console.log('compras metadata', data);
+
+        numeroSolicitud.value = data.numero_solicitud || '';
+
+        data.personal.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.legajo;
+          option.textContent = item.nombre;
+          solicitante.appendChild(option);
+          const ocOption = document.createElement('option');
+          ocOption.value = item.nombre;
+          ocOption.textContent = item.nombre;
+          document.getElementById('oc-solicitante').appendChild(ocOption);
+        });
+
+        data.proyectos.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.nombre;
+          option.textContent = item.nombre;
+          listaProyectos.appendChild(option);
+        });
+
+        data.centros_costos.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = `${item.id} - ${item.nombre}`;
+          centroCostoSelect.appendChild(option);
+        });
+        ocCentrosCostos = data.centros_costos || [];
+
+        data.vehiculos.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.codigo;
+          option.textContent = `${item.codigo} - ${item.nombre_equipo}`;
+          ciVehiculo.appendChild(option);
+        });
+
+        data.productos.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = `${item.codigo} - ${item.descripcion}`;
+          listaProductos.appendChild(option);
+        });
+
+        data.unidades_medida.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.nombre;
+          listaUnidades.appendChild(option);
+        });
+
+        data.prioridades.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.nombre;
+          prioridad.appendChild(option);
+        });
+      } catch (error) {
+        console.error(error);
+      }
+
+      try {
+        const response = await fetch('/compras/proveedores', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('No se pudieron cargar los proveedores.');
+        ocProveedores = await response.json();
+        ocProveedores.forEach((proveedor) => {
+          const option = document.createElement('option');
+          option.value = proveedor.id;
+          option.textContent = proveedor.nombre;
+          ocProveedor.appendChild(option);
+        });
+      } catch (error) {
+        console.error(error);
+        alert(error.message || 'No se pudieron cargar los proveedores.');
+      }
+      document.getElementById('oc-fecha').value = new Date().toISOString().slice(0, 10);
+      agregarLineaOC();
+
+      const btnAgregar = document.getElementById('btn-agregar-item');
+      const btnEmitirSolicitud = document.getElementById('btn-emitir-solicitud');
+      const detalleBody = document.getElementById('detalle-items-body');
+      const detalleArticulo = document.getElementById('detalleArticulo');
+      const motivoCompra = document.getElementById('motivoCompra');
+      const cantidad = document.getElementById('cantidad');
+      const unidadMedida = document.getElementById('unidadMedida');
+
+      let items = [];
+      let editIndex = null;
+
+      const renderItems = () => {
+        detalleBody.innerHTML = '';
+        items.forEach((item, index) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${item.centroCosto}</td>
+            <td>${item.ci}</td>
+            <td>${item.detalle}</td>
+            <td>${item.motivo}</td>
+            <td>${item.cantidad}</td>
+            <td>${item.unidad}</td>
+            <td>
+              <button type="button" class="btn-secondary btn-editar" data-index="${index}">Editar</button>
+              <button type="button" class="btn-secondary btn-eliminar" data-index="${index}">Eliminar</button>
+            </td>
+          `;
+          detalleBody.appendChild(row);
+        });
+      };
+
+      const resetDetalleInputs = () => {
+        detalleArticulo.value = '';
+        motivoCompra.value = '';
+        cantidad.value = '';
+        unidadMedida.value = '';
+        centroCostoSelect.value = '';
+        ciVehiculo.value = '';
+        editIndex = null;
+        btnAgregar.textContent = 'Agregar';
+      };
+
+      btnAgregar.addEventListener('click', () => {
+        if (items.length >= 20 && editIndex === null) {
+          alert('Solo se pueden agregar hasta 20 artículos.');
+          return;
+        }
+
+        const centroId = centroCostoSelect.value;
+        const centroNombre = centroCostoSelect.selectedOptions[0]?.textContent || '';
+        const ciCodigo = ciVehiculo.value;
+        const item = {
+          centroCosto: centroId,
+          centroCostoText: centroNombre,
+          ci: ciCodigo,
+          detalle: detalleArticulo.value.trim(),
+          motivo: motivoCompra.value.trim(),
+          cantidad: cantidad.value.trim(),
+          unidad: unidadMedida.value.trim(),
+        };
+
+        if (!item.detalle || !item.cantidad || !item.unidad) {
+          alert('Los campos Detallar artículo, Cantidad y Unidad son obligatorios.');
+          return;
+        }
+
+        if (editIndex !== null) {
+          items[editIndex] = item;
+          editIndex = null;
+          btnAgregar.textContent = 'Agregar';
+        } else {
+          items.push(item);
+        }
+
+        renderItems();
+        resetDetalleInputs();
+      });
+
+      detalleBody.addEventListener('click', (event) => {
+        const target = event.target;
+        const index = Number(target.dataset.index);
+        if (target.classList.contains('btn-eliminar')) {
+          items.splice(index, 1);
+          renderItems();
+          resetDetalleInputs();
+          return;
+        }
+        if (target.classList.contains('btn-editar')) {
+          const item = items[index];
+          editIndex = index;
+          detalleArticulo.value = item.detalle;
+          motivoCompra.value = item.motivo;
+          cantidad.value = item.cantidad;
+          unidadMedida.value = item.unidad;
+          centroCostoSelect.value = item.centroCosto;
+          ciVehiculo.value = item.ci;
+          btnAgregar.textContent = 'Guardar cambios';
+        }
+      });
+
+      document.querySelector('#cerrar-solicitud').addEventListener('click', () => {
+        window.location.reload();
+      });
+
+      btnEmitirSolicitud.addEventListener('click', async () => {
+        if (items.length === 0) {
+          alert('Agregue al menos un artículo antes de emitir la solicitud.');
+          return;
+        }
+
+        const payload = {
+          numero_solicitud: numeroSolicitud.value,
+          fecha_solicitud: fecha.value,
+          id_solicitante: solicitante.value,
+          destino_compra: destinoCompra.value.trim(),
+          prioridad_id: prioridad.value,
+          observaciones: document.getElementById('observaciones').value.trim(),
+          items,
+        };
+
+        try {
+          const response = await fetch('/compras/emitir', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'No se pudo emitir la solicitud.');
+          }
+
+          const blob = await response.blob();
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${numeroSolicitud.value}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(downloadUrl);
+
+          alert('Solicitud emitida y PDF descargado.');
+          window.location.reload();
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Error al emitir la solicitud.');
+        }
+      });
+    });
+  </script>
+</div>
+</body>
+</html>

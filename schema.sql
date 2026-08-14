@@ -144,6 +144,13 @@ CREATE INDEX IF NOT EXISTS idx_recursos_id_viaje ON recursos_viaje (id_viaje);
 CREATE INDEX IF NOT EXISTS idx_acompanantes_id_viaje ON recurso_acompanantes (id_viaje);
 CREATE INDEX IF NOT EXISTS idx_ordenes_id_viaje ON ordenes_salida (id_viaje);
 
+CREATE TABLE IF NOT EXISTS centros_costos (
+    id INTEGER PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    activo INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS categorias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT NOT NULL UNIQUE
@@ -209,6 +216,19 @@ CREATE TABLE IF NOT EXISTS remitos_ingreso (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     raw_json TEXT,
     FOREIGN KEY (responsable_legajo) REFERENCES personal (legajo) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS proveedores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "NOM_PROVEE" TEXT NOT NULL,
+    "DOMICILIO" TEXT,
+    "TELÉFONO_1" TEXT,
+    "TELÉFONO_2" TEXT,
+    "DESC_COND" TEXT,
+    "COND_IVA" TEXT,
+    "CUIT" TEXT,
+    "C_POSTAL" TEXT,
+    "LOCALIDAD" TEXT
 );
 
 CREATE TABLE IF NOT EXISTS remitos_ingreso_detalle (
@@ -409,6 +429,120 @@ CREATE TABLE IF NOT EXISTS proyectos (
     cliente TEXT,
     activo INTEGER DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS prioridades_compra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    activo INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS estados_compra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    activo INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS solicitud_compra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_solicitud TEXT NOT NULL UNIQUE,
+    fecha_solicitud TEXT NOT NULL,
+    id_solicitante INTEGER NOT NULL,
+    id_proyecto INTEGER NOT NULL,
+    id_prioridad INTEGER NOT NULL,
+    observaciones TEXT,
+    id_estado INTEGER NOT NULL,
+    fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_modificacion TEXT,
+    FOREIGN KEY (id_solicitante) REFERENCES personal (legajo) ON DELETE RESTRICT,
+    FOREIGN KEY (id_proyecto) REFERENCES proyectos (id) ON DELETE RESTRICT,
+    FOREIGN KEY (id_prioridad) REFERENCES prioridades_compra (id) ON DELETE RESTRICT,
+    FOREIGN KEY (id_estado) REFERENCES estados_compra (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS solicitud_compra_detalle (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_solicitud INTEGER NOT NULL,
+    id_centro_costo INTEGER NOT NULL,
+    id_vehiculo INTEGER,
+    id_maquinaria INTEGER,
+    descripcion_articulo TEXT NOT NULL,
+    motivo_compra TEXT NOT NULL,
+    cantidad REAL NOT NULL,
+    unidad_medida TEXT,
+    observacion TEXT,
+    estado_aprobacion TEXT NOT NULL DEFAULT 'Pendiente',
+    motivo_rechazo TEXT,
+    usuario_resolucion TEXT,
+    FOREIGN KEY (id_solicitud) REFERENCES solicitud_compra (id) ON DELETE CASCADE,
+    FOREIGN KEY (id_centro_costo) REFERENCES centros_costos (id) ON DELETE RESTRICT,
+    FOREIGN KEY (id_vehiculo) REFERENCES vehiculos (id) ON DELETE SET NULL,
+    FOREIGN KEY (id_maquinaria) REFERENCES vehiculos (id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS OrdenCompra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_oc TEXT NOT NULL UNIQUE,
+    fecha TEXT,
+    proveedor_id INTEGER,
+    cotizacion TEXT,
+    moneda TEXT,
+    tipo_cambio REAL,
+    forma_pago TEXT,
+    lugar_entrega TEXT,
+    transporte TEXT,
+    validez_oferta TEXT,
+    observaciones TEXT,
+    solicitante TEXT,
+    aprobador TEXT,
+    estado TEXT,
+    fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores (id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS OrdenCompraDetalle (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orden_compra_id INTEGER NOT NULL,
+    codigo_proveedor TEXT,
+    articulo_id INTEGER,
+    descripcion TEXT,
+    cantidad REAL,
+    precio_unitario REAL,
+    subtotal REAL,
+    centro_costo_id INTEGER,
+    FOREIGN KEY (orden_compra_id) REFERENCES OrdenCompra (id) ON DELETE CASCADE,
+    FOREIGN KEY (articulo_id) REFERENCES productos (id) ON DELETE SET NULL,
+    FOREIGN KEY (centro_costo_id) REFERENCES centros_costos (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_orden_compra_detalle_orden
+    ON OrdenCompraDetalle (orden_compra_id);
+
+CREATE TABLE IF NOT EXISTS OrdenCompraHistorial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orden_compra_id INTEGER NOT NULL,
+    accion TEXT NOT NULL,
+    detalle TEXT NOT NULL,
+    usuario TEXT NOT NULL,
+    usuario_nombre TEXT NOT NULL,
+    fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (orden_compra_id) REFERENCES OrdenCompra (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_orden_compra_historial_orden
+    ON OrdenCompraHistorial (orden_compra_id);
+
+CREATE TABLE IF NOT EXISTS OrdenCompraDetalleSolicitud (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orden_compra_detalle_id INTEGER NOT NULL,
+    solicitud_compra_detalle_id INTEGER NOT NULL UNIQUE,
+    fecha_vinculacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (orden_compra_detalle_id) REFERENCES OrdenCompraDetalle (id) ON DELETE CASCADE,
+    FOREIGN KEY (solicitud_compra_detalle_id) REFERENCES solicitud_compra_detalle (id) ON DELETE RESTRICT,
+    UNIQUE (orden_compra_detalle_id, solicitud_compra_detalle_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_oc_detalle_solicitud_oc_detalle
+    ON OrdenCompraDetalleSolicitud (orden_compra_detalle_id);
 
 CREATE TABLE IF NOT EXISTS instalaciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
