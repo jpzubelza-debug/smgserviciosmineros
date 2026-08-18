@@ -409,11 +409,38 @@
   @media (max-width: 900px) {
     .app-shell { grid-template-columns: 1fr; }
     .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 1fr; }
-    .sidebar { order: 2; width: auto; }
+    .sidebar {
+      order: 1;
+      width: 100%;
+      min-width: 0;
+      padding: 8px;
+      gap: 8px;
+    }
     .sidebar:hover, .sidebar:focus-within { width: auto; }
-    .sidebar:not(:hover):not(:focus-within) .menu button { text-indent: 0; padding-left: 10px; padding-right: 10px; }
+    .sidebar .brand {
+      min-height: 64px;
+      padding: 8px;
+    }
     .sidebar:not(:hover):not(:focus-within) .brand img { width: 78%; }
-    .main { order: 1; }
+    .sidebar .menu {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 1px 6px;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sidebar .menu button,
+    .sidebar:not(:hover):not(:focus-within) .menu button {
+      flex: 0 0 auto;
+      min-height: 42px;
+      max-width: none;
+      padding: 10px 12px;
+      text-indent: 0;
+      overflow: visible;
+    }
+    .main { order: 2; }
     .card-grid, .form-grid { grid-template-columns: 1fr; }
     .detail-table { min-width: 700px; }
     .oc-provider-grid { grid-template-columns: 1fr; }
