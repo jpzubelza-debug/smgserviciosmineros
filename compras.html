@@ -899,6 +899,7 @@
       btnGuardarOc.disabled = !puedeAccion('emision_orden_compra', 'emitir', ['ADMINISTRADOR', 'SUPERVISOR']);
       btnEditarOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'editar', ['ADMINISTRADOR', 'SUPERVISOR']);
       btnAnularOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'anular', ['ADMINISTRADOR', 'SUPERVISOR']);
+      btnGestionarProveedores.disabled = !puedeAccion('proveedores', 'consultar');
 
       fecha.value = new Date().toISOString().slice(0, 10);
 
@@ -1527,6 +1528,7 @@
       };
 
       const recargarProveedores = async () => {
+        if (!puedeAccion('proveedores', 'consultar')) return false;
         const response = await fetch('/compras/proveedores', { credentials: 'same-origin' });
         if (!response.ok) throw new Error('No se pudieron cargar los proveedores.');
         ocProveedores = await response.json();
@@ -1541,6 +1543,7 @@
       };
 
       btnGestionarProveedores.addEventListener('click', async () => {
+        if (!puedeAccion('proveedores', 'consultar')) return;
         try {
           resetProveedorForm();
           buscarProveedorInput.value = '';
