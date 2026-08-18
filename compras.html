@@ -874,17 +874,18 @@
         return;
       }
       const tipoUsuario = String(me.tipo_usuario || '').toUpperCase();
+      const esDesarrollador = me.es_desarrollador === true;
       const panelesCompras = new Set(me.paneles?.compras || []);
       const accionesCompras = me.acciones?.compras || {};
       const puedePanel = (panel, tipos = null) => {
-        const panelPermitido = panelesCompras.has(panel);
+        const panelPermitido = esDesarrollador || panelesCompras.has(panel);
         const tipoPermitido = !tipos || tipos.includes(tipoUsuario);
         return panelPermitido && tipoPermitido;
       };
       const puedeAccion = (panel, accion, tipos = null) => {
         const accionesPanel = new Set(accionesCompras[panel] || []);
         const tipoPermitido = !tipos || tipos.includes(tipoUsuario);
-        return panelesCompras.has(panel) && accionesPanel.has(accion) && tipoPermitido;
+        return (esDesarrollador || (panelesCompras.has(panel) && accionesPanel.has(accion))) && tipoPermitido;
       };
       const controlesCompras = [
         [btnDashboardCompras, puedePanel('dashboard', ['ADMINISTRADOR', 'SUPERVISOR', 'ASISTENTE'])],

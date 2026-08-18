@@ -115,6 +115,11 @@ CONTINGENCY_PANELS = {
     "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
     "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
+    "rrhh": ["dashboard"],
+    "mantenimiento": ["dashboard"],
+    "dashboard_ejecutivo": ["dashboard"],
+    "administracion": ["usuarios", "accesos"],
+    "base_datos": ["tablas"],
 }
 
 
@@ -133,6 +138,7 @@ def _usuario_autenticado(request: Request):
             "modulos": ALL_MODULES,
             "paneles": CONTINGENCY_PANELS,
             "acciones": {},
+            "es_desarrollador": True,
         }
 
     try:
@@ -2281,7 +2287,7 @@ def _requiere_modulo(request: Request, modulo: str):
     perfil = _usuario_autenticado(request)
     if perfil is None:
         raise HTTPException(status_code=401, detail="Sesión no válida")
-    if modulo in (perfil.get("modulos", []) or []):
+    if perfil.get("es_desarrollador") or modulo in (perfil.get("modulos", []) or []):
         return perfil
     raise HTTPException(status_code=403, detail="No tiene acceso a este módulo")
 
@@ -2289,7 +2295,7 @@ def _requiere_modulo(request: Request, modulo: str):
 def _requiere_panel(request: Request, modulo: str, panel: str):
     perfil = _requiere_modulo(request, modulo)
     paneles = perfil.get("paneles", {}) or {}
-    if panel in (paneles.get(modulo, []) or []):
+    if perfil.get("es_desarrollador") or panel in (paneles.get(modulo, []) or []):
         return perfil
     raise HTTPException(status_code=403, detail="No tiene acceso a este panel")
 
@@ -2305,7 +2311,7 @@ def _requiere_accion(request: Request, modulo: str, panel: str, accion: str):
     perfil = _requiere_panel(request, modulo, panel)
     acciones = perfil.get("acciones", {}) or {}
     permitidas = ((acciones.get(modulo, {}) or {}).get(panel, []) or [])
-    if accion in permitidas:
+    if perfil.get("es_desarrollador") or accion in permitidas:
         return perfil
     raise HTTPException(status_code=403, detail="No tiene habilitada esta acción")
 
@@ -2321,9 +2327,9 @@ def _requiere_panel_compras(request: Request, panel: str):
     perfil = _usuario_autenticado(request)
     if perfil is None:
         raise HTTPException(status_code=401, detail="Sesión no válida")
-    if "compras" not in (perfil.get("modulos", []) or []):
+    if not perfil.get("es_desarrollador") and "compras" not in (perfil.get("modulos", []) or []):
         raise HTTPException(status_code=403, detail="No tiene acceso a este módulo")
-    if panel in ((perfil.get("paneles", {}) or {}).get("compras", []) or []):
+    if perfil.get("es_desarrollador") or panel in ((perfil.get("paneles", {}) or {}).get("compras", []) or []):
         return perfil
     raise HTTPException(status_code=403, detail="No tiene acceso a este panel")
 
