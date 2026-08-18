@@ -3342,7 +3342,7 @@ def generar_pdf_orden_compra(path_pdf, orden, proveedor, detalles, contactos):
         pdf.setFont("Helvetica-Oblique", 8)
         pdf.drawString(margin, y, "Agradeceremos nos provean de lo siguiente:")
         y -= 4
-        columns = [("N°", 19), ("Código\nproveedor", 55), ("Cant.", 35), ("Descripción", 235), ("Precio unitario", 74), ("NETO S/IVA", 74), ("Centro de Costo", 72)]
+        columns = [("N°", 22), ("Código\nproveedor", 58), ("Cant.", 36), ("Descripción", 210), ("Precio unitario", 78), ("NETO S/IVA", 78), ("Centro de Costo", 69)]
         header_height = 23
         x = margin
         pdf.setFillColor(colors.HexColor("#dce6f1"))
