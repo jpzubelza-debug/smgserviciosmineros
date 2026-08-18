@@ -313,6 +313,14 @@
         ["movimientos", "Movimientos"],
         ["inventario", "Inventario"],
       ],
+      compras: [
+        ["dashboard", "Dashboard"],
+        ["solicitud_compra", "Solicitud de Compra"],
+        ["solicitudes_emitidas", "Solicitudes Emitidas"],
+        ["emision_orden_compra", "Emision Orden de Compra"],
+        ["ordenes_compra_emitidas", "OC Emitidas"],
+        ["proveedores", "Proveedores"],
+      ],
     };
 
     const ACCIONES_POR_MODULO_PANEL = {
@@ -388,6 +396,14 @@
           ["exportar_pdf", "Exportar PDF"],
           ["exportar_excel", "Exportar Excel"],
         ],
+      },
+      compras: {
+        dashboard: [["ver", "Ver dashboard de compras"]],
+        solicitud_compra: [["crear_solicitud", "Emitir solicitud de compra"]],
+        solicitudes_emitidas: [["consultar", "Consultar solicitudes emitidas"], ["resolver", "Aprobar / rechazar solicitudes"]],
+        emision_orden_compra: [["emitir", "Emitir orden de compra"]],
+        ordenes_compra_emitidas: [["consultar", "Consultar OC emitidas"], ["editar", "Editar OC"], ["anular", "Anular OC"], ["ver_pdf", "Descargar PDF"]],
+        proveedores: [["consultar", "Consultar proveedores"], ["crear", "Crear proveedor"], ["editar", "Editar proveedor"], ["eliminar", "Eliminar proveedor"]],
       },
     };
 

@@ -840,6 +840,39 @@
       let ocItemsSolicitud = [];
       let ocFilaVinculando = null;
 
+      const meResponse = await fetch('/me', { credentials: 'same-origin' });
+      const me = await meResponse.json();
+      if (!me.autenticado || !(Array.isArray(me.modulos) && me.modulos.includes('compras'))) {
+        window.location.href = '/';
+        return;
+      }
+      const tipoUsuario = String(me.tipo_usuario || '').toUpperCase();
+      const panelesCompras = new Set(me.paneles?.compras || []);
+      const accionesCompras = me.acciones?.compras || {};
+      const puedePanel = (panel, tipos = null) => {
+        const panelPermitido = panelesCompras.has(panel);
+        const tipoPermitido = !tipos || tipos.includes(tipoUsuario);
+        return panelPermitido && tipoPermitido;
+      };
+      const puedeAccion = (panel, accion, tipos = null) => {
+        const accionesPanel = new Set(accionesCompras[panel] || []);
+        const tipoPermitido = !tipos || tipos.includes(tipoUsuario);
+        return panelesCompras.has(panel) && accionesPanel.has(accion) && tipoPermitido;
+      };
+      const controlesCompras = [
+        [btnDashboardCompras, puedeAccion('dashboard', 'ver', ['ADMINISTRADOR', 'SUPERVISOR', 'ASISTENTE'])],
+        [btnSolicitudCompra, puedeAccion('solicitud_compra', 'crear_solicitud')],
+        [btnSolicitudesEmitidas, puedeAccion('solicitudes_emitidas', 'consultar')],
+        [btnEmisionOrdenCompra, puedeAccion('emision_orden_compra', 'emitir', ['ADMINISTRADOR', 'SUPERVISOR'])],
+        [btnOrdenesCompraEmitidas, puedeAccion('ordenes_compra_emitidas', 'consultar', ['ADMINISTRADOR', 'SUPERVISOR'])],
+        [btnGestionarProveedores, puedeAccion('proveedores', 'consultar')],
+      ];
+      controlesCompras.forEach(([control, visible]) => { control.hidden = !visible; });
+      panelAprobacion.classList.toggle('admin-only', !puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']));
+      btnGuardarOc.disabled = !puedeAccion('emision_orden_compra', 'emitir', ['ADMINISTRADOR', 'SUPERVISOR']);
+      btnEditarOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'editar', ['ADMINISTRADOR', 'SUPERVISOR']);
+      btnAnularOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'anular', ['ADMINISTRADOR', 'SUPERVISOR']);
+
       fecha.value = new Date().toISOString().slice(0, 10);
 
       const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -1134,8 +1167,8 @@
           detalleOrdenCompraTitulo.textContent = `Detalle de ${orden.numero_oc}`;
           detalleOrdenCompraEstado.textContent = orden.estado || '';
           const anulada = String(orden.estado || '').toUpperCase() === 'ANULADA';
-          btnEditarOrdenCompra.disabled = anulada;
-          btnAnularOrdenCompra.disabled = anulada;
+          btnEditarOrdenCompra.disabled = anulada || !puedeAccion('ordenes_compra_emitidas', 'editar', ['ADMINISTRADOR', 'SUPERVISOR']);
+          btnAnularOrdenCompra.disabled = anulada || !puedeAccion('ordenes_compra_emitidas', 'anular', ['ADMINISTRADOR', 'SUPERVISOR']);
           detalleOrdenCompraCabecera.innerHTML = `
             <div class="field"><label>Fecha</label><input readonly value="${escapeHtml(orden.fecha || '')}"></div>
             <div class="field"><label>Proveedor</label><input readonly value="${escapeHtml(orden.proveedor)}"></div>
@@ -1261,7 +1294,7 @@
           if (!response.ok) throw new Error('No se pudo cargar el detalle de la solicitud.');
           const solicitud = await response.json();
           solicitudSeleccionadaId = solicitud.id;
-          const puedeAprobar = Boolean(solicitud.puede_aprobar);
+          const puedeAprobar = Boolean(solicitud.puede_aprobar) && puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']);
           panelAprobacion.classList.toggle('admin-only', !puedeAprobar);
           thSeleccionarItems.classList.toggle('admin-only', !puedeAprobar);
           seleccionarTodosItems.checked = false;
@@ -1461,8 +1494,8 @@
             <td>${escapeHtml(proveedor.id)}</td><td>${escapeHtml(proveedor.nombre)}</td>
             <td>${escapeHtml(proveedor.cuit || '')}</td><td>${escapeHtml(proveedor.localidad || '')}</td>
             <td>${escapeHtml(proveedor.condicion_pago || proveedor.condicion_iva || '')}</td>
-            <td><button type="button" class="btn-secondary btn-editar-proveedor" data-id="${proveedor.id}">Editar</button>
-              <button type="button" class="btn-secondary btn-eliminar-proveedor" data-id="${proveedor.id}">Eliminar</button></td>
+            <td>${puedeAccion('proveedores', 'editar') ? `<button type="button" class="btn-secondary btn-editar-proveedor" data-id="${proveedor.id}">Editar</button>` : ''}
+              ${puedeAccion('proveedores', 'eliminar') ? `<button type="button" class="btn-secondary btn-eliminar-proveedor" data-id="${proveedor.id}">Eliminar</button>` : ''}</td>
           </tr>`).join('') : '<tr><td colspan="6" class="empty-message">No se encontraron proveedores.</td></tr>';
       };
 
@@ -1590,19 +1623,20 @@
         console.error(error);
       }
 
-      try {
-        const response = await fetch('/compras/proveedores', { credentials: 'same-origin' });
-        if (!response.ok) throw new Error('No se pudieron cargar los proveedores.');
-        ocProveedores = await response.json();
-        ocProveedores.forEach((proveedor) => {
-          const option = document.createElement('option');
-          option.value = proveedor.id;
-          option.textContent = proveedor.nombre;
-          ocProveedor.appendChild(option);
-        });
-      } catch (error) {
-        console.error(error);
-        alert(error.message || 'No se pudieron cargar los proveedores.');
+      if (puedeAccion('proveedores', 'consultar')) {
+        try {
+          const response = await fetch('/compras/proveedores', { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar los proveedores.');
+          ocProveedores = await response.json();
+          ocProveedores.forEach((proveedor) => {
+            const option = document.createElement('option');
+            option.value = proveedor.id;
+            option.textContent = proveedor.nombre;
+            ocProveedor.appendChild(option);
+          });
+        } catch (error) {
+          console.error(error);
+        }
       }
       document.getElementById('oc-fecha').value = new Date().toISOString().slice(0, 10);
       agregarLineaOC();

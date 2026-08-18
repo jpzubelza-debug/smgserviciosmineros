@@ -111,6 +111,11 @@ ALL_MODULES = [
     "logistica", "almacen", "operaciones", "compras", "rrhh",
     "mantenimiento", "dashboard_ejecutivo", "administracion", "base_datos",
 ]
+CONTINGENCY_PANELS = {
+    "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
+    "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
+    "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
+}
 
 
 def _usuario_autenticado(request: Request):
@@ -126,13 +131,15 @@ def _usuario_autenticado(request: Request):
             "nombre_apellido": "Administrador",
             "tipo_usuario": "ADMINISTRADOR",
             "modulos": ALL_MODULES,
+            "paneles": CONTINGENCY_PANELS,
+            "acciones": {},
         }
 
     try:
         with get_sqlite_connection() as conn:
             fila = conn.execute(
                 """
-                SELECT correo, nombre_apellido, tipo_usuario, modulos_json
+                SELECT correo, nombre_apellido, tipo_usuario, modulos_json, paneles_json, acciones_json
                 FROM usuarios
                 WHERE lower(correo) = lower(?)
                   AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO'
@@ -150,6 +157,8 @@ def _usuario_autenticado(request: Request):
         "nombre_apellido": fila["nombre_apellido"],
         "tipo_usuario": fila["tipo_usuario"],
         "modulos": parse_json_list(fila["modulos_json"]),
+        "paneles": parse_json_dict(fila["paneles_json"], default={}) if "paneles_json" in fila.keys() else {},
+        "acciones": parse_json_dict(fila["acciones_json"], default={}) if "acciones_json" in fila.keys() else {},
     }
 
 
@@ -2272,9 +2281,66 @@ def _requiere_modulo(request: Request, modulo: str):
     perfil = _usuario_autenticado(request)
     if perfil is None:
         raise HTTPException(status_code=401, detail="Sesión no válida")
-    if str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR" or modulo in perfil.get("modulos", []):
+    if modulo in (perfil.get("modulos", []) or []):
         return perfil
     raise HTTPException(status_code=403, detail="No tiene acceso a este módulo")
+
+
+def _requiere_panel(request: Request, modulo: str, panel: str):
+    perfil = _requiere_modulo(request, modulo)
+    paneles = perfil.get("paneles", {}) or {}
+    if panel in (paneles.get(modulo, []) or []):
+        return perfil
+    raise HTTPException(status_code=403, detail="No tiene acceso a este panel")
+
+
+def _requiere_panel_por_tipo(request: Request, modulo: str, panel: str, tipos):
+    perfil = _requiere_panel(request, modulo, panel)
+    if str(perfil.get("tipo_usuario", "")).upper() not in {str(tipo).upper() for tipo in tipos}:
+        raise HTTPException(status_code=403, detail="Su perfil no tiene habilitada esta operación")
+    return perfil
+
+
+def _requiere_accion(request: Request, modulo: str, panel: str, accion: str):
+    perfil = _requiere_panel(request, modulo, panel)
+    acciones = perfil.get("acciones", {}) or {}
+    permitidas = ((acciones.get(modulo, {}) or {}).get(panel, []) or [])
+    if accion in permitidas:
+        return perfil
+    raise HTTPException(status_code=403, detail="No tiene habilitada esta acción")
+
+
+def _requiere_accion_por_tipo(request: Request, modulo: str, panel: str, accion: str, tipos):
+    perfil = _requiere_accion(request, modulo, panel, accion)
+    if str(perfil.get("tipo_usuario", "")).upper() not in {str(tipo).upper() for tipo in tipos}:
+        raise HTTPException(status_code=403, detail="Su perfil no tiene habilitada esta operación")
+    return perfil
+
+
+def _requiere_panel_compras(request: Request, panel: str):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+    if "compras" not in (perfil.get("modulos", []) or []):
+        raise HTTPException(status_code=403, detail="No tiene acceso a este módulo")
+    if panel in ((perfil.get("paneles", {}) or {}).get("compras", []) or []):
+        return perfil
+    raise HTTPException(status_code=403, detail="No tiene acceso a este panel")
+
+
+def _requiere_panel_compras_por_tipo(request: Request, panel: str, tipos):
+    perfil = _requiere_panel_compras(request, panel)
+    if str(perfil.get("tipo_usuario", "")).upper() not in {str(tipo).upper() for tipo in tipos}:
+        raise HTTPException(status_code=403, detail="Su perfil no tiene habilitada esta operación")
+    return perfil
+
+
+def _requiere_accion_compras(request: Request, panel: str, accion: str):
+    return _requiere_accion(request, "compras", panel, accion)
+
+
+def _requiere_accion_compras_por_tipo(request: Request, panel: str, accion: str, tipos):
+    return _requiere_accion_por_tipo(request, "compras", panel, accion, tipos)
 
 
 @app.get("/base_datos", response_class=HTMLResponse)
@@ -2511,25 +2577,25 @@ def menu_principal(request: Request):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "dashboard")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(DASHBOARD_PATH)
 
 
 @app.get("/compras", response_class=HTMLResponse)
 def compras_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_modulo(request, "compras")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(COMPRAS_PATH)
 
 
 @app.get("/compras/metadata")
 def compras_metadata(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "solicitud_compra", "crear_solicitud")
 
     with get_sqlite_connection() as conn:
         _ensure_prioridades_y_estados_compras(conn)
@@ -2663,9 +2729,7 @@ def compras_metadata(request: Request):
 
 @app.get("/compras/solicitudes")
 def compras_listar_solicitudes(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
 
     with get_sqlite_connection() as conn:
         filas = conn.execute(
@@ -2688,9 +2752,7 @@ def compras_listar_solicitudes(request: Request):
 
 @app.get("/compras/dashboard")
 def compras_dashboard(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
 
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_solicitudes(conn)
@@ -2813,9 +2875,7 @@ def compras_dashboard(request: Request):
 
 @app.get("/compras/proveedores")
 def compras_listar_proveedores(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "proveedores", "consultar")
 
     with get_sqlite_connection() as conn:
         filas = conn.execute(
@@ -2868,9 +2928,7 @@ def _registrar_orden_compra_historial(conn, orden_compra_id, accion, detalle, pe
 
 @app.get("/compras/ordenes-compra")
 def compras_listar_ordenes_compra(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "ordenes_compra_emitidas", "consultar", {"ADMINISTRADOR", "SUPERVISOR"})
 
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_historial(conn)
@@ -2892,9 +2950,7 @@ def compras_listar_ordenes_compra(request: Request):
 
 @app.get("/compras/ordenes-compra/{orden_compra_id}")
 def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "ordenes_compra_emitidas", "consultar", {"ADMINISTRADOR", "SUPERVISOR"})
 
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_historial(conn)
@@ -2958,9 +3014,7 @@ def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
 
 @app.get("/compras/ordenes-compra/{orden_compra_id}/pdf")
 def compras_descargar_orden_compra_pdf(orden_compra_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "ordenes_compra_emitidas", "ver_pdf", {"ADMINISTRADOR", "SUPERVISOR"})
 
     orden = compras_obtener_orden_compra(orden_compra_id, request)
     pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{orden['numero_oc']}.pdf")
@@ -2975,9 +3029,7 @@ def compras_descargar_orden_compra_pdf(orden_compra_id: int, request: Request):
 
 @app.post("/compras/ordenes-compra/{orden_compra_id}/anular")
 async def compras_anular_orden_compra(orden_compra_id: int, request: Request):
-    perfil = _usuario_autenticado(request)
-    if perfil is None:
-        return RedirectResponse("/login", status_code=302)
+    perfil = _requiere_accion_compras_por_tipo(request, "ordenes_compra_emitidas", "anular", {"ADMINISTRADOR", "SUPERVISOR"})
     try:
         payload = await request.json()
     except Exception:
@@ -3001,9 +3053,7 @@ async def compras_anular_orden_compra(orden_compra_id: int, request: Request):
 
 @app.put("/compras/ordenes-compra/{orden_compra_id}/editar")
 async def compras_editar_orden_compra(orden_compra_id: int, request: Request):
-    perfil = _usuario_autenticado(request)
-    if perfil is None:
-        return RedirectResponse("/login", status_code=302)
+    perfil = _requiere_accion_compras_por_tipo(request, "ordenes_compra_emitidas", "editar", {"ADMINISTRADOR", "SUPERVISOR"})
     try:
         payload = await request.json()
     except Exception:
@@ -3102,9 +3152,7 @@ def _proveedor_values(payload):
 
 @app.post("/compras/proveedores")
 async def compras_crear_proveedor(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "proveedores", "crear")
     values = _proveedor_values(await request.json())
     with get_sqlite_connection() as conn:
         conn.execute(
@@ -3122,9 +3170,7 @@ async def compras_crear_proveedor(request: Request):
 
 @app.put("/compras/proveedores/{proveedor_id}")
 async def compras_actualizar_proveedor(proveedor_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "proveedores", "editar")
     values = _proveedor_values(await request.json())
     with get_sqlite_connection() as conn:
         if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
@@ -3144,9 +3190,7 @@ async def compras_actualizar_proveedor(proveedor_id: int, request: Request):
 
 @app.delete("/compras/proveedores/{proveedor_id}")
 def compras_eliminar_proveedor(proveedor_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "proveedores", "eliminar")
     with get_sqlite_connection() as conn:
         if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
             raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
@@ -3177,9 +3221,7 @@ def _ensure_orden_compra_solicitudes(conn):
 
 @app.get("/compras/solicitudes-items")
 def compras_listar_items_solicitud(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "emision_orden_compra", "emitir", {"ADMINISTRADOR", "SUPERVISOR"})
 
     with get_sqlite_connection() as conn:
         _ensure_estado_detalle_compra(conn)
@@ -3374,9 +3416,7 @@ def generar_pdf_orden_compra(path_pdf, orden, proveedor, detalles, contactos):
 
 @app.post("/compras/ordenes-compra")
 async def compras_guardar_orden_compra(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras_por_tipo(request, "emision_orden_compra", "emitir", {"ADMINISTRADOR", "SUPERVISOR"})
     perfil = _usuario_autenticado(request) or {}
     try:
         payload = await request.json()
@@ -3511,11 +3551,8 @@ async def compras_guardar_orden_compra(request: Request):
 
 @app.get("/compras/solicitudes/{solicitud_id}")
 def compras_obtener_solicitud(solicitud_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    perfil = _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
 
-    perfil = _usuario_autenticado(request) or {}
     with get_sqlite_connection() as conn:
         _ensure_estado_detalle_compra(conn)
         cabecera = conn.execute(
@@ -3559,13 +3596,13 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
 
     solicitud = dict(cabecera)
     solicitud["items"] = [dict(item) for item in items]
-    solicitud["puede_aprobar"] = str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR"
+    solicitud["puede_aprobar"] = str(perfil.get("tipo_usuario", "")).upper() in {"ADMINISTRADOR", "SUPERVISOR"}
     return solicitud
 
 
 @app.post("/compras/solicitudes/{solicitud_id}/resolver")
 async def compras_resolver_solicitud(solicitud_id: int, request: Request):
-    perfil = _requiere_administrador(request)
+    perfil = _requiere_accion_compras_por_tipo(request, "solicitudes_emitidas", "resolver", {"ADMINISTRADOR", "SUPERVISOR"})
     usuario_resolucion = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
     try:
         payload = await request.json()
@@ -3641,9 +3678,7 @@ async def compras_resolver_solicitud(solicitud_id: int, request: Request):
 
 @app.get("/compras/solicitudes/{solicitud_id}/pdf")
 def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
 
     perfil = _usuario_autenticado(request) or {}
     with get_sqlite_connection() as conn:
@@ -3902,9 +3937,7 @@ def _ensure_detalle_compra_cc_nullable(conn):
 
 @app.post("/compras/emitir")
 async def compras_emitir(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    _requiere_accion_compras(request, "solicitud_compra", "crear_solicitud")
 
     perfil = _usuario_autenticado(request) or {}
     usuario_logueado = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
@@ -4052,9 +4085,10 @@ async def compras_emitir(request: Request):
 
 @app.get("/dashboard.html", response_class=HTMLResponse)
 def dashboard_html(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "dashboard")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(DASHBOARD_PATH)
 
 
@@ -5960,9 +5994,10 @@ def generar_pdf_remito(
 
 @app.get("/almacen", response_class=HTMLResponse)
 def almacen_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "almacen", "dashboard")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(ALMACEN_V2_PATH)
 
 

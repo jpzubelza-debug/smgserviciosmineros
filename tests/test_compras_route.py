@@ -6,7 +6,7 @@ import main
 
 class ComprasRouteTests(unittest.TestCase):
     def test_ruta_compras_devuelve_html(self):
-        with patch.object(main, "_requiere_login", return_value=None), patch.object(main, "_leer_html", return_value="compras") as leer_html:
+        with patch.object(main, "_requiere_modulo", return_value={}), patch.object(main, "_leer_html", return_value="compras") as leer_html:
             response = main.compras_view(None)
 
         self.assertEqual(response, "compras")
@@ -57,7 +57,7 @@ class ComprasRouteTests(unittest.TestCase):
         fake_conn.execute.side_effect = fake_execute
         fake_conn.commit = MagicMock()
 
-        with patch.object(main, "_requiere_login", return_value=None), \
+        with patch.object(main, "_requiere_accion_compras", return_value={"usuario": "jlopez", "nombre_apellido": "Juan López"}), \
              patch.object(main, "_usuario_autenticado", return_value={"usuario": "jlopez", "nombre_apellido": "Juan López"}), \
              patch.object(main, "get_sqlite_connection", return_value=fake_conn), \
              patch.object(main, "_ensure_prioridades_y_estados_compras"), \
