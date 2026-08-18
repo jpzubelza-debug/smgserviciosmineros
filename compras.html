@@ -887,12 +887,12 @@
         return panelesCompras.has(panel) && accionesPanel.has(accion) && tipoPermitido;
       };
       const controlesCompras = [
-        [btnDashboardCompras, puedeAccion('dashboard', 'ver', ['ADMINISTRADOR', 'SUPERVISOR', 'ASISTENTE'])],
-        [btnSolicitudCompra, puedeAccion('solicitud_compra', 'crear_solicitud')],
-        [btnSolicitudesEmitidas, puedeAccion('solicitudes_emitidas', 'consultar')],
-        [btnEmisionOrdenCompra, puedeAccion('emision_orden_compra', 'emitir', ['ADMINISTRADOR', 'SUPERVISOR'])],
-        [btnOrdenesCompraEmitidas, puedeAccion('ordenes_compra_emitidas', 'consultar', ['ADMINISTRADOR', 'SUPERVISOR'])],
-        [btnGestionarProveedores, puedeAccion('proveedores', 'consultar')],
+        [btnDashboardCompras, puedePanel('dashboard', ['ADMINISTRADOR', 'SUPERVISOR', 'ASISTENTE'])],
+        [btnSolicitudCompra, puedePanel('solicitud_compra')],
+        [btnSolicitudesEmitidas, puedePanel('solicitudes_emitidas')],
+        [btnEmisionOrdenCompra, puedePanel('emision_orden_compra', ['ADMINISTRADOR', 'SUPERVISOR'])],
+        [btnOrdenesCompraEmitidas, puedePanel('ordenes_compra_emitidas', ['ADMINISTRADOR', 'SUPERVISOR'])],
+        [btnGestionarProveedores, puedePanel('proveedores')],
       ];
       controlesCompras.forEach(([control, visible]) => { control.hidden = !visible; });
       panelAprobacion.classList.toggle('admin-only', !puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']));
