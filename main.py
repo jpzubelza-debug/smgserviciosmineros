@@ -3015,6 +3015,8 @@ def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
     orden = dict(cabecera)
     orden["detalles"] = [dict(detalle) for detalle in detalles]
     orden["historial"] = [dict(item) for item in historial]
+    emision = next((item for item in historial if str(item["accion"] or "").strip().lower() == "emitida"), None)
+    orden["usuario_emisor"] = (emision["usuario_nombre"] if emision else "") or (emision["usuario"] if emision else "")
     return orden
 
 
@@ -3416,6 +3418,13 @@ def generar_pdf_orden_compra(path_pdf, orden, proveedor, detalles, contactos):
                 pdf.drawString(x + 5, y - 30, text(value))
                 pdf.setFont("Helvetica-Oblique", 6.5)
                 pdf.drawString(x + 5, y - 39, "Firma y Aclaración")
+            pdf.setFont("Helvetica-Oblique", 6.5)
+            usuario_emisor = text(orden.get("usuario_emisor") or "Usuario no identificado")
+            pdf.drawCentredString(
+                page_width / 2,
+                12,
+                f"Documento emitido desde Sistema de Gestión SMG SRL, por usuario: {usuario_emisor}",
+            )
         pdf.showPage()
     pdf.save()
 
@@ -3549,6 +3558,7 @@ async def compras_guardar_orden_compra(request: Request):
         "observaciones": str(payload.get("observaciones") or ""),
         "solicitante": str(payload.get("solicitante") or ""),
         "aprobador": str(payload.get("aprobador") or ""),
+        "usuario_emisor": str(perfil.get("nombre_apellido") or perfil.get("usuario") or ""),
     }
     pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{numero_oc}.pdf")
     generar_pdf_orden_compra(pdf_path, orden_pdf, dict(proveedor), detalles_pdf, contactos)
