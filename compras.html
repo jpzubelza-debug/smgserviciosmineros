@@ -189,6 +189,34 @@
     outline: 1px solid rgba(74, 222, 128, 0.55);
   }
 
+  .solicitudes-toolbar {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr)) repeat(2, minmax(135px, 0.8fr)) auto;
+    gap: 8px;
+    align-items: end;
+    margin: 12px 0;
+  }
+  .solicitudes-toolbar .field { min-width: 0; }
+  .solicitudes-toolbar .btn-secondary { height: 36px; white-space: nowrap; }
+  .solicitud-sort {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .solicitud-sort::after { content: ' ↕'; color: #94a3b8; font-size: 0.8em; }
+  .solicitud-sort.active::after { content: attr(data-indicator); color: #7dd3fc; }
+  @media (max-width: 1100px) {
+    .solicitudes-toolbar { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+  }
+  @media (max-width: 700px) {
+    .solicitudes-toolbar { grid-template-columns: 1fr 1fr; }
+  }
+
   .empty-message {
     margin: 0;
     padding: 16px;
@@ -605,16 +633,26 @@
           <button class="btn-secondary" id="btn-rechazar-items" type="button">Rechazar seleccionados</button>
         </div>
       </div>
+      <div class="solicitudes-toolbar" aria-label="Filtros de solicitudes emitidas">
+        <div class="field"><label for="solicitudes-buscar">Buscar</label><input id="solicitudes-buscar" type="search" placeholder="N.º, solicitante, destino o prioridad"></div>
+        <div class="field"><label for="solicitudes-filtro-solicitante">Solicitante</label><select id="solicitudes-filtro-solicitante"><option value="">Todos</option></select></div>
+        <div class="field"><label for="solicitudes-filtro-destino">Destino</label><select id="solicitudes-filtro-destino"><option value="">Todos</option></select></div>
+        <div class="field"><label for="solicitudes-filtro-prioridad">Prioridad</label><select id="solicitudes-filtro-prioridad"><option value="">Todas</option></select></div>
+        <div class="field"><label for="solicitudes-filtro-estado">Estado</label><select id="solicitudes-filtro-estado"><option value="">Todos</option></select></div>
+        <div class="field"><label for="solicitudes-desde">Desde</label><input id="solicitudes-desde" type="date"></div>
+        <div class="field"><label for="solicitudes-hasta">Hasta</label><input id="solicitudes-hasta" type="date"></div>
+        <button class="btn-secondary" id="btn-limpiar-filtros-solicitudes" type="button">Limpiar</button>
+      </div>
       <div class="detail-table-wrap">
         <table class="detail-table">
           <thead>
             <tr>
-              <th>Solicitud N.º</th>
-              <th>Fecha</th>
-              <th>Solicitante</th>
-              <th>Destino</th>
-              <th>Prioridad</th>
-              <th>Estado</th>
+              <th><button class="solicitud-sort" data-sort="numero_solicitud" type="button">Solicitud N.º</button></th>
+              <th><button class="solicitud-sort" data-sort="fecha_solicitud" type="button">Fecha</button></th>
+              <th><button class="solicitud-sort" data-sort="solicitante" type="button">Solicitante</button></th>
+              <th><button class="solicitud-sort" data-sort="destino_compra" type="button">Destino</button></th>
+              <th><button class="solicitud-sort" data-sort="prioridad" type="button">Prioridad</button></th>
+              <th><button class="solicitud-sort" data-sort="estado" type="button">Estado</button></th>
             </tr>
           </thead>
           <tbody id="solicitudes-emitidas-body"></tbody>
@@ -850,6 +888,14 @@
       const ocResultadosSolicitud = document.getElementById('oc-resultados-solicitud');
       const solicitudesBody = document.getElementById('solicitudes-emitidas-body');
       const sinSolicitudes = document.getElementById('sin-solicitudes');
+      const solicitudesBuscar = document.getElementById('solicitudes-buscar');
+      const solicitudesFiltroSolicitante = document.getElementById('solicitudes-filtro-solicitante');
+      const solicitudesFiltroDestino = document.getElementById('solicitudes-filtro-destino');
+      const solicitudesFiltroPrioridad = document.getElementById('solicitudes-filtro-prioridad');
+      const solicitudesFiltroEstado = document.getElementById('solicitudes-filtro-estado');
+      const solicitudesDesde = document.getElementById('solicitudes-desde');
+      const solicitudesHasta = document.getElementById('solicitudes-hasta');
+      const btnLimpiarFiltrosSolicitudes = document.getElementById('btn-limpiar-filtros-solicitudes');
       const detalleSolicitudPanel = document.getElementById('solicitud-detalle-panel');
       const detalleSolicitudTitulo = document.getElementById('solicitud-detalle-titulo');
       const detalleSolicitudCabecera = document.getElementById('solicitud-detalle-cabecera');
@@ -863,11 +909,82 @@
       const seleccionarTodosItems = document.getElementById('seleccionar-todos-items');
       let solicitudSeleccionadaId = null;
       let solicitudSeleccionadaNumero = '';
+      let solicitudesEmitidas = [];
+      let solicitudesOrden = { campo: 'id', direccion: 'desc' };
       let ocProveedores = [];
       let ocPersonal = [];
       let ocCentrosCostos = [];
       let ocItemsSolicitud = [];
       let ocFilaVinculando = null;
+
+      const normalizarSolicitud = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const valorOrdenSolicitud = (solicitud, campo) => {
+        if (campo === 'id') return Number(solicitud.id) || 0;
+        if (campo === 'numero_solicitud') return Number(String(solicitud.numero_solicitud || '').replace(/\D/g, '')) || 0;
+        return normalizarSolicitud(solicitud[campo]);
+      };
+      const poblarFiltroSolicitudes = (select, filas, campo, etiqueta) => {
+        const actual = select.value;
+        const valores = [...new Set(filas.map((fila) => String(fila[campo] || '').trim()).filter(Boolean))]
+          .sort((a, b) => normalizarSolicitud(a).localeCompare(normalizarSolicitud(b), 'es'));
+        select.innerHTML = `<option value="">${etiqueta}</option>`;
+        valores.forEach((valor) => {
+          const option = document.createElement('option');
+          option.value = valor;
+          option.textContent = valor;
+          select.appendChild(option);
+        });
+        if (valores.includes(actual)) select.value = actual;
+      };
+      const renderSolicitudesEmitidas = () => {
+        const termino = normalizarSolicitud(solicitudesBuscar.value);
+        const desde = solicitudesDesde.value;
+        const hasta = solicitudesHasta.value;
+        const filtros = [
+          [solicitudesFiltroSolicitante.value, 'solicitante'],
+          [solicitudesFiltroDestino.value, 'destino_compra'],
+          [solicitudesFiltroPrioridad.value, 'prioridad'],
+          [solicitudesFiltroEstado.value, 'estado'],
+        ];
+        const filas = solicitudesEmitidas
+          .filter((solicitud) => {
+            const texto = normalizarSolicitud([
+              solicitud.numero_solicitud, solicitud.fecha_solicitud, solicitud.solicitante,
+              solicitud.destino_compra, solicitud.prioridad, solicitud.estado,
+            ].join(' '));
+            return (!termino || texto.includes(termino))
+              && filtros.every(([valor, campo]) => !valor || String(solicitud[campo] || '') === valor)
+              && (!desde || String(solicitud.fecha_solicitud || '') >= desde)
+              && (!hasta || String(solicitud.fecha_solicitud || '') <= hasta);
+          })
+          .sort((a, b) => {
+            const primero = valorOrdenSolicitud(a, solicitudesOrden.campo);
+            const segundo = valorOrdenSolicitud(b, solicitudesOrden.campo);
+            const comparacion = typeof primero === 'number' && typeof segundo === 'number'
+              ? primero - segundo
+              : String(primero).localeCompare(String(segundo), 'es', { numeric: true });
+            return solicitudesOrden.direccion === 'asc' ? comparacion : -comparacion;
+          });
+        solicitudesBody.innerHTML = filas.map((solicitud) => `
+          <tr class="solicitud-row" data-id="${solicitud.id}">
+            <td>${escapeHtml(solicitud.numero_solicitud)}</td>
+            <td>${escapeHtml(solicitud.fecha_solicitud)}</td>
+            <td>${escapeHtml(solicitud.solicitante)}</td>
+            <td>${escapeHtml(solicitud.destino_compra)}</td>
+            <td>${escapeHtml(solicitud.prioridad)}</td>
+            <td>${escapeHtml(solicitud.estado)}</td>
+          </tr>`).join('');
+        sinSolicitudes.textContent = solicitudesEmitidas.length && !filas.length
+          ? 'No hay solicitudes que coincidan con los filtros.'
+          : 'No hay solicitudes emitidas.';
+        sinSolicitudes.classList.toggle('hidden', filas.length > 0);
+      };
+      const cargarFiltrosSolicitudes = () => {
+        poblarFiltroSolicitudes(solicitudesFiltroSolicitante, solicitudesEmitidas, 'solicitante', 'Todos');
+        poblarFiltroSolicitudes(solicitudesFiltroDestino, solicitudesEmitidas, 'destino_compra', 'Todos');
+        poblarFiltroSolicitudes(solicitudesFiltroPrioridad, solicitudesEmitidas, 'prioridad', 'Todas');
+        poblarFiltroSolicitudes(solicitudesFiltroEstado, solicitudesEmitidas, 'estado', 'Todos');
+      };
 
       const meResponse = await fetch('/me', { credentials: 'same-origin' });
       const me = await meResponse.json();
@@ -1017,27 +1134,50 @@
         try {
           const response = await fetch('/compras/solicitudes', { credentials: 'same-origin' });
           if (!response.ok) throw new Error('No se pudieron cargar las solicitudes emitidas.');
-          const solicitudes = await response.json();
-          sinSolicitudes.classList.toggle('hidden', solicitudes.length > 0);
-          solicitudes.forEach((solicitud) => {
-            const row = document.createElement('tr');
-            row.className = 'solicitud-row';
-            row.dataset.id = solicitud.id;
-            row.innerHTML = `
-              <td>${escapeHtml(solicitud.numero_solicitud)}</td>
-              <td>${escapeHtml(solicitud.fecha_solicitud)}</td>
-              <td>${escapeHtml(solicitud.solicitante)}</td>
-              <td>${escapeHtml(solicitud.destino_compra)}</td>
-              <td>${escapeHtml(solicitud.prioridad)}</td>
-              <td>${escapeHtml(solicitud.estado)}</td>`;
-            solicitudesBody.appendChild(row);
-          });
+          solicitudesEmitidas = await response.json();
+          cargarFiltrosSolicitudes();
+          renderSolicitudesEmitidas();
         } catch (error) {
           console.error(error);
           sinSolicitudes.textContent = error.message || 'Error al cargar las solicitudes.';
           sinSolicitudes.classList.remove('hidden');
         }
       };
+
+      [solicitudesBuscar, solicitudesFiltroSolicitante, solicitudesFiltroDestino, solicitudesFiltroPrioridad,
+        solicitudesFiltroEstado, solicitudesDesde, solicitudesHasta].forEach((control) => {
+        control.addEventListener('input', renderSolicitudesEmitidas);
+        control.addEventListener('change', renderSolicitudesEmitidas);
+      });
+      document.querySelectorAll('.solicitud-sort').forEach((button) => {
+        button.addEventListener('click', () => {
+          const campo = button.dataset.sort;
+          solicitudesOrden = solicitudesOrden.campo === campo
+            ? { campo, direccion: solicitudesOrden.direccion === 'asc' ? 'desc' : 'asc' }
+            : { campo, direccion: 'asc' };
+          document.querySelectorAll('.solicitud-sort').forEach((item) => {
+            const activo = item === button;
+            item.classList.toggle('active', activo);
+            item.dataset.indicator = activo ? (solicitudesOrden.direccion === 'asc' ? ' ↑' : ' ↓') : '';
+          });
+          renderSolicitudesEmitidas();
+        });
+      });
+      btnLimpiarFiltrosSolicitudes.addEventListener('click', () => {
+        solicitudesBuscar.value = '';
+        solicitudesFiltroSolicitante.value = '';
+        solicitudesFiltroDestino.value = '';
+        solicitudesFiltroPrioridad.value = '';
+        solicitudesFiltroEstado.value = '';
+        solicitudesDesde.value = '';
+        solicitudesHasta.value = '';
+        solicitudesOrden = { campo: 'id', direccion: 'desc' };
+        document.querySelectorAll('.solicitud-sort').forEach((button) => {
+          button.classList.remove('active');
+          button.dataset.indicator = '';
+        });
+        renderSolicitudesEmitidas();
+      });
 
       const formatCurrency = (value) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value || 0);
       const actualizarLineasOC = () => {
