@@ -1769,7 +1769,8 @@ class Viaje(BaseModel):
     alojamiento: str = "NO"
 
 @app.post("/viajes")
-def crear_viaje(viaje: Viaje):
+def crear_viaje(request: Request, viaje: Viaje):
+    _requiere_accion(request, "logistica", "solicitud_viaje", "crear_solicitud")
     nuevo = viaje.dict()
     with get_sqlite_connection() as conn:
         row = conn.execute("SELECT COALESCE(MAX(id), 0) AS max_id FROM viajes").fetchone()
@@ -2639,7 +2640,7 @@ def menu_principal(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     try:
-        _requiere_panel(request, "logistica", "dashboard")
+        _requiere_modulo(request, "logistica")
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(DASHBOARD_PATH)
@@ -4198,9 +4199,10 @@ def cambiar_estado(id_viaje: int, estado: str):
 
 @app.get("/form", response_class=HTMLResponse)
 def form_viaje(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "solicitud_viaje")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(FORM_VIAJE_PATH)
 
 
