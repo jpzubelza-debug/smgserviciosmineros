@@ -15,6 +15,14 @@
       --brand: #0d4f8c;
       --brand-strong: #083a68;
       --accent: #1f7cc5;
+      --accent-green: #7ac142;
+      --accent-green-dark: #5a9c2c;
+      --smg-navy: #101c2c;
+      --smg-dark: #0b1422;
+      --smg-green: #8ed63f;
+      --smg-blue: #1684d8;
+      --smg-white: #ffffff;
+      --smg-gray: #b8c0c8;
       --line: rgba(18, 54, 88, 0.18);
       --card: rgba(255, 255, 255, 0.64);
       --glass: rgba(255, 255, 255, 0.52);
@@ -38,19 +46,14 @@
       font-family: "Barlow", "Segoe UI", sans-serif;
       color: var(--ink);
       min-height: 100vh;
-      background:
-        linear-gradient(115deg, rgba(7, 49, 84, 0.82), rgba(11, 72, 123, 0.52), rgba(236, 245, 255, 0.78)),
-        url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat fixed;
+      background: url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat fixed;
     }
 
     .overlay {
       position: fixed;
       inset: 0;
       pointer-events: none;
-      background:
-        radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.24), transparent 44%),
-        radial-gradient(circle at 82% 78%, rgba(8, 58, 104, 0.24), transparent 42%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(7, 39, 66, 0.15));
+      background: linear-gradient(180deg, rgba(2, 10, 20, 0.25), rgba(2, 10, 20, 0.4));
       z-index: 0;
     }
 
@@ -112,8 +115,8 @@
     }
 
     .nav-links a:hover {
-      background: rgba(8, 58, 104, 0.12);
-      color: var(--brand-strong);
+      background: rgba(122, 193, 66, 0.16);
+      color: var(--accent-green-dark);
     }
 
     .login-container {
@@ -124,17 +127,17 @@
     }
 
     .login-trigger {
-      border: 1px solid rgba(8, 58, 104, 0.38);
-      background: linear-gradient(135deg, var(--brand), #2d8fd8);
-      color: #ffffff;
-      padding: 11px 18px;
-      border-radius: 999px;
-      font-weight: 700;
+      border: 1px solid rgba(142, 214, 63, 0.55);
+      background: var(--smg-green);
+      color: var(--smg-dark);
+      padding: 11px 20px;
+      border-radius: 8px;
+      font-weight: 800;
       font-family: "Rajdhani", sans-serif;
       letter-spacing: 0.05em;
       font-size: 15px;
       cursor: pointer;
-      transition: transform 0.2s ease, filter 0.2s ease;
+      transition: transform 0.18s ease, background 0.18s ease;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
@@ -143,7 +146,7 @@
 
     .login-trigger:hover {
       transform: translateY(-1px);
-      filter: brightness(1.04);
+      background: #9fe35d;
     }
 
     .login-panel {
@@ -151,16 +154,27 @@
       top: calc(100% + 12px);
       right: 0;
       width: min(320px, calc(100vw - 26px));
-      border: 1px solid rgba(8, 58, 104, 0.26);
-      background: rgba(255, 255, 255, 0.84);
-      backdrop-filter: blur(9px);
-      border-radius: var(--radius-md);
-      box-shadow: 0 16px 34px rgba(5, 29, 49, 0.2);
-      padding: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(142, 214, 63, 0.22);
+      border-top: 3px solid var(--smg-green);
+      background: linear-gradient(180deg, var(--smg-navy), var(--smg-dark));
+      border-radius: 10px;
+      box-shadow: 0 20px 40px rgba(2, 8, 16, 0.45);
+      padding: 18px;
       opacity: 0;
       visibility: hidden;
       transform: translateY(-10px);
-      transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+      transition: opacity 0.24s ease, transform 0.24s ease, visibility 0.24s ease;
+    }
+
+    .login-panel::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 46px;
+      height: 3px;
+      background: var(--smg-blue);
     }
 
     .login-container:hover .login-panel,
@@ -169,67 +183,113 @@
       opacity: 1;
       visibility: visible;
       transform: translateY(0);
+      animation: fade-up 0.28s ease both;
     }
 
     .login-panel h3 {
-      font-size: 15px;
+      font-size: 14px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--brand-strong);
-      margin-bottom: 8px;
+      letter-spacing: 0.08em;
+      color: var(--smg-white);
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .login-panel .login-subtitle {
+      font-size: 12px;
+      color: var(--smg-gray);
+      margin-bottom: 14px;
     }
 
     .login-panel form {
       display: grid;
-      gap: 10px;
+      gap: 12px;
     }
 
     .login-panel label {
       display: grid;
-      gap: 5px;
-      font-size: 12px;
+      gap: 6px;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--ink-soft);
+      letter-spacing: 0.06em;
+      color: var(--smg-gray);
       font-weight: 700;
     }
 
+    .login-panel .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .login-panel .input-icon {
+      position: absolute;
+      left: 11px;
+      color: var(--smg-gray);
+      opacity: 0.8;
+      pointer-events: none;
+      display: inline-flex;
+    }
+
     .login-panel input {
-      border: 1px solid rgba(8, 58, 104, 0.24);
-      border-radius: 9px;
-      padding: 9px 10px;
+      width: 100%;
+      border: 1px solid rgba(184, 192, 200, 0.28);
+      border-radius: 8px;
+      padding: 10px 12px 10px 34px;
       font-size: 14px;
       font-family: "Barlow", sans-serif;
-      background: rgba(255, 255, 255, 0.92);
-      color: var(--ink);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--smg-white);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .login-panel input::placeholder {
+      color: rgba(184, 192, 200, 0.55);
     }
 
     .login-panel input:focus {
       outline: none;
-      border-color: rgba(31, 124, 197, 0.75);
-      box-shadow: 0 0 0 2px rgba(31, 124, 197, 0.18);
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--smg-green);
+      box-shadow: 0 0 0 3px rgba(142, 214, 63, 0.18);
     }
 
     .login-panel button {
-      border: 1px solid rgba(8, 58, 104, 0.42);
-      border-radius: 10px;
-      padding: 9px;
-      background: linear-gradient(125deg, #0a4a83, #1e7fc7);
-      color: #ffffff;
-      font-size: 14px;
-      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      padding: 11px;
+      margin-top: 2px;
+      background: var(--smg-green);
+      color: var(--smg-dark);
+      font-family: "Rajdhani", sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       cursor: pointer;
+      transition: background 0.18s ease, transform 0.18s ease;
+    }
+
+    .login-panel button:hover {
+      background: #9fe35d;
+      transform: translateY(-1px);
+    }
+
+    .login-panel button:focus-visible,
+    .login-trigger:focus-visible {
+      outline: 2px solid var(--smg-blue);
+      outline-offset: 2px;
     }
 
     .error {
       display: none;
-      margin-top: 8px;
-      background: rgba(190, 54, 54, 0.12);
-      color: #922f2f;
-      border: 1px solid rgba(190, 54, 54, 0.3);
-      border-radius: 9px;
+      margin-top: 4px;
+      background: rgba(219, 68, 68, 0.14);
+      color: #ff9c9c;
+      border: 1px solid rgba(219, 68, 68, 0.4);
+      border-radius: 8px;
       padding: 8px 10px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
     }
 
@@ -359,8 +419,21 @@
       color: var(--brand-strong);
       font-size: clamp(30px, 4vw, 44px);
       margin-bottom: 15px;
+      padding-bottom: 14px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      position: relative;
+    }
+
+    .section h2::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 86px;
+      height: 4px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--brand), var(--accent-green));
     }
 
     .section-intro {
@@ -379,6 +452,12 @@
     .grid-2 {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -446,12 +525,12 @@
 
     .btn-secondary {
       width: fit-content;
-      border: 1px solid rgba(8, 58, 104, 0.35);
+      border: 1px solid rgba(90, 156, 44, 0.4);
       border-radius: 999px;
       padding: 11px 18px;
       text-decoration: none;
       color: #ffffff;
-      background: linear-gradient(135deg, #0a4a83, #2789d1);
+      background: linear-gradient(135deg, var(--accent-green-dark), var(--accent-green));
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -478,6 +557,16 @@
       font-size: 30px;
       margin-bottom: 12px;
       text-transform: uppercase;
+    }
+
+    .footer-slogan {
+      font-family: "Rajdhani", sans-serif;
+      color: var(--accent-green);
+      font-size: clamp(20px, 3vw, 28px);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 10px;
     }
 
     .footer-grid {
@@ -549,6 +638,7 @@
 
       .grid-3,
       .grid-2,
+      .grid-4,
       .logistics-list,
       .footer-grid {
         grid-template-columns: 1fr;
@@ -579,9 +669,9 @@
         <ul class="nav-links">
           <li><a href="#inicio">Inicio</a></li>
           <li><a href="#nosotros">Nosotros</a></li>
+          <li><a href="#diferenciales">Diferenciales</a></li>
           <li><a href="#servicios">Servicios</a></li>
           <li><a href="#experiencia">Proyectos</a></li>
-          <li><a href="#logistica">Logistica</a></li>
           <li><a href="#servicios">Campamentos</a></li>
           <li><a href="#servicios">I+D</a></li>
           <li><a href="#contacto">Contacto</a></li>
@@ -592,16 +682,23 @@
         <a class="login-trigger" href="#acceso-plataforma" aria-haspopup="true" aria-expanded="false">Acceso Usuarios</a>
 
         <div class="login-panel" role="dialog" aria-label="Formulario de acceso">
-          <h3>Acceso</h3>
+          <h3>Acceso al Sistema</h3>
+          <p class="login-subtitle">SMG Servicios Mineros</p>
           <form method="post" action="/login">
-            <label>
+            <label for="username">
               Usuario
-              <input id="username" type="text" name="username" autocomplete="username" required>
+              <span class="input-wrap">
+                <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+                <input id="username" type="text" name="username" autocomplete="username" required>
+              </span>
             </label>
 
-            <label>
+            <label for="password">
               Contrasena
-              <input type="password" name="password" autocomplete="current-password" required>
+              <span class="input-wrap">
+                <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                <input id="password" type="password" name="password" autocomplete="current-password" required>
+              </span>
             </label>
 
             <button type="submit">Ingresar</button>
@@ -616,6 +713,7 @@
         <div class="carousel-track" id="carousel-track"></div>
         <div class="carousel-copy">
           <div class="hero-content">
+            <h1>Experiencia que Construye Resultados</h1>
             <p>Soluciones Integrales para la<br>Industria Minera e Industrial</p>
             <p class="minor">Construccion • Logistica • Rental • Campamentos</p>
             <a class="btn-primary" href="#servicios">Conocer Servicios</a>
@@ -631,15 +729,15 @@
 
     <section class="section" id="nosotros">
       <h2>Nosotros</h2>
-      <p class="section-intro">SMG impulsa operaciones mineras e industriales con enfoque en productividad, seguridad y continuidad operativa en la region de la Puna.</p>
+      <p class="section-intro">SMG Servicios Mineros es una empresa argentina especializada en brindar servicios y soluciones integrales para proyectos mineros e industriales. Contamos con un equipo humano altamente calificado, flota propia de equipos y tecnologia para garantizar operaciones seguras, eficientes y sostenibles.</p>
       <div class="grid-3">
         <article class="card">
           <h3>Mision</h3>
-          <p>Ser la principal empresa proveedora de servicios mineros del norte argentino.</p>
+          <p>Brindar soluciones integrales para el desarrollo de proyectos mineros e industriales, aportando equipos, conocimiento y equipo humano comprometidos con la seguridad y la calidad.</p>
         </article>
         <article class="card">
           <h3>Vision</h3>
-          <p>Desarrollar capacidad productiva minera sustentable para la region Puna.</p>
+          <p>Ser una empresa referente del norte argentino en servicios mineros e industriales, distinguiendonos por nuestra excelencia operativa, innovacion, confiabilidad, infraestructura y el compromiso permanente con los stakeholders.</p>
         </article>
         <article class="card">
           <h3>Valores</h3>
@@ -650,6 +748,43 @@
             <li>Solidaridad</li>
             <li>Confianza</li>
           </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="diferenciales">
+      <h2>Diferenciales</h2>
+      <p class="section-intro">Brindamos servicios integrales para la mineria, infraestructura y movimiento de suelos, con compromiso, tecnologia y un equipo altamente capacitado. Operaciones en todo el noroeste argentino.</p>
+      <div class="grid-4">
+        <article class="card">
+          <h3>Flota Propia</h3>
+          <p>Equipos modernos y en constante renovacion.</p>
+        </article>
+        <article class="card">
+          <h3>Personal Calificado</h3>
+          <p>Operadores y tecnicos capacitados.</p>
+        </article>
+        <article class="card">
+          <h3>Gestion Integral</h3>
+          <p>Logistica, mantenimiento y soporte operativo.</p>
+        </article>
+        <article class="card">
+          <h3>Sustentabilidad</h3>
+          <p>Cuidado del medioambiente y comunidades.</p>
+        </article>
+      </div>
+      <div class="grid-3" style="margin-top:14px;">
+        <article class="card">
+          <h3>Seguridad</h3>
+          <p>Comprometidos con las personas y el entorno.</p>
+        </article>
+        <article class="card">
+          <h3>Eficiencia</h3>
+          <p>Optimizamos recursos y tiempos.</p>
+        </article>
+        <article class="card">
+          <h3>Compromiso</h3>
+          <p>Construimos relaciones de confianza y largo plazo.</p>
         </article>
       </div>
     </section>
@@ -748,22 +883,6 @@
       </div>
     </section>
 
-    <section class="section" id="logistica">
-      <h2>Gestion Operativa en Tiempo Real</h2>
-      <p class="section-intro">Nuestra plataforma centraliza toda la operacion logistica para dar trazabilidad y control continuo sobre viajes, recursos y cumplimiento.</p>
-      <div class="logistics-panel">
-        <ul class="logistics-list">
-          <li>Planificacion de viajes</li>
-          <li>Ordenes de salida</li>
-          <li>Control de flota</li>
-          <li>Habilitacion de personal</li>
-          <li>Gestion de recursos</li>
-          <li>Dashboard operativo</li>
-        </ul>
-        <a class="btn-secondary" id="open-login" href="#acceso-plataforma">Acceso Usuarios</a>
-      </div>
-    </section>
-
     <section class="section" id="contacto">
       <h2>Contacto</h2>
       <p class="section-intro">Estamos listos para acompanar tus operaciones mineras con soluciones a medida y soporte continuo.</p>
@@ -777,12 +896,14 @@
           <h3>Canales</h3>
           <p>+54 XXX</p>
           <p>info@smgminera.com</p>
+          <p>www.smgminera.com</p>
           <p>LinkedIn • Instagram • Facebook</p>
         </article>
       </div>
     </section>
 
     <footer>
+      <p class="footer-slogan">Soluciones que Mueven tu Proyecto</p>
       <h2>SMG Servicios Mineros</h2>
       <div class="footer-grid">
         <div class="footer-block">
@@ -790,6 +911,7 @@
           <p>Palpala - Jujuy</p>
           <p>+54 XXX</p>
           <p>info@smgminera.com</p>
+          <p>www.smgminera.com</p>
         </div>
         <div class="footer-block">
           <a href="#" aria-label="LinkedIn">LinkedIn</a>
