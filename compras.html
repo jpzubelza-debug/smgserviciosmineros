@@ -862,6 +862,7 @@
       const thSeleccionarItems = document.getElementById('th-seleccionar-items');
       const seleccionarTodosItems = document.getElementById('seleccionar-todos-items');
       let solicitudSeleccionadaId = null;
+      let solicitudSeleccionadaNumero = '';
       let ocProveedores = [];
       let ocPersonal = [];
       let ocCentrosCostos = [];
@@ -1349,6 +1350,7 @@
           if (!response.ok) throw new Error('No se pudo cargar el detalle de la solicitud.');
           const solicitud = await response.json();
           solicitudSeleccionadaId = solicitud.id;
+          solicitudSeleccionadaNumero = solicitud.numero_solicitud || '';
           const puedeAprobar = Boolean(solicitud.puede_aprobar) && puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']);
           panelAprobacion.classList.toggle('admin-only', !puedeAprobar);
           thSeleccionarItems.classList.toggle('admin-only', !puedeAprobar);
@@ -1521,7 +1523,9 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = 'solicitud-compra.pdf';
+          const nombrePdf = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1]
+            || `${solicitudSeleccionadaNumero || `SC-${String(solicitudSeleccionadaId).padStart(4, '0')}`}.pdf`;
+          link.download = nombrePdf;
           document.body.appendChild(link);
           link.click();
           link.remove();

@@ -3796,9 +3796,6 @@ def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
         motivo_pdf = str(item["motivo_compra"] or "").strip()
         estado_item = str(item["estado_aprobacion"] or "Pendiente").strip()
         usuario_item = str(item["usuario_resolucion"] or "").strip()
-        if estado_item in {"Aprobada", "Rechazada"} and usuario_item:
-            accion_item = "Aprobado" if estado_item == "Aprobada" else "Rechazado"
-            motivo_pdf = f"{motivo_pdf} | {accion_item} por: {usuario_item}".strip(" |")
         motivo = str(item["motivo_rechazo"] or "").strip()
         if motivo:
             detalle_rechazo = f"{motivo} — Rechazado por: {usuario_item}" if usuario_item else motivo
