@@ -2405,6 +2405,14 @@ def _requiere_accion_compras_por_tipo(request: Request, panel: str, accion: str,
     return _requiere_accion_por_tipo(request, "compras", panel, accion, tipos)
 
 
+def _puede_visualizar_todas_solicitudes(perfil):
+    if str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR" or perfil.get("es_desarrollador"):
+        return True
+    acciones = perfil.get("acciones", {}) or {}
+    permitidas = ((acciones.get("compras", {}) or {}).get("solicitudes_emitidas", []) or [])
+    return "consultar_todas" in permitidas
+
+
 @app.get("/base_datos", response_class=HTMLResponse)
 def base_datos_view(request: Request):
     try:
@@ -2806,7 +2814,7 @@ def compras_metadata(request: Request):
 @app.get("/compras/solicitudes")
 def compras_listar_solicitudes(request: Request):
     perfil = _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
-    es_administrador = str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR"
+    puede_ver_todas = _puede_visualizar_todas_solicitudes(perfil)
     nombre_usuario = str(perfil.get("nombre_apellido") or "").strip()
 
     with get_sqlite_connection() as conn:
@@ -2823,7 +2831,7 @@ def compras_listar_solicitudes(request: Request):
             LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
         """
         params = []
-        if not es_administrador:
+        if not puede_ver_todas:
             sql += " WHERE LOWER(TRIM(COALESCE(p.nombre, ''))) = LOWER(TRIM(?))"
             params.append(nombre_usuario)
         sql += " ORDER BY sc.id DESC"
@@ -3666,7 +3674,7 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
         if cabecera is None:
             raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
         if (
-            str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR"
+            not _puede_visualizar_todas_solicitudes(perfil)
             and str(cabecera["solicitante"] or "").strip().casefold() != str(perfil.get("nombre_apellido") or "").strip().casefold()
         ):
             raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
@@ -3811,7 +3819,7 @@ def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
     if solicitud is None:
         raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
     if (
-        str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR"
+        not _puede_visualizar_todas_solicitudes(perfil)
         and str(solicitud["solicitante"] or "").strip().casefold() != str(perfil.get("nombre_apellido") or "").strip().casefold()
     ):
         raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
