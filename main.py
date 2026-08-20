@@ -3548,99 +3548,121 @@ async def compras_guardar_orden_compra(request: Request):
         contactos = []
     contactos = [contacto for contacto in contactos if isinstance(contacto, dict)][:2]
 
-    with get_sqlite_connection() as conn:
-        _ensure_orden_compra_solicitudes(conn)
-        _ensure_orden_compra_historial(conn)
-        proveedor = conn.execute(
-            '''
-            SELECT id, "NOM_PROVEE" AS nombre, "DOMICILIO" AS domicilio,
-                   "TELÉFONO_1" AS telefono_1, "TELÉFONO_2" AS telefono_2,
-                   "COND_IVA" AS condicion_iva, "CUIT" AS cuit,
-                   "C_POSTAL" AS codigo_postal, "LOCALIDAD" AS localidad
-            FROM proveedores WHERE id = ?
-            ''',
-            (proveedor_id,),
-        ).fetchone()
-        if proveedor is None:
-            raise HTTPException(status_code=400, detail="El proveedor seleccionado no existe.")
-        ultimo = conn.execute("SELECT numero_oc FROM OrdenCompra ORDER BY id DESC LIMIT 1").fetchone()
-        ultimo_numero = ''.join(ch for ch in str(ultimo[0] if ultimo else "") if ch.isdigit())
-        numero_oc = f"OC-{int(ultimo_numero or 0) + 1:05d}"
-        cur = conn.execute(
-            '''
-            INSERT INTO OrdenCompra (
-                numero_oc, fecha, proveedor_id, cotizacion, moneda, tipo_cambio,
-                forma_pago, lugar_entrega, transporte, validez_oferta, observaciones,
-                solicitante, aprobador, estado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''',
-            (
-                numero_oc, str(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")), proveedor_id,
-                str(payload.get("cotizacion") or ""), str(payload.get("moneda") or "PESOS ARGENTINOS"),
-                payload.get("tipo_cambio") or None, str(payload.get("forma_pago") or ""),
-                str(payload.get("lugar_entrega") or ""), str(payload.get("transporte") or ""),
-                str(payload.get("validez_oferta") or ""), str(payload.get("observaciones") or ""),
-                str(payload.get("solicitante") or ""), str(payload.get("aprobador") or ""), "Emitida",
-            ),
-        )
-        orden_compra_id = cur.lastrowid
-        detalles_pdf = []
-        for item in items:
-            try:
-                cantidad = float(item.get("cantidad") or 0)
-                precio_unitario = float(item.get("precio_unitario") or 0)
-            except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail="Cantidad y precio unitario deben ser numéricos.")
-            ids_solicitudes = item.get("solicitud_detalle_ids") or []
-            if not isinstance(ids_solicitudes, list) or len(ids_solicitudes) > 2:
-                raise HTTPException(status_code=400, detail="Cada artículo admite hasta dos ítems de solicitud.")
-            ids_solicitudes = list({int(item_id) for item_id in ids_solicitudes if str(item_id).strip()})
-            cur_detalle = conn.execute(
+    try:
+        with get_sqlite_connection() as conn:
+            _ensure_orden_compra_solicitudes(conn)
+            _ensure_orden_compra_historial(conn)
+            proveedor = conn.execute(
                 '''
-                INSERT INTO OrdenCompraDetalle (
-                    orden_compra_id, codigo_proveedor, articulo_id, descripcion, cantidad,
-                    precio_unitario, subtotal, centro_costo_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                SELECT id, "NOM_PROVEE" AS nombre, "DOMICILIO" AS domicilio,
+                       "TELÉFONO_1" AS telefono_1, "TELÉFONO_2" AS telefono_2,
+                       "COND_IVA" AS condicion_iva, "CUIT" AS cuit,
+                       "C_POSTAL" AS codigo_postal, "LOCALIDAD" AS localidad
+                FROM proveedores WHERE id = ?
+                ''',
+                (proveedor_id,),
+            ).fetchone()
+            if proveedor is None:
+                raise HTTPException(status_code=400, detail="El proveedor seleccionado no existe.")
+            ultimo = conn.execute("SELECT numero_oc FROM OrdenCompra ORDER BY id DESC LIMIT 1").fetchone()
+            ultimo_numero = ''.join(ch for ch in str(ultimo[0] if ultimo else "") if ch.isdigit())
+            numero_oc = f"OC-{int(ultimo_numero or 0) + 1:05d}"
+            cur = conn.execute(
+                '''
+                INSERT INTO OrdenCompra (
+                    numero_oc, fecha, proveedor_id, cotizacion, moneda, tipo_cambio,
+                    forma_pago, lugar_entrega, transporte, validez_oferta, observaciones,
+                    solicitante, aprobador, estado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''',
                 (
-                    orden_compra_id, str(item.get("codigo_proveedor") or ""), item.get("articulo_id") or None,
-                    str(item.get("descripcion") or ""), cantidad, precio_unitario,
-                    cantidad * precio_unitario, item.get("centro_costo_id") or None,
+                    numero_oc, str(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")), proveedor_id,
+                    str(payload.get("cotizacion") or ""), str(payload.get("moneda") or "PESOS ARGENTINOS"),
+                    payload.get("tipo_cambio") or None, str(payload.get("forma_pago") or ""),
+                    str(payload.get("lugar_entrega") or ""), str(payload.get("transporte") or ""),
+                    str(payload.get("validez_oferta") or ""), str(payload.get("observaciones") or ""),
+                    str(payload.get("solicitante") or ""), str(payload.get("aprobador") or ""), "Emitida",
                 ),
             )
-            detalles_pdf.append({
-                "codigo_proveedor": str(item.get("codigo_proveedor") or ""),
-                "descripcion": str(item.get("descripcion") or ""),
-                "cantidad": cantidad,
-                "precio_unitario": precio_unitario,
-                "subtotal": cantidad * precio_unitario,
-                "centro_costo": str(item.get("centro_costo_id") or ""),
-            })
-            for solicitud_detalle_id in ids_solicitudes:
-                disponible = conn.execute(
+            orden_compra_id = cur.lastrowid
+            detalles_pdf = []
+            for item in items:
+                try:
+                    cantidad = float(item.get("cantidad") or 0)
+                    precio_unitario = float(item.get("precio_unitario") or 0)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="Cantidad y precio unitario deben ser numéricos.")
+                ids_solicitudes = item.get("solicitud_detalle_ids") or []
+                if not isinstance(ids_solicitudes, list) or len(ids_solicitudes) > 2:
+                    raise HTTPException(status_code=400, detail="Cada artículo admite hasta dos ítems de solicitud.")
+                try:
+                    ids_solicitudes = list({int(item_id) for item_id in ids_solicitudes if str(item_id).strip()})
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="Los ítems de solicitud vinculados son inválidos.")
+
+                centro_costo_id = item.get("centro_costo_id")
+                if str(centro_costo_id or "").strip() == "":
+                    centro_costo_id = None
+                else:
+                    try:
+                        centro_costo_id = int(centro_costo_id)
+                    except (TypeError, ValueError):
+                        raise HTTPException(status_code=400, detail="El centro de costo de un artículo no es válido.")
+
+                cur_detalle = conn.execute(
                     '''
-                    SELECT d.id
-                    FROM solicitud_compra_detalle d
-                    LEFT JOIN OrdenCompraDetalleSolicitud vinculo
-                           ON vinculo.solicitud_compra_detalle_id = d.id
-                    WHERE d.id = ?
-                      AND COALESCE(d.estado_aprobacion, 'Pendiente') = 'Aprobada'
-                      AND vinculo.id IS NULL
+                    INSERT INTO OrdenCompraDetalle (
+                        orden_compra_id, codigo_proveedor, articulo_id, descripcion, cantidad,
+                        precio_unitario, subtotal, centro_costo_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''',
-                    (solicitud_detalle_id,),
-                ).fetchone()
-                if disponible is None:
-                    raise HTTPException(status_code=400, detail="Uno de los ítems de solicitud ya fue gestionado o no está aprobado.")
-                conn.execute(
-                    "INSERT INTO OrdenCompraDetalleSolicitud (orden_compra_detalle_id, solicitud_compra_detalle_id) VALUES (?, ?)",
-                    (cur_detalle.lastrowid, solicitud_detalle_id),
+                    (
+                        orden_compra_id, str(item.get("codigo_proveedor") or ""), item.get("articulo_id") or None,
+                        str(item.get("descripcion") or ""), cantidad, precio_unitario,
+                        cantidad * precio_unitario, centro_costo_id,
+                    ),
                 )
-                conn.execute(
-                    "UPDATE solicitud_compra_detalle SET estado_aprobacion = 'Gestionado' WHERE id = ?",
-                    (solicitud_detalle_id,),
-                )
-            _registrar_orden_compra_historial(conn, orden_compra_id, "Emitida", "Emisión inicial de la orden de compra.", perfil)
-        conn.commit()
+                detalles_pdf.append({
+                    "codigo_proveedor": str(item.get("codigo_proveedor") or ""),
+                    "descripcion": str(item.get("descripcion") or ""),
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_unitario,
+                    "subtotal": cantidad * precio_unitario,
+                    "centro_costo": str(centro_costo_id or ""),
+                })
+                for solicitud_detalle_id in ids_solicitudes:
+                    disponible = conn.execute(
+                        '''
+                        SELECT d.id
+                        FROM solicitud_compra_detalle d
+                        LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                               ON vinculo.solicitud_compra_detalle_id = d.id
+                        WHERE d.id = ?
+                          AND COALESCE(d.estado_aprobacion, 'Pendiente') = 'Aprobada'
+                          AND vinculo.id IS NULL
+                        ''',
+                        (solicitud_detalle_id,),
+                    ).fetchone()
+                    if disponible is None:
+                        raise HTTPException(status_code=400, detail="Uno de los ítems de solicitud ya fue gestionado o no está aprobado.")
+                    conn.execute(
+                        "INSERT INTO OrdenCompraDetalleSolicitud (orden_compra_detalle_id, solicitud_compra_detalle_id) VALUES (?, ?)",
+                        (cur_detalle.lastrowid, solicitud_detalle_id),
+                    )
+                    conn.execute(
+                        "UPDATE solicitud_compra_detalle SET estado_aprobacion = 'Gestionado' WHERE id = ?",
+                        (solicitud_detalle_id,),
+                    )
+                _registrar_orden_compra_historial(conn, orden_compra_id, "Emitida", "Emisión inicial de la orden de compra.", perfil)
+            conn.commit()
+    except HTTPException:
+        raise
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=400, detail=f"Error de integridad al emitir OC: {exc}")
+    except sqlite3.OperationalError as exc:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos al emitir OC: {exc}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error inesperado al emitir OC: {exc}")
     orden_pdf = {
         "numero_oc": numero_oc,
         "fecha": str(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")),
@@ -3657,7 +3679,10 @@ async def compras_guardar_orden_compra(request: Request):
         "usuario_emisor": str(perfil.get("nombre_apellido") or perfil.get("usuario") or ""),
     }
     pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{numero_oc}.pdf")
-    generar_pdf_orden_compra(pdf_path, orden_pdf, dict(proveedor), detalles_pdf, contactos)
+    try:
+        generar_pdf_orden_compra(pdf_path, orden_pdf, dict(proveedor), detalles_pdf, contactos)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"La orden se guardó pero falló la generación de PDF: {exc}")
     return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
 
 
