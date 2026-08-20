@@ -49,6 +49,42 @@ SQLITE_DB_PATH = os.path.join(DATA_DIR, "dashboard.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "schema.sql")
 MEMBRETE_LOGO_PATH = os.path.join(BASE_DIR, "Imagenes", "09-smg.png")
 
+CENTROS_COSTOS_OFICIALES = [
+    (1, "ADMINISTRACION"), (2, "CONSTRUCCION"), (3, "EXPLORACION"),
+    (4, "FINCA YALA"), (5, "LABORATORIO"), (6, "ALTO LA TORRE"),
+    (7, "SNOPEK"), (8, "SMG METALURGICA"), (9, "LOZANO"),
+    (10, "OBRA CIVIL"), (11, "IMPORTACIONES"), (13, "OPERACIÓN COMERCIAL"),
+    (21, "CANALES DE GUARDA"), (27, "TALLER ALTO LA TORRE"),
+    (28, "PILETAS MILENNIAL PASTOS GRANDES"), (29, "TERRAPLEN POZUELOS"),
+    (30, "UTE RUCA-VIAP"), (31, "UTE BSD - SMG PILETAS"),
+    (66, "INV. PLANTA HIPOCLORITO SODIO"), (101, "INVERSION MODULOS"),
+    (102, "MONTAJE COCINA-COMEDOR EXAR"), (103, "TERMOFUSION POZO ANALIA SDJ"),
+    (104, "OBRA EXAR MOD. SANITARIO OFICINA"), (105, "OBRA EXAR TRASLADO PABELLON B"),
+    (106, "OBRA EXAR - MANT. CAMINO Y REPOS. COMB."),
+    (131, "COMERCIALIZACION ODORANTE"), (200, "ALQUILER EQUIPOS MOVIMIENTO DE SUELO"),
+    (201, "ALQUILER EQUIPOS EVASA CATAMARCA"), (202, "ALQUILER ESQUIPOS EVASA JUNIN"),
+    (203, "MONTAJE EXAR"), (204, "MONTAJE RUCA PANEL"),
+    (205, "ALQUILER ESQUIPOS EVASA CORDOBA"), (206, "ALQUILER EQUIPOS EVASA BAHIA BLANCA"),
+    (207, "ALQUILER EQUIPOS EVASA RIO NEGRO"), (208, "MONTAJE LINDERO"),
+    (209, "MANTENIMIENTO DE CAMINO SSR"), (210, "MANT. DE CAMINO SSR. TRAMO 2"),
+    (211, "ALQ. CAMIONES - OBRA GUAYATAYOC"), (212, "OBRA LÍTICA"),
+    (213, "GERENCIA DE OBRAS"), (214, "OBRA SALES DE JUJUY"),
+    (215, "OBRA ESPIRITU DE LOS ANDES"), (216, "MINA PIRQUITAS - CANCHA DE FUTBOL"),
+    (217, "OBRA LÍTICA - POCITOS"), (218, "OBRA LÍTICA - POZUELO. ALQ DE EQUIPOS"),
+    (219, "OBRA SALES DE JUJUY - COSECHA"),
+    (220, "OBRA SALES DE JUJUY - GAVIONES Y COLCHONETAS"),
+    (221, "OBRA LÍTICA - POZAZ 300/500 EFLUENTES"), (222, "OBRA LÍTICA - BERMAS"),
+    (223, "MINA PIRQUITAS - REP Y PROT GASODUCTO"),
+    (224, "OBRA LÍTICA - ALQUILER POR HS MAQUINA"), (228, "OBRA RINCON - RIO TINTO"),
+    (400, "PROYECTO ARGENTINA LITIO Y ENERGIA"), (401, "PROYECTO POZUELOS"),
+    (402, "PROYECTO ADY PIPING"), (500, "LITHIUM CHILE - CAMPAÑA SALAR ARIZARO"),
+    (800, "ASANOA (ALEX STEWART NOA)"), (803, "GABRIEL BERNAL"), (900, "NORLAB"),
+    (901, "MANTENIMIENTO EDILICIO SMG"), (902, "GERENCIA GENERAL NG"),
+    (903, "DIRECTORIO DG"), (904, "CATEX"), (905, "TECTRAMIN ARGENTINA SRL"),
+    (906, "VIAP SRL"), (907, "ABASTECIMIENTO EN OBRAS"), (908, "ARIZARO"),
+    (909, "GERENCIA  CG"), (910, "LITIAR"),
+]
+
 EMPRESA_MEMBRETE = {
     "razon_social": "S.M.G. S.R.L.",
     "telefono": "0388-4052871",
@@ -1027,6 +1063,24 @@ def migrar_habilitaciones_personal(conn):
                 )
 
 
+def sincronizar_centros_costos(conn):
+    ids_oficiales = tuple(id_centro for id_centro, _ in CENTROS_COSTOS_OFICIALES)
+    placeholders = ", ".join("?" for _ in ids_oficiales)
+    conn.execute(
+        f"DELETE FROM centros_costos WHERE id NOT IN ({placeholders})",
+        ids_oficiales,
+    )
+    for id_centro, nombre in CENTROS_COSTOS_OFICIALES:
+        conn.execute(
+            """
+            INSERT INTO centros_costos (id, nombre, activo)
+            VALUES (?, ?, 1)
+            ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre, activo = 1
+            """,
+            (id_centro, nombre),
+        )
+
+
 def init_sqlite():
     if not os.path.exists(SCHEMA_PATH):
         return
@@ -1037,6 +1091,7 @@ def init_sqlite():
             with get_sqlite_connection() as conn:
                 with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
                     conn.executescript(f.read())
+                sincronizar_centros_costos(conn)
                 try:
                     migrar_tabla_viajes(conn)
                 except sqlite3.OperationalError as exc:
@@ -2635,7 +2690,7 @@ def compras_metadata(request: Request):
         centros_costos = [
             dict(r)
             for r in conn.execute(
-                "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
+                "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
             ).fetchall()
         ]
 
