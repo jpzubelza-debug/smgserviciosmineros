@@ -2640,7 +2640,21 @@ def menu_principal(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     try:
-        _requiere_modulo(request, "logistica")
+        perfil = _requiere_modulo(request, "logistica")
+        paneles = perfil.get("paneles", {}).get("logistica", []) or []
+        if not perfil.get("es_desarrollador") and "dashboard" not in paneles:
+            primer_panel = next((panel for panel in CONTINGENCY_PANELS["logistica"] if panel in paneles), None)
+            destinos = {
+                "solicitud_viaje": "/form",
+                "asignar_recursos": "/recursos_form",
+                "vehiculos": "/vehiculos_form",
+                "personal": "/personal_form",
+                "ordenes_salida": "/ordenes_view",
+                "gestion_operativa": "/gestion_operativa",
+            }
+            if primer_panel in destinos:
+                return RedirectResponse(destinos[primer_panel], status_code=302)
+            raise HTTPException(status_code=403, detail="No tiene paneles de Logística asignados")
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(DASHBOARD_PATH)
@@ -4177,9 +4191,10 @@ def dashboard_html(request: Request):
 
 @app.get("/gestion_operativa", response_class=HTMLResponse)
 def gestion_operativa_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "gestion_operativa")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(GESTION_OPERATIVA_PATH)
     
 @app.put("/estado/{id_viaje}")
@@ -4208,9 +4223,10 @@ def form_viaje(request: Request):
 
 @app.get("/recursos_form", response_class=HTMLResponse)
 def form_recursos(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "asignar_recursos")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(FORM_RECURSOS_PATH)
 
 
@@ -4831,9 +4847,10 @@ async def guardar_cierre_logistico(
 
 @app.get("/ordenes_view", response_class=HTMLResponse)
 def ordenes_view(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "ordenes_salida")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(ORDENES_VIEW_PATH)
 
 @app.get("/print_viaje", response_class=HTMLResponse)
@@ -4852,9 +4869,10 @@ def print_orden_salida(request: Request):
 
 @app.get("/personal_form", response_class=HTMLResponse)
 def personal_form(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "personal")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     return _leer_html(PERSONAL_FORM_PATH)
     
     
@@ -4924,9 +4942,10 @@ def eliminar_vehiculo(codigo: str):
 
 @app.get("/vehiculos_form", response_class=HTMLResponse)
 def vehiculos_form(request: Request):
-    redirect = _requiere_login(request)
-    if redirect is not None:
-        return redirect
+    try:
+        _requiere_panel(request, "logistica", "vehiculos")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
     with open("vehiculos.html", "r", encoding="utf-8") as f:
         return f.read()
 
