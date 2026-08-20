@@ -3322,6 +3322,67 @@ def _ensure_orden_compra_solicitudes(conn):
             "ALTER TABLE OrdenCompraDetalleSolicitud ADD COLUMN fecha_vinculacion TEXT NOT NULL DEFAULT ''"
         )
 
+    fk_info = conn.execute("PRAGMA foreign_key_list(OrdenCompraDetalleSolicitud)").fetchall()
+    fk_rota_detalle = any(str(fk[2] or "").strip() == "solicitud_compra_detalle_old" for fk in fk_info)
+    if fk_rota_detalle:
+        backup_name = "OrdenCompraDetalleSolicitud_fk_old"
+        if conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (backup_name,),
+        ).fetchone():
+            conn.execute(f"DROP TABLE {backup_name}")
+
+        columnas_actuales = {fila[1] for fila in conn.execute("PRAGMA table_info(OrdenCompraDetalleSolicitud)").fetchall()}
+        conn.execute("ALTER TABLE OrdenCompraDetalleSolicitud RENAME TO OrdenCompraDetalleSolicitud_fk_old")
+        conn.execute(
+            '''
+            CREATE TABLE OrdenCompraDetalleSolicitud (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                orden_compra_detalle_id INTEGER NOT NULL,
+                solicitud_compra_detalle_id INTEGER NOT NULL UNIQUE,
+                fecha_vinculacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (orden_compra_detalle_id) REFERENCES OrdenCompraDetalle (id) ON DELETE CASCADE,
+                FOREIGN KEY (solicitud_compra_detalle_id) REFERENCES solicitud_compra_detalle (id) ON DELETE RESTRICT,
+                UNIQUE (orden_compra_detalle_id, solicitud_compra_detalle_id)
+            )
+            '''
+        )
+        if "fecha_vinculacion" in columnas_actuales:
+            conn.execute(
+                '''
+                INSERT OR IGNORE INTO OrdenCompraDetalleSolicitud (
+                    id, orden_compra_detalle_id, solicitud_compra_detalle_id, fecha_vinculacion
+                )
+                SELECT
+                    id,
+                    orden_compra_detalle_id,
+                    solicitud_compra_detalle_id,
+                    CASE
+                        WHEN COALESCE(fecha_vinculacion, '') = '' THEN CURRENT_TIMESTAMP
+                        ELSE fecha_vinculacion
+                    END
+                FROM OrdenCompraDetalleSolicitud_fk_old
+                '''
+            )
+        else:
+            conn.execute(
+                '''
+                INSERT OR IGNORE INTO OrdenCompraDetalleSolicitud (
+                    id, orden_compra_detalle_id, solicitud_compra_detalle_id, fecha_vinculacion
+                )
+                SELECT
+                    id,
+                    orden_compra_detalle_id,
+                    solicitud_compra_detalle_id,
+                    CURRENT_TIMESTAMP
+                FROM OrdenCompraDetalleSolicitud_fk_old
+                '''
+            )
+        conn.execute("DROP TABLE OrdenCompraDetalleSolicitud_fk_old")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_oc_detalle_solicitud_oc_detalle ON OrdenCompraDetalleSolicitud (orden_compra_detalle_id)"
+        )
+
 
 @app.get("/compras/solicitudes-items")
 def compras_listar_items_solicitud(request: Request):
@@ -4076,6 +4137,7 @@ def _ensure_detalle_compra_cc_nullable(conn):
             '''
         )
         conn.execute("DROP TABLE solicitud_compra_detalle_old")
+        _ensure_orden_compra_solicitudes(conn)
 
 
 @app.post("/compras/emitir")
