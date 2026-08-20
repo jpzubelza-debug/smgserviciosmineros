@@ -2995,6 +2995,14 @@ def _ensure_orden_compra_historial(conn):
         )
         '''
     )
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(OrdenCompraHistorial)").fetchall()}
+    for nombre, definicion in {
+        "usuario": "TEXT NOT NULL DEFAULT ''",
+        "usuario_nombre": "TEXT NOT NULL DEFAULT ''",
+        "fecha": "TEXT NOT NULL DEFAULT ''",
+    }.items():
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE OrdenCompraHistorial ADD COLUMN {nombre} {definicion}")
 
 
 def _registrar_orden_compra_historial(conn, orden_compra_id, accion, detalle, perfil):
@@ -3308,6 +3316,11 @@ def _ensure_orden_compra_solicitudes(conn):
             ON OrdenCompraDetalleSolicitud (orden_compra_detalle_id);
         '''
     )
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(OrdenCompraDetalleSolicitud)").fetchall()}
+    if "fecha_vinculacion" not in columnas:
+        conn.execute(
+            "ALTER TABLE OrdenCompraDetalleSolicitud ADD COLUMN fecha_vinculacion TEXT NOT NULL DEFAULT ''"
+        )
 
 
 @app.get("/compras/solicitudes-items")

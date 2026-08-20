@@ -1593,7 +1593,8 @@
           const response = await fetch('/compras/ordenes-compra', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadOc) });
           if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(data.detail || 'No se pudo emitir la orden de compra.');
+            const detalle = data.detail || data.message || `Error del servidor (${response.status}).`;
+            throw new Error(detalle);
           }
           const blob = await response.blob();
           const downloadUrl = URL.createObjectURL(blob);
