@@ -181,8 +181,9 @@
         <h2>Gestion de Usuarios</h2>
         <form id="user-form" class="grid">
           <div class="full">
-            <label>Nombre y Apellido</label>
-            <input id="f_nombre" required />
+            <label for="f_nombre">Apellido y Nombre</label>
+            <input id="f_nombre" list="empleados-nombres" required autocomplete="off" />
+            <datalist id="empleados-nombres"></datalist>
           </div>
           <div>
             <label>DNI</label>
@@ -411,6 +412,7 @@
       me: null,
       users: [],
       roles: [],
+      empleados: [],
       editId: null,
     };
 
@@ -420,6 +422,14 @@
       const el = $("form-msg");
       el.textContent = text || "";
       el.className = `msg full ${ok ? "ok" : "err"}`;
+    }
+
+    function renderEmpleados() {
+      const lista = $("empleados-nombres");
+      lista.innerHTML = state.empleados
+        .filter((empleado) => String(empleado.nombre || "").trim())
+        .map((empleado) => `<option value="${String(empleado.nombre).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"></option>`)
+        .join("");
     }
 
     async function api(path, opts = {}) {
@@ -687,6 +697,8 @@
         return;
       }
       state.me = me;
+      state.empleados = await api("/personal", { method: "GET", headers: {} });
+      renderEmpleados();
       state.roles = await api("/admin/roles_funcionales", { method: "GET", headers: {} });
       renderRoles();
       state.users = await api("/admin/usuarios", { method: "GET", headers: {} });
