@@ -432,6 +432,16 @@
         .join("");
     }
 
+    function normalizarNombre(value) {
+      return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    }
+
+    function completarLegajoDesdeEmpleado() {
+      const nombreBuscado = normalizarNombre($("f_nombre").value);
+      const empleado = state.empleados.find((item) => normalizarNombre(item.nombre) === nombreBuscado);
+      if (empleado) $("f_legajo").value = empleado.legajo || "";
+    }
+
     async function api(path, opts = {}) {
       const resp = await fetch(path, {
         credentials: "same-origin",
@@ -581,6 +591,7 @@
       $("f_nombre").value = u?.nombre_apellido || "";
       $("f_dni").value = u?.dni || "";
       $("f_legajo").value = u?.legajo || "";
+      if (!u?.legajo) completarLegajoDesdeEmpleado();
       $("f_correo").value = u?.correo || "";
       $("f_password").value = "";
       $("f_estado").value = u?.estado || "ACTIVO";
@@ -763,6 +774,8 @@
     window.resetPwd = resetPwd;
 
     $("btn-cancel").addEventListener("click", () => fillForm(null));
+    $("f_nombre").addEventListener("input", completarLegajoDesdeEmpleado);
+    $("f_nombre").addEventListener("change", completarLegajoDesdeEmpleado);
 
     $("user-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
