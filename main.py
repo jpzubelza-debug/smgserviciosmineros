@@ -2790,11 +2790,12 @@ def compras_metadata(request: Request):
 
 @app.get("/compras/solicitudes")
 def compras_listar_solicitudes(request: Request):
-    _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
+    perfil = _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
+    es_administrador = str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR"
+    nombre_usuario = str(perfil.get("nombre_apellido") or "").strip()
 
     with get_sqlite_connection() as conn:
-        filas = conn.execute(
-            """
+        sql = """
             SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
                    COALESCE(p.nombre, '') AS solicitante,
                    COALESCE(pr.nombre, '') AS destino_compra,
@@ -2805,9 +2806,13 @@ def compras_listar_solicitudes(request: Request):
             LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
             LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
             LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
-            ORDER BY sc.id DESC
-            """
-        ).fetchall()
+        """
+        params = []
+        if not es_administrador:
+            sql += " WHERE LOWER(TRIM(COALESCE(p.nombre, ''))) = LOWER(TRIM(?))"
+            params.append(nombre_usuario)
+        sql += " ORDER BY sc.id DESC"
+        filas = conn.execute(sql, params).fetchall()
     return [dict(fila) for fila in filas]
 
 
@@ -3645,6 +3650,11 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
         ).fetchone()
         if cabecera is None:
             raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+        if (
+            str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR"
+            and str(cabecera["solicitante"] or "").strip().casefold() != str(perfil.get("nombre_apellido") or "").strip().casefold()
+        ):
+            raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
 
         items = conn.execute(
             """
@@ -3749,9 +3759,8 @@ async def compras_resolver_solicitud(solicitud_id: int, request: Request):
 
 @app.get("/compras/solicitudes/{solicitud_id}/pdf")
 def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
-    _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
+    perfil = _requiere_accion_compras(request, "solicitudes_emitidas", "consultar")
 
-    perfil = _usuario_autenticado(request) or {}
     with get_sqlite_connection() as conn:
         _ensure_estado_detalle_compra(conn)
         solicitud = conn.execute(
@@ -3785,6 +3794,11 @@ def compras_descargar_solicitud_pdf(solicitud_id: int, request: Request):
         ).fetchall()
 
     if solicitud is None:
+        raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+    if (
+        str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR"
+        and str(solicitud["solicitante"] or "").strip().casefold() != str(perfil.get("nombre_apellido") or "").strip().casefold()
+    ):
         raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
 
     pdf_path = os.path.join(DOC_ALMACEN_DIR, f"{solicitud['numero_solicitud']}.pdf")
