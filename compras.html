@@ -701,7 +701,7 @@
         <div class="field"><label for="oc-transporte">Transporte</label><input id="oc-transporte"></div>
         <div class="field"><label for="oc-validez">Validez de la oferta</label><input id="oc-validez"></div>
         <div class="field"><label for="oc-solicitante">Solicitó</label><select id="oc-solicitante"><option value="">Seleccione</option></select></div>
-        <div class="field"><label for="oc-aprobador">Aprobó</label><input id="oc-aprobador"></div>
+        <div class="field"><label for="oc-aprobador">Aprobó</label><select id="oc-aprobador"><option value="">Seleccione un empleado</option></select></div>
         <div class="field"><label for="oc-observaciones">Observaciones</label><textarea id="oc-observaciones"></textarea></div>
       </div></div>
       <div class="detail-actions" style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
@@ -767,7 +767,7 @@
         <div class="field"><label for="editar-oc-transporte">Transporte</label><input id="editar-oc-transporte"></div>
         <div class="field"><label for="editar-oc-validez">Validez de la oferta</label><input id="editar-oc-validez"></div>
         <div class="field"><label for="editar-oc-solicitante">Solicitó</label><input id="editar-oc-solicitante"></div>
-        <div class="field"><label for="editar-oc-aprobador">Aprobó</label><input id="editar-oc-aprobador"></div>
+        <div class="field"><label for="editar-oc-aprobador">Aprobó</label><select id="editar-oc-aprobador"><option value="">Seleccione un empleado</option></select></div>
         <div class="field"><label for="editar-oc-observaciones">Observaciones</label><textarea id="editar-oc-observaciones"></textarea></div>
         <div class="field"><label for="editar-oc-motivo">Motivo de la edición *</label><textarea id="editar-oc-motivo" required></textarea></div>
       </div>
@@ -863,6 +863,7 @@
       const seleccionarTodosItems = document.getElementById('seleccionar-todos-items');
       let solicitudSeleccionadaId = null;
       let ocProveedores = [];
+      let ocPersonal = [];
       let ocCentrosCostos = [];
       let ocItemsSolicitud = [];
       let ocFilaVinculando = null;
@@ -907,6 +908,26 @@
       const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       })[character]);
+      const normalizarNombre = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const esArielVillagra = (value) => {
+        const nombre = normalizarNombre(value);
+        return nombre === 'ariel villagra' || (nombre.includes('ariel') && nombre.includes('villagra'));
+      };
+      const poblarAprobadores = (personal) => {
+        ocPersonal = Array.isArray(personal) ? personal : [];
+        ['oc-aprobador', 'editar-oc-aprobador'].forEach((id) => {
+          const select = document.getElementById(id);
+          select.innerHTML = '<option value="">Seleccione un empleado</option>';
+          ocPersonal.forEach((item) => {
+            const option = document.createElement('option');
+            option.value = item.nombre;
+            option.textContent = item.nombre;
+            select.appendChild(option);
+          });
+        });
+        const ariel = ocPersonal.find((item) => esArielVillagra(item.nombre));
+        if (ariel) document.getElementById('oc-aprobador').value = ariel.nombre;
+      };
 
       const historialLabels = {
         proveedor_id: 'Proveedor', cotizacion: 'Cotización', moneda: 'Moneda', tipo_cambio: 'Tipo de cambio',
@@ -1261,7 +1282,12 @@
         document.getElementById('editar-oc-transporte').value = ordenCompraSeleccionada.transporte || '';
         document.getElementById('editar-oc-validez').value = ordenCompraSeleccionada.validez_oferta || '';
         document.getElementById('editar-oc-solicitante').value = ordenCompraSeleccionada.solicitante || '';
-        document.getElementById('editar-oc-aprobador').value = ordenCompraSeleccionada.aprobador || '';
+        const editarAprobador = document.getElementById('editar-oc-aprobador');
+        editarAprobador.value = ordenCompraSeleccionada.aprobador || '';
+        if (!editarAprobador.value && ocPersonal.length) {
+          const ariel = ocPersonal.find((item) => esArielVillagra(item.nombre));
+          if (ariel) editarAprobador.value = ariel.nombre;
+        }
         document.getElementById('editar-oc-observaciones').value = ordenCompraSeleccionada.observaciones || '';
         document.getElementById('editar-oc-motivo').value = '';
         editarOrdenDetallesBody.innerHTML = ordenCompraSeleccionada.detalles.map((detalle) => `
@@ -1609,6 +1635,7 @@
           ocOption.textContent = item.nombre;
           document.getElementById('oc-solicitante').appendChild(ocOption);
         });
+        poblarAprobadores(data.personal);
 
         data.proyectos.forEach((item) => {
           const option = document.createElement('option');
