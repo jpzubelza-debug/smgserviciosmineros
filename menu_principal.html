@@ -409,6 +409,24 @@
       },
     ];
 
+    const PANELES_LOGISTICA = [
+      ["dashboard", "/dashboard"],
+      ["solicitud_viaje", "/form"],
+      ["asignar_recursos", "/recursos_form"],
+      ["vehiculos", "/vehiculos_form"],
+      ["personal", "/personal_form"],
+      ["ordenes_salida", "/ordenes_view"],
+      ["gestion_operativa", "/gestion_operativa"],
+    ];
+
+    function resolverDestinoModulo(modulo, me) {
+      if (modulo.key !== "logistica" || String(me?.tipo_usuario || "").toUpperCase() === "ADMINISTRADOR") {
+        return modulo.href;
+      }
+      const paneles = new Set(me?.paneles?.logistica || []);
+      return PANELES_LOGISTICA.find(([panel]) => paneles.has(panel))?.[1] || "";
+    }
+
     function crearCard(modulo) {
       const baseClass = modulo.habilitado ? "menu-btn logistica" : "menu-btn";
       const html = `<strong>${modulo.titulo}</strong><span>${modulo.descripcion}</span>`;
@@ -447,7 +465,10 @@
 
         userChip.textContent = `${me.nombre_apellido || me.usuario || "Usuario"} | ${me.tipo_usuario || ""}`;
         grid.innerHTML = "";
-        visibles.forEach((m) => grid.appendChild(crearCard(m)));
+        visibles.forEach((modulo) => {
+          const destino = resolverDestinoModulo(modulo, me);
+          grid.appendChild(crearCard({ ...modulo, href: destino }));
+        });
 
         if (visibles.length === 0) {
           foot.textContent = "No hay modulos asignados para este usuario. Contacte al Administrador.";

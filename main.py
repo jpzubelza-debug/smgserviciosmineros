@@ -3079,7 +3079,7 @@ def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
                         SELECT ocd.id, ocd.codigo_proveedor, ocd.descripcion, ocd.cantidad,
                                      ocd.centro_costo_id,
                    ocd.precio_unitario, ocd.subtotal,
-                   COALESCE(cc.nombre, '') AS centro_costo,
+                   COALESCE(cc.id, '') AS centro_costo,
                    COALESCE(GROUP_CONCAT(sc.numero_solicitud, ', '), '') AS solicitudes
             FROM OrdenCompraDetalle ocd
             LEFT JOIN centros_costos cc ON cc.id = ocd.centro_costo_id
@@ -3088,7 +3088,7 @@ def compras_obtener_orden_compra(orden_compra_id: int, request: Request):
             LEFT JOIN solicitud_compra sc ON sc.id = scd.id_solicitud
             WHERE ocd.orden_compra_id = ?
             GROUP BY ocd.id, ocd.codigo_proveedor, ocd.descripcion, ocd.cantidad,
-                     ocd.centro_costo_id, ocd.precio_unitario, ocd.subtotal, cc.nombre
+                     ocd.centro_costo_id, ocd.precio_unitario, ocd.subtotal, cc.id
             ORDER BY ocd.id
             ''',
             (orden_compra_id,),
