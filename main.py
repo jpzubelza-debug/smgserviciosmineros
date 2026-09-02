@@ -3024,6 +3024,31 @@ def compras_dashboard_items(estado: str, request: Request):
     return [dict(fila) for fila in filas]
 
 
+@app.get("/compras/dashboard/solicitudes")
+def compras_dashboard_solicitudes(estado: str, request: Request):
+    _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            '''
+            SELECT sc.numero_solicitud,
+                   sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(pr.nombre, '') AS destino_compra,
+                   COALESCE(pc.nombre, '') AS prioridad
+            FROM solicitud_compra sc
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            WHERE COALESCE(ec.nombre, 'Sin estado') = ?
+            ORDER BY sc.id DESC
+            ''',
+            (estado,),
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
 @app.get("/compras/proveedores")
 def compras_listar_proveedores(request: Request):
     _requiere_accion_compras(request, "proveedores", "consultar")

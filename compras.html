@@ -183,12 +183,15 @@
   .compras-deadline-row:hover { background: rgba(248, 113, 113, 0.12); }
   .compras-overdue-detail { margin-top: 12px; }
 
-  #compras-items-detail .detail-table-wrap {
+  #compras-items-detail .detail-table-wrap,
+  #compras-solicitudes-detail .detail-table-wrap {
     max-height: 215px;
     overflow-y: auto;
   }
   #compras-items-detail .detail-table th,
-  #compras-items-detail .detail-table td {
+  #compras-items-detail .detail-table td,
+  #compras-solicitudes-detail .detail-table th,
+  #compras-solicitudes-detail .detail-table td {
     font-size: 0.78rem;
     padding: 8px 8px;
   }
@@ -548,7 +551,7 @@
       <div class="oc-header"><div><h2>Dashboard de Compras</h2><p class="empty-message">Indicadores generales del módulo de compras.</p></div><button class="btn-secondary" id="btn-actualizar-dashboard-compras" type="button">Actualizar</button></div>
       <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
       <div class="compras-charts-grid">
-        <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div></div>
+        <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div><div class="compras-overdue-detail hidden" id="compras-solicitudes-detail"><h3 id="compras-solicitudes-detail-title">Solicitudes por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Destino</th><th>Prioridad</th></tr></thead><tbody id="compras-solicitudes-detail-body"></tbody></table></div></div></div>
         <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
       </div>
       <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
@@ -902,6 +905,9 @@
       const btnDashboardCompras = document.getElementById('btn-dashboard-compras');
       const comprasKpiGrid = document.getElementById('compras-kpi-grid');
       const comprasSolicitudesChart = document.getElementById('compras-solicitudes-chart');
+      const comprasSolicitudesDetail = document.getElementById('compras-solicitudes-detail');
+      const comprasSolicitudesDetailTitle = document.getElementById('compras-solicitudes-detail-title');
+      const comprasSolicitudesDetailBody = document.getElementById('compras-solicitudes-detail-body');
       const comprasItemsChart = document.getElementById('compras-items-chart');
       const comprasItemsDetail = document.getElementById('compras-items-detail');
       const comprasItemsDetailTitle = document.getElementById('compras-items-detail-title');
@@ -1199,7 +1205,7 @@
         });
         if (estados.includes(actual)) ocEmitidasEstado.value = actual;
       };
-      const renderComprasChart = (container, rows, seleccionable = false) => {
+      const renderComprasChart = (container, rows, onSeleccionar = null) => {
         if (!rows.length) {
           container.innerHTML = '<p class="empty-message">Sin datos para mostrar.</p>';
           return;
@@ -1209,14 +1215,31 @@
           const total = Number(row.total) || 0;
           const width = Math.max((total / max) * 100, total ? 3 : 0);
           const contenido = `<div class="compras-chart-label">${escapeHtml(row.estado)}</div><div class="compras-chart-track"><div class="compras-chart-bar" style="width:${width}%"></div></div><div class="compras-chart-value">${total}</div>`;
-          return seleccionable
-            ? `<button type="button" class="compras-chart-row" data-estado="${escapeHtml(row.estado)}" aria-label="Ver ítems ${escapeHtml(row.estado)}">${contenido}</button>`
+          return onSeleccionar
+            ? `<button type="button" class="compras-chart-row" data-estado="${escapeHtml(row.estado)}" aria-label="Ver detalle ${escapeHtml(row.estado)}">${contenido}</button>`
             : `<div class="compras-chart-row">${contenido}</div>`;
         }).join('');
-        if (seleccionable) {
+        if (onSeleccionar) {
           container.querySelectorAll('.compras-chart-row[data-estado]').forEach((fila) => {
-            fila.addEventListener('click', () => mostrarDetalleItemsEstado(fila.dataset.estado));
+            fila.addEventListener('click', () => onSeleccionar(fila.dataset.estado));
           });
+        }
+      };
+      const mostrarDetalleSolicitudesEstado = async (estado) => {
+        comprasSolicitudesDetailTitle.textContent = `Solicitudes: ${estado}`;
+        comprasSolicitudesDetail.classList.remove('hidden');
+        comprasSolicitudesChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
+        comprasSolicitudesDetailBody.innerHTML = '<tr><td colspan="5" class="empty-message">Cargando solicitudes...</td></tr>';
+        try {
+          const response = await fetch(`/compras/dashboard/solicitudes?estado=${encodeURIComponent(estado)}`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar las solicitudes del estado seleccionado.');
+          const solicitudes = await response.json();
+          comprasSolicitudesDetailBody.innerHTML = solicitudes.length ? solicitudes.map((solicitud) => `
+            <tr><td>${escapeHtml(solicitud.numero_solicitud)}</td><td>${escapeHtml(solicitud.fecha_solicitud || '')}</td><td>${escapeHtml(solicitud.solicitante || '')}</td><td>${escapeHtml(solicitud.destino_compra || '')}</td><td>${escapeHtml(solicitud.prioridad || '')}</td></tr>
+          `).join('') : '<tr><td colspan="5" class="empty-message">No hay solicitudes para este estado.</td></tr>';
+        } catch (error) {
+          console.error(error);
+          comprasSolicitudesDetailBody.innerHTML = `<tr><td colspan="5" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
         }
       };
       const mostrarDetalleItemsEstado = async (estado) => {
@@ -1238,9 +1261,14 @@
       };
       document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
-        if (comprasItemsDetail.classList.contains('hidden')) return;
-        comprasItemsDetail.classList.add('hidden');
-        comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.remove('selected'));
+        if (!comprasItemsDetail.classList.contains('hidden')) {
+          comprasItemsDetail.classList.add('hidden');
+          comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.remove('selected'));
+        }
+        if (!comprasSolicitudesDetail.classList.contains('hidden')) {
+          comprasSolicitudesDetail.classList.add('hidden');
+          comprasSolicitudesChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.remove('selected'));
+        }
       });
       const mostrarDetalleFueraPlazo = (prioridad) => {
         const resumen = comprasPrioridades.find((item) => item.prioridad === prioridad);
@@ -1500,9 +1528,10 @@
           comprasKpiGrid.innerHTML = kpis.map(([label, value, note]) => `
             <div class="compras-kpi"><div class="compras-kpi-label">${escapeHtml(label)}</div><div class="compras-kpi-value">${escapeHtml(value)}</div><div class="compras-kpi-note">${escapeHtml(note)}</div></div>
           `).join('');
-          renderComprasChart(comprasSolicitudesChart, data.estados_solicitudes || []);
-          renderComprasChart(comprasItemsChart, data.estados_items || [], true);
+          renderComprasChart(comprasSolicitudesChart, data.estados_solicitudes || [], mostrarDetalleSolicitudesEstado);
+          renderComprasChart(comprasItemsChart, data.estados_items || [], mostrarDetalleItemsEstado);
           comprasItemsDetail.classList.add('hidden');
+          comprasSolicitudesDetail.classList.add('hidden');
           comprasPrioridades = data.prioridades || [];
           comprasOverdueDetail.classList.add('hidden');
           comprasPrioridadesBody.innerHTML = comprasPrioridades.length ? comprasPrioridades.map((item) => `
