@@ -3840,6 +3840,7 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
 
     with get_sqlite_connection() as conn:
         _ensure_estado_detalle_compra(conn)
+        _ensure_gestion_manual_detalle_compra(conn)
         cabecera = conn.execute(
             """
             SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
