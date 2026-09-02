@@ -183,6 +183,16 @@
   .compras-deadline-row:hover { background: rgba(248, 113, 113, 0.12); }
   .compras-overdue-detail { margin-top: 12px; }
 
+  #compras-items-detail .detail-table-wrap {
+    max-height: 215px;
+    overflow-y: auto;
+  }
+  #compras-items-detail .detail-table th,
+  #compras-items-detail .detail-table td {
+    font-size: 0.78rem;
+    padding: 8px 8px;
+  }
+
   .hidden { display: none; }
 
   .solicitud-row { cursor: pointer; }
@@ -1226,6 +1236,12 @@
           comprasItemsDetailBody.innerHTML = `<tr><td colspan="6" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
         }
       };
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        if (comprasItemsDetail.classList.contains('hidden')) return;
+        comprasItemsDetail.classList.add('hidden');
+        comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.remove('selected'));
+      });
       const mostrarDetalleFueraPlazo = (prioridad) => {
         const resumen = comprasPrioridades.find((item) => item.prioridad === prioridad);
         if (!resumen) return;
