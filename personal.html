@@ -334,6 +334,14 @@
       background-repeat: no-repeat;
       padding-right: 26px;
     }
+    .form-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .form-actions button { width: auto; flex: 1; }
+    #lista-personal tbody tr { cursor: pointer; }
+    #lista-personal tbody tr.fila-seleccionada { background: rgba(59, 130, 246, 0.26); }
+    #lista-personal tbody tr.fila-seleccionada td:first-child { background: rgba(30, 64, 175, 0.98); }
   </style>
 </head>
 <body>
@@ -392,6 +400,7 @@
 
 <div id="form-wrapper" class="form-wrapper">
   <form id="form">
+    <h3 id="form-empleado-titulo">Cargar empleado</h3>
     <input type="text" id="legajo" placeholder="N° de Legajo" required>
     <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
     <input type="text" id="cuil" placeholder="CUIL" required>
@@ -405,7 +414,10 @@
       Las habilitaciones por proyecto y su vencimiento se cargan despues, desde la tabla.
     </p>
 
-    <button type="submit">Guardar</button>
+    <div class="form-actions">
+      <button type="submit" id="btn-guardar-empleado">Guardar</button>
+      <button type="button" id="btn-cancelar-edicion" style="display:none;">Cancelar</button>
+    </div>
   </form>
 </div>
 
@@ -455,27 +467,77 @@
 <script>
 const formWrapper = document.getElementById("form-wrapper");
 const btnCargarEmpleado = document.getElementById("btn-cargar-empleado");
+const formEmpleado = document.getElementById("form");
+const inputLegajo = document.getElementById("legajo");
+const tituloFormEmpleado = document.getElementById("form-empleado-titulo");
+const btnGuardarEmpleado = document.getElementById("btn-guardar-empleado");
+const btnCancelarEdicion = document.getElementById("btn-cancelar-edicion");
 let chartResumen;
 let chartSi;
 let chartNo;
+let legajoEnEdicion = null;
+let legajoSeleccionado = null;
 
 let proyectosHabilitacion = [];
 
 function actualizarTextoBotonCarga() {
-  btnCargarEmpleado.textContent = formWrapper.classList.contains("open") ? "Ocultar carga" : "Cargar empleados";
+  if (formWrapper.classList.contains("open")) {
+    btnCargarEmpleado.textContent = "Ocultar carga";
+    return;
+  }
+  btnCargarEmpleado.textContent = legajoSeleccionado ? "Editar empleado" : "Cargar empleados";
 }
 
 function toggleFormularioEmpleado() {
-  formWrapper.classList.toggle("open");
+  if (formWrapper.classList.contains("open")) {
+    minimizarFormularioEmpleado();
+    return;
+  }
+  if (legajoSeleccionado) {
+    editarEmpleado(legajoSeleccionado);
+    return;
+  }
+  restablecerFormularioEmpleado();
+  formWrapper.classList.add("open");
   actualizarTextoBotonCarga();
 }
 
 function minimizarFormularioEmpleado() {
   formWrapper.classList.remove("open");
+  restablecerFormularioEmpleado();
   actualizarTextoBotonCarga();
 }
 
+function restablecerFormularioEmpleado() {
+  legajoEnEdicion = null;
+  formEmpleado.reset();
+  inputLegajo.readOnly = false;
+  tituloFormEmpleado.textContent = "Cargar empleado";
+  btnGuardarEmpleado.textContent = "Guardar";
+  btnCancelarEdicion.style.display = "none";
+}
+
+function editarEmpleado(legajo) {
+  const empleado = personalData.find((persona) => String(persona.legajo) === String(legajo));
+  if (!empleado) return;
+
+  legajoEnEdicion = String(empleado.legajo);
+  inputLegajo.value = empleado.legajo || "";
+  inputLegajo.readOnly = true;
+  document.getElementById("nombre").value = empleado.nombre || "";
+  document.getElementById("cuil").value = empleado.cuil || "";
+  document.getElementById("fecha_nacimiento").value = empleado.fecha_nacimiento || "";
+  document.getElementById("activo").value = empleado.activo || "ACTIVO";
+  tituloFormEmpleado.textContent = `Editar empleado: ${empleado.nombre || empleado.legajo}`;
+  btnGuardarEmpleado.textContent = "Guardar cambios";
+  btnCancelarEdicion.style.display = "";
+  formWrapper.classList.add("open");
+  actualizarTextoBotonCarga();
+  inputLegajo.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 btnCargarEmpleado.addEventListener("click", toggleFormularioEmpleado);
+btnCancelarEdicion.addEventListener("click", minimizarFormularioEmpleado);
 
 function escapeHtml(texto) {
   return (texto || "")
@@ -780,9 +842,37 @@ function cerrarModalHabilitacion() {
 }
 
 document.getElementById("personal-body").addEventListener("click", (ev) => {
+  ev.stopPropagation();
   const chip = ev.target.closest(".chip-habilitacion");
-  if (!chip) return;
-  abrirModalHabilitacion(chip.dataset.legajo, chip.dataset.proyecto);
+  if (chip) {
+    abrirModalHabilitacion(chip.dataset.legajo, chip.dataset.proyecto);
+    return;
+  }
+  const fila = ev.target.closest("tr[data-legajo]");
+  if (!fila) return;
+  const legajo = String(fila.dataset.legajo);
+  legajoSeleccionado = legajoSeleccionado === legajo ? null : legajo;
+  aplicarFiltrosPersonal();
+  actualizarTextoBotonCarga();
+});
+
+function limpiarSeleccionEmpleado() {
+  if (!legajoSeleccionado) return;
+  legajoSeleccionado = null;
+  aplicarFiltrosPersonal();
+  actualizarTextoBotonCarga();
+}
+
+document.addEventListener("click", (ev) => {
+  if (!ev.target.closest("#personal-body tr[data-legajo]")) {
+    limpiarSeleccionEmpleado();
+  }
+});
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") {
+    limpiarSeleccionEmpleado();
+  }
 });
 
 document.getElementById("modal-habilitacion-cancelar").addEventListener("click", cerrarModalHabilitacion);
@@ -823,6 +913,10 @@ function renderFilasPersonal(data) {
   data.forEach(p => {
     const fila = document.createElement("tr");
     const legajo = p.legajo || "";
+    fila.dataset.legajo = legajo;
+    if (String(legajo) === String(legajoSeleccionado)) {
+      fila.classList.add("fila-seleccionada");
+    }
     const celdasHabilitacion = proyectosHabilitacion
       .map(pr => `<td>${chipHabilitacion(p, pr)}</td>`)
       .join("");
@@ -904,7 +998,7 @@ async function cargarPersonal() {
   }
 }
 
-document.getElementById("form").addEventListener("submit", async function(e) {
+formEmpleado.addEventListener("submit", async function(e) {
   e.preventDefault();
 
   const empleado = {
@@ -915,8 +1009,9 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     activo: document.getElementById("activo").value
   };
 
-  const res = await fetch("/personal", {
-    method: "POST",
+  const editando = legajoEnEdicion !== null;
+  const res = await fetch(editando ? `/personal/${encodeURIComponent(legajoEnEdicion)}` : "/personal", {
+    method: editando ? "PUT" : "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(empleado)
   });
@@ -931,8 +1026,7 @@ document.getElementById("form").addEventListener("submit", async function(e) {
   }
 
   mensaje.style.color = "#86efac";
-  mensaje.textContent = "Empleado agregado correctamente.";
-  document.getElementById("form").reset();
+  mensaje.textContent = editando ? "Empleado actualizado correctamente." : "Empleado agregado correctamente.";
   minimizarFormularioEmpleado();
   cargarPersonal();
 });

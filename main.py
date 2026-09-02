@@ -2870,7 +2870,7 @@ def compras_dashboard(request: Request):
         estados_items = conn.execute(
             '''
             SELECT CASE
-                WHEN vinculo.id IS NOT NULL THEN 'Gestionado'
+                WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
                 WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
                 WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
                 ELSE 'Pendiente'
@@ -2880,6 +2880,28 @@ def compras_dashboard(request: Request):
                    ON vinculo.solicitud_compra_detalle_id = d.id
             GROUP BY estado
             ORDER BY total DESC, estado
+            '''
+        ).fetchall()
+        detalles_items = conn.execute(
+            '''
+            SELECT CASE
+                WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
+                ELSE 'Pendiente'
+            END AS estado,
+                   sc.numero_solicitud,
+                   sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(d.descripcion_articulo, '') AS descripcion_articulo,
+                   d.cantidad,
+                   COALESCE(d.unidad_medida, '') AS unidad_medida
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            ORDER BY sc.id DESC, d.id
             '''
         ).fetchall()
         solicitudes_plazo = conn.execute(
@@ -2915,7 +2937,7 @@ def compras_dashboard(request: Request):
             solicitud_id,
             {"prioridad": nombre, "dias": dias, "fecha": fila["fecha_solicitud"], "numero": fila["numero_solicitud"], "pendiente": False, "productos": []},
         )
-        if fila["detalle_id"] is not None and fila["vinculo_id"] is None and str(fila["estado_aprobacion"] or "Pendiente").upper() != "RECHAZADA":
+        if fila["detalle_id"] is not None and fila["vinculo_id"] is None and str(fila["estado_aprobacion"] or "Pendiente").upper() not in {"RECHAZADA", "GESTIONADO"}:
             solicitud["pendiente"] = True
             descripcion = str(fila["descripcion_articulo"] or "").strip()
             if descripcion and descripcion not in solicitud["productos"]:
@@ -2946,6 +2968,10 @@ def compras_dashboard(request: Request):
         )
     prioridades_dashboard = [prioridad_resumen[key] for key in prioridades_ordenadas]
     solicitudes_fuera_plazo = sum(item["fuera_plazo"] for item in prioridades_dashboard)
+    items_por_estado = {}
+    for item in detalles_items:
+        item_dict = dict(item)
+        items_por_estado.setdefault(item_dict["estado"], []).append(item_dict)
 
     return {
         "solicitudes": solicitudes,
@@ -2957,9 +2983,45 @@ def compras_dashboard(request: Request):
         "total_neto": total_neto,
         "estados_solicitudes": [dict(item) for item in estados_solicitudes],
         "estados_items": [dict(item) for item in estados_items],
+        "items_por_estado": items_por_estado,
         "prioridades": prioridades_dashboard,
         "solicitudes_fuera_plazo": solicitudes_fuera_plazo,
     }
+
+
+@app.get("/compras/dashboard/items")
+def compras_dashboard_items(estado: str, request: Request):
+    _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+    estados_validos = {"Gestionado", "Pendiente de gestionar", "Rechazado", "Pendiente"}
+    if estado not in estados_validos:
+        raise HTTPException(status_code=400, detail="Estado de ítems inválido.")
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_solicitudes(conn)
+        filas = conn.execute(
+            '''
+            SELECT sc.numero_solicitud,
+                   sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(d.descripcion_articulo, '') AS descripcion_articulo,
+                   d.cantidad,
+                   COALESCE(d.unidad_medida, '') AS unidad_medida
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            WHERE CASE
+                WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
+                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
+                ELSE 'Pendiente'
+            END = ?
+            ORDER BY sc.id DESC, d.id
+            ''',
+            (estado,),
+        ).fetchall()
+    return [dict(fila) for fila in filas]
 
 
 @app.get("/compras/proveedores")
@@ -3021,6 +3083,13 @@ def _registrar_orden_compra_historial(conn, orden_compra_id, accion, detalle, pe
             nombre_usuario,
         ),
     )
+
+
+def _nombre_descarga_orden_compra(numero_oc, proveedor):
+    nombre_proveedor = " ".join(str(proveedor or "").split())
+    nombre_proveedor = "".join(caracter for caracter in nombre_proveedor if caracter not in '\\/:*?"<>|')
+    nombre_proveedor = " ".join(nombre_proveedor.split())
+    return f"{numero_oc}-{nombre_proveedor}.pdf" if nombre_proveedor else f"{numero_oc}.pdf"
 
 
 @app.get("/compras/ordenes-compra")
@@ -3123,7 +3192,8 @@ def compras_descargar_orden_compra_pdf(orden_compra_id: int, request: Request):
         "localidad": orden["localidad"], "telefono_1": orden["telefono_1"],
     }
     generar_pdf_orden_compra(pdf_path, orden, proveedor, orden["detalles"], [])
-    return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
+    nombre_descarga = _nombre_descarga_orden_compra(orden["numero_oc"], orden["proveedor"])
+    return FileResponse(pdf_path, media_type="application/pdf", filename=nombre_descarga)
 
 
 @app.post("/compras/ordenes-compra/{orden_compra_id}/anular")
@@ -3744,7 +3814,24 @@ async def compras_guardar_orden_compra(request: Request):
         generar_pdf_orden_compra(pdf_path, orden_pdf, dict(proveedor), detalles_pdf, contactos)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"La orden se guardó pero falló la generación de PDF: {exc}")
-    return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
+    nombre_descarga = _nombre_descarga_orden_compra(numero_oc, proveedor["nombre"])
+    return FileResponse(pdf_path, media_type="application/pdf", filename=nombre_descarga)
+
+
+@app.get("/compras/ordenes-para-gestion")
+def compras_listar_ordenes_para_gestion(request: Request):
+    _requiere_accion_compras(request, "solicitudes_emitidas", "gestionar_items")
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            '''
+            SELECT oc.id, oc.numero_oc, COALESCE(p."NOM_PROVEE", '') AS proveedor
+            FROM OrdenCompra oc
+            LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+            WHERE UPPER(COALESCE(oc.estado, '')) <> 'ANULADA'
+            ORDER BY oc.id DESC
+            '''
+        ).fetchall()
+    return [dict(fila) for fila in filas]
 
 
 @app.get("/compras/solicitudes/{solicitud_id}")
@@ -3788,9 +3875,14 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
                    COALESCE(d.observacion, '') AS observacion,
                    COALESCE(d.estado_aprobacion, 'Pendiente') AS estado_aprobacion,
                    COALESCE(d.motivo_rechazo, '') AS motivo_rechazo,
-                   COALESCE(d.usuario_resolucion, '') AS usuario_resolucion
+                     COALESCE(d.usuario_resolucion, '') AS usuario_resolucion,
+                     COALESCE(oc.numero_oc, '') AS gestion_orden_compra,
+                     COALESCE(d.gestion_observacion, '') AS gestion_observacion,
+                     COALESCE(d.gestion_usuario, '') AS gestion_usuario,
+                     COALESCE(d.gestion_fecha, '') AS gestion_fecha
             FROM solicitud_compra_detalle d
             LEFT JOIN centros_costos cc ON cc.id = d.id_centro_costo
+                 LEFT JOIN OrdenCompra oc ON oc.id = d.gestion_orden_compra_id
             WHERE d.id_solicitud = ?
             ORDER BY d.id
             """,
@@ -3877,6 +3969,73 @@ async def compras_resolver_solicitud(solicitud_id: int, request: Request):
         conn.commit()
 
     return {"estado": estado_general}
+
+
+@app.post("/compras/solicitudes/{solicitud_id}/gestionar-items")
+async def compras_gestionar_items_solicitud(solicitud_id: int, request: Request):
+    perfil = _requiere_accion_compras(request, "solicitudes_emitidas", "gestionar_items")
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    ids_items = payload.get("ids_items", [])
+    orden_compra_id = payload.get("orden_compra_id") or None
+    observacion = str(payload.get("observacion", "")).strip()
+    if not isinstance(ids_items, list) or not ids_items:
+        raise HTTPException(status_code=400, detail="Seleccione al menos un ítem para gestionar.")
+    try:
+        ids_items = sorted({int(item_id) for item_id in ids_items})
+        orden_compra_id = int(orden_compra_id) if orden_compra_id else None
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Los datos de gestión no son válidos.")
+    if orden_compra_id is None and not observacion:
+        raise HTTPException(status_code=400, detail="Indique una OC asociada o una observación de gestión.")
+
+    usuario = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
+    with get_sqlite_connection() as conn:
+        _ensure_estado_detalle_compra(conn)
+        _ensure_gestion_manual_detalle_compra(conn)
+        _ensure_orden_compra_solicitudes(conn)
+        solicitud = conn.execute("SELECT 1 FROM solicitud_compra WHERE id = ?", (solicitud_id,)).fetchone()
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud de compra no encontrada.")
+        if orden_compra_id is not None and conn.execute("SELECT 1 FROM OrdenCompra WHERE id = ?", (orden_compra_id,)).fetchone() is None:
+            raise HTTPException(status_code=400, detail="La orden de compra asociada no existe.")
+
+        placeholders = ", ".join("?" for _ in ids_items)
+        disponibles = conn.execute(
+            f'''
+            SELECT d.id
+            FROM solicitud_compra_detalle d
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            WHERE d.id_solicitud = ?
+              AND d.id IN ({placeholders})
+              AND UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA'
+              AND vinculo.id IS NULL
+              AND d.gestion_fecha IS NULL
+            ''',
+            (solicitud_id, *ids_items),
+        ).fetchall()
+        if len(disponibles) != len(ids_items):
+            raise HTTPException(status_code=400, detail="Solo se pueden gestionar ítems aprobados que aún no estén gestionados.")
+
+        conn.execute(
+            f'''
+            UPDATE solicitud_compra_detalle
+               SET estado_aprobacion = 'Gestionado',
+                   gestion_orden_compra_id = ?,
+                   gestion_observacion = ?,
+                   gestion_usuario = ?,
+                   gestion_fecha = datetime('now')
+             WHERE id_solicitud = ? AND id IN ({placeholders})
+            ''',
+            (orden_compra_id, observacion, usuario, solicitud_id, *ids_items),
+        )
+        conn.commit()
+
+    return {"mensaje": "Ítems marcados como gestionados."}
 
 
 @app.get("/compras/solicitudes/{solicitud_id}/pdf")
@@ -4053,6 +4212,20 @@ def _ensure_estado_detalle_compra(conn):
     conn.commit()
 
 
+def _ensure_gestion_manual_detalle_compra(conn):
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(solicitud_compra_detalle)").fetchall()}
+    nuevas_columnas = {
+        "gestion_orden_compra_id": "INTEGER",
+        "gestion_observacion": "TEXT",
+        "gestion_usuario": "TEXT",
+        "gestion_fecha": "TEXT",
+    }
+    for columna, definicion in nuevas_columnas.items():
+        if columna not in columnas:
+            conn.execute(f"ALTER TABLE solicitud_compra_detalle ADD COLUMN {columna} {definicion}")
+    conn.commit()
+
+
 def _obtener_proyecto_id_por_nombre(conn, nombre):
     nombre_normalizado = str(nombre or "").strip()
     if not nombre_normalizado:
@@ -4166,6 +4339,8 @@ async def compras_emitir(request: Request):
         raise HTTPException(status_code=400, detail="Debe indicar el destino de compra.")
     if not id_solicitante:
         raise HTTPException(status_code=400, detail="Debe indicar quien solicita.")
+    if not prioridad_id:
+        raise HTTPException(status_code=400, detail="Debe seleccionar la prioridad de compra.")
 
     with get_sqlite_connection() as conn:
         _ensure_prioridades_y_estados_compras(conn)

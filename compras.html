@@ -168,6 +168,9 @@
   .compras-chart { padding: 16px; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 10px; background: rgba(15, 23, 42, 0.5); }
   .compras-chart h3 { margin: 0 0 14px; }
   .compras-chart-row { display: grid; grid-template-columns: minmax(130px, 1fr) 3fr 42px; gap: 10px; align-items: center; margin: 12px 0; }
+  button.compras-chart-row { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+  button.compras-chart-row:hover .compras-chart-bar, button.compras-chart-row.selected .compras-chart-bar { filter: brightness(1.18); }
+  button.compras-chart-row.selected { outline: 1px solid rgba(125, 211, 252, 0.7); outline-offset: 4px; border-radius: 4px; }
   .compras-chart-label { color: #e2e8f0; font-size: 0.84rem; }
   .compras-chart-track { height: 12px; overflow: hidden; border-radius: 6px; background: rgba(148, 163, 184, 0.18); }
   .compras-chart-bar { height: 100%; min-width: 2px; border-radius: 6px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.35s ease; }
@@ -198,6 +201,36 @@
   }
   .solicitudes-toolbar .field { min-width: 0; }
   .solicitudes-toolbar .btn-secondary { height: 36px; white-space: nowrap; }
+  .solicitudes-lista-wrap {
+    max-height: min(42vh, 360px);
+    overflow: auto;
+  }
+  .solicitudes-lista-wrap .detail-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #16243b;
+  }
+  .oc-emitidas-toolbar {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) minmax(220px, 2fr) minmax(135px, 0.8fr) minmax(135px, 0.8fr) minmax(150px, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+    margin: 12px 0;
+  }
+  .oc-emitidas-toolbar .field { min-width: 0; }
+  .oc-emitidas-toolbar .btn-secondary { height: 36px; white-space: nowrap; }
+  .oc-emitidas-lista-wrap {
+    height: min(42vh, 360px);
+    overflow-y: auto;
+    overflow-x: auto;
+  }
+  .oc-emitidas-lista-wrap .detail-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #16243b;
+  }
   .solicitud-sort {
     border: 0;
     padding: 0;
@@ -212,9 +245,11 @@
   .solicitud-sort.active::after { content: attr(data-indicator); color: #7dd3fc; }
   @media (max-width: 1100px) {
     .solicitudes-toolbar { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+    .oc-emitidas-toolbar { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
   }
   @media (max-width: 700px) {
     .solicitudes-toolbar { grid-template-columns: 1fr 1fr; }
+    .oc-emitidas-toolbar { grid-template-columns: 1fr 1fr; }
   }
 
   .empty-message {
@@ -504,7 +539,7 @@
       <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
       <div class="compras-charts-grid">
         <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div></div>
-        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div></div>
+        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
       </div>
       <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
     </section>
@@ -527,8 +562,8 @@
           </div>
           <div class="field">
             <label for="destinoCompra">Destino de compra</label>
-            <input id="destinoCompra" list="lista-proyectos" placeholder="Seleccione o escriba un proyecto">
-            <datalist id="lista-proyectos"></datalist>
+            <input id="destinoCompra" list="lista-centros-costos" placeholder="Seleccione o escriba un centro de costos">
+            <datalist id="lista-centros-costos"></datalist>
           </div>
         </div>
 
@@ -633,6 +668,17 @@
           <button class="btn-primary" id="btn-aprobar-items" type="button">Aprobar seleccionados</button>
           <button class="btn-secondary" id="btn-rechazar-items" type="button">Rechazar seleccionados</button>
         </div>
+        <div class="approval-actions admin-only" id="panel-gestion-items">
+          <div class="field">
+            <label for="gestion-observacion">Observación de gestión</label>
+            <textarea id="gestion-observacion" placeholder="Obligatoria si no se asocia una OC"></textarea>
+          </div>
+          <div class="field">
+            <label for="gestion-orden-compra">OC asociada (opcional)</label>
+            <select id="gestion-orden-compra"><option value="">Sin OC asociada</option></select>
+          </div>
+          <button class="btn-primary" id="btn-gestionar-items" type="button">Marcar gestionados</button>
+        </div>
       </div>
       <div class="solicitudes-toolbar" aria-label="Filtros de solicitudes emitidas">
         <div class="field"><label for="solicitudes-buscar">Buscar</label><input id="solicitudes-buscar" type="search" placeholder="N.º, solicitante, destino o prioridad"></div>
@@ -644,7 +690,7 @@
         <div class="field"><label for="solicitudes-hasta">Hasta</label><input id="solicitudes-hasta" type="date"></div>
         <button class="btn-secondary" id="btn-limpiar-filtros-solicitudes" type="button">Limpiar</button>
       </div>
-      <div class="detail-table-wrap">
+      <div class="detail-table-wrap solicitudes-lista-wrap">
         <table class="detail-table">
           <thead>
             <tr>
@@ -682,7 +728,9 @@
                 <th>Estado</th>
                 <th>Motivo de rechazo</th>
                 <th>Resuelto por</th>
-                <th class="admin-only" id="th-seleccionar-items"><input id="seleccionar-todos-items" type="checkbox" aria-label="Seleccionar todos los ítems"></th>
+                <th>Gestión</th>
+                <th class="admin-only" id="th-seleccionar-items">Aprobar / Rechazar<br><input id="seleccionar-todos-items" type="checkbox" aria-label="Seleccionar todos los ítems"></th>
+                <th class="admin-only" id="th-seleccionar-gestion">Gestionar<br><input id="seleccionar-todos-gestion" type="checkbox" aria-label="Seleccionar todos los ítems para gestionar"></th>
               </tr>
             </thead>
             <tbody id="solicitud-detalle-body"></tbody>
@@ -755,7 +803,15 @@
         </div>
         <button class="btn-secondary" id="btn-actualizar-ordenes-compra" type="button">Actualizar</button>
       </div>
-      <div class="detail-table-wrap">
+      <div class="oc-emitidas-toolbar" aria-label="Filtros de órdenes de compra emitidas">
+        <div class="field"><label for="oc-emitidas-numero">N.º de OC</label><input id="oc-emitidas-numero" type="search" placeholder="OC-00048"></div>
+        <div class="field"><label for="oc-emitidas-proveedor">Proveedor</label><input id="oc-emitidas-proveedor" type="search" placeholder="Buscar proveedor"></div>
+        <div class="field"><label for="oc-emitidas-desde">Desde</label><input id="oc-emitidas-desde" type="date"></div>
+        <div class="field"><label for="oc-emitidas-hasta">Hasta</label><input id="oc-emitidas-hasta" type="date"></div>
+        <div class="field"><label for="oc-emitidas-estado">Estado</label><select id="oc-emitidas-estado"><option value="">Todos</option></select></div>
+        <button class="btn-secondary" id="btn-limpiar-filtros-oc-emitidas" type="button">Limpiar</button>
+      </div>
+      <div class="detail-table-wrap oc-emitidas-lista-wrap">
         <table class="detail-table">
           <thead><tr><th>N.º OC</th><th>Fecha</th><th>Proveedor</th><th>Estado</th><th>Ítems</th><th>Total neto s/IVA</th><th>Acciones</th></tr></thead>
           <tbody id="ordenes-compra-emitidas-body"></tbody>
@@ -825,7 +881,7 @@
       const numeroSolicitud = document.getElementById('numeroSolicitud');
       const solicitante = document.getElementById('solicitante');
       const destinoCompra = document.getElementById('destinoCompra');
-      const listaProyectos = document.getElementById('lista-proyectos');
+      const listaCentrosCostos = document.getElementById('lista-centros-costos');
       const listaProductos = document.getElementById('lista-productos');
       const listaUnidades = document.getElementById('lista-unidades');
       const centroCostoSelect = document.getElementById('centroCosto');
@@ -837,6 +893,9 @@
       const comprasKpiGrid = document.getElementById('compras-kpi-grid');
       const comprasSolicitudesChart = document.getElementById('compras-solicitudes-chart');
       const comprasItemsChart = document.getElementById('compras-items-chart');
+      const comprasItemsDetail = document.getElementById('compras-items-detail');
+      const comprasItemsDetailTitle = document.getElementById('compras-items-detail-title');
+      const comprasItemsDetailBody = document.getElementById('compras-items-detail-body');
       const comprasPrioridadesBody = document.getElementById('compras-prioridades-body');
       const comprasOverdueDetail = document.getElementById('compras-overdue-detail');
       const comprasOverdueDetailTitle = document.getElementById('compras-overdue-detail-title');
@@ -870,6 +929,12 @@
       const ordenesCompraEmitidasPanel = document.getElementById('ordenes-compra-emitidas-panel');
       const ordenesCompraEmitidasBody = document.getElementById('ordenes-compra-emitidas-body');
       const sinOrdenesCompra = document.getElementById('sin-ordenes-compra');
+      const ocEmitidasNumero = document.getElementById('oc-emitidas-numero');
+      const ocEmitidasProveedor = document.getElementById('oc-emitidas-proveedor');
+      const ocEmitidasDesde = document.getElementById('oc-emitidas-desde');
+      const ocEmitidasHasta = document.getElementById('oc-emitidas-hasta');
+      const ocEmitidasEstado = document.getElementById('oc-emitidas-estado');
+      const btnLimpiarFiltrosOcEmitidas = document.getElementById('btn-limpiar-filtros-oc-emitidas');
       const detalleOrdenCompraPanel = document.getElementById('detalle-orden-compra-panel');
       const detalleOrdenCompraTitulo = document.getElementById('detalle-orden-compra-titulo');
       const detalleOrdenCompraEstado = document.getElementById('detalle-orden-compra-estado');
@@ -906,12 +971,19 @@
       const motivoRechazo = document.getElementById('motivo-rechazo');
       const btnAprobarItems = document.getElementById('btn-aprobar-items');
       const btnRechazarItems = document.getElementById('btn-rechazar-items');
+      const panelGestionItems = document.getElementById('panel-gestion-items');
+      const gestionObservacion = document.getElementById('gestion-observacion');
+      const gestionOrdenCompra = document.getElementById('gestion-orden-compra');
+      const btnGestionarItems = document.getElementById('btn-gestionar-items');
       const thSeleccionarItems = document.getElementById('th-seleccionar-items');
       const seleccionarTodosItems = document.getElementById('seleccionar-todos-items');
+      const thSeleccionarGestion = document.getElementById('th-seleccionar-gestion');
+      const seleccionarTodosGestion = document.getElementById('seleccionar-todos-gestion');
       let solicitudSeleccionadaId = null;
       let solicitudSeleccionadaNumero = '';
       let solicitudesEmitidas = [];
       let solicitudesOrden = { campo: 'id', direccion: 'desc' };
+      let ordenesCompraEmitidas = [];
       let ocProveedores = [];
       let ocPersonal = [];
       let ocCentrosCostos = [];
@@ -1017,6 +1089,7 @@
       ];
       controlesCompras.forEach(([control, visible]) => { control.hidden = !visible; });
       panelAprobacion.classList.toggle('admin-only', !puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']));
+      panelGestionItems.classList.toggle('admin-only', !puedeAccion('solicitudes_emitidas', 'gestionar_items'));
       btnGuardarOc.disabled = !puedeAccion('emision_orden_compra', 'emitir', ['ADMINISTRADOR', 'SUPERVISOR']);
       btnEditarOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'editar', ['ADMINISTRADOR', 'SUPERVISOR']);
       btnAnularOrdenCompra.disabled = !puedeAccion('ordenes_compra_emitidas', 'anular', ['ADMINISTRADOR', 'SUPERVISOR']);
@@ -1027,6 +1100,26 @@
       const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       })[character]);
+      const obtenerNombreDescarga = (response, predeterminado) => {
+        const contentDisposition = response.headers.get('content-disposition') || '';
+        const extendido = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (extendido) {
+          try { return decodeURIComponent(extendido[1]); } catch (error) { return extendido[1]; }
+        }
+        return contentDisposition.match(/filename="?([^";]+)"?/i)?.[1] || predeterminado;
+      };
+      const cargarOrdenesParaGestion = async () => {
+        const response = await fetch('/compras/ordenes-para-gestion', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('No se pudieron cargar las OC para asociar la gestión.');
+        const ordenes = await response.json();
+        gestionOrdenCompra.innerHTML = '<option value="">Sin OC asociada</option>';
+        ordenes.forEach((orden) => {
+          const option = document.createElement('option');
+          option.value = orden.id;
+          option.textContent = `${orden.numero_oc}${orden.proveedor ? ` - ${orden.proveedor}` : ''}`;
+          gestionOrdenCompra.appendChild(option);
+        });
+      };
       const normalizarNombre = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
       const esArielVillagra = (value) => {
         const nombre = normalizarNombre(value);
@@ -1055,7 +1148,48 @@
         aprobador: 'Aprobó', codigo_proveedor: 'Código proveedor', descripcion: 'Descripción', cantidad: 'Cantidad',
         precio_unitario: 'Precio unitario', centro_costo_id: 'Centro de costo', detalles: 'Artículos',
       };
-      const renderComprasChart = (container, rows) => {
+      const renderOrdenesCompraEmitidas = () => {
+        const numero = normalizarSolicitud(ocEmitidasNumero.value);
+        const proveedor = normalizarSolicitud(ocEmitidasProveedor.value);
+        const desde = ocEmitidasDesde.value;
+        const hasta = ocEmitidasHasta.value;
+        const estado = ocEmitidasEstado.value;
+        const ordenes = ordenesCompraEmitidas.filter((orden) =>
+          (!numero || normalizarSolicitud(orden.numero_oc).includes(numero))
+          && (!proveedor || normalizarSolicitud(orden.proveedor).includes(proveedor))
+          && (!desde || String(orden.fecha || '') >= desde)
+          && (!hasta || String(orden.fecha || '') <= hasta)
+          && (!estado || orden.estado === estado)
+        );
+        ordenesCompraEmitidasBody.innerHTML = ordenes.map((orden) => `
+          <tr class="solicitud-row orden-compra-row" data-id="${orden.id}">
+            <td>${escapeHtml(orden.numero_oc)}</td>
+            <td>${escapeHtml(orden.fecha || '')}</td>
+            <td>${escapeHtml(orden.proveedor)}</td>
+            <td>${escapeHtml(orden.estado || '')}</td>
+            <td>${escapeHtml(orden.cantidad_items)}</td>
+            <td>${formatCurrency(orden.total_neto)}</td>
+            <td><button type="button" class="btn-secondary btn-descargar-oc" data-id="${orden.id}">Descargar PDF</button></td>
+          </tr>`).join('');
+        sinOrdenesCompra.textContent = ordenesCompraEmitidas.length && !ordenes.length
+          ? 'No hay órdenes de compra que coincidan con los filtros.'
+          : 'No hay órdenes de compra emitidas.';
+        sinOrdenesCompra.classList.toggle('hidden', ordenes.length > 0);
+      };
+      const cargarFiltroEstadosOcEmitidas = () => {
+        const actual = ocEmitidasEstado.value;
+        const estados = [...new Set(ordenesCompraEmitidas.map((orden) => String(orden.estado || '').trim()).filter(Boolean))]
+          .sort((a, b) => normalizarSolicitud(a).localeCompare(normalizarSolicitud(b), 'es'));
+        ocEmitidasEstado.innerHTML = '<option value="">Todos</option>';
+        estados.forEach((estado) => {
+          const option = document.createElement('option');
+          option.value = estado;
+          option.textContent = estado;
+          ocEmitidasEstado.appendChild(option);
+        });
+        if (estados.includes(actual)) ocEmitidasEstado.value = actual;
+      };
+      const renderComprasChart = (container, rows, seleccionable = false) => {
         if (!rows.length) {
           container.innerHTML = '<p class="empty-message">Sin datos para mostrar.</p>';
           return;
@@ -1064,8 +1198,33 @@
         container.innerHTML = rows.map((row) => {
           const total = Number(row.total) || 0;
           const width = Math.max((total / max) * 100, total ? 3 : 0);
-          return `<div class="compras-chart-row"><div class="compras-chart-label">${escapeHtml(row.estado)}</div><div class="compras-chart-track"><div class="compras-chart-bar" style="width:${width}%"></div></div><div class="compras-chart-value">${total}</div></div>`;
+          const contenido = `<div class="compras-chart-label">${escapeHtml(row.estado)}</div><div class="compras-chart-track"><div class="compras-chart-bar" style="width:${width}%"></div></div><div class="compras-chart-value">${total}</div>`;
+          return seleccionable
+            ? `<button type="button" class="compras-chart-row" data-estado="${escapeHtml(row.estado)}" aria-label="Ver ítems ${escapeHtml(row.estado)}">${contenido}</button>`
+            : `<div class="compras-chart-row">${contenido}</div>`;
         }).join('');
+        if (seleccionable) {
+          container.querySelectorAll('.compras-chart-row[data-estado]').forEach((fila) => {
+            fila.addEventListener('click', () => mostrarDetalleItemsEstado(fila.dataset.estado));
+          });
+        }
+      };
+      const mostrarDetalleItemsEstado = async (estado) => {
+        comprasItemsDetailTitle.textContent = `Ítems: ${estado}`;
+        comprasItemsDetail.classList.remove('hidden');
+        comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
+        comprasItemsDetailBody.innerHTML = '<tr><td colspan="6" class="empty-message">Cargando ítems...</td></tr>';
+        try {
+          const response = await fetch(`/compras/dashboard/items?estado=${encodeURIComponent(estado)}`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar los ítems del estado seleccionado.');
+          const items = await response.json();
+          comprasItemsDetailBody.innerHTML = items.length ? items.map((item) => `
+            <tr><td>${escapeHtml(item.numero_solicitud)}</td><td>${escapeHtml(item.fecha_solicitud || '')}</td><td>${escapeHtml(item.solicitante || '')}</td><td>${escapeHtml(item.descripcion_articulo || '')}</td><td>${escapeHtml(item.cantidad)}</td><td>${escapeHtml(item.unidad_medida || '')}</td></tr>
+          `).join('') : '<tr><td colspan="6" class="empty-message">No hay ítems para este estado.</td></tr>';
+        } catch (error) {
+          console.error(error);
+          comprasItemsDetailBody.innerHTML = `<tr><td colspan="6" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
+        }
       };
       const mostrarDetalleFueraPlazo = (prioridad) => {
         const resumen = comprasPrioridades.find((item) => item.prioridad === prioridad);
@@ -1128,7 +1287,9 @@
         btnOrdenesCompraEmitidas.classList.remove('active');
         detalleSolicitudPanel.classList.add('hidden');
         panelAprobacion.classList.add('admin-only');
+        panelGestionItems.classList.add('admin-only');
         thSeleccionarItems.classList.add('admin-only');
+        thSeleccionarGestion.classList.add('admin-only');
         solicitudesBody.innerHTML = '';
         sinSolicitudes.classList.add('hidden');
 
@@ -1285,18 +1446,9 @@
         try {
           const response = await fetch('/compras/ordenes-compra', { credentials: 'same-origin' });
           if (!response.ok) throw new Error('No se pudieron cargar las órdenes de compra.');
-          const ordenes = await response.json();
-          sinOrdenesCompra.classList.toggle('hidden', ordenes.length > 0);
-          ordenesCompraEmitidasBody.innerHTML = ordenes.map((orden) => `
-            <tr class="solicitud-row orden-compra-row" data-id="${orden.id}">
-              <td>${escapeHtml(orden.numero_oc)}</td>
-              <td>${escapeHtml(orden.fecha || '')}</td>
-              <td>${escapeHtml(orden.proveedor)}</td>
-              <td>${escapeHtml(orden.estado || '')}</td>
-              <td>${escapeHtml(orden.cantidad_items)}</td>
-              <td>${formatCurrency(orden.total_neto)}</td>
-              <td><button type="button" class="btn-secondary btn-descargar-oc" data-id="${orden.id}">Descargar PDF</button></td>
-            </tr>`).join('');
+          ordenesCompraEmitidas = await response.json();
+          cargarFiltroEstadosOcEmitidas();
+          renderOrdenesCompraEmitidas();
         } catch (error) {
           console.error(error);
           sinOrdenesCompra.textContent = error.message || 'Error al cargar las órdenes de compra.';
@@ -1333,7 +1485,8 @@
             <div class="compras-kpi"><div class="compras-kpi-label">${escapeHtml(label)}</div><div class="compras-kpi-value">${escapeHtml(value)}</div><div class="compras-kpi-note">${escapeHtml(note)}</div></div>
           `).join('');
           renderComprasChart(comprasSolicitudesChart, data.estados_solicitudes || []);
-          renderComprasChart(comprasItemsChart, data.estados_items || []);
+          renderComprasChart(comprasItemsChart, data.estados_items || [], true);
+          comprasItemsDetail.classList.add('hidden');
           comprasPrioridades = data.prioridades || [];
           comprasOverdueDetail.classList.add('hidden');
           comprasPrioridadesBody.innerHTML = comprasPrioridades.length ? comprasPrioridades.map((item) => `
@@ -1400,7 +1553,7 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1] || 'orden_compra.pdf';
+          link.download = obtenerNombreDescarga(response, 'orden_compra.pdf');
           document.body.appendChild(link);
           link.click();
           link.remove();
@@ -1493,9 +1646,14 @@
           solicitudSeleccionadaId = solicitud.id;
           solicitudSeleccionadaNumero = solicitud.numero_solicitud || '';
           const puedeAprobar = Boolean(solicitud.puede_aprobar) && puedeAccion('solicitudes_emitidas', 'resolver', ['ADMINISTRADOR', 'SUPERVISOR']);
+          const puedeGestionar = puedeAccion('solicitudes_emitidas', 'gestionar_items');
           panelAprobacion.classList.toggle('admin-only', !puedeAprobar);
+          panelGestionItems.classList.toggle('admin-only', !puedeGestionar);
           thSeleccionarItems.classList.toggle('admin-only', !puedeAprobar);
+          thSeleccionarGestion.classList.toggle('admin-only', !puedeGestionar);
           seleccionarTodosItems.checked = false;
+          seleccionarTodosGestion.checked = false;
+          if (puedeGestionar) await cargarOrdenesParaGestion();
           detalleSolicitudTitulo.textContent = `Detalle de ${solicitud.numero_solicitud}`;
           detalleSolicitudCabecera.innerHTML = `
             <div class="field"><label>Solicitante</label><input readonly value="${escapeHtml(solicitud.solicitante)}"></div>
@@ -1509,7 +1667,9 @@
               <td>${escapeHtml(item.descripcion_articulo)}</td><td>${escapeHtml(item.motivo_compra)}</td>
               <td>${escapeHtml(item.cantidad)}</td><td>${escapeHtml(item.unidad_medida)}</td><td>${escapeHtml(item.observacion)}</td>
               <td>${escapeHtml(item.estado_aprobacion)}</td><td>${escapeHtml(item.motivo_rechazo)}</td><td>${escapeHtml(item.usuario_resolucion)}</td>
+              <td>${escapeHtml([item.gestion_orden_compra, item.gestion_observacion, item.gestion_usuario].filter(Boolean).join(' | '))}</td>
               ${puedeAprobar ? `<td><input class="item-aprobacion-check" type="checkbox" value="${item.id}" aria-label="Seleccionar ítem ${index + 1}"></td>` : ''}
+              ${puedeGestionar ? `<td><input class="item-gestion-check" type="checkbox" value="${item.id}" ${String(item.estado_aprobacion).toUpperCase() === 'APROBADA' ? '' : 'disabled'} aria-label="Gestionar ítem ${index + 1}"></td>` : ''}
             </tr>`).join('');
           detalleSolicitudPanel.classList.remove('hidden');
           solicitudesBody.querySelectorAll('.solicitud-row').forEach((row) => row.classList.toggle('selected', row.dataset.id === String(id)));
@@ -1530,6 +1690,18 @@
       btnEmisionOrdenCompra.addEventListener('click', mostrarOrdenCompra);
       btnOrdenesCompraEmitidas.addEventListener('click', mostrarOrdenesCompraEmitidas);
       document.getElementById('btn-actualizar-ordenes-compra').addEventListener('click', mostrarOrdenesCompraEmitidas);
+      [ocEmitidasNumero, ocEmitidasProveedor, ocEmitidasDesde, ocEmitidasHasta, ocEmitidasEstado].forEach((control) => {
+        control.addEventListener('input', renderOrdenesCompraEmitidas);
+        control.addEventListener('change', renderOrdenesCompraEmitidas);
+      });
+      btnLimpiarFiltrosOcEmitidas.addEventListener('click', () => {
+        ocEmitidasNumero.value = '';
+        ocEmitidasProveedor.value = '';
+        ocEmitidasDesde.value = '';
+        ocEmitidasHasta.value = '';
+        ocEmitidasEstado.value = '';
+        renderOrdenesCompraEmitidas();
+      });
       ordenesCompraEmitidasBody.addEventListener('click', (event) => {
         const downloadButton = event.target.closest('.btn-descargar-oc');
         if (downloadButton) {
@@ -1601,8 +1773,7 @@
           const downloadUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = downloadUrl;
-          const filename = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1];
-          link.download = filename || 'orden_compra.pdf';
+          link.download = obtenerNombreDescarga(response, 'orden_compra.pdf');
           document.body.appendChild(link);
           link.click();
           link.remove();
@@ -1620,6 +1791,39 @@
         detalleSolicitudBody.querySelectorAll('.item-aprobacion-check').forEach((check) => {
           check.checked = seleccionarTodosItems.checked;
         });
+      });
+
+      seleccionarTodosGestion.addEventListener('change', () => {
+        detalleSolicitudBody.querySelectorAll('.item-gestion-check:not(:disabled)').forEach((check) => {
+          check.checked = seleccionarTodosGestion.checked;
+        });
+      });
+
+      btnGestionarItems.addEventListener('click', async () => {
+        const idsItems = [...detalleSolicitudBody.querySelectorAll('.item-gestion-check:checked')].map((check) => Number(check.value));
+        if (!idsItems.length) { alert('Seleccione al menos un ítem aprobado para gestionar.'); return; }
+        if (!gestionOrdenCompra.value && !gestionObservacion.value.trim()) {
+          alert('Seleccione una OC asociada o indique una observación de gestión.');
+          gestionObservacion.focus();
+          return;
+        }
+        try {
+          const response = await fetch(`/compras/solicitudes/${encodeURIComponent(solicitudSeleccionadaId)}/gestionar-items`, {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids_items: idsItems, orden_compra_id: gestionOrdenCompra.value || null, observacion: gestionObservacion.value.trim() }),
+          });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || 'No se pudieron gestionar los ítems.');
+          }
+          gestionObservacion.value = '';
+          gestionOrdenCompra.value = '';
+          await mostrarSolicitudes();
+          await mostrarDetalleSolicitud(solicitudSeleccionadaId);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'No se pudieron gestionar los ítems.');
+        }
       });
 
       const resolverItems = async (accion) => {
@@ -1783,18 +1987,15 @@
         });
         poblarAprobadores(data.personal);
 
-        data.proyectos.forEach((item) => {
-          const option = document.createElement('option');
-          option.value = item.nombre;
-          option.textContent = item.nombre;
-          listaProyectos.appendChild(option);
-        });
-
         data.centros_costos.forEach((item) => {
           const option = document.createElement('option');
           option.value = item.id;
           option.textContent = `${item.id} - ${item.nombre}`;
           centroCostoSelect.appendChild(option);
+
+          const destinoOption = document.createElement('option');
+          destinoOption.value = `${item.id} ${item.nombre}`;
+          listaCentrosCostos.appendChild(destinoOption);
         });
         ocCentrosCostos = data.centros_costos || [];
 
