@@ -401,7 +401,10 @@
 <div id="form-wrapper" class="form-wrapper">
   <form id="form">
     <h3 id="form-empleado-titulo">Cargar empleado</h3>
-    <input type="text" id="legajo" placeholder="N° de Legajo" required>
+    <div class="campo-legajo-wrap" style="display:flex; gap:8px; align-items:center;">
+      <input type="text" id="legajo" placeholder="N° de Legajo" required style="flex:1;">
+      <button type="button" id="btn-corregir-legajo" style="display:none; white-space:nowrap;">Corregir legajo</button>
+    </div>
     <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
     <input type="text" id="cuil" placeholder="CUIL" required>
     <input type="date" id="fecha_nacimiento" aria-label="Fecha de nacimiento">
@@ -418,6 +421,7 @@
       <button type="submit" id="btn-guardar-empleado">Guardar</button>
       <button type="button" id="btn-cancelar-edicion" style="display:none;">Cancelar</button>
     </div>
+
   </form>
 </div>
 
@@ -469,9 +473,11 @@ const formWrapper = document.getElementById("form-wrapper");
 const btnCargarEmpleado = document.getElementById("btn-cargar-empleado");
 const formEmpleado = document.getElementById("form");
 const inputLegajo = document.getElementById("legajo");
+const btnCorregirLegajo = document.getElementById("btn-corregir-legajo");
 const tituloFormEmpleado = document.getElementById("form-empleado-titulo");
 const btnGuardarEmpleado = document.getElementById("btn-guardar-empleado");
 const btnCancelarEdicion = document.getElementById("btn-cancelar-edicion");
+let esAdministrador = false;
 let chartResumen;
 let chartSi;
 let chartNo;
@@ -515,6 +521,7 @@ function restablecerFormularioEmpleado() {
   tituloFormEmpleado.textContent = "Cargar empleado";
   btnGuardarEmpleado.textContent = "Guardar";
   btnCancelarEdicion.style.display = "none";
+  btnCorregirLegajo.style.display = "none";
 }
 
 function editarEmpleado(legajo) {
@@ -531,10 +538,45 @@ function editarEmpleado(legajo) {
   tituloFormEmpleado.textContent = `Editar empleado: ${empleado.nombre || empleado.legajo}`;
   btnGuardarEmpleado.textContent = "Guardar cambios";
   btnCancelarEdicion.style.display = "";
+  btnCorregirLegajo.style.display = esAdministrador ? "" : "none";
   formWrapper.classList.add("open");
   actualizarTextoBotonCarga();
   inputLegajo.scrollIntoView({ behavior: "smooth", block: "center" });
 }
+
+async function corregirLegajo() {
+  if (!legajoEnEdicion) return;
+  const nuevoLegajo = prompt(`Corregir legajo (actual: ${legajoEnEdicion})`, legajoEnEdicion);
+  if (nuevoLegajo === null) return;
+  const valor = nuevoLegajo.trim();
+  if (!valor || valor === legajoEnEdicion) return;
+
+  const mensaje = document.getElementById("mensaje");
+  try {
+    const res = await fetch(`/personal/${encodeURIComponent(legajoEnEdicion)}/legajo`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nuevo_legajo: valor })
+    });
+    const resultado = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      mensaje.style.color = "#fca5a5";
+      mensaje.textContent = resultado.detail || resultado.error || "No se pudo corregir el legajo";
+      return;
+    }
+    mensaje.style.color = "#86efac";
+    mensaje.textContent = "Legajo corregido correctamente.";
+    legajoSeleccionado = valor;
+    minimizarFormularioEmpleado();
+    await cargarPersonal();
+  } catch (error) {
+    mensaje.style.color = "#fca5a5";
+    mensaje.textContent = "No se pudo corregir el legajo.";
+    console.error(error);
+  }
+}
+
+btnCorregirLegajo.addEventListener("click", corregirLegajo);
 
 btnCargarEmpleado.addEventListener("click", toggleFormularioEmpleado);
 btnCancelarEdicion.addEventListener("click", minimizarFormularioEmpleado);
@@ -1031,14 +1073,26 @@ formEmpleado.addEventListener("submit", async function(e) {
   cargarPersonal();
 });
 
-cargarProyectosHabilitacion()
-  .then(cargarPersonal)
-  .catch(err => {
-    const mensaje = document.getElementById("mensaje");
-    mensaje.style.color = "#fca5a5";
-    mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté activo.";
-    console.error(err);
-  });
+async function detectarAdministrador() {
+  try {
+    const res = await fetch("/me");
+    const me = await res.json();
+    esAdministrador = !!me.autenticado && String(me.tipo_usuario || "").toUpperCase() === "ADMINISTRADOR";
+  } catch (error) {
+    esAdministrador = false;
+  }
+}
+
+detectarAdministrador().then(() =>
+  cargarProyectosHabilitacion()
+    .then(cargarPersonal)
+    .catch(err => {
+      const mensaje = document.getElementById("mensaje");
+      mensaje.style.color = "#fca5a5";
+      mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté activo.";
+      console.error(err);
+    })
+);
 </script>
 
 </div>

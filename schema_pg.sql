@@ -495,6 +495,16 @@ CREATE TABLE IF NOT EXISTS historial_accesos (
     FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS responsables_modulo (
+    modulo TEXT NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (modulo, usuario_id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo);
+
 -- Stock
 CREATE TABLE IF NOT EXISTS stock_consumibles (
     id SERIAL PRIMARY KEY,

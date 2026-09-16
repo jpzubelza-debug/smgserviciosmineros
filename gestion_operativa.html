@@ -347,6 +347,8 @@
           <thead>
             <tr>
               <th>Nro Orden</th>
+              <th>Inicio OS</th>
+              <th>Fin OS</th>
               <th>Empleado</th>
               <th>Rol</th>
               <th>Proyecto</th>
@@ -456,17 +458,27 @@ function renderBars(id, data, color) {
   }).join('');
 }
 
+function formatFechaCorta(v) {
+  const texto = String(v || '').trim();
+  if (texto.length >= 10 && texto[4] === '-' && texto[7] === '-') {
+    return `${texto.slice(8, 10)}/${texto.slice(5, 7)}/${texto.slice(0, 4)}`;
+  }
+  return texto;
+}
+
 function renderTabla(data) {
   const tbody = document.getElementById('tabla-body');
   if (!tbody) return;
   const rows = Array.isArray(data) ? data : [];
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11">Sin datos para los filtros seleccionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13">Sin datos para los filtros seleccionados.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r) =>
     '<tr>'
     + '<td>' + esc(r.nro_orden || '') + '</td>'
+    + '<td>' + esc(formatFechaCorta(r.fecha_inicio_os)) + '</td>'
+    + '<td>' + esc(formatFechaCorta(r.fecha_fin_os)) + '</td>'
     + '<td>' + esc(r.empleado || '') + '</td>'
     + '<td>' + esc(r.rol || '') + '</td>'
     + '<td>' + esc(r.proyecto || '') + '</td>'

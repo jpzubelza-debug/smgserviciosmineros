@@ -655,6 +655,20 @@ let ordenesCache = [];
 let ordenesFiltradas = [];
 let nominaPersonal = [];
 let nominaVehiculos = [];
+let puedeEditarOrdenCerrada = false;
+let edicionManualHabilitada = false;
+let ultimoNroOrdenRenderizado = null;
+
+async function cargarPerfilActual() {
+  try {
+    const res = await fetch("/me");
+    const me = await res.json();
+    const tipo = String(me?.tipo_usuario || "").toUpperCase();
+    puedeEditarOrdenCerrada = !!me?.autenticado && (tipo === "JEFE DE AREA" || tipo === "ADMINISTRADOR");
+  } catch (error) {
+    puedeEditarOrdenCerrada = false;
+  }
+}
 
 function esc(valor) {
   const div = document.createElement("div");
@@ -822,6 +836,32 @@ function renderBloqueoOrdenCerrada() {
       La información se muestra en modo solo lectura.
     </div>
   `;
+}
+
+function renderEdicionOrdenCerrada() {
+  return `
+    <div class="card" style="margin-top:12px;border-left:4px solid #1d4ed8;">
+      <strong>Orden cerrada - edición habilitada (Rol Jefe de Area)</strong><br>
+      Los cambios que guarde reemplazarán los datos ya cargados.
+    </div>
+  `;
+}
+
+function renderHabilitarEdicionOrdenCerrada() {
+  return `
+    <div class="card" style="margin-top:12px;border-left:4px solid #1d4ed8;">
+      <strong>Orden cerrada</strong><br>
+      Su rol permite corregir esta orden.
+      <div style="margin-top:8px;">
+        <button type="button" onclick="habilitarEdicionOrdenCerrada()">Habilitar edición</button>
+      </div>
+    </div>
+  `;
+}
+
+function habilitarEdicionOrdenCerrada() {
+  edicionManualHabilitada = true;
+  renderOrdenSeleccionada(obtenerOrdenActualSeleccionada());
 }
 
 function timeToMinutes(value) {
@@ -1468,7 +1508,14 @@ function renderOrdenSeleccionada(orden) {
   const recursos = orden.recursos || {};
   const cierreLogistica = (orden.cierre_logistica && typeof orden.cierre_logistica === "object") ? orden.cierre_logistica : {};
   const cierreDatos = (cierreLogistica.datos && typeof cierreLogistica.datos === "object") ? cierreLogistica.datos : {};
-  const bloqueado = estaOrdenCerrada(orden);
+  const ordenCerrada = estaOrdenCerrada(orden);
+  const nroActual = String(orden.nro_orden || "");
+  if (nroActual !== ultimoNroOrdenRenderizado) {
+    ultimoNroOrdenRenderizado = nroActual;
+    edicionManualHabilitada = false;
+  }
+  const edicionHabilitada = ordenCerrada && puedeEditarOrdenCerrada && edicionManualHabilitada;
+  const bloqueado = ordenCerrada && !edicionHabilitada;
   const recursosVista = {
     ...recursos,
     ...(cierreDatos.solicitud || {}),
@@ -1491,7 +1538,9 @@ function renderOrdenSeleccionada(orden) {
   const html = `
     <div class="card">
       <div class="title">${esc(orden.nro_orden || "SIN NUMERO")}</div>
-      ${bloqueado ? renderBloqueoOrdenCerrada() : ""}
+      ${bloqueado
+        ? (ordenCerrada && puedeEditarOrdenCerrada ? renderHabilitarEdicionOrdenCerrada() : renderBloqueoOrdenCerrada())
+        : (ordenCerrada ? renderEdicionOrdenCerrada() : "")}
       <div class="grid">
         <div class="item"><label>Fecha Orden:</label><br>${esc(orden.fecha_orden || "")}</div>
         <div class="item"><label>ID Viaje:</label><br>${esc(orden.id_viaje || "")}</div>
@@ -1684,9 +1733,11 @@ document.getElementById("btn-imprimir").addEventListener("click", () => {
   }
 });
 
-cargarOrdenes().catch((err) => {
-  document.getElementById("listado").innerHTML = `<div class="card">Error cargando ordenes: ${esc(err.message)}</div>`;
-});
+cargarPerfilActual().then(() =>
+  cargarOrdenes().catch((err) => {
+    document.getElementById("listado").innerHTML = `<div class="card">Error cargando ordenes: ${esc(err.message)}</div>`;
+  })
+);
 </script>
 </body>
 </html>

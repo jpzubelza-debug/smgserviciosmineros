@@ -676,6 +676,16 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_estado ON usuarios (estado);
 CREATE INDEX IF NOT EXISTS idx_historial_fecha ON historial_accesos (created_at);
 CREATE INDEX IF NOT EXISTS idx_historial_usuario ON historial_accesos (usuario_id);
 
+CREATE TABLE IF NOT EXISTS responsables_modulo (
+    modulo TEXT NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (modulo, usuario_id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo);
+
 CREATE TABLE IF NOT EXISTS stock_consumibles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_producto INTEGER NOT NULL UNIQUE,

@@ -29,9 +29,9 @@
       min-height: 100vh;
     }
     .page {
-      max-width: 1200px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 28px;
     }
     .head {
       display: flex;
@@ -56,8 +56,9 @@
     .btn.danger { border-color: #991b1b; background: #b91c1c; }
     .layout {
       display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 14px;
+      grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
     }
     .card {
       border: 1px solid var(--line);
@@ -65,13 +66,22 @@
       border-radius: 14px;
       padding: 14px;
     }
+    .user-card { position: sticky; top: 16px; }
+    .side-column { display: grid; gap: 18px; min-width: 0; }
+    .users-card { grid-column: 1 / -1; }
+    .section-kicker {
+      margin: -4px 0 14px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
     .card h2 {
       margin: 0 0 10px;
       font-size: 1.05rem;
     }
     .grid {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       grid-template-columns: 1fr 1fr;
     }
     label { font-size: 0.86rem; color: var(--muted); }
@@ -99,6 +109,21 @@
       font-size: 0.86rem;
     }
     .checks input { width: auto; }
+    .permission-section {
+      grid-column: 1 / -1;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(11, 19, 40, 0.36);
+      overflow: hidden;
+    }
+    .permission-section summary {
+      padding: 10px;
+      cursor: pointer;
+      color: #bfdbfe;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .permission-section > div { padding: 0 10px 10px; }
     .paneles-box {
       display: grid;
       gap: 10px;
@@ -134,6 +159,15 @@
       font-weight: 600;
     }
     .table-wrap { overflow: auto; }
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .table-toolbar h2 { margin: 0; }
+    .table-toolbar input { max-width: 320px; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -163,6 +197,17 @@
     .err { color: #fca5a5; }
     @media (max-width: 1000px) {
       .layout { grid-template-columns: 1fr; }
+      .user-card { position: static; }
+      .users-card { grid-column: auto; }
+    }
+    @media (max-width: 620px) {
+      .page { padding: 16px; }
+      .head, .table-toolbar { align-items: flex-start; flex-direction: column; }
+      .head .actions { width: 100%; }
+      .head .actions .btn { flex: 1; }
+      .grid { grid-template-columns: 1fr; }
+      .full { grid-column: auto; }
+      .table-toolbar input { max-width: none; }
     }
   </style>
 </head>
@@ -177,8 +222,9 @@
     </header>
 
     <section class="layout">
-      <article class="card">
+      <article class="card user-card">
         <h2>Gestion de Usuarios</h2>
+        <p class="section-kicker">Cree o edite una cuenta y configure sus accesos desde los apartados desplegables.</p>
         <form id="user-form" class="grid">
           <div class="full">
             <label for="f_nombre">Apellido y Nombre</label>
@@ -213,27 +259,28 @@
             <select id="f_tipo">
               <option>ADMINISTRADOR</option>
               <option>SUPERVISOR</option>
+              <option>JEFE DE AREA</option>
               <option>ASISTENTE</option>
               <option>OPERADOR</option>
               <option selected>CONSULTOR</option>
             </select>
           </div>
-          <div class="full">
-            <label>Permisos por modulo</label>
+          <details class="permission-section" open>
+            <summary>1. Permisos por módulo</summary>
             <div class="checks" id="modulos-box"></div>
-          </div>
-          <div class="full">
-            <label>Permisos por panel</label>
+          </details>
+          <details class="permission-section">
+            <summary>2. Paneles habilitados</summary>
             <div class="paneles-box" id="paneles-box"></div>
-          </div>
-          <div class="full">
-            <label>Permisos por accion (Logistica)</label>
+          </details>
+          <details class="permission-section">
+            <summary>3. Acciones permitidas</summary>
             <div class="acciones-box" id="acciones-box"></div>
-          </div>
-          <div class="full">
-            <label>Roles funcionales</label>
+          </details>
+          <details class="permission-section">
+            <summary>Roles funcionales</summary>
             <div class="checks" id="roles-box"></div>
-          </div>
+          </details>
           <div class="full" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn primary" type="submit" id="btn-save">Crear usuario</button>
             <button class="btn" type="button" id="btn-cancel" style="display:none;">Cancelar edicion</button>
@@ -242,8 +289,36 @@
         </form>
       </article>
 
+      <aside class="side-column">
       <article class="card">
-        <h2>Usuarios y Accesos</h2>
+        <h2>Responsables de módulo</h2>
+        <p class="section-kicker">Los responsables reciben las notificaciones de las solicitudes emitidas en el módulo seleccionado.</p>
+        <div class="grid">
+          <div class="full">
+            <label for="responsable-modulo">Módulo</label>
+            <select id="responsable-modulo"></select>
+          </div>
+          <div class="full">
+            <label>Usuarios responsables</label>
+            <div class="checks" id="responsables-box"></div>
+          </div>
+          <div class="full" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn primary" type="button" id="btn-guardar-responsables">Guardar responsables</button>
+          </div>
+          <div id="responsables-msg" class="msg full"></div>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Uso rápido</h2>
+        <p class="section-kicker">Para Compras, asigne uno o más responsables. Cada nueva solicitud les llegará por correo y su emisor recibirá una copia.</p>
+      </article>
+      </aside>
+
+      <article class="card users-card">
+        <div class="table-toolbar">
+          <div><h2>Usuarios y Accesos</h2><p class="section-kicker">Consulta, búsqueda y administración de las cuentas creadas.</p></div>
+          <input id="users-search" type="search" placeholder="Buscar por nombre, correo o legajo" autocomplete="off" />
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -321,6 +396,10 @@
         ["emision_orden_compra", "Emision Orden de Compra"],
         ["ordenes_compra_emitidas", "OC Emitidas"],
         ["proveedores", "Proveedores"],
+      ],
+      operaciones: [
+        ["dashboard", "Dashboard"],
+        ["carga_partes_diarios", "Carga de Partes Diarios"],
       ],
     };
 
@@ -413,6 +492,7 @@
       users: [],
       roles: [],
       empleados: [],
+      responsables: [],
       editId: null,
     };
 
@@ -453,6 +533,39 @@
         throw new Error(txt || `HTTP ${resp.status}`);
       }
       return resp.json();
+    }
+
+    function setResponsablesMsg(text, ok = false) {
+      const el = $("responsables-msg");
+      el.textContent = text || "";
+      el.className = `msg full ${ok ? "ok" : "err"}`;
+    }
+
+    function responsablesDelModulo(modulo) {
+      return state.responsables
+        .filter((item) => item.modulo === modulo)
+        .map((item) => Number(item.usuario_id));
+    }
+
+    function renderResponsables() {
+      const select = $("responsable-modulo");
+      const anterior = select.value || "compras";
+      select.innerHTML = MODULOS.map(([codigo, nombre]) => `<option value="${codigo}">${nombre}</option>`).join("");
+      select.value = MODULOS.some(([codigo]) => codigo === anterior) ? anterior : "compras";
+      renderUsuariosResponsables();
+    }
+
+    function renderUsuariosResponsables() {
+      const modulo = $("responsable-modulo").value;
+      const seleccionados = new Set(responsablesDelModulo(modulo));
+      const usuarios = state.users.filter((usuario) => usuario.estado === "ACTIVO" && !usuario.bloqueado);
+      $("responsables-box").innerHTML = usuarios.length
+        ? usuarios.map((usuario) => `
+            <label><input type="checkbox" data-responsable-usuario="${usuario.id}" ${seleccionados.has(Number(usuario.id)) ? "checked" : ""} />
+            ${usuario.nombre_apellido || usuario.correo} <span class="muted">(${usuario.correo})</span></label>
+          `).join("")
+        : '<span class="muted">No hay usuarios activos disponibles.</span>';
+      setResponsablesMsg("");
     }
 
     function renderModulos() {
@@ -652,7 +765,13 @@
 
     function renderUsers() {
       const tb = $("users-body");
-      tb.innerHTML = state.users.map((u) => {
+      const buscado = String($("users-search")?.value || "").trim().toLocaleLowerCase();
+      const usuarios = state.users.filter((u) => {
+        if (!buscado) return true;
+        return [u.nombre_apellido, u.correo, u.legajo, u.dni, u.tipo_usuario]
+          .some((valor) => String(valor || "").toLocaleLowerCase().includes(buscado));
+      });
+      tb.innerHTML = usuarios.map((u) => {
         const modulos = badges(u.modulos || []);
         const paneles = badgesPaneles(u.paneles || {});
         const acciones = badgesAcciones(u.acciones || {});
@@ -685,7 +804,7 @@
             </td>
           </tr>
         `;
-      }).join("");
+      }).join("") || '<tr><td colspan="10" class="muted">No se encontraron usuarios.</td></tr>';
     }
 
     function renderAccess(rows) {
@@ -714,6 +833,8 @@
       renderRoles();
       state.users = await api("/admin/usuarios", { method: "GET", headers: {} });
       renderUsers();
+      state.responsables = await api("/admin/responsables-modulo", { method: "GET", headers: {} });
+      renderResponsables();
       renderAccess(await api("/admin/accesos?limit=100", { method: "GET", headers: {} }));
       fillForm(null);
     }
@@ -776,6 +897,24 @@
     $("btn-cancel").addEventListener("click", () => fillForm(null));
     $("f_nombre").addEventListener("input", completarLegajoDesdeEmpleado);
     $("f_nombre").addEventListener("change", completarLegajoDesdeEmpleado);
+    $("users-search").addEventListener("input", renderUsers);
+    $("responsable-modulo").addEventListener("change", renderUsuariosResponsables);
+    $("btn-guardar-responsables").addEventListener("click", async () => {
+      const modulo = $("responsable-modulo").value;
+      const usuario_ids = Array.from(document.querySelectorAll("input[data-responsable-usuario]:checked"))
+        .map((el) => Number(el.getAttribute("data-responsable-usuario")));
+      try {
+        await api(`/admin/responsables-modulo/${encodeURIComponent(modulo)}`, {
+          method: "PUT",
+          body: JSON.stringify({ usuario_ids }),
+        });
+        state.responsables = await api("/admin/responsables-modulo", { method: "GET", headers: {} });
+        renderUsuariosResponsables();
+        setResponsablesMsg("Responsables actualizados", true);
+      } catch (err) {
+        setResponsablesMsg(String(err.message || err));
+      }
+    });
 
     $("user-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();

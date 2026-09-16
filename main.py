@@ -11,10 +11,13 @@ from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 import io
 import json
+import math
 import os
 import secrets
 import sqlite3
+import smtplib
 import time
+from email.message import EmailMessage
 
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -35,6 +38,7 @@ FORM_VIAJE_PATH = os.path.join(BASE_DIR, "form_viaje.html")
 FORM_RECURSOS_PATH = os.path.join(BASE_DIR, "form_recursos.html")
 PERSONAL_FORM_PATH = os.path.join(BASE_DIR, "personal.html")
 COMPRAS_PATH = os.path.join(BASE_DIR, "compras.html")
+OPERACIONES_PATH = os.path.join(BASE_DIR, "operaciones.html")
 PRINT_VIAJE_PATH = os.path.join(BASE_DIR, "print_viaje.html")
 PRINT_ORDEN_SALIDA_PATH = os.path.join(BASE_DIR, "print_orden_salida.html")
 ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
@@ -151,6 +155,7 @@ CONTINGENCY_PANELS = {
     "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
     "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
+    "operaciones": ["dashboard", "carga_partes_diarios"],
     "rrhh": ["dashboard"],
     "mantenimiento": ["dashboard"],
     "dashboard_ejecutivo": ["dashboard"],
@@ -967,11 +972,27 @@ def migrar_usuarios_administracion(conn):
     }.items():
         if nombre not in columnas:
             conn.execute(f"ALTER TABLE usuarios ADD COLUMN {nombre} {definicion}")
-    for nombre in ("ADMINISTRADOR", "SUPERVISOR", "ASISTENTE", "OPERADOR", "CONSULTOR"):
+    for nombre in ("ADMINISTRADOR", "SUPERVISOR", "ASISTENTE", "OPERADOR", "CONSULTOR", "JEFE DE AREA"):
         conn.execute(
             "INSERT OR IGNORE INTO roles_funcionales (nombre, activo) VALUES (?, 1)",
             (nombre,),
         )
+
+
+def migrar_responsables_modulo(conn):
+    """Crea la asignación de responsables para las notificaciones por módulo."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS responsables_modulo (
+            modulo TEXT NOT NULL,
+            usuario_id INTEGER NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (modulo, usuario_id),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo)")
 
 
 def migrar_personal_dotacion(conn):
@@ -1130,6 +1151,7 @@ def init_sqlite():
                         raise
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
                 migrar_usuarios_administracion(conn)
+                migrar_responsables_modulo(conn)
                 migrar_personal_dotacion(conn)
                 migrar_habilitaciones_personal(conn)
                 sembrar_configuracion_almacen(conn)
@@ -1770,7 +1792,7 @@ class Viaje(BaseModel):
 
 @app.post("/viajes")
 def crear_viaje(request: Request, viaje: Viaje):
-    _requiere_accion(request, "logistica", "solicitud_viaje", "crear_solicitud")
+    perfil = _requiere_accion(request, "logistica", "solicitud_viaje", "crear_solicitud")
     nuevo = viaje.dict()
     with get_sqlite_connection() as conn:
         row = conn.execute("SELECT COALESCE(MAX(id), 0) AS max_id FROM viajes").fetchone()
@@ -1782,7 +1804,21 @@ def crear_viaje(request: Request, viaje: Viaje):
 
     with get_sqlite_connection() as conn:
         guardar_viaje_sql(conn, nuevo)
+        responsables = _obtener_destinatarios_responsables(conn, "logistica")
         conn.commit()
+
+    _enviar_notificacion_solicitud_viaje(
+        responsables=responsables,
+        correo_emisor=str(perfil.get("usuario") or ""),
+        viaje_id=nuevo_id,
+        solicitante=str(nuevo.get("solicitante") or ""),
+        area=str(nuevo.get("area") or ""),
+        origen=str(nuevo.get("origen") or ""),
+        destino=str(nuevo.get("destino") or ""),
+        fecha_salida=str(nuevo.get("fecha_salida") or ""),
+        fecha_regreso=str(nuevo.get("fecha_regreso") or ""),
+        motivo=str(nuevo.get("motivo") or ""),
+    )
 
     return {"mensaje": "Viaje creado", "id": nuevo["id"]}
 
@@ -2413,6 +2449,151 @@ def _puede_visualizar_todas_solicitudes(perfil):
     return "consultar_todas" in permitidas
 
 
+def _obtener_destinatarios_responsables(conn, modulo: str):
+    filas = conn.execute(
+        """
+        SELECT u.correo, u.nombre_apellido
+        FROM responsables_modulo rm
+        JOIN usuarios u ON u.id = rm.usuario_id
+        WHERE rm.modulo = ?
+          AND upper(COALESCE(u.estado, 'ACTIVO')) = 'ACTIVO'
+          AND COALESCE(u.bloqueado, 0) = 0
+          AND trim(COALESCE(u.correo, '')) <> ''
+        ORDER BY u.nombre_apellido, u.correo
+        """,
+        (modulo,),
+    ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+def _enviar_notificacion_solicitud_compra(responsables, correo_emisor: str, numero_solicitud: str,
+                                          solicitante: str, prioridad: str, destino: str,
+                                          observaciones: str, pdf_path: str):
+    """Envía la notificación sin afectar la emisión si el correo falla."""
+    smtp_usuario = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        smtp_port = 465
+    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
+    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
+    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
+    correo_emisor = str(correo_emisor or "").strip()
+    copias = []
+    if correo_emisor and correo_emisor.casefold() not in {correo.casefold() for correo in destinatarios}:
+        copias.append(correo_emisor)
+    if not (smtp_usuario and smtp_password and remitente and destinatarios):
+        return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
+
+    mensaje = EmailMessage()
+    mensaje["Subject"] = f"Nueva solicitud de compra {numero_solicitud}"
+    mensaje["From"] = remitente
+    mensaje["To"] = ", ".join(destinatarios)
+    if copias:
+        mensaje["Cc"] = ", ".join(copias)
+    mensaje.set_content(
+        "Se generó una nueva solicitud de compra.\n\n"
+        f"Solicitud: {numero_solicitud}\nSolicitante: {solicitante or '-'}\n"
+        f"Prioridad: {prioridad or '-'}\nDestino: {destino or '-'}\n"
+        f"Observaciones: {observaciones or '-'}\n\n"
+        "Se adjunta el PDF de la solicitud."
+    )
+    try:
+        with open(pdf_path, "rb") as archivo:
+            mensaje.add_attachment(archivo.read(), maintype="application", subtype="pdf", filename=os.path.basename(pdf_path))
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as servidor:
+            servidor.login(smtp_usuario, smtp_password)
+            servidor.send_message(mensaje)
+        return {"enviado": True, "destinatarios": destinatarios, "copias": copias}
+    except Exception as exc:
+        print(f"No se pudo enviar la notificación de compra {numero_solicitud}: {exc}")
+        return {"enviado": False, "motivo": "Error al enviar la notificación"}
+
+
+def _enviar_notificacion_solicitud_viaje(responsables, correo_emisor: str, viaje_id: int,
+                                         solicitante: str, area: str, origen: str, destino: str,
+                                         fecha_salida: str, fecha_regreso: str, motivo: str):
+    """Notifica nuevas solicitudes de viaje a los responsables de Logística."""
+    smtp_usuario = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        smtp_port = 465
+    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
+    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
+    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
+    correo_emisor = str(correo_emisor or "").strip()
+    copias = []
+    if correo_emisor and correo_emisor.casefold() not in {correo.casefold() for correo in destinatarios}:
+        copias.append(correo_emisor)
+    if not (smtp_usuario and smtp_password and remitente and destinatarios):
+        return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
+
+    mensaje = EmailMessage()
+    mensaje["Subject"] = f"Nueva solicitud de viaje #{viaje_id}"
+    mensaje["From"] = remitente
+    mensaje["To"] = ", ".join(destinatarios)
+    if copias:
+        mensaje["Cc"] = ", ".join(copias)
+    mensaje.set_content(
+        "Se generó una nueva solicitud de viaje.\n\n"
+        f"Solicitud: #{viaje_id}\nSolicitante: {solicitante or '-'}\nÁrea: {area or '-'}\n"
+        f"Origen: {origen or '-'}\nDestino: {destino or '-'}\n"
+        f"Salida: {fecha_salida or '-'}\nRegreso: {fecha_regreso or '-'}\n"
+        f"Motivo: {motivo or '-'}"
+    )
+    try:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as servidor:
+            servidor.login(smtp_usuario, smtp_password)
+            servidor.send_message(mensaje)
+        return {"enviado": True, "destinatarios": destinatarios, "copias": copias}
+    except Exception as exc:
+        print(f"No se pudo enviar la notificación de viaje #{viaje_id}: {exc}")
+        return {"enviado": False, "motivo": "Error al enviar la notificación"}
+
+
+def _enviar_notificacion_remito(responsables, tipo: str, numero: str, fecha: str,
+                                detalle_principal: str, total_items: int, pdf_path: str):
+    """Envía a Almacén el remito generado con su PDF adjunto."""
+    smtp_usuario = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        smtp_port = 465
+    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
+    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
+    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
+    if not (smtp_usuario and smtp_password and remitente and destinatarios):
+        return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
+
+    mensaje = EmailMessage()
+    mensaje["Subject"] = f"{tipo} {numero} generado"
+    mensaje["From"] = remitente
+    mensaje["To"] = ", ".join(destinatarios)
+    mensaje.set_content(
+        f"Se generó un {tipo.lower()}.\n\n"
+        f"Número: {numero}\nFecha: {fecha or '-'}\n"
+        f"Detalle: {detalle_principal or '-'}\nTotal de ítems: {total_items}\n\n"
+        "Se adjunta el PDF del remito."
+    )
+    try:
+        with open(pdf_path, "rb") as archivo:
+            mensaje.add_attachment(archivo.read(), maintype="application", subtype="pdf", filename=os.path.basename(pdf_path))
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as servidor:
+            servidor.login(smtp_usuario, smtp_password)
+            servidor.send_message(mensaje)
+        return {"enviado": True, "destinatarios": destinatarios}
+    except Exception as exc:
+        print(f"No se pudo enviar la notificación del remito {numero}: {exc}")
+        return {"enviado": False, "motivo": "Error al enviar la notificación"}
+
+
 @app.get("/base_datos", response_class=HTMLResponse)
 def base_datos_view(request: Request):
     try:
@@ -2444,22 +2625,37 @@ def base_datos_tablas(request: Request):
 
 
 @app.get("/base_datos/tabla/{tabla}")
-def base_datos_tabla(tabla: str, request: Request):
+def base_datos_tabla(tabla: str, request: Request, pagina: int = 1, limite: int = 100):
     _requiere_modulo(request, "base_datos")
+    pagina = max(1, pagina)
+    limite = max(1, min(limite, 2000))  # tope de seguridad para no saturar la respuesta
     with get_sqlite_connection() as conn:
         if tabla not in _tablas_base_datos(conn):
             raise HTTPException(status_code=404, detail="Tabla no encontrada")
         tabla_sql = tabla.replace('"', '""')
         columnas = [fila["name"] for fila in conn.execute(f'PRAGMA table_info("{tabla_sql}")').fetchall()]
+        total = conn.execute(f'SELECT COUNT(*) FROM "{tabla_sql}"').fetchone()[0]
+        total_paginas = max(1, math.ceil(total / limite))
+        pagina = min(pagina, total_paginas)
+        offset = (pagina - 1) * limite
         filas = []
-        for fila in conn.execute(f'SELECT * FROM "{tabla_sql}"').fetchall():
+        cursor = conn.execute(f'SELECT * FROM "{tabla_sql}" LIMIT ? OFFSET ?', (limite, offset))
+        for fila in cursor.fetchall():
             registro = dict(fila)
             # Las credenciales y material de autenticación nunca se exponen en una grilla.
             for campo in ("password_hash", "password_cifrada"):
                 if campo in registro:
                     registro[campo] = "••••••••"
             filas.append(registro)
-        return {"tabla": tabla, "columnas": columnas, "filas": filas, "total": len(filas)}
+        return {
+            "tabla": tabla,
+            "columnas": columnas,
+            "filas": filas,
+            "total": total,
+            "pagina": pagina,
+            "limite": limite,
+            "total_paginas": total_paginas,
+        }
 
 
 @app.get("/admin/roles_funcionales")
@@ -2484,6 +2680,53 @@ def admin_listar_usuarios(request: Request):
             """
         ).fetchall()
         return [_admin_usuario_a_dict(conn, fila) for fila in filas]
+
+
+@app.get("/admin/responsables-modulo")
+def admin_listar_responsables_modulo(request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        migrar_responsables_modulo(conn)
+        filas = conn.execute(
+            """
+            SELECT rm.modulo, u.id AS usuario_id, u.nombre_apellido, u.correo
+            FROM responsables_modulo rm
+            JOIN usuarios u ON u.id = rm.usuario_id
+            ORDER BY rm.modulo, u.nombre_apellido, u.correo
+            """
+        ).fetchall()
+        return [dict(fila) for fila in filas]
+
+
+@app.put("/admin/responsables-modulo/{modulo}")
+def admin_actualizar_responsables_modulo(modulo: str, request: Request, payload: dict):
+    _requiere_administrador(request)
+    modulo = str(modulo or "").strip().lower()
+    if modulo not in ALL_MODULES:
+        raise HTTPException(status_code=400, detail="Módulo inválido")
+    ids = (payload or {}).get("usuario_ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="usuario_ids debe ser una lista")
+    try:
+        ids = sorted({int(usuario_id) for usuario_id in ids})
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="La lista de responsables es inválida")
+    with get_sqlite_connection() as conn:
+        migrar_responsables_modulo(conn)
+        if ids:
+            placeholders = ", ".join("?" for _ in ids)
+            activos = conn.execute(
+                f"SELECT id FROM usuarios WHERE id IN ({placeholders}) AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO' AND COALESCE(bloqueado, 0) = 0",
+                ids,
+            ).fetchall()
+            if len(activos) != len(ids):
+                raise HTTPException(status_code=400, detail="Solo se pueden asignar usuarios activos y no bloqueados")
+        conn.execute("DELETE FROM responsables_modulo WHERE modulo = ?", (modulo,))
+        for usuario_id in ids:
+            conn.execute("INSERT INTO responsables_modulo (modulo, usuario_id) VALUES (?, ?)", (modulo, usuario_id))
+        _registrar_acceso_admin(conn, request, "RESPONSABLES_MODULO_ACTUALIZADOS", f"modulo={modulo}; total={len(ids)}")
+        conn.commit()
+    return {"ok": True, "modulo": modulo, "usuario_ids": ids}
 
 
 @app.post("/admin/usuarios")
@@ -2666,6 +2909,15 @@ def dashboard(request: Request):
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(DASHBOARD_PATH)
+
+
+@app.get("/operaciones", response_class=HTMLResponse)
+def operaciones_view(request: Request):
+    try:
+        _requiere_modulo(request, "operaciones")
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    return _leer_html(OPERACIONES_PATH)
 
 
 @app.get("/compras", response_class=HTMLResponse)
@@ -4486,6 +4738,13 @@ async def compras_emitir(request: Request):
         columnas_multilinea={0, 5},
     )
 
+    with get_sqlite_connection() as conn:
+        responsables = _obtener_destinatarios_responsables(conn, "compras")
+    _enviar_notificacion_solicitud_compra(
+        responsables, str(perfil.get("usuario") or ""), numero_solicitud,
+        solicitante_nombre, prioridad_nombre, destino_nombre, observaciones, pdf_path,
+    )
+
     return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
 
 
@@ -4537,6 +4796,18 @@ def form_recursos(request: Request):
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(FORM_RECURSOS_PATH)
+
+
+def _orden_salida_esta_cerrada(orden: dict) -> bool:
+    """Replica en el backend la logica de bloqueo usada en ordenes_view.html (estaOrdenCerrada)."""
+    if not isinstance(orden, dict):
+        return False
+    estado_orden = str(orden.get("estado") or "").upper()
+    viaje = orden.get("viaje") if isinstance(orden.get("viaje"), dict) else {}
+    estado_viaje = str(viaje.get("estado") or "").upper()
+    cierre = orden.get("cierre_logistica") if isinstance(orden.get("cierre_logistica"), dict) else {}
+    cerrado_por_cierre = bool(cierre.get("cerrado")) or bool(cierre.get("fecha_guardado"))
+    return cerrado_por_cierre or estado_orden.startswith("CERRAD") or estado_viaje.startswith("CERRAD")
 
 
 @app.get("/ordenes")
@@ -4627,6 +4898,13 @@ def gestion_operativa_resumen(
     return payload
 
 
+def _formatear_fecha_corta(valor):
+    texto = str(valor or "").strip()
+    if len(texto) >= 10 and texto[4] == "-" and texto[7] == "-":
+        return f"{texto[8:10]}/{texto[5:7]}/{texto[0:4]}"
+    return texto
+
+
 def _gestion_operativa_resumen_payload(
     conn,
     desde: str = "",
@@ -4696,6 +4974,8 @@ def _gestion_operativa_resumen_payload(
                 "centro_costo": key[4],
                 "origen": key[5],
                 "destino": key[6],
+                "fecha_inicio_os": str(r.get("fecha_salida") or "").strip(),
+                "fecha_fin_os": str(r.get("fecha_regreso") or "").strip(),
                 "jornadas": 0.0,
                 "hh": 0.0,
                 "compensables": 0.0,
@@ -4718,6 +4998,8 @@ def _gestion_operativa_resumen_payload(
                 "centro_costo": item["centro_costo"],
                 "origen": item["origen"],
                 "destino": item["destino"],
+                "fecha_inicio_os": item["fecha_inicio_os"],
+                "fecha_fin_os": item["fecha_fin_os"],
                 "jornadas": round(item["jornadas"], 2),
                 "hh": round(item["hh"], 2),
                 "compensables": round(item["compensables"], 2),
@@ -4851,6 +5133,8 @@ def gestion_operativa_pdf(
     table_width = table_right - table_left
     col_specs = [
         ("Nro Orden", 62.0, "left"),
+        ("Inicio OS", 58.0, "left"),
+        ("Fin OS", 58.0, "left"),
         ("Empleado", 126.0, "left"),
         ("Rol", 75.0, "left"),
         ("Proyecto", 85.0, "left"),
@@ -4923,6 +5207,8 @@ def gestion_operativa_pdf(
                 c.setFont("Helvetica", 8)
             valores = [
                 fila.get("nro_orden") or "",
+                _formatear_fecha_corta(fila.get("fecha_inicio_os")),
+                _formatear_fecha_corta(fila.get("fecha_fin_os")),
                 fila.get("empleado") or "",
                 fila.get("rol") or "",
                 fila.get("proyecto") or "",
@@ -4984,11 +5270,13 @@ def gestion_operativa_excel(
     wb = Workbook()
     ws = wb.active
     ws.title = "Resumen Operativo"
-    headers = ["Nro Orden", "Empleado", "Rol", "Proyecto", "Centro de Costos", "Origen", "Destino", "HH", "Compensables", "Viaticos"]
+    headers = ["Nro Orden", "Inicio OS", "Fin OS", "Empleado", "Rol", "Proyecto", "Centro de Costos", "Origen", "Destino", "HH", "Compensables", "Viaticos"]
     ws.append(headers)
     for fila in filas:
         ws.append([
             fila.get("nro_orden") or "",
+            _formatear_fecha_corta(fila.get("fecha_inicio_os")),
+            _formatear_fecha_corta(fila.get("fecha_fin_os")),
             fila.get("empleado") or "",
             fila.get("rol") or "",
             fila.get("proyecto") or "",
@@ -5020,10 +5308,13 @@ def gestion_operativa_excel(
 @app.post("/ordenes/{nro_orden}/cierre")
 async def guardar_cierre_logistico(
     nro_orden: str,
+    request: Request,
     payload: str = Form("{}"),
     checklist_mantenimiento: UploadFile | None = File(default=None),
     formulario_logistica_viaje: UploadFile | None = File(default=None),
 ):
+    perfil = _requiere_panel(request, "logistica", "ordenes_salida")
+
     with get_sqlite_connection() as conn:
         orden_row = conn.execute(
             "SELECT raw_json FROM ordenes_salida WHERE nro_orden = ?",
@@ -5035,6 +5326,9 @@ async def guardar_cierre_logistico(
         orden = parse_json_dict(orden_row["raw_json"], default={})
         if not orden:
             return {"error": f"No se encontró la orden {nro_orden}"}
+
+    if _orden_salida_esta_cerrada(orden) and str(perfil.get("tipo_usuario", "")).upper() not in {"JEFE DE AREA", "ADMINISTRADOR"}:
+        raise HTTPException(status_code=403, detail="Solo un usuario con Rol Jefe de Area puede editar una Orden de Salida cerrada")
 
     try:
         payload_data = json.loads(payload or "{}")
@@ -5329,6 +5623,50 @@ def obtener_personal():
     return obtener_personal_data()
 
 
+def _normalizar_legajo(valor):
+    """Normaliza un legajo para comparar duplicados sin importar ceros a la izquierda (ej: '0001' == '1')."""
+    texto = str(valor or "").strip()
+    if texto.isdigit():
+        return str(int(texto))
+    return texto.upper()
+
+
+def _buscar_legajo_duplicado(conn, legajo, excluir_legajo=None):
+    normalizado = _normalizar_legajo(legajo)
+    filas = conn.execute("SELECT legajo FROM personal").fetchall()
+    for fila in filas:
+        existente = str(fila["legajo"])
+        if excluir_legajo is not None and existente == str(excluir_legajo):
+            continue
+        if _normalizar_legajo(existente) == normalizado:
+            return existente
+    return None
+
+
+# Tablas/columnas que referencian personal.legajo y deben actualizarse al corregir un legajo.
+_TABLAS_REFERENCIAN_LEGAJO = [
+    ("remitos_ingreso", "responsable_legajo"),
+    ("remitos_entrega", "entrega_legajo"),
+    ("remitos_entrega", "recibe_legajo"),
+    ("movimientos_stock", "responsable_legajo"),
+    ("inventarios", "responsable_legajo"),
+    ("ajustes_stock", "solicitado_por_legajo"),
+    ("ajustes_stock", "aprobado_por_legajo"),
+    ("personal_roles_almacen", "legajo"),
+    ("personal_habilitaciones", "legajo"),
+    ("solicitud_compra", "id_solicitante"),
+    ("documentos", "responsable"),
+    ("movimientos", "id_personal"),
+    ("auditoria", "usuario"),
+]
+
+
+def _tabla_existe(conn, nombre_tabla):
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (nombre_tabla,)
+    ).fetchone() is not None
+
+
 @app.post("/personal")
 def crear_personal(data: dict):
     legajo = str(data.get("legajo", "")).strip()
@@ -5336,8 +5674,7 @@ def crear_personal(data: dict):
         return {"error": "El legajo es obligatorio"}
 
     with get_sqlite_connection() as conn:
-        existe = conn.execute("SELECT 1 FROM personal WHERE legajo = ?", (legajo,)).fetchone()
-        if existe:
+        if _buscar_legajo_duplicado(conn, legajo) is not None:
             return {"error": "El legajo ya existe"}
 
         conn.execute(
@@ -5415,6 +5752,50 @@ def actualizar_personal(legajo: str, data: dict):
         conn.commit()
 
     return {"mensaje": "Empleado actualizado"}
+
+
+@app.put("/personal/{legajo}/legajo")
+def corregir_legajo_personal(legajo: str, request: Request, data: dict):
+    """Permite al administrador corregir un legajo mal cargado, propagando el cambio a las tablas relacionadas."""
+    _requiere_administrador(request)
+
+    legajo_actual = str(legajo).strip()
+    nuevo_legajo = str((data or {}).get("nuevo_legajo", "")).strip()
+    if not nuevo_legajo:
+        raise HTTPException(status_code=400, detail="El nuevo legajo es obligatorio")
+
+    with get_sqlite_connection() as conn:
+        existente = conn.execute("SELECT 1 FROM personal WHERE legajo = ?", (legajo_actual,)).fetchone()
+        if existente is None:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
+        duplicado = _buscar_legajo_duplicado(conn, nuevo_legajo, excluir_legajo=legajo_actual)
+        if duplicado is not None:
+            raise HTTPException(status_code=400, detail=f"El legajo {nuevo_legajo} ya esta en uso (legajo {duplicado})")
+
+        if nuevo_legajo == legajo_actual:
+            return {"mensaje": "El legajo no tuvo cambios"}
+
+        try:
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.execute("BEGIN")
+            conn.execute("UPDATE personal SET legajo = ? WHERE legajo = ?", (nuevo_legajo, legajo_actual))
+            for tabla, columna in _TABLAS_REFERENCIAN_LEGAJO:
+                if not _tabla_existe(conn, tabla):
+                    continue
+                conn.execute(
+                    f"UPDATE {tabla} SET {columna} = ? WHERE {columna} = ?",
+                    (nuevo_legajo, legajo_actual),
+                )
+            inconsistencias = conn.execute("PRAGMA foreign_key_check").fetchall()
+            if inconsistencias:
+                conn.execute("ROLLBACK")
+                raise HTTPException(status_code=409, detail="No se pudo corregir el legajo por referencias inconsistentes")
+            conn.commit()
+        finally:
+            conn.execute("PRAGMA foreign_keys = ON")
+
+    return {"mensaje": "Legajo corregido correctamente", "legajo_anterior": legajo_actual, "legajo_nuevo": nuevo_legajo}
 
 
 @app.get("/personal/proyectos")
@@ -6825,6 +7206,17 @@ def crear_remito_ingreso(payload: AlmacenRIPayload):
             bloque_envio_titulo="Datos de ingreso",
             observaciones_pie=payload.observaciones or "",
         )
+        responsables = _obtener_destinatarios_responsables(conn, "almacen")
+
+    _enviar_notificacion_remito(
+        responsables=responsables,
+        tipo="Remito de Ingreso",
+        numero=numero,
+        fecha=fecha,
+        detalle_principal=f"Proveedor: {payload.proveedor or '-'}",
+        total_items=len(det_rows),
+        pdf_path=pdf_path,
+    )
 
     return {"mensaje": "Remito de ingreso creado", "numero": numero, "id": remito_id}
 
@@ -7104,8 +7496,19 @@ def crear_remito_entrega(payload: AlmacenREPayload):
 
         row = conn.execute("SELECT * FROM remitos_entrega WHERE id = ?", (remito_id,)).fetchone()
         det_rows = _detalle_remito_entrega_rows(conn, remito_id)
-        _generar_pdf_remito_entrega(conn, row, det_rows)
+        pdf_path = _generar_pdf_remito_entrega(conn, row, det_rows)
+        responsables = _obtener_destinatarios_responsables(conn, "almacen")
         conn.commit()
+
+    _enviar_notificacion_remito(
+        responsables=responsables,
+        tipo="Remito de Entrega",
+        numero=numero,
+        fecha=fecha,
+        detalle_principal=f"Destinatario: {payload.destinatario or '-'}",
+        total_items=len(det_rows),
+        pdf_path=pdf_path,
+    )
 
     return {"mensaje": "Remito de entrega registrado en estado PENDIENTE", "numero": numero, "id": remito_id, "estado_autorizacion": "PENDIENTE"}
 

@@ -11,6 +11,12 @@ services:
         value: /var/data
       - key: PASSWORD_ENCRYPTION_KEY
         sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
     disk:
       name: dashboard-data
       mountPath: /var/data
