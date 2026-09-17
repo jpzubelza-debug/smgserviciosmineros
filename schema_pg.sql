@@ -505,6 +505,27 @@ CREATE TABLE IF NOT EXISTS responsables_modulo (
 
 CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo);
 
+CREATE TABLE IF NOT EXISTS email_templates (
+    id SERIAL PRIMARY KEY,
+    codigo TEXT NOT NULL UNIQUE,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    modulo TEXT,
+    asunto_template TEXT NOT NULL,
+    cuerpo_template TEXT NOT NULL,
+    formato TEXT DEFAULT 'texto',
+    asunto_original TEXT NOT NULL,
+    cuerpo_original TEXT NOT NULL,
+    variables_permitidas TEXT NOT NULL,
+    activo INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_templates_codigo ON email_templates (codigo);
+CREATE INDEX IF NOT EXISTS idx_email_templates_modulo ON email_templates (modulo);
+
 -- Stock
 CREATE TABLE IF NOT EXISTS stock_consumibles (
     id SERIAL PRIMARY KEY,

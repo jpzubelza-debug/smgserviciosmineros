@@ -42,6 +42,9 @@ class FakeConnection:
     def commit(self):
         pass
 
+    def close(self):
+        pass
+
 
 class AdminCrearUsuarioTests(unittest.TestCase):
     def test_crear_usuario_usa_lastrowid_del_cursor(self):

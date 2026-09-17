@@ -69,6 +69,7 @@
     .user-card { min-width: 0; }
     .side-column { display: grid; gap: 18px; min-width: 0; }
     .users-card { grid-column: 1 / -1; }
+    .templates-card { grid-column: 1 / -1; }
     .section-kicker {
       margin: -4px 0 14px;
       color: var(--muted);
@@ -85,7 +86,7 @@
       grid-template-columns: 1fr 1fr;
     }
     label { font-size: 0.86rem; color: var(--muted); }
-    input, select {
+    input, select, textarea {
       width: 100%;
       background: #0b1328;
       color: var(--text);
@@ -93,6 +94,12 @@
       border-radius: 8px;
       padding: 8px 9px;
       outline: none;
+    }
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+      line-height: 1.45;
+      font-family: "Outfit", sans-serif;
     }
     .full { grid-column: 1 / -1; }
     .checks {
@@ -168,6 +175,34 @@
     }
     .table-toolbar h2 { margin: 0; }
     .table-toolbar input { max-width: 320px; }
+    .templates-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+      gap: 14px;
+    }
+    .template-list { display: grid; gap: 8px; align-content: start; }
+    .template-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: rgba(11, 19, 40, 0.45);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .template-item.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.12); }
+    .template-item strong { display: block; margin-bottom: 4px; }
+    .template-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .variables-box { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .preview-box {
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(8, 15, 33, 0.55);
+      min-height: 120px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -198,6 +233,8 @@
     @media (max-width: 1000px) {
       .layout { grid-template-columns: 1fr; }
       .users-card { grid-column: auto; }
+      .templates-card { grid-column: auto; }
+      .templates-layout { grid-template-columns: 1fr; }
     }
     @media (max-width: 620px) {
       .page { padding: 16px; }
@@ -312,6 +349,73 @@
         <p class="section-kicker">Para Compras, asigne uno o más responsables. Cada nueva solicitud les llegará por correo y su emisor recibirá una copia.</p>
       </article>
       </aside>
+
+      <article class="card templates-card">
+        <div class="table-toolbar">
+          <div>
+            <h2>Plantillas de Emails</h2>
+            <p class="section-kicker">Administre los textos usados en las notificaciones automaticas del sistema.</p>
+          </div>
+        </div>
+        <div class="templates-layout">
+          <div class="template-list" id="email-template-list"></div>
+          <form id="email-template-form" class="grid">
+            <div>
+              <label>Codigo interno</label>
+              <input id="tpl_codigo" disabled />
+            </div>
+            <div>
+              <label>Modulo</label>
+              <input id="tpl_modulo" disabled />
+            </div>
+            <div class="full">
+              <label>Nombre visible</label>
+              <input id="tpl_nombre" required />
+            </div>
+            <div class="full">
+              <label>Descripcion</label>
+              <input id="tpl_descripcion" />
+            </div>
+            <div>
+              <label>Formato</label>
+              <select id="tpl_formato">
+                <option value="texto">Texto plano</option>
+                <option value="html">HTML</option>
+              </select>
+            </div>
+            <div>
+              <label>Estado</label>
+              <select id="tpl_activo">
+                <option value="1">Activo</option>
+                <option value="0">Inactivo (usa original)</option>
+              </select>
+            </div>
+            <div class="full">
+              <label>Asunto</label>
+              <input id="tpl_asunto" required />
+            </div>
+            <div class="full">
+              <label>Cuerpo</label>
+              <textarea id="tpl_cuerpo" required></textarea>
+            </div>
+            <div class="full">
+              <label>Variables permitidas</label>
+              <div class="variables-box" id="tpl_variables"></div>
+            </div>
+            <div class="full template-actions">
+              <button class="btn primary" type="submit">Guardar plantilla</button>
+              <button class="btn" type="button" id="btn-preview-template">Vista previa</button>
+              <button class="btn warn" type="button" id="btn-toggle-template">Activar/desactivar</button>
+              <button class="btn danger" type="button" id="btn-restore-template">Restaurar original</button>
+            </div>
+            <div id="templates-msg" class="msg full"></div>
+            <div class="full">
+              <label>Vista previa</label>
+              <div class="preview-box" id="template-preview">Seleccione una plantilla y presione Vista previa.</div>
+            </div>
+          </form>
+        </div>
+      </article>
 
       <article class="card users-card">
         <div class="table-toolbar">
@@ -492,6 +596,8 @@
       roles: [],
       empleados: [],
       responsables: [],
+      emailTemplates: [],
+      selectedTemplate: null,
       editId: null,
     };
 
@@ -536,6 +642,12 @@
 
     function setResponsablesMsg(text, ok = false) {
       const el = $("responsables-msg");
+      el.textContent = text || "";
+      el.className = `msg full ${ok ? "ok" : "err"}`;
+    }
+
+    function setTemplatesMsg(text, ok = false) {
+      const el = $("templates-msg");
       el.textContent = text || "";
       el.className = `msg full ${ok ? "ok" : "err"}`;
     }
@@ -762,6 +874,100 @@
       return chunks.join("");
     }
 
+    function esc(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderEmailTemplates() {
+      const lista = $("email-template-list");
+      lista.innerHTML = state.emailTemplates.map((tpl) => `
+        <button type="button" class="template-item ${state.selectedTemplate?.codigo === tpl.codigo ? "active" : ""}" onclick="selectEmailTemplate('${esc(tpl.codigo)}')">
+          <strong>${esc(tpl.nombre)}</strong>
+          <span class="badge">${esc(tpl.codigo)}</span>
+          <span class="badge">${esc(tpl.modulo)}</span>
+          <span class="badge">${tpl.activo ? "Activo" : "Inactivo"}</span>
+          <div class="muted">${esc(tpl.descripcion || "")}</div>
+          <div class="muted">Actualizado: ${esc(tpl.updated_at || "-")} ${tpl.updated_by ? `por ${esc(tpl.updated_by)}` : ""}</div>
+        </button>
+      `).join("") || '<div class="muted">No hay plantillas disponibles.</div>';
+    }
+
+    function fillEmailTemplate(tpl) {
+      state.selectedTemplate = tpl || null;
+      $("tpl_codigo").value = tpl?.codigo || "";
+      $("tpl_modulo").value = tpl?.modulo || "";
+      $("tpl_nombre").value = tpl?.nombre || "";
+      $("tpl_descripcion").value = tpl?.descripcion || "";
+      $("tpl_formato").value = tpl?.formato || "texto";
+      $("tpl_activo").value = tpl?.activo ? "1" : "0";
+      $("tpl_asunto").value = tpl?.asunto_template || "";
+      $("tpl_cuerpo").value = tpl?.cuerpo_template || "";
+      $("tpl_variables").innerHTML = (tpl?.variables_permitidas || [])
+        .map((variable) => `<button type="button" class="btn" onclick="copyTemplateVariable('${esc(variable)}')">{{ ${esc(variable)} }}</button>`)
+        .join("") || '<span class="muted">Sin variables.</span>';
+      $("template-preview").textContent = "Seleccione una plantilla y presione Vista previa.";
+      setTemplatesMsg("");
+      renderEmailTemplates();
+    }
+
+    function selectEmailTemplate(codigo) {
+      const tpl = state.emailTemplates.find((item) => item.codigo === codigo);
+      if (tpl) fillEmailTemplate(tpl);
+    }
+
+    function templatePayload() {
+      return {
+        nombre: $("tpl_nombre").value.trim(),
+        descripcion: $("tpl_descripcion").value.trim(),
+        formato: $("tpl_formato").value,
+        activo: $("tpl_activo").value === "1",
+        asunto_template: $("tpl_asunto").value.trim(),
+        cuerpo_template: $("tpl_cuerpo").value.trim(),
+      };
+    }
+
+    async function reloadEmailTemplates(codigo = "") {
+      state.emailTemplates = await api("/admin/email-templates", { method: "GET", headers: {} });
+      const seleccionado = state.emailTemplates.find((tpl) => tpl.codigo === (codigo || state.selectedTemplate?.codigo)) || state.emailTemplates[0];
+      fillEmailTemplate(seleccionado || null);
+    }
+
+    async function previewEmailTemplate() {
+      if (!state.selectedTemplate) return;
+      const data = await api(`/admin/email-templates/${encodeURIComponent(state.selectedTemplate.codigo)}/preview`, {
+        method: "POST",
+        body: JSON.stringify(templatePayload()),
+      });
+      $("template-preview").textContent =
+        `Asunto: ${data.asunto}\nRemitente: ${data.remitente}\nDestinatarios: ${(data.destinatarios || []).join(", ")}\nCopias: ${(data.copias || []).join(", ")}\n\n${data.cuerpo}`;
+      setTemplatesMsg("Vista previa generada sin enviar email.", true);
+    }
+
+    async function restoreEmailTemplate() {
+      if (!state.selectedTemplate) return;
+      if (!confirm("Restaurar el asunto y cuerpo original de esta plantilla?")) return;
+      const codigo = state.selectedTemplate.codigo;
+      await api(`/admin/email-templates/${encodeURIComponent(codigo)}/restore`, { method: "POST", body: JSON.stringify({}) });
+      await reloadEmailTemplates(codigo);
+      setTemplatesMsg("Plantilla restaurada", true);
+    }
+
+    async function toggleEmailTemplate() {
+      if (!state.selectedTemplate) return;
+      const codigo = state.selectedTemplate.codigo;
+      const activo = $("tpl_activo").value !== "1";
+      await api(`/admin/email-templates/${encodeURIComponent(codigo)}/toggle`, {
+        method: "POST",
+        body: JSON.stringify({ activo }),
+      });
+      await reloadEmailTemplates(codigo);
+      setTemplatesMsg(activo ? "Plantilla activada" : "Plantilla inactiva: se usara el texto original", true);
+    }
+
     function renderUsers() {
       const tb = $("users-body");
       const buscado = String($("users-search")?.value || "").trim().toLocaleLowerCase();
@@ -834,6 +1040,7 @@
       renderUsers();
       state.responsables = await api("/admin/responsables-modulo", { method: "GET", headers: {} });
       renderResponsables();
+      await reloadEmailTemplates();
       renderAccess(await api("/admin/accesos?limit=100", { method: "GET", headers: {} }));
       fillForm(null);
     }
@@ -892,6 +1099,16 @@
     window.toggleBlock = toggleBlock;
     window.togglePwd = togglePwd;
     window.resetPwd = resetPwd;
+    window.selectEmailTemplate = selectEmailTemplate;
+    window.copyTemplateVariable = async (variable) => {
+      const text = `{{ ${variable} }}`;
+      try {
+        await navigator.clipboard.writeText(text);
+        setTemplatesMsg(`Variable copiada: ${text}`, true);
+      } catch (_err) {
+        setTemplatesMsg(`Variable disponible: ${text}`, true);
+      }
+    };
 
     $("btn-cancel").addEventListener("click", () => fillForm(null));
     $("f_nombre").addEventListener("input", completarLegajoDesdeEmpleado);
@@ -913,6 +1130,32 @@
       } catch (err) {
         setResponsablesMsg(String(err.message || err));
       }
+    });
+
+    $("email-template-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!state.selectedTemplate) return;
+      try {
+        const codigo = state.selectedTemplate.codigo;
+        await api(`/admin/email-templates/${encodeURIComponent(codigo)}`, {
+          method: "POST",
+          body: JSON.stringify(templatePayload()),
+        });
+        await reloadEmailTemplates(codigo);
+        setTemplatesMsg("Plantilla guardada", true);
+      } catch (err) {
+        setTemplatesMsg(String(err.message || err));
+      }
+    });
+
+    $("btn-preview-template").addEventListener("click", () => {
+      previewEmailTemplate().catch((err) => setTemplatesMsg(String(err.message || err)));
+    });
+    $("btn-restore-template").addEventListener("click", () => {
+      restoreEmailTemplate().catch((err) => setTemplatesMsg(String(err.message || err)));
+    });
+    $("btn-toggle-template").addEventListener("click", () => {
+      toggleEmailTemplate().catch((err) => setTemplatesMsg(String(err.message || err)));
     });
 
     $("user-form").addEventListener("submit", async (ev) => {

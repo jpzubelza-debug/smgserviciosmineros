@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -66,7 +67,7 @@ class ComprasRouteTests(unittest.TestCase):
              patch.object(main, "_obtener_proyecto_id_por_nombre", return_value=5), \
              patch.object(main, "generar_pdf_remito") as generar_pdf, \
              patch.object(main, "FileResponse", return_value="pdf-response"):
-            response = main.compras_emitir(DummyRequest())
+            response = asyncio.run(main.compras_emitir(DummyRequest()))
 
         self.assertEqual(response, "pdf-response")
         self.assertEqual(generar_pdf.call_args.args[1], "SOLICITUD DE COMPRAS")

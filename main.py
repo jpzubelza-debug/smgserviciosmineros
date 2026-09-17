@@ -11,16 +11,23 @@ from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 import io
 import json
+import logging
 import math
 import os
+import re
 import secrets
 import sqlite3
 import smtplib
 import time
+import unicodedata
+from email.policy import SMTPUTF8
 from email.message import EmailMessage
+from email.utils import getaddresses
 
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("smg")
 api_key = os.getenv("OPENAI_API_KEY", "").strip()
 client = OpenAI(api_key=api_key) if api_key else None
 
@@ -159,9 +166,66 @@ CONTINGENCY_PANELS = {
     "rrhh": ["dashboard"],
     "mantenimiento": ["dashboard"],
     "dashboard_ejecutivo": ["dashboard"],
-    "administracion": ["usuarios", "accesos"],
+    "administracion": ["usuarios", "accesos", "plantillas_emails"],
     "base_datos": ["tablas"],
 }
+
+EMAIL_TEMPLATE_DEFINITIONS = {
+    "solicitud_viaje": {
+        "nombre": "Notificacion de nueva solicitud de viaje",
+        "descripcion": "Aviso enviado a responsables de Logistica cuando se emite una solicitud de viaje.",
+        "modulo": "logistica",
+        "asunto": "Nueva solicitud de viaje #{{ viaje_id }}",
+        "cuerpo": (
+            "Se genero una nueva solicitud de viaje.\n\n"
+            "Solicitud: #{{ viaje_id }}\n"
+            "Solicitante: {{ solicitante }}\n"
+            "Area: {{ area }}\n"
+            "Origen: {{ origen }}\n"
+            "Destino: {{ destino }}\n"
+            "Salida: {{ fecha_salida }}\n"
+            "Regreso: {{ fecha_regreso }}\n"
+            "Motivo: {{ motivo }}"
+        ),
+        "formato": "texto",
+        "variables": ["viaje_id", "solicitante", "area", "origen", "destino", "fecha_salida", "fecha_regreso", "motivo"],
+    },
+    "compra": {
+        "nombre": "Notificacion de nueva solicitud de compra",
+        "descripcion": "Aviso enviado a responsables de Compras con el PDF de la solicitud adjunto.",
+        "modulo": "compras",
+        "asunto": "Nueva solicitud de compra {{ numero_solicitud }}",
+        "cuerpo": (
+            "Se genero una nueva solicitud de compra.\n\n"
+            "Solicitud: {{ numero_solicitud }}\n"
+            "Solicitante: {{ solicitante }}\n"
+            "Prioridad: {{ prioridad }}\n"
+            "Destino: {{ destino }}\n"
+            "Observaciones: {{ observaciones }}\n\n"
+            "Se adjunta el PDF de la solicitud."
+        ),
+        "formato": "texto",
+        "variables": ["numero_solicitud", "solicitante", "prioridad", "destino", "observaciones"],
+    },
+    "remito": {
+        "nombre": "Notificacion de remito generado",
+        "descripcion": "Aviso enviado a responsables de Almacen con el PDF del remito adjunto.",
+        "modulo": "almacen",
+        "asunto": "{{ tipo }} {{ numero }} generado",
+        "cuerpo": (
+            "Se genero un {{ tipo }}.\n\n"
+            "Numero: {{ numero }}\n"
+            "Fecha: {{ fecha }}\n"
+            "Detalle: {{ detalle_principal }}\n"
+            "Total de items: {{ total_items }}\n\n"
+            "Se adjunta el PDF del remito."
+        ),
+        "formato": "texto",
+        "variables": ["tipo", "numero", "fecha", "detalle_principal", "total_items"],
+    },
+}
+
+EMAIL_VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 
 
 def _usuario_autenticado(request: Request):
@@ -995,6 +1059,62 @@ def migrar_responsables_modulo(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo)")
 
 
+def migrar_email_templates(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT NOT NULL UNIQUE,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            modulo TEXT,
+            asunto_template TEXT NOT NULL,
+            cuerpo_template TEXT NOT NULL,
+            formato TEXT DEFAULT 'texto',
+            asunto_original TEXT NOT NULL,
+            cuerpo_original TEXT NOT NULL,
+            variables_permitidas TEXT NOT NULL,
+            activo INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_templates_codigo ON email_templates (codigo)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_templates_modulo ON email_templates (modulo)")
+    for codigo, cfg in EMAIL_TEMPLATE_DEFINITIONS.items():
+        variables_json = json.dumps(cfg["variables"], ensure_ascii=False)
+        conn.execute(
+            """
+            INSERT INTO email_templates (
+                codigo, nombre, descripcion, modulo, asunto_template, cuerpo_template,
+                formato, asunto_original, cuerpo_original, variables_permitidas, activo
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(codigo) DO UPDATE SET
+                nombre = COALESCE(NULLIF(email_templates.nombre, ''), excluded.nombre),
+                descripcion = COALESCE(NULLIF(email_templates.descripcion, ''), excluded.descripcion),
+                modulo = excluded.modulo,
+                asunto_original = excluded.asunto_original,
+                cuerpo_original = excluded.cuerpo_original,
+                variables_permitidas = excluded.variables_permitidas
+            """,
+            (
+                codigo,
+                cfg["nombre"],
+                cfg["descripcion"],
+                cfg["modulo"],
+                cfg["asunto"],
+                cfg["cuerpo"],
+                cfg["formato"],
+                cfg["asunto"],
+                cfg["cuerpo"],
+                variables_json,
+            ),
+        )
+
+
 def migrar_personal_dotacion(conn):
     """Incorpora los campos de dotación para instalaciones ya existentes."""
     columnas = {r[1] for r in conn.execute("PRAGMA table_info(personal)").fetchall()}
@@ -1152,6 +1272,7 @@ def init_sqlite():
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
                 migrar_usuarios_administracion(conn)
                 migrar_responsables_modulo(conn)
+                migrar_email_templates(conn)
                 migrar_personal_dotacion(conn)
                 migrar_habilitaciones_personal(conn)
                 sembrar_configuracion_almacen(conn)
@@ -2449,6 +2570,228 @@ def _puede_visualizar_todas_solicitudes(perfil):
     return "consultar_todas" in permitidas
 
 
+def normalizar_texto_email(valor, default: str = "") -> str:
+    if valor is None:
+        texto = default
+    else:
+        texto = str(valor)
+    texto = texto.replace("\xa0", " ")
+    texto = texto.replace("\u2007", " ")
+    texto = texto.replace("\u202f", " ")
+    return unicodedata.normalize("NFC", texto)
+
+
+def _normalizar_direccion_email(valor: str) -> str:
+    texto = normalizar_texto_email(valor).strip()
+    if not texto:
+        return ""
+    direcciones = getaddresses([texto])
+    if not direcciones:
+        return ""
+    nombre, correo = direcciones[0]
+    correo = correo.strip()
+    if "@" not in correo or "\n" in correo or "\r" in correo:
+        return ""
+    if nombre:
+        return normalizar_texto_email(f"{nombre} <{correo}>")
+    return normalizar_texto_email(correo)
+
+
+def _deduplicar_emails(valores):
+    vistos = set()
+    salida = []
+    for valor in valores or []:
+        correo = _normalizar_direccion_email(valor)
+        if not correo:
+            continue
+        clave = correo.casefold()
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        salida.append(correo)
+    return salida
+
+
+def _smtp_config():
+    smtp_usuario = _normalizar_direccion_email(os.getenv("SMTP_USER", "").strip())
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = normalizar_texto_email(os.getenv("SMTP_HOST", "smtp.gmail.com")).strip()
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        smtp_port = 465
+    remitente = _normalizar_direccion_email(os.getenv("SMTP_FROM", smtp_usuario).strip())
+    return smtp_usuario, smtp_password, smtp_host, smtp_port, remitente
+
+
+def _variables_en_template(texto: str):
+    return sorted(set(EMAIL_VARIABLE_RE.findall(texto or "")))
+
+
+def _validar_variables_template(asunto: str, cuerpo: str, permitidas):
+    usadas = set(_variables_en_template(asunto)) | set(_variables_en_template(cuerpo))
+    permitidas_set = set(permitidas or [])
+    desconocidas = sorted(usadas - permitidas_set)
+    if desconocidas:
+        raise ValueError("Variables no permitidas: " + ", ".join(f"{{{{ {v} }}}}" for v in desconocidas))
+
+
+def _renderizar_texto_template(texto: str, variables: dict, permitidas):
+    permitidas_set = set(permitidas or [])
+
+    def reemplazar(match):
+        clave = match.group(1)
+        if clave not in permitidas_set:
+            raise ValueError(f"Variable no permitida: {{{{ {clave} }}}}")
+        valor = variables.get(clave, "-")
+        return normalizar_texto_email(valor if valor not in (None, "") else "-")
+
+    return normalizar_texto_email(EMAIL_VARIABLE_RE.sub(reemplazar, texto or ""))
+
+
+def _email_template_fallback(codigo: str):
+    cfg = EMAIL_TEMPLATE_DEFINITIONS[codigo]
+    return {
+        "codigo": codigo,
+        "nombre": cfg["nombre"],
+        "descripcion": cfg["descripcion"],
+        "modulo": cfg["modulo"],
+        "asunto_template": cfg["asunto"],
+        "cuerpo_template": cfg["cuerpo"],
+        "formato": cfg["formato"],
+        "asunto_original": cfg["asunto"],
+        "cuerpo_original": cfg["cuerpo"],
+        "variables_permitidas": cfg["variables"],
+        "activo": 1,
+        "updated_at": "",
+        "updated_by": "",
+    }
+
+
+def _email_template_row_to_dict(fila):
+    data = dict(fila)
+    data["variables_permitidas"] = parse_json_list(data.get("variables_permitidas"))
+    data["activo"] = int(data.get("activo") or 0)
+    return data
+
+
+def _email_template_public(data):
+    return {
+        "id": data.get("id"),
+        "codigo": data.get("codigo"),
+        "nombre": data.get("nombre"),
+        "descripcion": data.get("descripcion"),
+        "modulo": data.get("modulo"),
+        "asunto_template": data.get("asunto_template"),
+        "cuerpo_template": data.get("cuerpo_template"),
+        "formato": data.get("formato") or "texto",
+        "asunto_original": data.get("asunto_original"),
+        "cuerpo_original": data.get("cuerpo_original"),
+        "variables_permitidas": data.get("variables_permitidas") or [],
+        "activo": bool(data.get("activo")),
+        "updated_at": data.get("updated_at") or "",
+        "updated_by": data.get("updated_by") or "",
+    }
+
+
+def _obtener_email_template(codigo: str):
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise KeyError(codigo)
+    try:
+        with get_sqlite_connection() as conn:
+            migrar_email_templates(conn)
+            fila = conn.execute("SELECT * FROM email_templates WHERE codigo = ?", (codigo,)).fetchone()
+            if fila:
+                return _email_template_row_to_dict(fila)
+            conn.commit()
+    except sqlite3.Error:
+        logger.exception("Error consultando plantilla de email. codigo=%s", codigo)
+    return _email_template_fallback(codigo)
+
+
+def _email_template_sample_variables(codigo: str):
+    muestras = {
+        "solicitud_viaje": {
+            "viaje_id": 26,
+            "solicitante": "Juan Perez",
+            "area": "Operaciones",
+            "origen": "Taller Palpala",
+            "destino": "Susques",
+            "fecha_salida": "18/09/2026",
+            "fecha_regreso": "19/09/2026",
+            "motivo": "Traslado de personal",
+        },
+        "compra": {
+            "numero_solicitud": "SC-00026",
+            "solicitante": "Juan Perez",
+            "prioridad": "Alta",
+            "destino": "Obra Susques",
+            "observaciones": "Materiales para mantenimiento preventivo",
+        },
+        "remito": {
+            "tipo": "Remito de Ingreso",
+            "numero": "RI-00026",
+            "fecha": "18/09/2026",
+            "detalle_principal": "Ingreso de insumos varios",
+            "total_items": 4,
+        },
+    }
+    return muestras.get(codigo, {})
+
+
+def _renderizar_email_template(codigo: str, variables: dict):
+    plantilla = _obtener_email_template(codigo)
+    permitidas = plantilla["variables_permitidas"]
+    asunto_tpl = plantilla["asunto_template"] if plantilla.get("activo") else plantilla["asunto_original"]
+    cuerpo_tpl = plantilla["cuerpo_template"] if plantilla.get("activo") else plantilla["cuerpo_original"]
+    try:
+        _validar_variables_template(asunto_tpl, cuerpo_tpl, permitidas)
+        asunto = _renderizar_texto_template(asunto_tpl, variables, permitidas)
+        cuerpo = _renderizar_texto_template(cuerpo_tpl, variables, permitidas)
+    except Exception:
+        logger.exception("Error renderizando plantilla de email; se usa original. codigo=%s", codigo)
+        fallback = _email_template_fallback(codigo)
+        permitidas = fallback["variables_permitidas"]
+        asunto = _renderizar_texto_template(fallback["asunto_template"], variables, permitidas)
+        cuerpo = _renderizar_texto_template(fallback["cuerpo_template"], variables, permitidas)
+    return {
+        "asunto": asunto,
+        "cuerpo": cuerpo,
+        "formato": plantilla.get("formato") or "texto",
+        "template": plantilla,
+    }
+
+
+def _crear_mensaje_email(asunto: str, remitente: str, destinatarios, copias=None, cuerpo: str = "", formato: str = "texto"):
+    mensaje = EmailMessage(policy=SMTPUTF8)
+    mensaje["Subject"] = normalizar_texto_email(asunto).strip()
+    mensaje["From"] = normalizar_texto_email(remitente).strip()
+    mensaje["To"] = ", ".join(_deduplicar_emails(destinatarios))
+    copias_ok = _deduplicar_emails(copias or [])
+    if copias_ok:
+        mensaje["Cc"] = ", ".join(copias_ok)
+    cuerpo = normalizar_texto_email(cuerpo)
+    if str(formato or "").lower() == "html":
+        mensaje.set_content(cuerpo, charset="utf-8")
+        mensaje.add_alternative(cuerpo, subtype="html", charset="utf-8")
+    else:
+        mensaje.set_content(cuerpo, charset="utf-8")
+    return mensaje
+
+
+def _registrar_error_email(tipo: str, registro_id, asunto: str, destinatarios, smtp_host: str, smtp_port: int, funcion: str):
+    logger.exception(
+        "Error enviando email. tipo=%s registro_id=%s asunto=%s destinatarios=%s smtp_host=%s smtp_port=%s funcion=%s",
+        tipo,
+        registro_id,
+        normalizar_texto_email(asunto),
+        _deduplicar_emails(destinatarios),
+        smtp_host,
+        smtp_port,
+        funcion,
+    )
+
+
 def _obtener_destinatarios_responsables(conn, modulo: str):
     filas = conn.execute(
         """
@@ -2469,37 +2812,22 @@ def _obtener_destinatarios_responsables(conn, modulo: str):
 def _enviar_notificacion_solicitud_compra(responsables, correo_emisor: str, numero_solicitud: str,
                                           solicitante: str, prioridad: str, destino: str,
                                           observaciones: str, pdf_path: str):
-    """Envía la notificación sin afectar la emisión si el correo falla."""
-    smtp_usuario = os.getenv("SMTP_USER", "").strip()
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-    try:
-        smtp_port = int(os.getenv("SMTP_PORT", "465"))
-    except ValueError:
-        smtp_port = 465
-    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
-    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
-    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
-    correo_emisor = str(correo_emisor or "").strip()
+    smtp_usuario, smtp_password, smtp_host, smtp_port, remitente = _smtp_config()
+    destinatarios = _deduplicar_emails(fila.get("correo", "") for fila in responsables)
+    correo_emisor = _normalizar_direccion_email(correo_emisor)
     copias = []
     if correo_emisor and correo_emisor.casefold() not in {correo.casefold() for correo in destinatarios}:
         copias.append(correo_emisor)
     if not (smtp_usuario and smtp_password and remitente and destinatarios):
         return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
-
-    mensaje = EmailMessage()
-    mensaje["Subject"] = f"Nueva solicitud de compra {numero_solicitud}"
-    mensaje["From"] = remitente
-    mensaje["To"] = ", ".join(destinatarios)
-    if copias:
-        mensaje["Cc"] = ", ".join(copias)
-    mensaje.set_content(
-        "Se generó una nueva solicitud de compra.\n\n"
-        f"Solicitud: {numero_solicitud}\nSolicitante: {solicitante or '-'}\n"
-        f"Prioridad: {prioridad or '-'}\nDestino: {destino or '-'}\n"
-        f"Observaciones: {observaciones or '-'}\n\n"
-        "Se adjunta el PDF de la solicitud."
-    )
+    render = _renderizar_email_template("compra", {
+        "numero_solicitud": numero_solicitud,
+        "solicitante": solicitante,
+        "prioridad": prioridad,
+        "destino": destino,
+        "observaciones": observaciones,
+    })
+    mensaje = _crear_mensaje_email(render["asunto"], remitente, destinatarios, copias, render["cuerpo"], render["formato"])
     try:
         with open(pdf_path, "rb") as archivo:
             mensaje.add_attachment(archivo.read(), maintype="application", subtype="pdf", filename=os.path.basename(pdf_path))
@@ -2507,81 +2835,53 @@ def _enviar_notificacion_solicitud_compra(responsables, correo_emisor: str, nume
             servidor.login(smtp_usuario, smtp_password)
             servidor.send_message(mensaje)
         return {"enviado": True, "destinatarios": destinatarios, "copias": copias}
-    except Exception as exc:
-        print(f"No se pudo enviar la notificación de compra {numero_solicitud}: {exc}")
-        return {"enviado": False, "motivo": "Error al enviar la notificación"}
-
-
+    except Exception:
+        _registrar_error_email("solicitud_compra", numero_solicitud, render["asunto"], destinatarios + copias, smtp_host, smtp_port, "_enviar_notificacion_solicitud_compra")
+        return {"enviado": False, "motivo": "Error al enviar la notificacion"}
 def _enviar_notificacion_solicitud_viaje(responsables, correo_emisor: str, viaje_id: int,
                                          solicitante: str, area: str, origen: str, destino: str,
                                          fecha_salida: str, fecha_regreso: str, motivo: str):
-    """Notifica nuevas solicitudes de viaje a los responsables de Logística."""
-    smtp_usuario = os.getenv("SMTP_USER", "").strip()
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-    try:
-        smtp_port = int(os.getenv("SMTP_PORT", "465"))
-    except ValueError:
-        smtp_port = 465
-    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
-    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
-    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
-    correo_emisor = str(correo_emisor or "").strip()
+    smtp_usuario, smtp_password, smtp_host, smtp_port, remitente = _smtp_config()
+    destinatarios = _deduplicar_emails(fila.get("correo", "") for fila in responsables)
+    correo_emisor = _normalizar_direccion_email(correo_emisor)
     copias = []
     if correo_emisor and correo_emisor.casefold() not in {correo.casefold() for correo in destinatarios}:
         copias.append(correo_emisor)
     if not (smtp_usuario and smtp_password and remitente and destinatarios):
         return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
-
-    mensaje = EmailMessage()
-    mensaje["Subject"] = f"Nueva solicitud de viaje #{viaje_id}"
-    mensaje["From"] = remitente
-    mensaje["To"] = ", ".join(destinatarios)
-    if copias:
-        mensaje["Cc"] = ", ".join(copias)
-    mensaje.set_content(
-        "Se generó una nueva solicitud de viaje.\n\n"
-        f"Solicitud: #{viaje_id}\nSolicitante: {solicitante or '-'}\nÁrea: {area or '-'}\n"
-        f"Origen: {origen or '-'}\nDestino: {destino or '-'}\n"
-        f"Salida: {fecha_salida or '-'}\nRegreso: {fecha_regreso or '-'}\n"
-        f"Motivo: {motivo or '-'}"
-    )
+    render = _renderizar_email_template("solicitud_viaje", {
+        "viaje_id": viaje_id,
+        "solicitante": solicitante,
+        "area": area,
+        "origen": origen,
+        "destino": destino,
+        "fecha_salida": fecha_salida,
+        "fecha_regreso": fecha_regreso,
+        "motivo": motivo,
+    })
+    mensaje = _crear_mensaje_email(render["asunto"], remitente, destinatarios, copias, render["cuerpo"], render["formato"])
     try:
         with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as servidor:
             servidor.login(smtp_usuario, smtp_password)
             servidor.send_message(mensaje)
         return {"enviado": True, "destinatarios": destinatarios, "copias": copias}
-    except Exception as exc:
-        print(f"No se pudo enviar la notificación de viaje #{viaje_id}: {exc}")
-        return {"enviado": False, "motivo": "Error al enviar la notificación"}
-
-
+    except Exception:
+        _registrar_error_email("solicitud_viaje", viaje_id, render["asunto"], destinatarios + copias, smtp_host, smtp_port, "_enviar_notificacion_solicitud_viaje")
+        return {"enviado": False, "motivo": "Error al enviar la notificacion"}
 def _enviar_notificacion_remito(responsables, tipo: str, numero: str, fecha: str,
                                 detalle_principal: str, total_items: int, pdf_path: str):
-    """Envía a Almacén el remito generado con su PDF adjunto."""
-    smtp_usuario = os.getenv("SMTP_USER", "").strip()
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-    try:
-        smtp_port = int(os.getenv("SMTP_PORT", "465"))
-    except ValueError:
-        smtp_port = 465
-    remitente = os.getenv("SMTP_FROM", smtp_usuario).strip()
-    destinatarios = [str(fila.get("correo", "")).strip() for fila in responsables]
-    destinatarios = list(dict.fromkeys(correo for correo in destinatarios if correo))
+    smtp_usuario, smtp_password, smtp_host, smtp_port, remitente = _smtp_config()
+    destinatarios = _deduplicar_emails(fila.get("correo", "") for fila in responsables)
     if not (smtp_usuario and smtp_password and remitente and destinatarios):
         return {"enviado": False, "motivo": "SMTP no configurado o sin destinatarios"}
-
-    mensaje = EmailMessage()
-    mensaje["Subject"] = f"{tipo} {numero} generado"
-    mensaje["From"] = remitente
-    mensaje["To"] = ", ".join(destinatarios)
-    mensaje.set_content(
-        f"Se generó un {tipo.lower()}.\n\n"
-        f"Número: {numero}\nFecha: {fecha or '-'}\n"
-        f"Detalle: {detalle_principal or '-'}\nTotal de ítems: {total_items}\n\n"
-        "Se adjunta el PDF del remito."
-    )
+    render = _renderizar_email_template("remito", {
+        "tipo": tipo,
+        "numero": numero,
+        "fecha": fecha,
+        "detalle_principal": detalle_principal,
+        "total_items": total_items,
+    })
+    mensaje = _crear_mensaje_email(render["asunto"], remitente, destinatarios, [], render["cuerpo"], render["formato"])
     try:
         with open(pdf_path, "rb") as archivo:
             mensaje.add_attachment(archivo.read(), maintype="application", subtype="pdf", filename=os.path.basename(pdf_path))
@@ -2589,11 +2889,9 @@ def _enviar_notificacion_remito(responsables, tipo: str, numero: str, fecha: str
             servidor.login(smtp_usuario, smtp_password)
             servidor.send_message(mensaje)
         return {"enviado": True, "destinatarios": destinatarios}
-    except Exception as exc:
-        print(f"No se pudo enviar la notificación del remito {numero}: {exc}")
-        return {"enviado": False, "motivo": "Error al enviar la notificación"}
-
-
+    except Exception:
+        _registrar_error_email("remito", numero, render["asunto"], destinatarios, smtp_host, smtp_port, "_enviar_notificacion_remito")
+        return {"enviado": False, "motivo": "Error al enviar la notificacion"}
 @app.get("/base_datos", response_class=HTMLResponse)
 def base_datos_view(request: Request):
     try:
@@ -2727,6 +3025,142 @@ def admin_actualizar_responsables_modulo(modulo: str, request: Request, payload:
         _registrar_acceso_admin(conn, request, "RESPONSABLES_MODULO_ACTUALIZADOS", f"modulo={modulo}; total={len(ids)}")
         conn.commit()
     return {"ok": True, "modulo": modulo, "usuario_ids": ids}
+
+
+@app.get("/admin/email-templates")
+def admin_listar_email_templates(request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        migrar_email_templates(conn)
+        filas = conn.execute("SELECT * FROM email_templates ORDER BY modulo, nombre").fetchall()
+        conn.commit()
+        return [_email_template_public(_email_template_row_to_dict(fila)) for fila in filas]
+
+
+@app.get("/admin/email-templates/{codigo}")
+def admin_obtener_email_template(codigo: str, request: Request):
+    _requiere_administrador(request)
+    codigo = str(codigo or "").strip()
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    return _email_template_public(_obtener_email_template(codigo))
+
+
+@app.post("/admin/email-templates/{codigo}")
+def admin_guardar_email_template(codigo: str, request: Request, payload: dict):
+    perfil = _requiere_administrador(request)
+    codigo = str(codigo or "").strip()
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    actual = _obtener_email_template(codigo)
+    datos = dict(payload or {})
+    nombre = normalizar_texto_email(datos.get("nombre", actual.get("nombre"))).strip()
+    asunto = normalizar_texto_email(datos.get("asunto_template", "")).strip()
+    cuerpo = normalizar_texto_email(datos.get("cuerpo_template", "")).strip()
+    formato = normalizar_texto_email(datos.get("formato", "texto")).strip().lower() or "texto"
+    descripcion = normalizar_texto_email(datos.get("descripcion", actual.get("descripcion", ""))).strip()
+    activo = 1 if bool(datos.get("activo", True)) else 0
+    if not nombre or not asunto or not cuerpo:
+        raise HTTPException(status_code=400, detail="Nombre, asunto y cuerpo son obligatorios")
+    if formato not in {"texto", "html"}:
+        raise HTTPException(status_code=400, detail="Formato invalido")
+    try:
+        _validar_variables_template(asunto, cuerpo, actual["variables_permitidas"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    with get_sqlite_connection() as conn:
+        migrar_email_templates(conn)
+        conn.execute(
+            """
+            UPDATE email_templates
+               SET nombre = ?, descripcion = ?, asunto_template = ?, cuerpo_template = ?,
+                   formato = ?, activo = ?, updated_at = datetime('now'), updated_by = ?
+             WHERE codigo = ?
+            """,
+            (nombre, descripcion, asunto, cuerpo, formato, activo, perfil.get("usuario", ""), codigo),
+        )
+        _registrar_acceso_admin(conn, request, "EMAIL_TEMPLATE_ACTUALIZADA", f"codigo={codigo}")
+        conn.commit()
+    return {"ok": True, "template": _email_template_public(_obtener_email_template(codigo))}
+
+
+@app.post("/admin/email-templates/{codigo}/preview")
+def admin_preview_email_template(codigo: str, request: Request, payload: dict = None):
+    _requiere_administrador(request)
+    codigo = str(codigo or "").strip()
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    plantilla = _obtener_email_template(codigo)
+    variables = _email_template_sample_variables(codigo)
+    if payload:
+        asunto_tpl = normalizar_texto_email(payload.get("asunto_template", plantilla["asunto_template"]))
+        cuerpo_tpl = normalizar_texto_email(payload.get("cuerpo_template", plantilla["cuerpo_template"]))
+        formato = normalizar_texto_email(payload.get("formato", plantilla.get("formato") or "texto"))
+        try:
+            _validar_variables_template(asunto_tpl, cuerpo_tpl, plantilla["variables_permitidas"])
+            asunto = _renderizar_texto_template(asunto_tpl, variables, plantilla["variables_permitidas"])
+            cuerpo = _renderizar_texto_template(cuerpo_tpl, variables, plantilla["variables_permitidas"])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    else:
+        render = _renderizar_email_template(codigo, variables)
+        asunto = render["asunto"]
+        cuerpo = render["cuerpo"]
+        formato = render["formato"]
+    smtp_usuario, _smtp_password, _smtp_host, _smtp_port, remitente = _smtp_config()
+    return {
+        "asunto": asunto,
+        "remitente": remitente or smtp_usuario or "notificaciones@ejemplo.com",
+        "destinatarios": ["responsable@ejemplo.com"],
+        "copias": ["solicitante@ejemplo.com"],
+        "cuerpo": cuerpo,
+        "formato": formato,
+        "variables": variables,
+    }
+
+
+@app.post("/admin/email-templates/{codigo}/restore")
+def admin_restaurar_email_template(codigo: str, request: Request):
+    perfil = _requiere_administrador(request)
+    codigo = str(codigo or "").strip()
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    with get_sqlite_connection() as conn:
+        migrar_email_templates(conn)
+        conn.execute(
+            """
+            UPDATE email_templates
+               SET asunto_template = asunto_original,
+                   cuerpo_template = cuerpo_original,
+                   formato = 'texto',
+                   activo = 1,
+                   updated_at = datetime('now'),
+                   updated_by = ?
+             WHERE codigo = ?
+            """,
+            (perfil.get("usuario", ""), codigo),
+        )
+        _registrar_acceso_admin(conn, request, "EMAIL_TEMPLATE_RESTAURADA", f"codigo={codigo}")
+        conn.commit()
+    return {"ok": True, "template": _email_template_public(_obtener_email_template(codigo))}
+
+
+@app.post("/admin/email-templates/{codigo}/toggle")
+def admin_toggle_email_template(codigo: str, request: Request, payload: dict = None):
+    perfil = _requiere_administrador(request)
+    codigo = str(codigo or "").strip()
+    if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    activo = 1 if bool((payload or {}).get("activo")) else 0
+    with get_sqlite_connection() as conn:
+        migrar_email_templates(conn)
+        conn.execute(
+            "UPDATE email_templates SET activo = ?, updated_at = datetime('now'), updated_by = ? WHERE codigo = ?",
+            (activo, perfil.get("usuario", ""), codigo),
+        )
+        _registrar_acceso_admin(conn, request, "EMAIL_TEMPLATE_ESTADO", f"codigo={codigo}; activo={activo}")
+        conn.commit()
+    return {"ok": True, "template": _email_template_public(_obtener_email_template(codigo))}
 
 
 @app.post("/admin/usuarios")

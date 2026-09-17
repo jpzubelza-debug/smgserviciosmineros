@@ -12,6 +12,10 @@ Para enviar los avisos de nuevas solicitudes de compra, configure estas variable
 
 Gmail usa por defecto `smtp.gmail.com` por SSL en el puerto 465. Desde Administración se pueden asignar uno o varios responsables a Compras, Logística o Almacén. Las solicitudes de Compra y los remitos de Ingreso/Entrega adjuntan su PDF; las Solicitudes de Viaje envían su resumen. Los responsables reciben las solicitudes y el emisor recibe una copia en Compras y Logística.
 
+## Plantillas de emails
+
+En Administración > Plantillas de Emails se pueden editar los asuntos y cuerpos de las notificaciones de viaje, compra y remitos. Las variables admitidas se muestran junto al editor y se validan al guardar; una plantilla inactiva conserva el envio usando el texto original del sistema como respaldo.
+
 Se agregaron dos archivos para arrancar la migracion sin romper el backend actual:
 
 - `schema.sql`: define tablas relacionales e indices.
