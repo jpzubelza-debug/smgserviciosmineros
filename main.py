@@ -5200,18 +5200,58 @@ def gestion_operativa_view(request: Request):
     return _leer_html(GESTION_OPERATIVA_PATH)
     
 @app.put("/estado/{id_viaje}")
-def cambiar_estado(id_viaje: int, estado: str):
+def cambiar_estado(id_viaje: int, estado: str, request: Request):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+
+    estado_normalizado = str(estado).strip().upper()
+    if estado_normalizado not in {"PENDIENTE", "APROBADO", "AUTORIZADO", "RECHAZADO", "ANULADO"}:
+        raise HTTPException(status_code=400, detail=f"Estado '{estado}' no válido")
+
+    if estado_normalizado == "AUTORIZADO":
+        estado_normalizado = "APROBADO"
+
     with get_sqlite_connection() as conn:
         row = conn.execute("SELECT raw_json FROM viajes WHERE id = ?", (id_viaje,)).fetchone()
         if row is None:
-            return {"error": "Viaje no encontrado"}
+            raise HTTPException(status_code=404, detail="Viaje no encontrado")
 
         viaje = parse_json_dict(row["raw_json"], default={})
-        viaje["estado"] = estado
+        estado_actual = str(viaje.get("estado") or "PENDIENTE").strip().upper()
+        if estado_actual == "AUTORIZADO":
+            estado_actual = "APROBADO"
+
+        es_admin = bool(perfil.get("es_desarrollador") or str(perfil.get("tipo_usuario", "")).upper() == "ADMINISTRADOR")
+        if not es_admin:
+            acciones_dash = (perfil.get("acciones", {}) or {}).get("logistica", {}).get("dashboard", []) or []
+            acciones_sol = (perfil.get("acciones", {}) or {}).get("logistica", {}).get("solicitud_viaje", []) or []
+            paneles_log = (perfil.get("paneles", {}) or {}).get("logistica", []) or []
+            if "dashboard" not in paneles_log and "solicitud_viaje" not in paneles_log:
+                raise HTTPException(status_code=403, detail="No tiene acceso al panel de viajes")
+
+            tiene_configuracion_acciones = bool(acciones_dash or acciones_sol)
+            if tiene_configuracion_acciones:
+                acciones_total = set(acciones_dash + acciones_sol)
+                tiene_gestionar = "gestionar_estado" in acciones_total
+                tiene_cambiar_veredicto = "cambiar_veredicto" in acciones_total or tiene_gestionar
+
+                if estado_actual in {"APROBADO", "RECHAZADO", "ANULADO"}:
+                    if not tiene_cambiar_veredicto:
+                        raise HTTPException(status_code=403, detail="No tiene permisos para cambiar el veredicto de una solicitud ya resuelta")
+                else:
+                    if estado_normalizado == "APROBADO" and not ("aprobar_solicitud" in acciones_total or tiene_cambiar_veredicto):
+                        raise HTTPException(status_code=403, detail="No tiene permisos para aprobar solicitudes de viaje")
+                    elif estado_normalizado == "RECHAZADO" and not ("rechazar_solicitud" in acciones_total or tiene_cambiar_veredicto):
+                        raise HTTPException(status_code=403, detail="No tiene permisos para rechazar solicitudes de viaje")
+                    elif estado_normalizado == "ANULADO" and not ("anular_solicitud" in acciones_total or tiene_cambiar_veredicto):
+                        raise HTTPException(status_code=403, detail="No tiene permisos para anular solicitudes de viaje")
+
+        viaje["estado"] = estado_normalizado
         guardar_viaje_sql(conn, viaje)
         conn.commit()
 
-    return {"mensaje": "Estado actualizado"}
+    return {"ok": True, "mensaje": f"Estado actualizado a {estado_normalizado}"}
 
 
 @app.get("/form", response_class=HTMLResponse)

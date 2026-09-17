@@ -493,6 +493,12 @@ textarea:focus,
   color: #ffd0d8;
 }
 
+.badge-anulado {
+  background: rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
 .badge-cerrado {
   background: rgba(116, 168, 217, 0.25);
   color: #d9edff;
@@ -853,6 +859,7 @@ canvas {
             <button id="estado-pendiente" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('PENDIENTE')">Pendientes de Aprobar</button>
             <button id="estado-aprobado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('APROBADO')">Aprobados</button>
             <button id="estado-rechazado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('RECHAZADO')">Rechazados</button>
+            <button id="estado-anulado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('ANULADO')">Anulados</button>
           </div>
           <div class="solicitudes-tools">
             <input id="buscarSolicitudId" type="number" min="1" step="1" placeholder="Buscar solicitud por ID" onkeydown="if(event.key==='Enter'){verSolicitudPorId();}">
@@ -1010,6 +1017,8 @@ function configurarFondoDashboard() {
   probar(0);
 }
 
+let usuarioActual = null;
+
 async function aplicarPermisosPanelLogistica() {
   try {
     const res = await fetch("/me", { credentials: "same-origin" });
@@ -1017,8 +1026,9 @@ async function aplicarPermisosPanelLogistica() {
       return;
     }
     const me = await res.json();
+    usuarioActual = me;
     const tipo = String(me?.tipo_usuario || "").trim().toUpperCase();
-    if (tipo === "ADMINISTRADOR") {
+    if (tipo === "ADMINISTRADOR" || me?.es_desarrollador) {
       return;
     }
 
@@ -1032,6 +1042,26 @@ async function aplicarPermisosPanelLogistica() {
   } catch (_error) {
     // Si falla /me, se conserva la UI actual.
   }
+}
+
+function puedeAccionLogistica(accion) {
+  if (!usuarioActual) {
+    return true;
+  }
+  const tipo = String(usuarioActual?.tipo_usuario || "").trim().toUpperCase();
+  if (tipo === "ADMINISTRADOR" || usuarioActual?.es_desarrollador) {
+    return true;
+  }
+  const dashboardAcciones = usuarioActual?.acciones?.logistica?.dashboard;
+  const viajeAcciones = usuarioActual?.acciones?.logistica?.solicitud_viaje;
+  if (!dashboardAcciones && !viajeAcciones) {
+    return true;
+  }
+  const lista = [...(dashboardAcciones || []), ...(viajeAcciones || [])];
+  if (lista.includes("gestionar_estado")) {
+    return true;
+  }
+  return lista.includes(accion);
 }
 
 function normalizarArray(data) {
@@ -1107,11 +1137,14 @@ function badgeEstado(estado) {
   if (valor === "CERRADO") {
     return '<span class="badge-estado badge-cerrado">CERRADO</span>';
   }
-  if (valor === "APROBADO") {
+  if (valor === "APROBADO" || valor === "AUTORIZADO") {
     return '<span class="badge-estado badge-aprobado">APROBADO</span>';
   }
   if (valor === "RECHAZADO") {
     return '<span class="badge-estado badge-rechazado">RECHAZADO</span>';
+  }
+  if (valor === "ANULADO") {
+    return '<span class="badge-estado badge-anulado">ANULADO</span>';
   }
   return '<span class="badge-estado badge-pendiente">PENDIENTE</span>';
 }
@@ -1125,8 +1158,14 @@ function obtenerEstadoViaje(viaje) {
   if (cerradoPorEstado || cerradoPorCampo || (tieneOrden && estadoBase === "CERRADO")) {
     return "CERRADO";
   }
-  if (estadoBase === "APROBADO" || estadoBase === "RECHAZADO") {
-    return estadoBase;
+  if (estadoBase === "APROBADO" || estadoBase === "AUTORIZADO") {
+    return "APROBADO";
+  }
+  if (estadoBase === "RECHAZADO") {
+    return "RECHAZADO";
+  }
+  if (estadoBase === "ANULADO") {
+    return "ANULADO";
   }
   return "PENDIENTE";
 }
@@ -1135,17 +1174,71 @@ function renderEstadoAccion(viaje) {
   const estado = obtenerEstadoViaje(viaje);
   const badge = badgeEstado(estado);
 
-  if (estado !== "PENDIENTE") {
+  if (estado === "CERRADO") {
     return `<div class="fila-acciones">${badge}</div>`;
   }
+
+  const opciones = [];
+  const puedeCambiarVeredicto = puedeAccionLogistica("cambiar_veredicto");
+  const puedeAprobar = puedeAccionLogistica("aprobar_solicitud");
+  const puedeRechazar = puedeAccionLogistica("rechazar_solicitud");
+  const puedeAnular = puedeAccionLogistica("anular_solicitud");
+
+  if (estado === "PENDIENTE") {
+    if (puedeAprobar || puedeCambiarVeredicto) {
+      opciones.push({ value: "APROBADO", label: "Aprobar / Autorizar" });
+    }
+    if (puedeRechazar || puedeCambiarVeredicto) {
+      opciones.push({ value: "RECHAZADO", label: "Rechazar" });
+    }
+    if (puedeAnular || puedeCambiarVeredicto) {
+      opciones.push({ value: "ANULADO", label: "Anular" });
+    }
+  } else if (estado === "APROBADO") {
+    if (puedeCambiarVeredicto) {
+      if (puedeRechazar || puedeCambiarVeredicto) {
+        opciones.push({ value: "RECHAZADO", label: "Cambiar a Rechazado" });
+      }
+      if (puedeAnular || puedeCambiarVeredicto) {
+        opciones.push({ value: "ANULADO", label: "Cambiar a Anulado" });
+      }
+      opciones.push({ value: "PENDIENTE", label: "Revertir a Pendiente" });
+    }
+  } else if (estado === "RECHAZADO") {
+    if (puedeCambiarVeredicto) {
+      if (puedeAprobar || puedeCambiarVeredicto) {
+        opciones.push({ value: "APROBADO", label: "Autorizar / Aprobar" });
+      }
+      if (puedeAnular || puedeCambiarVeredicto) {
+        opciones.push({ value: "ANULADO", label: "Cambiar a Anulado" });
+      }
+      opciones.push({ value: "PENDIENTE", label: "Revertir a Pendiente" });
+    }
+  } else if (estado === "ANULADO") {
+    if (puedeCambiarVeredicto) {
+      if (puedeAprobar || puedeCambiarVeredicto) {
+        opciones.push({ value: "APROBADO", label: "Autorizar / Aprobar" });
+      }
+      if (puedeRechazar || puedeCambiarVeredicto) {
+        opciones.push({ value: "RECHAZADO", label: "Cambiar a Rechazado" });
+      }
+      opciones.push({ value: "PENDIENTE", label: "Revertir a Pendiente" });
+    }
+  }
+
+  if (opciones.length === 0) {
+    return `<div class="fila-acciones">${badge}</div>`;
+  }
+
+  const placeholder = estado === "PENDIENTE" ? "Seleccionar..." : "Cambiar veredicto...";
+  const opcionesHtml = opciones.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
 
   return `
     <div class="fila-acciones">
       ${badge}
       <select class="accion-select" onchange="manejarCambioEstado(this, ${viaje.id})">
-        <option value="">Seleccionar...</option>
-        <option value="APROBADO">APROBAR</option>
-        <option value="RECHAZADO">RECHAZAR</option>
+        <option value="">${placeholder}</option>
+        ${opcionesHtml}
       </select>
     </div>
   `;
@@ -1154,6 +1247,12 @@ function renderEstadoAccion(viaje) {
 function manejarCambioEstado(select, idViaje) {
   const valor = (select.value || "").toUpperCase();
   if (!valor) {
+    return;
+  }
+  const textoDestino = valor === "APROBADO" ? "APROBAR / AUTORIZAR" : valor;
+  const confirmar = confirm(`¿Confirma cambiar el estado de la solicitud #${idViaje} a ${textoDestino}?`);
+  if (!confirmar) {
+    select.value = "";
     return;
   }
   actualizarEstadoViaje(idViaje, valor);
@@ -1284,7 +1383,7 @@ function renderSolicitudesFila(viajes) {
 
 function setFiltroEstadoSolicitudes(estado) {
   filtroEstadoSolicitudes = estado;
-  ["all", "pendiente", "aprobado", "rechazado"].forEach(key => {
+  ["all", "pendiente", "aprobado", "rechazado", "anulado"].forEach(key => {
     const btn = document.getElementById(`estado-${key}`);
     if (btn) {
       btn.classList.remove("active");
@@ -1295,7 +1394,8 @@ function setFiltroEstadoSolicitudes(estado) {
     ALL: "estado-all",
     PENDIENTE: "estado-pendiente",
     APROBADO: "estado-aprobado",
-    RECHAZADO: "estado-rechazado"
+    RECHAZADO: "estado-rechazado",
+    ANULADO: "estado-anulado"
   };
   const activo = document.getElementById(mapa[estado]);
   if (activo) {
@@ -1311,12 +1411,13 @@ async function actualizarEstadoViaje(idViaje, nuevoEstado) {
 
   try {
     const res = await fetch(`/estado/${idViaje}?estado=${encodeURIComponent(nuevoEstado)}`, {
-      method: "PUT"
+      method: "PUT",
+      credentials: "same-origin"
     });
     const result = await res.json();
 
-    if (result.error) {
-      status.textContent = result.error;
+    if (!res.ok || result.error) {
+      status.textContent = result.detail || result.error || "No se pudo actualizar el estado de la solicitud";
       return;
     }
 
