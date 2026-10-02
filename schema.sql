@@ -138,18 +138,115 @@ CREATE TABLE IF NOT EXISTS personal (
     raw_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS clientes (
+    codigo TEXT PRIMARY KEY,
+    razon_social TEXT NOT NULL,
+    nombre_comercial TEXT,
+    cuit TEXT,
+    telefono_1 TEXT,
+    movil TEXT,
+    correo_electronico TEXT,
+    pagina_web TEXT,
+    raw_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_viajes_estado ON viajes (estado);
 CREATE INDEX IF NOT EXISTS idx_viajes_fechas ON viajes (fecha_salida, fecha_regreso);
 CREATE INDEX IF NOT EXISTS idx_recursos_id_viaje ON recursos_viaje (id_viaje);
 CREATE INDEX IF NOT EXISTS idx_acompanantes_id_viaje ON recurso_acompanantes (id_viaje);
 CREATE INDEX IF NOT EXISTS idx_ordenes_id_viaje ON ordenes_salida (id_viaje);
+CREATE INDEX IF NOT EXISTS idx_clientes_razon_social ON clientes (razon_social);
+CREATE INDEX IF NOT EXISTS idx_clientes_cuit ON clientes (cuit);
 
 CREATE TABLE IF NOT EXISTS centros_costos (
     id INTEGER PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
     activo INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    cliente_id INTEGER,
+    proyecto_id INTEGER,
+    ubicacion TEXT,
+    responsable_id TEXT,
+    contrato TEXT,
+    orden_compra TEXT,
+    fecha_inicio TEXT,
+    fecha_fin_prevista TEXT,
+    fecha_fin_real TEXT,
+    estado TEXT DEFAULT 'Planificación',
+    moneda TEXT DEFAULT 'USD',
+    importe_contratado REAL DEFAULT 0,
+    presupuesto REAL DEFAULT 0,
+    observaciones TEXT,
+    updated_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS seguimiento_cc (
+    id INTEGER PRIMARY KEY,
+    centro_costo_id INTEGER,
+    fecha_alta_servicio DATE,
+    cotizacion TEXT,
+    fecha_inicio DATE,
+    fecha_final DATE,
+    anticipo NUMERIC,
+    moneda_anticipo TEXT,
+    monto_oc_total NUMERIC,
+    moneda_oc TEXT,
+    total_ejecutado_anticipo NUMERIC,
+    avance_ejecutado_anticipo NUMERIC,
+    falta_ejecutar_anticipo NUMERIC,
+    falta_ejecutar_anticipo_pct NUMERIC,
+    ejecutado_obra NUMERIC,
+    avance_ejecutado_obra NUMERIC,
+    falta_ejecutar_obra NUMERIC,
+    falta_ejecutar_obra_pct NUMERIC,
+    neto_facturado NUMERIC,
+    avance_neto_facturado NUMERIC,
+    falta_neto_facturado NUMERIC,
+    falta_neto_facturado_pct NUMERIC,
+    cantidad_certificados INTEGER,
+    condiciones_comerciales TEXT,
+    observaciones TEXT,
+    estado_seguimiento TEXT,
+    fecha_ultima_actualizacion DATETIME,
+    usuario_ultima_actualizacion INTEGER,
+    FOREIGN KEY (centro_costo_id) REFERENCES centros_costos(id)
+);
+
+CREATE TABLE IF NOT EXISTS Orden_de_compra_cliente (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    seguimiento_cc_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL,
+    orden_compra TEXT,
+    revision TEXT,
+    otorgada DATE,
+    vencimiento DATE,
+    moneda TEXT,
+    monto_oc NUMERIC DEFAULT 0,
+    observaciones TEXT,
+    FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_orden_compra_cliente_seguimiento
+    ON Orden_de_compra_cliente (seguimiento_cc_id);
+
+CREATE TABLE IF NOT EXISTS items_oc_cliente (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orden_compra_cliente_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL,
+    descripcion TEXT,
+    unidad TEXT,
+    cantidad NUMERIC DEFAULT 0,
+    moneda TEXT,
+    precio NUMERIC DEFAULT 0,
+    total NUMERIC DEFAULT 0,
+    observacion TEXT,
+    FOREIGN KEY (orden_compra_cliente_id) REFERENCES Orden_de_compra_cliente(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_items_oc_cliente_orden
+    ON items_oc_cliente (orden_compra_cliente_id);
 
 INSERT OR IGNORE INTO centros_costos (id, nombre, activo) VALUES
     (1, 'ADMINISTRACION', 1),
@@ -829,3 +926,47 @@ CREATE INDEX IF NOT EXISTS idx_mov_v2_fecha ON movimientos (fecha);
 CREATE INDEX IF NOT EXISTS idx_mov_v2_producto ON movimientos (id_producto);
 CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON auditoria (tabla, registro);
 CREATE INDEX IF NOT EXISTS idx_adj_doc ON adjuntos (id_documento);
+
+CREATE TABLE IF NOT EXISTS horas_maquinas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ci TEXT,
+    fecha_parte TEXT NOT NULL,
+    nro_parte TEXT,
+    legajo_empleado TEXT,
+    maquinista TEXT,
+    obra TEXT,
+    proyecto TEXT,
+    descripcion_trabajos TEXT,
+    turno TEXT,
+    acoplado TEXT,
+    cliente TEXT,
+    orden_compra TEXT,
+    hs_inicio TEXT,
+    hs_final TEXT,
+    total_hs REAL DEFAULT 0,
+    km_inicio REAL DEFAULT 0,
+    km_final REAL DEFAULT 0,
+    km_total REAL DEFAULT 0,
+    viajes REAL DEFAULT 0,
+    gasoil REAL DEFAULT 0,
+    aceite REAL DEFAULT 0,
+    novedades TEXT,
+    firma_parte TEXT,
+    hs_desplazamiento REAL DEFAULT 0,
+    hs_mantenimiento REAL DEFAULT 0,
+    hs_reparaciones REAL DEFAULT 0,
+    hs_disposicion REAL DEFAULT 0,
+    total_hs_control REAL DEFAULT 0,
+    no_programadas REAL DEFAULT 0,
+    certificado TEXT,
+    estado_sub_alquiler TEXT,
+    control_supervisor TEXT,
+    control TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_hm_ci ON horas_maquinas (ci);
+CREATE INDEX IF NOT EXISTS idx_hm_fecha ON horas_maquinas (fecha_parte);
+CREATE INDEX IF NOT EXISTS idx_hm_ci_fecha ON horas_maquinas (ci, fecha_parte DESC);
+CREATE INDEX IF NOT EXISTS idx_hm_nro_parte ON horas_maquinas (nro_parte);
+

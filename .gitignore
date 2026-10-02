@@ -19,6 +19,7 @@ backups/
 # Runtime/generated folders
 Doc_Almacen/
 Doc_Log_Viajes/
+tmp/
 
 # Local office/docs assets
 *.doc

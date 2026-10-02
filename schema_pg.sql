@@ -56,55 +56,6 @@ CREATE TABLE IF NOT EXISTS recursos_viaje (
     FOREIGN KEY (id_viaje) REFERENCES viajes (id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS recurso_acompanantes (
-    id SERIAL PRIMARY KEY,
-    id_viaje INTEGER NOT NULL,
-    nombre TEXT NOT NULL,
-    viatico REAL DEFAULT 0,
-    FOREIGN KEY (id_viaje) REFERENCES viajes (id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS ordenes_salida (
-    nro_orden TEXT PRIMARY KEY,
-    fecha_orden TEXT,
-    id_viaje INTEGER,
-    estado TEXT,
-    cierre_logistica_json TEXT,
-    raw_json TEXT,
-    FOREIGN KEY (id_viaje) REFERENCES viajes (id) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS gestion_operativa (
-    id SERIAL PRIMARY KEY,
-    nro_orden TEXT,
-    fecha_orden TEXT,
-    estado_orden TEXT,
-    id_viaje INTEGER,
-    centro_costo TEXT,
-    proyecto TEXT,
-    origen TEXT,
-    destino TEXT,
-    fecha_salida TEXT,
-    fecha_regreso TEXT,
-    jornadas INTEGER,
-    legajo TEXT,
-    nombre TEXT,
-    rol TEXT,
-    vehiculo TEXT,
-    chofer TEXT,
-    viatico REAL DEFAULT 0,
-    horas_totales REAL DEFAULT 0,
-    horas_normales REAL DEFAULT 0,
-    horas_compensables REAL DEFAULT 0,
-    costo_total REAL DEFAULT 0,
-    fecha_cierre TEXT
-);
-
-CREATE TABLE IF NOT EXISTS vehiculos (
-    codigo TEXT PRIMARY KEY,
-    propiedad TEXT,
-    marca TEXT,
-    tipo TEXT,
     modelo TEXT,
     dominio TEXT,
     anio INTEGER,
@@ -339,55 +290,6 @@ ALTER TABLE IF EXISTS usuarios
 ALTER TABLE IF EXISTS usuarios
     ADD COLUMN IF NOT EXISTS password_visible TEXT;
 
-CREATE TABLE IF NOT EXISTS movimientos_stock (
-    id SERIAL PRIMARY KEY,
-    fecha TEXT,
-    producto_id INTEGER NOT NULL,
-    documento TEXT,
-    tipo TEXT NOT NULL,
-    cantidad REAL NOT NULL,
-    stock_anterior REAL NOT NULL,
-    stock_nuevo REAL NOT NULL,
-    responsable_legajo TEXT,
-    responsable_nombre TEXT,
-    observaciones TEXT,
-    remito_id INTEGER,
-    vehiculo_codigo TEXT,
-    proyecto TEXT,
-    instalacion TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    raw_json TEXT,
-    FOREIGN KEY (producto_id) REFERENCES productos (id) ON DELETE RESTRICT,
-    FOREIGN KEY (responsable_legajo) REFERENCES personal (legajo) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS inventarios (
-    id SERIAL PRIMARY KEY,
-    numero TEXT NOT NULL UNIQUE,
-    fecha TEXT,
-    estado TEXT DEFAULT 'PENDIENTE',
-    responsable_legajo TEXT,
-    responsable_nombre TEXT,
-    observaciones TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    raw_json TEXT,
-    FOREIGN KEY (responsable_legajo) REFERENCES personal (legajo) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS inventarios_detalle (
-    id SERIAL PRIMARY KEY,
-    inventario_id INTEGER NOT NULL,
-    producto_id INTEGER NOT NULL,
-    stock_sistema REAL NOT NULL,
-    stock_fisico REAL,
-    diferencia REAL,
-    estado TEXT DEFAULT 'PENDIENTE',
-    observaciones TEXT,
-    FOREIGN KEY (inventario_id) REFERENCES inventarios (id) ON DELETE CASCADE,
-    FOREIGN KEY (producto_id) REFERENCES productos (id) ON DELETE RESTRICT
-);
-
-CREATE TABLE IF NOT EXISTS ajustes_stock (
     id SERIAL PRIMARY KEY,
     inventario_id INTEGER,
     inventario_detalle_id INTEGER,
@@ -535,59 +437,41 @@ CREATE TABLE IF NOT EXISTS stock_consumibles (
     FOREIGN KEY (id_producto) REFERENCES productos (id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS stock (
-    id SERIAL PRIMARY KEY,
-    producto_id INTEGER NOT NULL UNIQUE,
-    id_familia INTEGER,
-    id_marca INTEGER,
-    id_modelo INTEGER,
-    id_unidad INTEGER,
-    id_ubicacion INTEGER,
-    producto_codigo TEXT,
-    producto_descripcion TEXT,
-    familia_nombre TEXT,
-    marca_nombre TEXT,
-    modelo_nombre TEXT,
-    unidad_nombre TEXT,
-    stock_actual REAL NOT NULL DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT,
-    raw_json TEXT,
-    FOREIGN KEY (producto_id) REFERENCES productos (id) ON DELETE RESTRICT,
-    FOREIGN KEY (id_familia) REFERENCES familias (id) ON DELETE SET NULL,
-    FOREIGN KEY (id_marca) REFERENCES marcas (id) ON DELETE SET NULL,
-    FOREIGN KEY (id_modelo) REFERENCES modelos (id) ON DELETE SET NULL,
-    FOREIGN KEY (id_unidad) REFERENCES unidades_medida (id) ON DELETE SET NULL,
-    FOREIGN KEY (id_ubicacion) REFERENCES ubicaciones (id) ON DELETE SET NULL
-);
-
--- Documentos / Movimientos / Auditoría / Adjuntos
-CREATE TABLE IF NOT EXISTS documentos (
-    id SERIAL PRIMARY KEY,
-    tipo TEXT NOT NULL,
-    numero TEXT NOT NULL UNIQUE,
-    fecha TEXT NOT NULL,
-    estado TEXT NOT NULL DEFAULT 'CONFIRMADO',
-    responsable TEXT,
-    observaciones TEXT,
-    payload_json TEXT,
-    FOREIGN KEY (responsable) REFERENCES personal (legajo) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS documentos_detalle (
-    id SERIAL PRIMARY KEY,
-    id_documento INTEGER NOT NULL,
-    id_producto INTEGER,
-    cantidad REAL DEFAULT 0,
-    id_vehiculo TEXT,
-    id_proyecto INTEGER,
-    id_instalacion INTEGER,
-    observaciones TEXT,
-    FOREIGN KEY (id_documento) REFERENCES documentos (id) ON DELETE CASCADE,
     FOREIGN KEY (id_producto) REFERENCES productos (id) ON DELETE RESTRICT,
     FOREIGN KEY (id_vehiculo) REFERENCES vehiculos (codigo) ON DELETE SET NULL,
     FOREIGN KEY (id_proyecto) REFERENCES proyectos (id) ON DELETE SET NULL,
     FOREIGN KEY (id_instalacion) REFERENCES instalaciones (id) ON DELETE SET NULL
+
+CREATE TABLE IF NOT EXISTS seguimiento_cc (
+    id INTEGER PRIMARY KEY,
+    centro_costo_id INTEGER,
+    fecha_alta_servicio DATE,
+    cotizacion TEXT,
+    fecha_inicio DATE,
+    fecha_final DATE,
+    anticipo NUMERIC,
+    moneda_anticipo TEXT,
+    monto_oc_total NUMERIC,
+    moneda_oc TEXT,
+    total_ejecutado_anticipo NUMERIC,
+    avance_ejecutado_anticipo NUMERIC,
+    falta_ejecutar_anticipo NUMERIC,
+    falta_ejecutar_anticipo_pct NUMERIC,
+    ejecutado_obra NUMERIC,
+    avance_ejecutado_obra NUMERIC,
+    falta_ejecutar_obra NUMERIC,
+    falta_ejecutar_obra_pct NUMERIC,
+    neto_facturado NUMERIC,
+    avance_neto_facturado NUMERIC,
+    falta_neto_facturado NUMERIC,
+    falta_neto_facturado_pct NUMERIC,
+    cantidad_certificados INTEGER,
+    condiciones_comerciales TEXT,
+    observaciones TEXT,
+    estado_seguimiento TEXT,
+    fecha_ultima_actualizacion TIMESTAMP,
+    usuario_ultima_actualizacion INTEGER,
+    FOREIGN KEY (centro_costo_id) REFERENCES centros_costos(id)
 );
 
 CREATE TABLE IF NOT EXISTS movimientos (
@@ -674,3 +558,48 @@ CREATE INDEX IF NOT EXISTS idx_mov_v2_fecha ON movimientos (fecha);
 CREATE INDEX IF NOT EXISTS idx_mov_v2_producto ON movimientos (id_producto);
 CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON auditoria (tabla, registro);
 CREATE INDEX IF NOT EXISTS idx_adj_doc ON adjuntos (id_documento);
+
+-- Horas Máquinas (Operaciones)
+CREATE TABLE IF NOT EXISTS horas_maquinas (
+    id SERIAL PRIMARY KEY,
+    ci TEXT,
+    fecha_parte TEXT NOT NULL,
+    nro_parte TEXT,
+    legajo_empleado TEXT,
+    maquinista TEXT,
+    obra TEXT,
+    proyecto TEXT,
+    descripcion_trabajos TEXT,
+    turno TEXT,
+    acoplado TEXT,
+    cliente TEXT,
+    orden_compra TEXT,
+    hs_inicio TEXT,
+    hs_final TEXT,
+    total_hs REAL DEFAULT 0,
+    km_inicio REAL DEFAULT 0,
+    km_final REAL DEFAULT 0,
+    km_total REAL DEFAULT 0,
+    viajes REAL DEFAULT 0,
+    gasoil REAL DEFAULT 0,
+    aceite REAL DEFAULT 0,
+    novedades TEXT,
+    firma_parte TEXT,
+    hs_desplazamiento REAL DEFAULT 0,
+    hs_mantenimiento REAL DEFAULT 0,
+    hs_reparaciones REAL DEFAULT 0,
+    hs_disposicion REAL DEFAULT 0,
+    total_hs_control REAL DEFAULT 0,
+    no_programadas REAL DEFAULT 0,
+    certificado TEXT,
+    estado_sub_alquiler TEXT,
+    control_supervisor TEXT,
+    control TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_hm_ci ON horas_maquinas (ci);
+CREATE INDEX IF NOT EXISTS idx_hm_fecha ON horas_maquinas (fecha_parte);
+CREATE INDEX IF NOT EXISTS idx_hm_ci_fecha ON horas_maquinas (ci, fecha_parte DESC);
+CREATE INDEX IF NOT EXISTS idx_hm_nro_parte ON horas_maquinas (nro_parte);
+

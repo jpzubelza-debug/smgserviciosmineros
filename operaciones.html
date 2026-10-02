@@ -3,19 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Operaciones</title>
+<title>Operaciones - Carga de Partes Diarios | SMG</title>
 <style>
   :root {
-    --bg-1: #0f172a;
-    --bg-2: #1e293b;
-    --bg-3: #0b1120;
-    --panel: rgba(15, 23, 42, 0.66);
-    --panel-soft: rgba(15, 23, 42, 0.45);
-    --line: rgba(148, 163, 184, 0.35);
-    --text: #e2e8f0;
-    --muted: #93c5fd;
-    --accent: #38bdf8;
-    --accent-2: #22c55e;
+    --bg-1: #090e17;
+    --bg-2: #0f172a;
+    --bg-3: #1e293b;
+    --card-bg: rgba(15, 23, 42, 0.78);
+    --card-header: rgba(30, 41, 59, 0.65);
+    --subcard-bg: rgba(15, 23, 42, 0.55);
+    --line: rgba(148, 163, 184, 0.22);
+    --line-active: rgba(56, 189, 248, 0.55);
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-blue: #38bdf8;
+    --text-green: #22c55e;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --accent: #0284c7;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --input-bg: rgba(2, 6, 23, 0.58);
+    --input-border: rgba(148, 163, 184, 0.3);
   }
 
   * { box-sizing: border-box; }
@@ -23,9 +33,10 @@
   body {
     margin: 0;
     min-height: 100vh;
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     color: var(--text);
     background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    overflow-x: hidden;
   }
 
   .bg-photo {
@@ -33,7 +44,7 @@
     inset: 0;
     z-index: 0;
     background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center/cover no-repeat;
-    opacity: 0.66;
+    opacity: 0.55;
     pointer-events: none;
   }
 
@@ -43,8 +54,8 @@
     z-index: 1;
     pointer-events: none;
     background:
-      radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-      radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
+      radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.12), transparent 40%),
+      radial-gradient(circle at 85% 75%, rgba(34, 197, 94, 0.10), transparent 45%);
   }
 
   .app-shell {
@@ -60,16 +71,19 @@
 
   .app-shell:has(.sidebar:hover),
   .app-shell:has(.sidebar:focus-within) {
-    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
   .card {
-    background: var(--panel);
+    background: var(--card-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--line);
     border-radius: 12px;
-    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   }
 
+  /* Sidebar */
   .sidebar {
     padding: 12px;
     display: flex;
@@ -82,142 +96,3604 @@
 
   .sidebar:hover,
   .sidebar:focus-within {
-    width: 250px;
+    width: 240px;
   }
 
   .brand {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 120px;
-    background: var(--panel-soft);
+    min-height: 90px;
+    background: rgba(15, 23, 42, 0.45);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 10px;
   }
 
   .brand img {
     width: 78%;
-    max-width: 170px;
+    max-width: 160px;
     object-fit: contain;
   }
 
   .sidebar:not(:hover):not(:focus-within) .brand img {
-    width: 44px;
+    width: 38px;
   }
 
   .menu {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
+    flex: 1;
   }
 
-  .menu button {
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    background: rgba(15, 23, 42, 0.55);
+  .menu-btn {
+    border: 1px solid var(--line);
+    background: rgba(15, 23, 42, 0.6);
     color: var(--text);
     border-radius: 8px;
-    padding: 10px;
-    font-weight: 700;
+    padding: 11px 12px;
+    font-weight: 600;
+    font-size: 13px;
     cursor: pointer;
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    transition: all 0.18s ease;
   }
 
-  .sidebar:not(:hover):not(:focus-within) .menu button {
-    text-indent: -9999px;
-    padding-left: 0;
-    padding-right: 0;
+  .menu-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #fff;
   }
 
-  .menu button.active {
+  .menu-btn.active {
     background: linear-gradient(135deg, #1d4ed8, #0284c7);
     border-color: rgba(147, 197, 253, 0.8);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
   }
 
+  .menu-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .menu-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .menu-label {
+    display: none;
+  }
+
+  .sidebar:not(:hover):not(:focus-within) .menu-btn {
+    justify-content: center;
+    padding: 11px 0;
+  }
+
+  /* Main Container */
   .main {
-    display: grid;
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     min-width: 0;
   }
 
-  .top {
-    padding: 16px 18px;
+  /* Top Banner */
+  .top-banner {
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: linear-gradient(90deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.7));
   }
 
-  .top h1 { margin: 0; font-size: 24px; }
-  .top p { margin: 6px 0 0; color: #bfdbfe; font-size: 13px; }
+  .top-left .breadcrumb {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-blue);
+    margin-bottom: 4px;
+  }
 
-  .content-panel {
-    padding: 16px;
+  .top-left h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+  }
+
+  .top-left p {
+    margin: 4px 0 0;
+    color: #cbd5e1;
+    font-size: 13px;
+  }
+
+  .top-right {
+    text-align: right;
+  }
+
+  .seguimiento-panel {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .seguimiento-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 16px 10px;
+    background: linear-gradient(90deg, rgba(15, 23, 42, 0.9), rgba(17, 24, 39, 0.75));
+    border-bottom: 1px solid var(--line);
+  }
+
+  .seguimiento-header h2 {
+    margin: 0;
+    font-size: 1.7rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: #f8fafc;
+  }
+
+  .seguimiento-header p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .seguimiento-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .seg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--text);
+    border-radius: 8px;
+    height: 32px;
+    padding: 0 10px;
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .seg-btn.primary {
+    background: linear-gradient(135deg, #2563eb, #0284c7);
+    border-color: rgba(147, 197, 253, 0.8);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+  }
+
+  .seg-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+  }
+
+  .seg-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .seguimiento-main {
+    padding: 10px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .seguimiento-grid {
     display: grid;
+    grid-template-columns: 1.2fr 1.2fr 1fr 1fr;
+    gap: 8px;
+    align-items: end;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #dfeaf6;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: rgba(56, 189, 248, 0.7);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+  }
+
+  .field textarea {
+    min-height: 54px;
+    resize: vertical;
+  }
+
+  .field.inline {
+    justify-content: flex-end;
+  }
+
+  .panel-section {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.48);
+  }
+
+  .panel-section-header {
+    background: rgba(15, 23, 42, 0.78);
+    color: #93c5fd;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .panel-section-body {
+    padding: 8px 10px 10px;
+  }
+
+  .details-client-grid,
+  .execution-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
-  .hidden { display: none; }
-
-  .section-card {
-    padding: 16px;
-    min-height: 180px;
+  .details-client-grid .field-wide,
+  .execution-grid .field-wide {
+    grid-column: span 2;
   }
 
-  .section-card h2 { margin: 0 0 8px; font-size: 20px; }
-  .section-card p { margin: 0; color: #bfdbfe; font-size: 13px; line-height: 1.5; }
+  .metrics-table,
+  .orders-table,
+  .items-table,
+  .attachments-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .metrics-table th,
+  .metrics-table td,
+  .orders-table th,
+  .orders-table td,
+  .items-table th,
+  .items-table td,
+  .attachments-table th,
+  .attachments-table td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    text-align: left;
+    background: rgba(15, 23, 42, 0.35);
+  }
+
+  .metrics-table th,
+  .orders-table th,
+  .items-table th,
+  .attachments-table th {
+    background: rgba(37, 99, 235, 0.12);
+    font-weight: 800;
+    color: #e2e8f0;
+  }
+
+  .metrics-table input,
+  .orders-table input,
+  .items-table input,
+  .attachments-table input,
+  .orders-table select {
+    width: 100%;
+    background: rgba(2, 6, 23, 0.46);
+    border: 1px solid var(--input-border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .orders-table td:last-child,
+  .items-table td:last-child,
+  .attachments-table td:last-child {
+    width: 60px;
+    text-align: center;
+  }
+
+  .mini-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.08);
+    color: #fca5a5;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .mini-btn.primary {
+    border-color: rgba(59, 130, 246, 0.6);
+    background: rgba(59, 130, 246, 0.12);
+    color: #bfdbfe;
+  }
+
+  .totals-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    color: #dfeaf6;
+    padding-top: 4px;
+  }
+
+  .totals-row .value {
+    min-width: 120px;
+    text-align: right;
+    color: #f8fafc;
+    font-weight: 800;
+  }
+
+  .seg-total-warning {
+    display: none;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(234, 179, 8, 0.55);
+    border-radius: 6px;
+    background: rgba(234, 179, 8, 0.12);
+    color: #fde68a;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .seg-total-warning.visible {
+    display: block;
+  }
+
+  /* Form Section Card */
+  .form-card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .card-header-bar {
+    padding: 12px 18px;
+    background: var(--card-header);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-icon-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
+  }
+
+  .header-icon-badge svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  .card-title-group h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: #cbd5e1;
+  }
+
+  .badge-version {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+
+  /* Form Layout Grid */
+  .form-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-grid-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .form-grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 1100px) {
+    .form-grid-top, .form-grid-bottom {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .form-grid-bottom .fields-1col {
+      grid-template-columns: 1fr;
+    }
+
+    .form-grid-bottom .subcard:last-child .field:nth-child(-n+2) {
+      grid-column: auto;
+    }
+  }
+
+  .subcard {
+    background: var(--subcard-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .subcard-title {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #93c5fd;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    padding-bottom: 6px;
+  }
+
+  .fields-grid {
+    display: grid;
+    gap: 7px 9px;
+  }
+
+  .form-grid-bottom .fields-1col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid-bottom .subcard:last-child .field:nth-child(-n+2) {
+    grid-column: span 2;
+  }
+
+  .fields-2col {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fields-3col {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .fields-1col {
+    grid-template-columns: 1fr;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #cbd5e1;
+    letter-spacing: 0.02em;
+  }
+
+  .field label .req {
+    color: #f87171;
+    margin-left: 2px;
+  }
+
+  .input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .selected-equipment {
+    margin-top: 5px;
+    padding: 5px 8px;
+    border-left: 3px solid var(--text-blue);
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--text-blue);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 6px 9px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.15s ease;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: #38bdf8;
+    background: rgba(15, 23, 42, 0.85);
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  }
+
+  input[readonly] {
+    background: rgba(30, 41, 59, 0.5);
+    color: #38bdf8;
+    font-weight: 700;
+    border-color: rgba(56, 189, 248, 0.3);
+    cursor: default;
+  }
+
+  select option {
+    background: #0f172a;
+    color: #ffffff;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 52px;
+  }
+
+  .btn-input-addon {
+    position: absolute;
+    right: 4px;
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    border-radius: 4px;
+    padding: 3px 6px;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-input-addon:hover {
+    background: rgba(56, 189, 248, 0.35);
+  }
+
+  /* Form Actions Bar */
+  .form-actions-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s ease;
+    user-select: none;
+  }
+
+  .btn-secondary {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid var(--line);
+    color: #cbd5e1;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(51, 65, 85, 0.85);
+    color: #fff;
+    border-color: rgba(148, 163, 184, 0.4);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #0369a1);
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.5);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* History Table Section */
+  .history-card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .history-controls-bar {
+    padding: 10px 16px;
+    background: rgba(15, 23, 42, 0.6);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .history-filters-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .history-filters-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .filter-label {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .input-sm {
+    padding: 5px 8px;
+    font-size: 12px;
+    height: 32px;
+  }
+
+  .search-input-wrap {
+    position: relative;
+    width: 220px;
+  }
+
+  .search-input-wrap input {
+    padding-left: 28px;
+  }
+
+  .search-icon-inside {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Table Container */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    max-height: 520px;
+  }
+
+  .hm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .hm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #0f172a;
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-bottom: 2px solid rgba(56, 189, 248, 0.4);
+    border-right: 1px solid rgba(148, 163, 184, 0.12);
+    text-align: left;
+  }
+
+  .hm-table thead th.text-center, .hm-table tbody td.text-center {
+    text-align: center;
+  }
+
+  .hm-table thead th.text-right, .hm-table tbody td.text-right {
+    text-align: right;
+  }
+
+  .hm-table tbody tr {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    transition: background 0.12s ease;
+  }
+
+  .hm-table tbody tr:nth-child(even) {
+    background: rgba(15, 23, 42, 0.35);
+  }
+
+  .hm-table tbody tr:hover {
+    background: rgba(56, 189, 248, 0.12);
+  }
+
+  .hm-table tbody td {
+    padding: 8px 12px;
+    color: #e2e8f0;
+    border-right: 1px solid rgba(148, 163, 184, 0.08);
+  }
+
+  .cell-desc {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .badge-turno {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .badge-turno-dia {
+    background: rgba(234, 179, 8, 0.18);
+    color: #fde047;
+    border: 1px solid rgba(234, 179, 8, 0.35);
+  }
+
+  .badge-turno-noche {
+    background: rgba(99, 102, 241, 0.2);
+    color: #c7d2fe;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+  }
+
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .btn-action {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--line);
+    color: #cbd5e1;
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: #38bdf8;
+    color: #fff;
+  }
+
+  .btn-action.btn-del:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+    color: #fca5a5;
+  }
+
+  .btn-action svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Table Footer & Pagination */
+  .table-footer {
+    padding: 10px 16px;
+    background: rgba(15, 23, 42, 0.7);
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: #cbd5e1;
+  }
+
+  .pagination-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .page-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: 5px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--line);
+    color: #cbd5e1;
+    font-weight: 600;
+    font-size: 11.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background: rgba(56, 189, 248, 0.25);
+    color: #fff;
+    border-color: #38bdf8;
+  }
+
+  .page-btn.active {
+    background: #2563eb;
+    border-color: #60a5fa;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(2, 6, 23, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-box {
+    background: #0f172a;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 820px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-head {
+    padding: 14px 18px;
+    background: rgba(30, 41, 59, 0.6);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-head h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #ffffff;
+  }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+  }
+
+  .modal-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .modal-body {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .detail-item {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  .detail-item .label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #93c5fd;
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .detail-item .val {
+    font-size: 13px;
+    color: #f8fafc;
+    font-weight: 600;
+  }
+
+  .detail-block {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+
+  .detail-block .label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #93c5fd;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .detail-block .val {
+    font-size: 12.5px;
+    color: #f8fafc;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+
+  .modal-foot {
+    padding: 12px 18px;
+    background: rgba(30, 41, 59, 0.4);
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Toast Notification */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toast {
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.25s ease-out;
+  }
+
+  .toast-success {
+    background: linear-gradient(135deg, #15803d, #16a34a);
+    border: 1px solid #22c55e;
+  }
+
+  .toast-error {
+    background: linear-gradient(135deg, #b91c1c, #dc2626);
+    border: 1px solid #f87171;
+  }
+
+  .toast-info {
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    border: 1px solid #38bdf8;
+  }
+
+  .toast-warning {
+    background: linear-gradient(135deg, #a16207, #d97706);
+    border: 1px solid #facc15;
+  }
+
+  .horometro-warning {
+    margin-top: 6px;
+    padding: 7px 9px;
+    border: 1px solid #facc15;
+    border-radius: 6px;
+    background: rgba(161, 98, 7, 0.2);
+    color: #fde68a;
+    font-size: 11.5px;
+    line-height: 1.35;
+    font-weight: 600;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .hidden { display: none !important; }
+
+  .centros-costos-panel {
+    padding: 16px;
+  }
+
+  .centros-costos-form {
+    display: flex;
+    align-items: end;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .centros-costos-form .field {
+    flex: 1;
+  }
+
+  .centros-costos-fields {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    gap: 8px;
+    flex: 1;
+  }
+
+  .centros-costos-fields .field-wide {
+    grid-column: span 2;
+  }
+
+  .centros-costos-form input,
+  .centros-costos-form select,
+  .centros-costos-form textarea {
+    min-width: 0;
+  }
+
+  .centros-costos-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .centros-costos-table-wrap {
+    overflow-x: auto;
+  }
+
+  .centros-costos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .centros-costos-table th,
+  .centros-costos-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    text-align: left;
+  }
+
+  .centros-costos-table th {
+    color: #93c5fd;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 620px) {
+    .centros-costos-form {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .centros-costos-form .field[style] { max-width: none !important; }
+    .centros-costos-fields { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  }
 </style>
 </head>
 <body>
 <div class="bg-photo"></div>
 <div class="bg-blur"></div>
+<div class="toast-container" id="toast-container"></div>
+
 <div class="app-shell">
+  <!-- Sidebar -->
   <aside class="sidebar card">
     <div class="brand">
       <img src="/Imagenes/09-smg.png" alt="Logo SMG">
     </div>
     <div class="menu">
-      <button class="active" id="btn-dashboard-operaciones" type="button">Dashboard</button>
-      <button id="btn-carga-partes-diarios" type="button">Carga de Partes Diarios</button>
+      <button class="menu-btn" id="btn-sidebar-dashboard" type="button">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </span>
+        <span class="menu-label">Dashboard</span>
+      </button>
+
+      <button class="menu-btn active" id="btn-sidebar-carga-partes" type="button">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </span>
+        <span class="menu-label">Carga de Partes Diarios</span>
+      </button>
+
+      <button class="menu-btn" id="btn-sidebar-centros-costos" type="button">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 21h18"></path><path d="M5 21V5l7-3 7 3v16"></path><path d="M9 9h1"></path><path d="M14 9h1"></path><path d="M9 13h1"></path><path d="M14 13h1"></path><path d="M9 17h1"></path><path d="M14 17h1"></path></svg>
+        </span>
+        <span class="menu-label">Centro de Costos</span>
+      </button>
+
+      <button class="menu-btn" id="btn-sidebar-seguimiento-cliente" type="button">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+        </span>
+        <span class="menu-label">Seguimiento de Cliente</span>
+      </button>
+
+      <a class="menu-btn" href="/" style="margin-top: auto;">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </span>
+        <span class="menu-label">Menú Principal</span>
+      </a>
     </div>
   </aside>
 
+  <!-- Main Content Area -->
   <main class="main">
-    <section class="card top">
-      <h1>Operaciones</h1>
-      <p>Seguimiento operativo integral, productividad y alertas en tiempo real.</p>
+    <!-- Top Header Bar -->
+    <header class="card top-banner">
+      <div class="top-left">
+        <h1>Carga de Partes Diarios</h1>
+        <p>Registro de horas, kilómetros, consumo y novedades de equipos.</p>
+      </div>
+      <div class="top-right"></div>
+    </header>
+
+    <!-- Dashboard Panel Placeholder (si se selecciona) -->
+    <section class="card form-card hidden" id="panel-dashboard" style="padding: 24px;">
+      <h2>Dashboard Operaciones</h2>
+      <p style="color: #94a3b8;">Indicadores operativos en desarrollo.</p>
     </section>
 
-    <section class="content-panel card section-card" id="dashboard-operaciones-panel">
-      <h2>Dashboard</h2>
-      <p>Próximamente: indicadores y alertas del módulo de Operaciones.</p>
+    <section class="card form-card hidden centros-costos-panel" id="panel-centros-costos">
+      <div class="card-header-bar">
+        <div class="card-title-group">
+          <h2>Centro de Costos</h2>
+          <p>Administrar centros disponibles para los partes diarios.</p>
+        </div>
+      </div>
+      <form class="centros-costos-form" id="form-centro-costo" onsubmit="event.preventDefault(); guardarCentroCosto();">
+        <input type="hidden" id="centro-costo-edit-id" value="">
+        <div class="centros-costos-fields">
+          <div class="field">
+            <label for="inp-centro-costo-id">ID</label>
+            <input type="number" id="inp-centro-costo-id" min="1" step="1" placeholder="Ej. 301" required>
+          </div>
+          <div class="field field-wide">
+            <label for="inp-centro-costo-nombre">Nombre del Centro de Costos</label>
+            <input type="text" id="inp-centro-costo-nombre" placeholder="Ej. MANTENIMIENTO" required>
+          </div>
+          <div class="field"><label for="inp-centro-costo-cliente">Cliente ID</label><select id="inp-centro-costo-cliente"><option value="">-- Seleccione cliente --</option></select></div>
+          <div class="field"><label for="inp-centro-costo-proyecto">Proyecto ID</label><input type="number" id="inp-centro-costo-proyecto"></div>
+          <div class="field"><label for="inp-centro-costo-ubicacion">Ubicación</label><input type="text" id="inp-centro-costo-ubicacion"></div>
+          <div class="field"><label for="inp-centro-costo-responsable">Responsable ID</label><input type="text" id="inp-centro-costo-responsable"></div>
+          <div class="field"><label for="inp-centro-costo-contrato">Contrato</label><input type="text" id="inp-centro-costo-contrato"></div>
+          <div class="field"><label for="inp-centro-costo-orden">Orden de Compra</label><input type="text" id="inp-centro-costo-orden"></div>
+          <div class="field"><label for="inp-centro-costo-fecha-inicio">Fecha Inicio</label><input type="date" id="inp-centro-costo-fecha-inicio"></div>
+          <div class="field"><label for="inp-centro-costo-fecha-prevista">Fin Previsto</label><input type="date" id="inp-centro-costo-fecha-prevista"></div>
+          <div class="field"><label for="inp-centro-costo-fecha-real">Fin Real</label><input type="date" id="inp-centro-costo-fecha-real"></div>
+          <div class="field"><label for="inp-centro-costo-estado">Estado</label><select id="inp-centro-costo-estado"><option>Planificación</option><option>En curso</option><option>Finalizado</option><option>Cancelado</option></select></div>
+          <div class="field"><label for="inp-centro-costo-moneda">Moneda</label><input type="text" id="inp-centro-costo-moneda" value="USD"></div>
+          <div class="field"><label for="inp-centro-costo-importe">Importe Contratado</label><input type="number" step="0.01" id="inp-centro-costo-importe"></div>
+          <div class="field"><label for="inp-centro-costo-presupuesto">Presupuesto</label><input type="number" step="0.01" id="inp-centro-costo-presupuesto"></div>
+          <div class="field field-wide"><label for="inp-centro-costo-observaciones">Observaciones</label><textarea id="inp-centro-costo-observaciones" rows="1"></textarea></div>
+        </div>
+        <div class="centros-costos-actions">
+          <button type="submit" class="btn btn-primary" id="btn-guardar-centro-costo">Crear Centro</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-centro-costo" onclick="limpiarFormularioCentroCosto()">Cancelar</button>
+        </div>
+      </form>
+      <div class="centros-costos-table-wrap">
+        <table class="centros-costos-table">
+          <thead><tr><th>ID</th><th>Centro de Costos</th><th>Cliente</th><th>Proyecto</th><th>Ubicación</th><th>Responsable</th><th>Contrato</th><th>Orden Compra</th><th>Inicio</th><th>Fin Previsto</th><th>Fin Real</th><th>Estado</th><th>Moneda</th><th>Importe</th><th>Presupuesto</th><th>Observaciones</th><th>Creado</th><th>Actualizado</th><th>Acciones</th></tr></thead>
+          <tbody id="tabla-centros-costos">
+            <tr><td colspan="19">Cargando Centros de Costos...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="content-panel card section-card hidden" id="carga-partes-diarios-panel">
-      <h2>Carga de Partes Diarios</h2>
-      <p>Próximamente: formulario de carga de partes diarios.</p>
+    <section class="card form-card hidden seguimiento-panel" id="panel-seguimiento-cliente">
+      <div class="seguimiento-header">
+        <div>
+          <h2>Seguimiento de Cliente</h2>
+          <p>Control general de obras, órdenes de compra y certificaciones</p>
+        </div>
+        <div class="seguimiento-actions">
+          <button class="seg-btn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M12 3v14"></path><path d="M17 18l-5 5-5-5"></path><path d="M4 21h16"></path></svg>
+            Exportar PDF
+          </button>
+          <button class="seg-btn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            Exportar Excel
+          </button>
+          <button class="seg-btn primary js-guardar-seguimiento" type="button">Guardar Registro</button>
+        </div>
+      </div>
+
+      <div class="seguimiento-main">
+        <input id="seg-id" type="hidden">
+        <div class="seguimiento-grid">
+          <div class="field">
+            <label for="seg-registro">N° Registro</label>
+            <select id="seg-registro">
+              <option value="">Nuevo seguimiento</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="seg-fecha">Fecha</label>
+            <input id="seg-fecha" value="18/09/2026" type="text">
+          </div>
+          <div class="field">
+            <label for="seg-fecha-alta">Fecha Alta Servicio</label>
+            <input id="seg-fecha-alta" type="date">
+          </div>
+          <div class="field inline">
+            <button class="seg-btn" id="btn-nuevo-seguimiento" type="button">Nuevo SEG</button>
+            <button class="seg-btn primary js-guardar-seguimiento" type="button">Guardar Registro</button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Detalles del Cliente</div>
+          <div class="panel-section-body details-client-grid">
+            <div class="field">
+              <label for="seg-empresa">Empresa</label>
+              <input id="seg-empresa" type="text" list="seg-empresas" placeholder="Escribir código o nombre..." autocomplete="off">
+              <datalist id="seg-empresas"></datalist>
+            </div>
+            <div class="field">
+              <label>Teléfono</label>
+              <input type="text" placeholder="Teléfono">
+            </div>
+            <div class="field">
+              <label for="seg-cuit">CUIT</label>
+              <input id="seg-cuit" type="text" placeholder="CUIT" readonly>
+            </div>
+            <div class="field">
+              <label>Solicitado Por</label>
+              <input type="text" placeholder="Solicitado Por">
+            </div>
+            <div class="field field-wide">
+              <label>Dirección</label>
+              <input type="text" placeholder="Dirección">
+            </div>
+            <div class="field field-wide">
+              <label>Contacto</label>
+              <input type="text" placeholder="Contacto">
+            </div>
+            <div class="field">
+              <label for="seg-centro-costo">Centro de Costo</label>
+              <input id="seg-centro-costo" type="text" list="seg-centros-costos" placeholder="Escribir código o nombre..." autocomplete="off">
+              <datalist id="seg-centros-costos"></datalist>
+            </div>
+            <div class="field"></div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Cotización</div>
+          <div class="panel-section-body">
+            <div class="details-client-grid">
+              <div class="field field-wide">
+                <label>Cotización</label>
+                <input id="seg-cotizacion" type="text" placeholder="Seleccionar cotización...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Detalles de Ejecución Obra</div>
+          <div class="panel-section-body execution-grid">
+            <div class="field">
+              <label>Fecha de Inicio</label>
+              <input id="seg-fecha-inicio" type="date">
+            </div>
+            <div class="field">
+              <label>Fecha Final</label>
+              <input id="seg-fecha-final" type="date">
+            </div>
+            <div class="field">
+              <label>Cantidad de Certificados</label>
+              <input id="seg-certificados" type="number" value="0" min="0" step="1">
+            </div>
+            <div class="field">
+              <label>Estado</label>
+              <select id="seg-estado">
+                <option>En preparación</option>
+                <option>En curso</option>
+                <option>Finalizado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Detallle ejecución</div>
+          <div class="panel-section-body">
+            <table class="metrics-table">
+              <thead>
+                <tr>
+                  <th>Concepto</th>
+                  <th>Monto</th>
+                  <th>Avance en %</th>
+                  <th>Falta en %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Anticipo</td>
+                  <td>$ 0,00</td>
+                  <td>0,0%</td>
+                  <td>100,0%</td>
+                </tr>
+                <tr>
+                  <td>Total Ejecutado + Anticipo</td>
+                  <td>$ 0,00</td>
+                  <td>0,0%</td>
+                  <td>100,0%</td>
+                </tr>
+                <tr>
+                  <td>Ejecutado en Obra</td>
+                  <td>$ 0,00</td>
+                  <td>0,0%</td>
+                  <td>100,0%</td>
+                </tr>
+                <tr>
+                  <td>Neto Facturado</td>
+                  <td>$ 0,00</td>
+                  <td>0,0%</td>
+                  <td>100,0%</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="panel-section-body" style="padding: 12px 0 0;">
+              <div class="details-client-grid">
+                <div class="field">
+                  <label>Disponibilidad</label>
+                  <input type="text" placeholder="Disponibilidad">
+                </div>
+                <div class="field">
+                  <label>Condiciones Comerciales</label>
+                  <input id="seg-condiciones" type="text" value="30 FF">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Órdenes de Compra</div>
+          <div class="panel-section-body">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th>N°</th><th>Orden de Compra</th><th>Revisión</th><th>Otorgada</th>
+                  <th>Vencimiento</th><th>Moneda</th><th>Monto de OC</th><th>Observaciones</th><th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="seg-ordenes-body"></tbody>
+            </table>
+            <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+              <button id="btn-agregar-orden-cliente" class="seg-btn primary" type="button">+ Agregar Orden de Compra</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Items Contratados</div>
+          <div class="panel-section-body">
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>N°</th><th>Descripción</th><th>Unidad</th><th>Cantidad</th>
+                  <th>Moneda</th><th>Precio</th><th>Total</th><th>Observación</th><th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="seg-items-body"></tbody>
+            </table>
+            <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+              <button id="btn-agregar-item-cliente" class="seg-btn primary" type="button">+ Agregar Item</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-header">Anexos de Orden de Compra y Cotización</div>
+          <div class="panel-section-body">
+            <table class="attachments-table">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Nombre del Archivo</th>
+                  <th>Total (USD)</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>1</td><td><input type="text" value="Seleccionar archivo..."></td><td><input type="text" value="$ 0,00"></td><td><button class="mini-btn" type="button">✕</button></td></tr>
+            <div class="totals-row">
+              <span>TOTAL ÍTEMS CONTRATADOS</span>
+              <span id="seg-items-total" class="value">0,00</span>
+            </div>
+            <div id="seg-total-warning" class="seg-total-warning" role="status">
+              Advertencia: el total de los ítems contratados no coincide con el monto de la Orden de Compra. La comparación considera solo números enteros.
+            </div>
+                <tr><td>2</td><td><input type="text" value="Seleccionar archivo..."></td><td><input type="text" value="$ 0,00"></td><td><button class="mini-btn" type="button">✕</button></td></tr>
+                <tr><td>3</td><td><input type="text" value="Seleccionar archivo..."></td><td><input type="text" value="$ 0,00"></td><td><button class="mini-btn" type="button">✕</button></td></tr>
+              </tbody>
+            </table>
+            <div class="totals-row">
+              <span>TOTAL -&gt; USD</span>
+              <span class="value">0,00</span>
+            </div>
+            <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+              <button class="seg-btn primary" type="button">+ Adjuntar Anexo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Principal Carga de Partes Diarios -->
+    <section id="panel-carga-partes" style="display: flex; flex-direction: column; gap: 14px;">
+      
+      <!-- SECTOR A: FORMULARIO DE CARGA DE PARTE DIARIO -->
+      <section class="card form-card" id="sector-formulario">
+        <div class="card-header-bar">
+          <div class="card-title-group">
+            <h2 id="form-title-text"></h2>
+          </div>
+          <div class="header-meta">
+            <span id="current-date-badge">Cargando fecha...</span>
+            <span class="badge-version">V1.0</span>
+          </div>
+        </div>
+
+        <form id="form-parte-diario" class="form-body" onsubmit="event.preventDefault();">
+          <input type="hidden" id="edit-id" value="">
+
+          <!-- Fila Superior de Subtarjetas (1. Datos Generales & 2. Horómetro / Kilómetro) -->
+          <div class="form-grid-top">
+            
+            <!-- 1. Datos Generales -->
+            <div class="subcard">
+              <div class="subcard-title">
+                <span>1. Datos Generales</span>
+              </div>
+              <div class="fields-grid fields-2col">
+                <div class="field">
+                  <label for="inp-nro-parte">Nº de Parte <span class="req">*</span></label>
+                  <input type="text" id="inp-nro-parte" placeholder="Ej. 25805" required>
+                </div>
+
+                <div class="field">
+                  <label for="inp-maquinista">Maquinista <span class="req">*</span></label>
+                  <input type="text" id="inp-maquinista" list="dl-maquinistas" placeholder="Escriba nombre o legajo" autocomplete="off" required>
+                  <datalist id="dl-maquinistas"></datalist>
+                </div>
+
+                <div class="field">
+                  <label for="inp-fecha-parte">Fecha de Parte <span class="req">*</span></label>
+                  <input type="date" id="inp-fecha-parte" required>
+                </div>
+
+                <div class="field">
+                  <label for="inp-obra-proyecto">Obra / Proyecto <span class="req">*</span></label>
+                  <input type="text" id="inp-obra-proyecto" list="dl-centros-costos" placeholder="Escriba centro de costos" autocomplete="off" required>
+                  <datalist id="dl-centros-costos"></datalist>
+                </div>
+
+                <div class="field">
+                  <label for="inp-ci">Código Interno (CI) <span class="req">*</span></label>
+                  <div class="input-wrap">
+                    <select id="inp-ci" required>
+                      <option value="">-- Seleccione equipo --</option>
+                    </select>
+                  </div>
+                  <div id="equipo-seleccionado-display" class="selected-equipment" hidden></div>
+                </div>
+
+                <div class="field">
+                  <label for="inp-cliente">Cliente <span class="req">*</span></label>
+                  <input type="text" id="inp-cliente" list="dl-clientes" placeholder="Escriba código o razón social" autocomplete="off" required>
+                  <datalist id="dl-clientes"></datalist>
+                </div>
+
+                <div class="field" style="grid-column: span 2;">
+                  <label for="inp-orden-compra">Orden de Compra</label>
+                  <input type="text" id="inp-orden-compra" placeholder="Ej. OC-4587">
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Horómetro / Kilómetro -->
+            <div class="subcard">
+              <div class="subcard-title">
+                <span>2. Horómetro / Kilómetro</span>
+              </div>
+              <div class="fields-grid fields-2col">
+                <div class="field">
+                  <label for="inp-hs-inicio">Horómetro Inicial</label>
+                  <input type="number" step="1" id="inp-hs-inicio" placeholder="0">
+                  <div id="advertencia-horometro" class="horometro-warning" hidden></div>
+                </div>
+
+                <div class="field">
+                  <label for="inp-km-inicio">Kilómetro Inicial</label>
+                  <input type="number" step="1" id="inp-km-inicio" placeholder="0">
+                  <div id="advertencia-kilometro" class="horometro-warning" hidden></div>
+                </div>
+
+                <div class="field">
+                  <label for="inp-hs-final">Horómetro Final</label>
+                  <input type="number" step="1" id="inp-hs-final" placeholder="0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-km-final">Kilómetro Final</label>
+                  <input type="number" step="1" id="inp-km-final" placeholder="0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-total-hs">Total Horas</label>
+                  <input type="number" step="1" id="inp-total-hs" readonly placeholder="0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-km-total">Total Kilómetros</label>
+                  <input type="number" step="1" id="inp-km-total" readonly placeholder="0">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Fila Inferior de Subtarjetas (3. Horas de Trabajo, 4. Consumos y Viajes, 5. Descripción y Novedades) -->
+          <div class="form-grid-bottom">
+            
+            <!-- 3. Horas de Trabajo (hs) -->
+            <div class="subcard">
+              <div class="subcard-title">
+                <span>3. Horas de Trabajo (hs)</span>
+              </div>
+              <div class="fields-grid fields-1col">
+                <div class="field">
+                  <label for="inp-hs-reales">Hs. Reales Trabajadas</label>
+                  <input type="number" step="0.1" id="inp-hs-reales" placeholder="0.0" readonly>
+                </div>
+
+                <div class="field">
+                  <label for="inp-hs-desplazamiento">Hs. Desplazamiento de Equipo</label>
+                  <input type="number" step="0.1" id="inp-hs-desplazamiento" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-hs-mantenimiento">Hs. Por Mantenimiento</label>
+                  <input type="number" step="0.1" id="inp-hs-mantenimiento" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-hs-reparaciones">Hs. Por Reparaciones</label>
+                  <input type="number" step="0.1" id="inp-hs-reparaciones" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-hs-disposicion">Hs. a Disposición</label>
+                  <input type="number" step="0.1" id="inp-hs-disposicion" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-no-programadas">No Programadas</label>
+                  <select id="inp-no-programadas" disabled>
+                    <option value="">-- Disponible con horas de reparaciones --</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Consumos y Viajes -->
+            <div class="subcard">
+              <div class="subcard-title">
+                <span>4. Consumos y Viajes</span>
+              </div>
+              <div class="fields-grid fields-1col">
+                <div class="field">
+                  <label for="inp-viajes">Total de Viajes</label>
+                  <input type="number" step="1" id="inp-viajes" placeholder="0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-gasoil">Gasoil (Lts)</label>
+                  <input type="number" step="0.1" id="inp-gasoil" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-aceite">Aceite (Lts)</label>
+                  <input type="number" step="0.1" id="inp-aceite" placeholder="0.0">
+                </div>
+
+                <div class="field">
+                  <label for="inp-acoplado">Acoplado</label>
+                  <input type="text" id="inp-acoplado" list="dl-acoplados" placeholder="Ej. S-04">
+                  <datalist id="dl-acoplados"></datalist>
+                </div>
+
+                <div class="field">
+                  <label for="inp-turno">Turno</label>
+                  <select id="inp-turno">
+                    <option value="Día" selected>Día</option>
+                    <option value="Noche">Noche</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Descripción y Novedades -->
+            <div class="subcard">
+              <div class="subcard-title">
+                <span>5. Descripción y Novedades</span>
+              </div>
+              <div class="fields-grid fields-1col">
+                <div class="field">
+                  <label for="inp-descripcion-trabajos">Descripción de Trabajos Realizados <span class="req">*</span></label>
+                  <textarea id="inp-descripcion-trabajos" rows="2" placeholder="Describa las tareas realizadas..." required></textarea>
+                </div>
+
+                <div class="field">
+                  <label for="inp-novedades">Novedades</label>
+                  <textarea id="inp-novedades" rows="2" placeholder="Observaciones o novedades..."></textarea>
+                </div>
+
+                <div class="field">
+                  <label for="inp-firma-parte">Firma Parte (Supervisor del cliente)</label>
+                  <input type="text" id="inp-firma-parte" list="dl-firmas-supervisores" placeholder="Escriba nombre del supervisor" autocomplete="off">
+                  <datalist id="dl-firmas-supervisores"></datalist>
+                </div>
+
+                <div class="field">
+                  <label for="inp-control-supervisor">Control Supervisor (Supervisor de turno SMG)</label>
+                  <select id="inp-control-supervisor">
+                    <option value="">-- Seleccione empleado activo --</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Botones de Acción del Formulario -->
+          <div class="form-actions-bar">
+            <button type="button" class="btn btn-secondary" id="btn-limpiar-form">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Limpiar</span>
+            </button>
+
+            <button type="button" class="btn btn-secondary" id="btn-cancelar-form">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span>Cancelar</span>
+            </button>
+
+            <button type="submit" class="btn btn-primary" id="btn-submit-form">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              <span id="btn-submit-label">Cargar Parte</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- SECTOR B: HISTORIAL DE HORAS_MAQUINAS -->
+      <section class="card history-card" id="sector-historial">
+        <div class="card-header-bar">
+          <div class="card-title-group">
+            <div>
+              <h2 id="historial-title">Historial de Partes – Seleccione un Equipo</h2>
+              <div style="font-size: 11.5px; color: #94a3b8;" id="historial-subtitle">Últimos registros. Selecciona un período para filtrar.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros del Historial -->
+        <div class="history-controls-bar">
+          <div class="history-filters-left">
+            <div class="filter-item">
+              <span class="filter-label">Período:</span>
+              <select id="filtro-periodo-preset" class="input-sm" style="width: 140px;">
+                <option value="ultimos_30" selected>Últimos registros</option>
+                <option value="hoy">Hoy</option>
+                <option value="ultimos_7">Últimos 7 días</option>
+                <option value="ultimos_30_dias">Últimos 30 días</option>
+                <option value="mes_actual">Mes actual</option>
+                <option value="mes_anterior">Mes anterior</option>
+                <option value="trimestre_actual">Trimestre actual</option>
+                <option value="anio_actual">Año actual</option>
+                <option value="personalizado">Personalizado</option>
+              </select>
+            </div>
+
+            <div class="filter-item">
+              <input type="date" id="filtro-fecha-desde" class="input-sm" style="width: 130px;">
+              <span style="color: #94a3b8; font-size: 11px;">a</span>
+              <input type="date" id="filtro-fecha-hasta" class="input-sm" style="width: 130px;">
+            </div>
+
+            <button type="button" class="btn btn-secondary input-sm" id="btn-aplicar-filtros" style="padding: 0 10px;">
+              <span>Aplicar</span>
+            </button>
+          </div>
+
+          <div class="history-filters-right">
+            <div class="search-input-wrap">
+              <span class="search-icon-inside">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </span>
+              <input type="text" id="filtro-busqueda-texto" class="input-sm" placeholder="Buscar en la tabla...">
+            </div>
+
+            <button type="button" class="btn btn-primary input-sm" id="btn-recargar-historial" style="padding: 0 12px;" title="Actualizar datos">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Actualizar</span>
+            </button>
+
+            <button type="button" class="btn btn-secondary input-sm" id="btn-exportar-excel" style="padding: 0 12px;" title="Exportar a Excel">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Exportar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla con Scroll Horizontal y Sticky Header -->
+        <div class="table-responsive">
+          <table class="hm-table" id="tabla-horas-maquinas">
+            <thead>
+              <tr>
+                <th class="text-center" style="width: 40px;">#</th>
+                <th>CI</th>
+                <th>FECHA_PARTE</th>
+                <th>NRO_PARTE</th>
+                <th>LEGAJO</th>
+                <th>MAQUINISTA</th>
+                <th>OBRA / PROYECTO</th>
+                <th>DESCRIPCIÓN DE TRABAJOS</th>
+                <th>TURNO</th>
+                <th>ACOPLADO</th>
+                <th>CLIENTE</th>
+                <th>ORDEN DE COMPRA</th>
+                <th class="text-right">HS INICIO</th>
+                <th class="text-right">HS FINAL</th>
+                <th class="text-right">TOTAL HS</th>
+                <th class="text-right">KM INICIO</th>
+                <th class="text-right">KM FINAL</th>
+                <th class="text-right">KM TOTAL</th>
+                <th class="text-right">VIAJES</th>
+                <th class="text-right">GASOIL (LTS)</th>
+                <th class="text-right">ACEITE (LTS)</th>
+                <th>NOVEDADES</th>
+                <th>FIRMA PARTE</th>
+                <th>CONTROL SUPERVISOR</th>
+                <th class="text-right">HS DESPLAZ.</th>
+                <th class="text-right">HS MANT.</th>
+                <th class="text-right">HS REPAR.</th>
+                <th class="text-right">HS DISPOS.</th>
+                <th class="text-right">TOTAL HS CONTROL</th>
+                <th class="text-right">NO PROGRAMADAS</th>
+                <th class="text-center" style="width: 130px;">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-body-partes">
+              <tr>
+                <td colspan="31" style="text-align: center; padding: 30px; color: #94a3b8;">
+                  Seleccione un equipo para ver su historial de partes.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Paginación y Resumen -->
+        <div class="table-footer">
+          <div class="pagination-group" id="pagination-controls">
+            <!-- Renderizado dinámicamente -->
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <select id="paginacion-limite" class="input-sm" style="width: 70px;">
+                <option value="30" selected>30</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              <span style="color: #94a3b8;">registros por página</span>
+            </div>
+
+            <span id="paginacion-resumen" style="font-weight: 600; color: #cbd5e1;">Mostrando 0 registros</span>
+          </div>
+        </div>
+
+      </section>
+
     </section>
   </main>
 </div>
 
+<!-- Modal Detalle del Parte -->
+<div class="modal-backdrop" id="modal-detalle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-detalle-title">Detalle de Parte Diario</h3>
+      <button type="button" class="modal-close" onclick="cerrarModalDetalle()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-detalle-content">
+      <!-- Rellenado dinámicamente -->
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-secondary" onclick="cerrarModalDetalle()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmación Eliminación -->
+<div class="modal-backdrop" id="modal-eliminar">
+  <div class="modal-box" style="max-width: 440px;">
+    <div class="modal-head">
+      <h3 style="color: #f87171;">Confirmar Eliminación</h3>
+      <button type="button" class="modal-close" onclick="cerrarModalEliminar()">✕</button>
+    </div>
+    <div class="modal-body" style="font-size: 13.5px; color: #e2e8f0; line-height: 1.5;">
+      ¿Está seguro de que desea eliminar el <strong id="eliminar-parte-info">Parte Diario</strong>?
+      <div style="margin-top: 8px; color: #94a3b8; font-size: 12px;">Esta acción no se puede deshacer y eliminará el registro de horas_maquinas.</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-secondary" onclick="cerrarModalEliminar()">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btn-confirmar-eliminar" style="background: linear-gradient(135deg, #b91c1c, #dc2626);">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  const btnDashboard = document.getElementById('btn-dashboard-operaciones');
-  const btnCargaPartes = document.getElementById('btn-carga-partes-diarios');
-  const panelDashboard = document.getElementById('dashboard-operaciones-panel');
-  const panelCargaPartes = document.getElementById('carga-partes-diarios-panel');
+  // Estado global
+  const state = {
+    metadata: {
+      equipos: [],
+      maquinistas: [],
+      firmas_supervisores: [],
+      obras: [],
+      proyectos: [],
+      clientes: [],
+      acoplados: [],
+      turnos: [],
+      no_programadas_opciones: []
+    },
+    equipoSeleccionado: '',
+    ultimoHorometro: null,
+    ultimoHorometroCi: '',
+    advertenciaHorometroMostrada: false,
+    ultimoKilometro: null,
+    ultimoKilometroCi: '',
+    advertenciaKilometroMostrada: false,
+    filtroPeriodo: 'ultimos_30',
+    fechaDesde: '',
+    fechaHasta: '',
+    busqueda: '',
+    paginaActual: 1,
+    limite: 30,
+    totalRegistros: 0,
+    totalPaginas: 1,
+    idParaEliminar: null,
+    modoEdicion: false
+  };
+  state.centrosCostos = [];
 
-  function mostrarDashboard() {
-    panelDashboard.classList.remove('hidden');
-    panelCargaPartes.classList.add('hidden');
-    btnDashboard.classList.add('active');
-    btnCargaPartes.classList.remove('active');
+  // Toast Helper
+  function showToast(mensaje, tipo = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    toast.innerHTML = `<span>${mensaje}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-10px)';
+      toast.style.transition = 'all 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
   }
 
-  function mostrarCargaPartes() {
-    panelCargaPartes.classList.remove('hidden');
-    panelDashboard.classList.add('hidden');
-    btnCargaPartes.classList.add('active');
-    btnDashboard.classList.remove('active');
+  function escHtml(valor) {
+    return String(valor ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
-  btnDashboard.addEventListener('click', mostrarDashboard);
-  btnCargaPartes.addEventListener('click', mostrarCargaPartes);
+  function actualizarCentrosCostosFormulario(filas) {
+    state.metadata.centros_costos = (filas || [])
+      .filter(fila => Number(fila.activo) === 1)
+      .map(fila => `${fila.id} - ${fila.nombre}`);
+    renderCentrosCostosDatalist('');
+  }
+
+  async function cargarCentrosCostosPanel() {
+    const tbody = document.getElementById('tabla-centros-costos');
+    if (!tbody) return;
+    try {
+      const res = await fetch('/operaciones/centros-costos');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar los Centros de Costos.');
+      const filas = data.data || [];
+      state.centrosCostos = filas;
+      actualizarCentrosCostosFormulario(filas);
+      tbody.innerHTML = filas.length
+        ? filas.map(fila => `
+            <tr>
+              <td>${fila.id}</td>
+              <td>${escHtml(fila.nombre)}</td>
+              <td>${escHtml(fila.cliente_id)}</td>
+              <td>${escHtml(fila.proyecto_id)}</td>
+              <td>${escHtml(fila.ubicacion)}</td>
+              <td>${escHtml(fila.responsable_id)}</td>
+              <td>${escHtml(fila.contrato)}</td>
+              <td>${escHtml(fila.orden_compra)}</td>
+              <td>${escHtml(fila.fecha_inicio)}</td>
+              <td>${escHtml(fila.fecha_fin_prevista)}</td>
+              <td>${escHtml(fila.fecha_fin_real)}</td>
+              <td>${escHtml(fila.estado)}</td>
+              <td>${escHtml(fila.moneda)}</td>
+              <td>${escHtml(fila.importe_contratado)}</td>
+              <td>${escHtml(fila.presupuesto)}</td>
+              <td title="${escHtml(fila.observaciones)}">${escHtml(fila.observaciones)}</td>
+              <td>${escHtml(fila.created_at)}</td>
+              <td>${escHtml(fila.updated_at)}</td>
+              <td>
+                <button type="button" class="btn-action" title="Editar" onclick="editarCentroCosto(${fila.id})">Editar</button>
+                <button type="button" class="btn-action btn-del" title="Eliminar" onclick="eliminarCentroCosto(${fila.id}, '${escHtml(fila.nombre)}')">Eliminar</button>
+              </td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="19">No hay Centros de Costos cargados.</td></tr>';
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="19">${escHtml(err.message || 'Error al cargar datos.')}</td></tr>`;
+      showToast(err.message || 'Error al cargar Centros de Costos.', 'error');
+    }
+  }
+
+  function editarCentroCosto(id) {
+    const fila = state.centrosCostos.find(item => Number(item.id) === Number(id));
+    if (!fila) return;
+    document.getElementById('centro-costo-edit-id').value = id;
+    document.getElementById('inp-centro-costo-id').value = fila.id;
+    document.getElementById('inp-centro-costo-id').disabled = true;
+    document.getElementById('inp-centro-costo-nombre').value = fila.nombre || '';
+    document.getElementById('inp-centro-costo-cliente').value = fila.cliente_id || '';
+    document.getElementById('inp-centro-costo-proyecto').value = fila.proyecto_id || '';
+    document.getElementById('inp-centro-costo-ubicacion').value = fila.ubicacion || '';
+    document.getElementById('inp-centro-costo-responsable').value = fila.responsable_id || '';
+    document.getElementById('inp-centro-costo-contrato').value = fila.contrato || '';
+    document.getElementById('inp-centro-costo-orden').value = fila.orden_compra || '';
+    document.getElementById('inp-centro-costo-fecha-inicio').value = fila.fecha_inicio || '';
+    document.getElementById('inp-centro-costo-fecha-prevista').value = fila.fecha_fin_prevista || '';
+    document.getElementById('inp-centro-costo-fecha-real').value = fila.fecha_fin_real || '';
+    document.getElementById('inp-centro-costo-estado').value = fila.estado || 'Planificación';
+    document.getElementById('inp-centro-costo-moneda').value = fila.moneda || 'USD';
+    document.getElementById('inp-centro-costo-importe').value = fila.importe_contratado || 0;
+    document.getElementById('inp-centro-costo-presupuesto').value = fila.presupuesto || 0;
+    document.getElementById('inp-centro-costo-observaciones').value = fila.observaciones || '';
+    document.getElementById('btn-guardar-centro-costo').textContent = 'Guardar Cambios';
+    document.getElementById('inp-centro-costo-nombre').focus();
+  }
+
+  function limpiarFormularioCentroCosto() {
+    document.getElementById('centro-costo-edit-id').value = '';
+    document.getElementById('inp-centro-costo-id').value = '';
+    document.getElementById('inp-centro-costo-id').disabled = false;
+    document.getElementById('inp-centro-costo-nombre').value = '';
+    ['cliente', 'proyecto', 'ubicacion', 'responsable', 'contrato', 'orden', 'fecha-inicio', 'fecha-prevista', 'fecha-real', 'importe', 'presupuesto', 'observaciones'].forEach(campo => {
+      const input = document.getElementById(`inp-centro-costo-${campo}`);
+      if (input) input.value = '';
+    });
+    document.getElementById('inp-centro-costo-estado').value = 'Planificación';
+    document.getElementById('inp-centro-costo-moneda').value = 'USD';
+    document.getElementById('btn-guardar-centro-costo').textContent = 'Crear Centro';
+  }
+
+  async function guardarCentroCosto() {
+    const id = document.getElementById('centro-costo-edit-id').value;
+    const idNuevo = document.getElementById('inp-centro-costo-id').value;
+    const nombre = document.getElementById('inp-centro-costo-nombre').value.trim();
+    if (!id && !idNuevo) {
+      showToast('Debe ingresar el ID del Centro de Costos.', 'error');
+      return;
+    }
+    if (!nombre) return;
+    try {
+      const res = await fetch(id ? `/operaciones/centros-costos/${id}` : '/operaciones/centros-costos', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: Number(idNuevo), nombre,
+          cliente_id: document.getElementById('inp-centro-costo-cliente').value || null,
+          proyecto_id: document.getElementById('inp-centro-costo-proyecto').value || null,
+          ubicacion: document.getElementById('inp-centro-costo-ubicacion').value,
+          responsable_id: document.getElementById('inp-centro-costo-responsable').value,
+          contrato: document.getElementById('inp-centro-costo-contrato').value,
+          orden_compra: document.getElementById('inp-centro-costo-orden').value,
+          fecha_inicio: document.getElementById('inp-centro-costo-fecha-inicio').value,
+          fecha_fin_prevista: document.getElementById('inp-centro-costo-fecha-prevista').value,
+          fecha_fin_real: document.getElementById('inp-centro-costo-fecha-real').value,
+          estado: document.getElementById('inp-centro-costo-estado').value,
+          moneda: document.getElementById('inp-centro-costo-moneda').value,
+          importe_contratado: document.getElementById('inp-centro-costo-importe').value || 0,
+          presupuesto: document.getElementById('inp-centro-costo-presupuesto').value || 0,
+          observaciones: document.getElementById('inp-centro-costo-observaciones').value
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo guardar el Centro de Costos.');
+      showToast(data.mensaje || 'Centro de Costos guardado correctamente.', 'success');
+      limpiarFormularioCentroCosto();
+      cargarCentrosCostosPanel();
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Error al guardar el Centro de Costos.', 'error');
+    }
+  }
+
+  async function eliminarCentroCosto(id, nombre) {
+    if (!confirm(`¿Eliminar el Centro de Costos "${nombre}"?`)) return;
+    try {
+      const res = await fetch(`/operaciones/centros-costos/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo eliminar el Centro de Costos.');
+      showToast(data.mensaje || 'Centro de Costos eliminado correctamente.', 'success');
+      cargarCentrosCostosPanel();
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Error al eliminar el Centro de Costos.', 'error');
+    }
+  }
+
+  function formatNum(val, dec = 1) {
+    if (val === null || val === undefined || val === '') return '0.0';
+    const n = parseFloat(val);
+    if (isNaN(n)) return '0.0';
+    return n.toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+
+  function parseInputNumber(val) {
+    if (!val) return 0;
+    const s = String(val).replace(/\s+/g, '').replace(',', '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function setHeaderDate() {
+    const badge = document.getElementById('current-date-badge');
+    if (!badge) return;
+    badge.textContent = new Date().toLocaleDateString('es-AR');
+  }
+
+  async function cargarMetadata() {
+    const selEquipos = document.getElementById('inp-ci');
+    if (selEquipos) {
+      selEquipos.innerHTML = '<option value="">Cargando equipos...</option>';
+      selEquipos.disabled = true;
+    }
+
+    try {
+      const res = await fetch('/operaciones/metadata');
+      if (!res.ok) throw new Error('Error al cargar metadatos de operaciones');
+      const data = await res.json();
+      state.metadata = data;
+
+      const segEmpresa = document.getElementById('seg-empresa');
+      const segCuit = document.getElementById('seg-cuit');
+      if (segEmpresa) {
+        const listaEmpresas = document.getElementById('seg-empresas');
+        if (listaEmpresas) listaEmpresas.innerHTML = '';
+        (data.clientes_catalogo || []).forEach(cliente => {
+          const option = document.createElement('option');
+          option.value = cliente.display || `${cliente.codigo} - ${cliente.nombre}`;
+          if (listaEmpresas) listaEmpresas.appendChild(option);
+        });
+        const actualizarCuit = () => {
+          const cliente = (data.clientes_catalogo || []).find(item =>
+            item.codigo === segEmpresa.value || item.display === segEmpresa.value
+          );
+          if (segCuit) segCuit.value = cliente ? (cliente.cuit || '') : '';
+        };
+        segEmpresa.addEventListener('input', actualizarCuit);
+        segEmpresa.addEventListener('change', actualizarCuit);
+      }
+
+      const selClienteCentro = document.getElementById('inp-centro-costo-cliente');
+      if (selClienteCentro) {
+        selClienteCentro.innerHTML = '<option value="">-- Seleccione cliente --</option>';
+        (data.clientes_catalogo || []).forEach(cliente => {
+          const option = document.createElement('option');
+          option.value = cliente.codigo;
+          option.textContent = cliente.display || `${cliente.codigo} - ${cliente.nombre}`;
+          selClienteCentro.appendChild(option);
+        });
+      }
+
+      // Poblar Select Equipos
+      selEquipos.innerHTML = '<option value="">-- Seleccione equipo --</option>';
+      data.equipos.forEach(eq => {
+        const opt = document.createElement('option');
+        opt.value = eq.ci;
+        opt.textContent = eq.display || eq.ci;
+        selEquipos.appendChild(opt);
+      });
+      selEquipos.disabled = false;
+
+      // Poblar sugerencias de Maquinistas por nombre o legajo
+      renderMaquinistasDatalist('');
+
+      // Poblar exclusivamente Centros de Costos
+      renderCentrosCostosDatalist('');
+
+      const segCentroCosto = document.getElementById('seg-centro-costo');
+      if (segCentroCosto) {
+        const listaCentrosCostos = document.getElementById('seg-centros-costos');
+        if (listaCentrosCostos) listaCentrosCostos.innerHTML = '';
+        (data.centros_costos || []).forEach(centro => {
+          const option = document.createElement('option');
+          option.value = centro;
+          if (listaCentrosCostos) listaCentrosCostos.appendChild(option);
+        });
+      }
+
+      // Poblar exclusivamente Clientes importados
+      renderClientesDatalist('');
+
+      // Poblar firmas históricas de supervisores de cliente
+      renderFirmasSupervisoresDatalist('');
+
+      // Poblar supervisor de turno SMG con empleados activos
+      const selControlSupervisor = document.getElementById('inp-control-supervisor');
+      selControlSupervisor.innerHTML = '<option value="">-- Seleccione empleado activo --</option>';
+      data.maquinistas.forEach(persona => {
+        const option = document.createElement('option');
+        option.value = persona.nombre || '';
+        option.textContent = persona.legajo ? `${persona.nombre} (${persona.legajo})` : persona.nombre;
+        selControlSupervisor.appendChild(option);
+      });
+
+      // Poblar Datalist Acoplados
+      const dlAcop = document.getElementById('dl-acoplados');
+      dlAcop.innerHTML = '';
+      data.acoplados.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a;
+        dlAcop.appendChild(opt);
+      });
+
+      state.metadata.no_programadas_opciones = data.no_programadas_opciones || ['RM', 'RED', 'LOG', 'MO'];
+      actualizarOpcionesNoProgramadas();
+
+      // Arranque limpio: no seleccionar equipo por defecto
+      selEquipos.value = '';
+      state.equipoSeleccionado = '';
+      const titleEl = document.getElementById('historial-title');
+      const subEl = document.getElementById('historial-subtitle');
+      if (titleEl) titleEl.textContent = 'Historial de Partes – Seleccione un Equipo';
+      if (subEl) subEl.textContent = 'Últimos registros. Selecciona un período para filtrar.';
+
+    } catch (err) {
+      console.error(err);
+      if (selEquipos) {
+        selEquipos.innerHTML = '<option value="">No se pudieron cargar equipos</option>';
+        selEquipos.disabled = true;
+      }
+      showToast('No se pudieron cargar los datos iniciales de equipos y listas.', 'error');
+    }
+  }
+
+  function renderMaquinistasDatalist(filtro = '') {
+    const dlMaq = document.getElementById('dl-maquinistas');
+    if (!dlMaq) return;
+
+    const query = (filtro || '').trim().toLowerCase();
+    const items = !query
+      ? state.metadata.maquinistas
+      : state.metadata.maquinistas.filter(m => {
+          const nombre = (m.nombre || '').trim().toLowerCase();
+          const legajo = (m.legajo || '').trim().toLowerCase();
+          return nombre.includes(query) || legajo.includes(query) || `${legajo} ${nombre}`.includes(query);
+        });
+
+    dlMaq.innerHTML = '';
+    items.forEach(m => {
+      const opt = document.createElement('option');
+      const label = m.legajo ? `${m.legajo} - ${m.nombre}` : m.nombre;
+      opt.value = label;
+      opt.dataset.legajo = m.legajo || '';
+      opt.dataset.nombre = m.nombre || '';
+      dlMaq.appendChild(opt);
+    });
+  }
+
+  function renderCentrosCostosDatalist(filtro = '') {
+    const datalist = document.getElementById('dl-centros-costos');
+    if (!datalist) return;
+
+    const query = (filtro || '').trim().toLowerCase();
+    const centros = (state.metadata.centros_costos || []).filter(centro => {
+      const valor = String(centro || '').trim();
+      return !query || valor.toLowerCase().includes(query);
+    });
+
+    datalist.innerHTML = '';
+    centros.forEach(centro => {
+      const option = document.createElement('option');
+      option.value = centro;
+      datalist.appendChild(option);
+    });
+  }
+
+  function centroCostoSeleccionado(valor) {
+    const texto = (valor || '').trim().toLowerCase();
+    const centro = (state.metadata.centros_costos || []).find(item => {
+      return String(item || '').trim().toLowerCase() === texto;
+    });
+    return centro ? String(centro).trim() : '';
+  }
+
+
+  function renderClientesDatalist(filtro = '') {
+    const datalist = document.getElementById('dl-clientes');
+    if (!datalist) return;
+
+    const query = (filtro || '').trim().toLowerCase();
+    const clientes = (state.metadata.clientes || []).filter(cliente => {
+      const valor = String(cliente || '').trim();
+      return !query || valor.toLowerCase().includes(query);
+    });
+
+    datalist.innerHTML = '';
+    clientes.forEach(cliente => {
+      const option = document.createElement('option');
+      option.value = cliente;
+      datalist.appendChild(option);
+    });
+  }
+
+  function clienteSeleccionado(valor) {
+    const texto = (valor || '').trim().toLowerCase();
+    const cliente = (state.metadata.clientes || []).find(item => {
+      return String(item || '').trim().toLowerCase() === texto;
+    });
+    return cliente ? String(cliente).trim() : '';
+  }
+  function actualizarOpcionesNoProgramadas(valorSeleccionado = '') {
+    const select = document.getElementById('inp-no-programadas');
+    const horasReparaciones = parseInputNumber(document.getElementById('inp-hs-reparaciones').value);
+    const habilitado = horasReparaciones > 0;
+    const opciones = state.metadata.no_programadas_opciones || ['RM', 'RED', 'LOG', 'MO'];
+
+    select.innerHTML = habilitado
+      ? '<option value="">-- Seleccione código --</option>'
+      : '<option value="">-- Disponible con horas de reparaciones --</option>';
+    opciones.forEach(codigo => {
+      const option = document.createElement('option');
+      option.value = codigo;
+      option.textContent = codigo;
+      select.appendChild(option);
+    });
+    select.disabled = !habilitado;
+    select.value = habilitado ? (valorSeleccionado || '') : '';
+  }
+
+  function renderFirmasSupervisoresDatalist(filtro = '') {
+    const datalist = document.getElementById('dl-firmas-supervisores');
+    if (!datalist) return;
+
+    const query = (filtro || '').trim().toLowerCase();
+    const firmas = (state.metadata.firmas_supervisores || []).filter(firma => {
+      const valor = String(firma || '').trim();
+      return !query || valor.toLowerCase().includes(query);
+    });
+
+    datalist.innerHTML = '';
+    firmas.forEach(firma => {
+      const option = document.createElement('option');
+      option.value = firma;
+      datalist.appendChild(option);
+    });
+  }
+
+  function resolverMaquinistaSeleccionado(valor) {
+    const texto = (valor || '').trim();
+    if (!texto) return { nombre: '', legajo: '' };
+
+    const normalized = texto.toLowerCase();
+    const item = state.metadata.maquinistas.find(m => {
+      const nombre = (m.nombre || '').trim();
+      const legajo = (m.legajo || '').trim();
+      return nombre.toLowerCase() === normalized ||
+        legajo.toLowerCase() === normalized ||
+        `${legajo} - ${nombre}`.toLowerCase() === normalized ||
+        nombre.toLowerCase().includes(normalized) ||
+        legajo.toLowerCase().includes(normalized) ||
+        `${legajo} ${nombre}`.toLowerCase().includes(normalized);
+    });
+
+    if (item) {
+      return { nombre: item.nombre || '', legajo: item.legajo || '' };
+    }
+
+    const separador = texto.indexOf(' - ');
+    if (separador > 0) {
+      const legajo = texto.slice(0, separador).trim();
+      const nombre = texto.slice(separador + 3).trim();
+      const match = state.metadata.maquinistas.find(m => {
+        return (m.legajo || '').trim().toLowerCase() === legajo.toLowerCase() && (m.nombre || '').trim().toLowerCase() === nombre.toLowerCase();
+      });
+      if (match) {
+        return { nombre: match.nombre || nombre, legajo: match.legajo || legajo };
+      }
+    }
+
+    return { nombre: texto, legajo: '' };
+  }
+
+  // Cálculos automáticos de Horómetro y Kilómetros
+  function recalcularTotales() {
+    const hsIni = parseInputNumber(document.getElementById('inp-hs-inicio').value);
+    const hsFin = parseInputNumber(document.getElementById('inp-hs-final').value);
+    const totalHsInput = document.getElementById('inp-total-hs');
+    
+    if (hsFin > 0 && hsFin >= hsIni) {
+      totalHsInput.value = String(hsFin - hsIni);
+    } else if (hsFin > 0 && hsFin < hsIni) {
+      totalHsInput.value = '0.0';
+    }
+
+    const horasReales = [
+      parseInputNumber(totalHsInput.value),
+      parseInputNumber(document.getElementById('inp-hs-desplazamiento').value),
+      parseInputNumber(document.getElementById('inp-hs-mantenimiento').value),
+      parseInputNumber(document.getElementById('inp-hs-reparaciones').value),
+      parseInputNumber(document.getElementById('inp-hs-disposicion').value)
+    ].reduce((total, valor) => total + valor, 0);
+    document.getElementById('inp-hs-reales').value = horasReales.toFixed(1);
+
+    const kmIni = parseInputNumber(document.getElementById('inp-km-inicio').value);
+    const kmFin = parseInputNumber(document.getElementById('inp-km-final').value);
+    const totalKmInput = document.getElementById('inp-km-total');
+
+    if (kmFin > 0 && kmFin >= kmIni) {
+      totalKmInput.value = String(kmFin - kmIni);
+    } else if (kmFin > 0 && kmFin < kmIni) {
+      totalKmInput.value = '0.0';
+    }
+  }
+
+  // Al cambiar el equipo seleccionado en el formulario o filtro
+  function seleccionarEquipo(ci) {
+    state.equipoSeleccionado = ci;
+    state.ultimoHorometro = null;
+    state.ultimoHorometroCi = ci || '';
+    state.advertenciaHorometroMostrada = false;
+    ocultarAdvertenciaHorometro();
+    state.ultimoKilometro = null;
+    state.ultimoKilometroCi = ci || '';
+    state.advertenciaKilometroMostrada = false;
+    ocultarAdvertenciaKilometro();
+    const selEquipos = document.getElementById('inp-ci');
+    if (selEquipos && selEquipos.value !== ci) {
+      selEquipos.value = ci;
+    }
+
+    const equipoObj = state.metadata.equipos.find(e => e.ci.toUpperCase() === (ci || '').toUpperCase());
+    const desc = equipoObj ? (equipoObj.display || equipoObj.ci) : ci;
+    const equipoSeleccionado = document.getElementById('equipo-seleccionado-display');
+    if (equipoSeleccionado) {
+      equipoSeleccionado.textContent = ci ? `Equipo seleccionado: ${desc}` : '';
+      equipoSeleccionado.hidden = !ci;
+    }
+
+    const titleEl = document.getElementById('historial-title');
+    const subEl = document.getElementById('historial-subtitle');
+    if (ci) {
+      titleEl.textContent = `Historial de Partes – Equipo: ${desc}`;
+      subEl.textContent = `Últimos registros del equipo ${ci}. Selecciona un período para filtrar.`;
+    } else {
+      titleEl.textContent = 'Historial de Partes – Todos los Equipos';
+      subEl.textContent = 'Selecciona un equipo o período para filtrar.';
+    }
+
+    state.paginaActual = 1;
+    cargarHistorial();
+    cargarUltimoHorometro(ci);
+    cargarUltimoKilometro(ci);
+  }
+
+  async function cargarUltimoHorometro(ci) {
+    if (!ci) return;
+
+    try {
+      const params = new URLSearchParams({ ci });
+      const res = await fetch(`/operaciones/horas-maquinas/ultimo-horometro?${params.toString()}`);
+      if (!res.ok) throw new Error('No se pudo consultar el último horómetro.');
+      const data = await res.json();
+
+      if (state.ultimoHorometroCi !== ci) return;
+      state.ultimoHorometro = data.encontrado ? Number(data.hs_final) : null;
+      state.advertenciaHorometroMostrada = false;
+      compararHorometroInicial();
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  async function cargarUltimoKilometro(ci) {
+    if (!ci) return;
+
+    try {
+      const params = new URLSearchParams({ ci });
+      const res = await fetch(`/operaciones/horas-maquinas/ultimo-kilometro?${params.toString()}`);
+      if (!res.ok) throw new Error('No se pudo consultar el último kilómetro.');
+      const data = await res.json();
+
+      if (state.ultimoKilometroCi !== ci) return;
+      state.ultimoKilometro = data.encontrado ? Number(data.km_final) : null;
+      state.advertenciaKilometroMostrada = false;
+      compararKilometroInicial();
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  function compararHorometroInicial() {
+    const advertencia = document.getElementById('advertencia-horometro');
+    const valorInicial = parseInputNumber(document.getElementById('inp-hs-inicio').value);
+    if (!advertencia) return;
+    if (state.ultimoHorometro === null || !valorInicial) {
+      ocultarAdvertenciaHorometro();
+      return;
+    }
+
+    if (valorInicial !== state.ultimoHorometro) {
+      state.advertenciaHorometroMostrada = true;
+      advertencia.textContent = `ADVERTENCIA: el horómetro inicial (${valorInicial}) no coincide con el último horómetro final registrado (${state.ultimoHorometro}). Corrija el valor o guarde el registro para continuar.`;
+      advertencia.hidden = false;
+    } else {
+      state.advertenciaHorometroMostrada = false;
+      ocultarAdvertenciaHorometro();
+    }
+  }
+
+  function ocultarAdvertenciaHorometro() {
+    const advertencia = document.getElementById('advertencia-horometro');
+    if (advertencia) {
+      advertencia.hidden = true;
+      advertencia.textContent = '';
+    }
+  }
+
+  function compararKilometroInicial() {
+    const advertencia = document.getElementById('advertencia-kilometro');
+    const valorInicial = parseInputNumber(document.getElementById('inp-km-inicio').value);
+    if (!advertencia) return;
+    if (state.ultimoKilometro === null || !valorInicial) {
+      ocultarAdvertenciaKilometro();
+      return;
+    }
+
+    if (valorInicial !== state.ultimoKilometro) {
+      state.advertenciaKilometroMostrada = true;
+      advertencia.textContent = `ADVERTENCIA: el kilómetro inicial (${valorInicial}) no coincide con el último kilómetro final registrado (${state.ultimoKilometro}). Corrija el valor o guarde el registro para continuar.`;
+      advertencia.hidden = false;
+    } else {
+      state.advertenciaKilometroMostrada = false;
+      ocultarAdvertenciaKilometro();
+    }
+  }
+
+  function ocultarAdvertenciaKilometro() {
+    const advertencia = document.getElementById('advertencia-kilometro');
+    if (advertencia) {
+      advertencia.hidden = true;
+      advertencia.textContent = '';
+    }
+  }
+
+  // Manejo de Períodos
+  function aplicarPresetPeriodo(preset) {
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().slice(0, 10);
+    let desde = '';
+    let hasta = hoyStr;
+
+    if (preset === 'hoy') {
+      desde = hoyStr;
+      hasta = hoyStr;
+    } else if (preset === 'ultimos_7') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      desde = d.toISOString().slice(0, 10);
+    } else if (preset === 'ultimos_30_dias') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      desde = d.toISOString().slice(0, 10);
+    } else if (preset === 'mes_actual') {
+      const y = hoy.getFullYear();
+      const m = String(hoy.getMonth() + 1).padStart(2, '0');
+      desde = `${y}-${m}-01`;
+      const lastDay = new Date(y, hoy.getMonth() + 1, 0).getDate();
+      hasta = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    } else if (preset === 'mes_anterior') {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      desde = `${y}-${m}-01`;
+      const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+      hasta = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    } else if (preset === 'trimestre_actual') {
+      const currentQuarter = Math.floor(hoy.getMonth() / 3);
+      const firstMonth = currentQuarter * 3;
+      const y = hoy.getFullYear();
+      desde = `${y}-${String(firstMonth + 1).padStart(2, '0')}-01`;
+      const lastMonth = firstMonth + 2;
+      const lastDay = new Date(y, lastMonth + 1, 0).getDate();
+      hasta = `${y}-${String(lastMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    } else if (preset === 'anio_actual') {
+      const y = hoy.getFullYear();
+      desde = `${y}-01-01`;
+      hasta = `${y}-12-31`;
+    } else if (preset === 'ultimos_30') {
+      desde = '';
+      hasta = '';
+    }
+
+    document.getElementById('filtro-fecha-desde').value = desde;
+    document.getElementById('filtro-fecha-hasta').value = hasta;
+    state.fechaDesde = desde;
+    state.fechaHasta = hasta;
+  }
+
+  // Cargar Historial de Horas Máquinas con Filtros y Paginación
+  async function cargarHistorial() {
+    const tbody = document.getElementById('tabla-body-partes');
+    tbody.innerHTML = `
+      <tr>
+          <td colspan="31" style="text-align: center; padding: 24px; color: #38bdf8;">
+          <svg style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+          Cargando registros del historial...
+        </td>
+      </tr>
+    `;
+
+    try {
+      const params = new URLSearchParams();
+      if (state.equipoSeleccionado) params.append('ci', state.equipoSeleccionado);
+      if (state.fechaDesde) params.append('fecha_desde', state.fechaDesde);
+      if (state.fechaHasta) params.append('fecha_hasta', state.fechaHasta);
+      if (state.busqueda) params.append('q', state.busqueda);
+      params.append('page', state.paginaActual);
+      params.append('limit', state.limite);
+
+      const res = await fetch(`/operaciones/horas-maquinas?${params.toString()}`);
+      if (!res.ok) throw new Error('Error al obtener registros de horas_maquinas');
+      const resData = await res.json();
+
+      state.totalRegistros = resData.total || 0;
+      state.totalPaginas = resData.total_pages || 1;
+      state.paginaActual = resData.page || 1;
+
+      renderTabla(resData.data || []);
+      renderPaginacion();
+
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="31" style="text-align: center; padding: 24px; color: #f87171;">
+            Error al consultar el historial de horas_maquinas.
+          </td>
+        </tr>
+      `;
+      showToast('Error al consultar el historial del equipo.', 'error');
+    }
+  }
+
+  // Renderizado de Filas de la Tabla
+  function renderTabla(filas) {
+    const tbody = document.getElementById('tabla-body-partes');
+    if (!filas || filas.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="31" style="text-align: center; padding: 30px; color: #94a3b8;">
+            No se encontraron partes diarios para el criterio de búsqueda seleccionado.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const startIdx = (state.paginaActual - 1) * state.limite;
+    tbody.innerHTML = filas.map((row, idx) => {
+      const turnoClass = (row.turno || '').toLowerCase().includes('noche') ? 'badge-turno-noche' : 'badge-turno-dia';
+      const turnoBadge = row.turno ? `<span class="badge-turno ${turnoClass}">${row.turno}</span>` : '--';
+      const obraProy = [row.obra, row.proyecto].filter(Boolean).join(' - ') || '--';
+      const maquinistaNoRegistrado = !String(row.legajo_empleado || '').trim() &&
+        String(row.maquinista || '').trim() && !String(row.control || '').trim();
+      const estiloMaquinista = maquinistaNoRegistrado ? 'color: #ef4444; font-weight: 700;' : '';
+
+      return `
+        <tr>
+          <td class="text-center" style="color: #94a3b8;">${startIdx + idx + 1}</td>
+          <td><strong style="color: #38bdf8;">${row.ci || '--'}</strong></td>
+          <td>${row.fecha_parte || '--'}</td>
+          <td><strong>${row.nro_parte || '--'}</strong></td>
+          <td>${row.legajo_empleado || '--'}</td>
+          <td style="${estiloMaquinista}">${row.maquinista || '--'}</td>
+          <td title="${obraProy}"><div class="cell-desc" style="max-width: 180px;">${obraProy}</div></td>
+          <td title="${row.descripcion_trabajos || ''}"><div class="cell-desc">${row.descripcion_trabajos || '--'}</div></td>
+          <td class="text-center">${turnoBadge}</td>
+          <td>${row.acoplado || '--'}</td>
+          <td>${row.cliente || '--'}</td>
+          <td>${row.orden_compra || '--'}</td>
+          <td class="text-right">${formatNum(row.hs_inicio, 0)}</td>
+          <td class="text-right">${formatNum(row.hs_final, 0)}</td>
+          <td class="text-right"><strong style="color: #38bdf8;">${formatNum(row.total_hs, 0)}</strong></td>
+          <td class="text-right">${formatNum(row.km_inicio, 0)}</td>
+          <td class="text-right">${formatNum(row.km_final, 0)}</td>
+          <td class="text-right"><strong style="color: #22c55e;">${formatNum(row.km_total, 0)}</strong></td>
+          <td class="text-right">${row.viajes || 0}</td>
+          <td class="text-right">${formatNum(row.gasoil, 1)}</td>
+          <td class="text-right">${formatNum(row.aceite, 1)}</td>
+          <td title="${row.novedades || ''}"><div class="cell-desc" style="max-width: 150px;">${row.novedades || '--'}</div></td>
+          <td>${row.firma_parte || '--'}</td>
+          <td>${row.control_supervisor || '--'}</td>
+          <td class="text-right">${formatNum(row.hs_desplazamiento, 1)}</td>
+          <td class="text-right">${formatNum(row.hs_mantenimiento, 1)}</td>
+          <td class="text-right">${formatNum(row.hs_reparaciones, 1)}</td>
+          <td class="text-right">${formatNum(row.hs_disposicion, 1)}</td>
+          <td class="text-right">${formatNum(row.total_hs_control, 1)}</td>
+          <td class="text-right">${formatNum(row.no_programadas, 1)}</td>
+          <td class="text-center">
+            <div class="row-actions">
+              <button type="button" class="btn-action" ${row.control ? `disabled title="Controlado por ${row.control}" style="color: #22c55e; cursor: default;"` : `title="Marcar como controlado" onclick="controlarParte(${row.id}, '${row.nro_parte || row.id}')"`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </button>
+              <button type="button" class="btn-action" title="Ver detalle" onclick="verDetalleParte(${row.id})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+              <button type="button" class="btn-action" title="Editar parte" onclick="editarParte(${row.id})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+              </button>
+              <button type="button" class="btn-action btn-del" title="Eliminar parte" onclick="confirmarEliminarParte(${row.id}, '${row.nro_parte || row.id}', '${row.ci || ''}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Renderizado de Paginación
+  function renderPaginacion() {
+    const container = document.getElementById('pagination-controls');
+    const resumen = document.getElementById('paginacion-resumen');
+
+    const startIdx = state.totalRegistros === 0 ? 0 : (state.paginaActual - 1) * state.limite + 1;
+    const endIdx = Math.min(state.totalRegistros, state.paginaActual * state.limite);
+    resumen.textContent = `Mostrando ${startIdx} a ${endIdx} de ${state.totalRegistros} registros`;
+
+    let html = '';
+    html += `<button type="button" class="page-btn" ${state.paginaActual <= 1 ? 'disabled' : ''} onclick="cambiarPagina(1)" title="Primera página">«</button>`;
+    html += `<button type="button" class="page-btn" ${state.paginaActual <= 1 ? 'disabled' : ''} onclick="cambiarPagina(${state.paginaActual - 1})" title="Página anterior">‹</button>`;
+
+    const total = state.totalPaginas;
+    const cur = state.paginaActual;
+    let startPage = Math.max(1, cur - 2);
+    let endPage = Math.min(total, cur + 2);
+
+    if (startPage > 1) {
+      html += `<button type="button" class="page-btn" onclick="cambiarPagina(1)">1</button>`;
+      if (startPage > 2) html += `<span style="padding: 0 4px; color: #64748b;">...</span>`;
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+      html += `<button type="button" class="page-btn ${p === cur ? 'active' : ''}" onclick="cambiarPagina(${p})">${p}</button>`;
+    }
+
+    if (endPage < total) {
+      if (endPage < total - 1) html += `<span style="padding: 0 4px; color: #64748b;">...</span>`;
+      html += `<button type="button" class="page-btn" onclick="cambiarPagina(${total})">${total}</button>`;
+    }
+
+    html += `<button type="button" class="page-btn" ${state.paginaActual >= total ? 'disabled' : ''} onclick="cambiarPagina(${state.paginaActual + 1})" title="Página siguiente">›</button>`;
+    html += `<button type="button" class="page-btn" ${state.paginaActual >= total ? 'disabled' : ''} onclick="cambiarPagina(${total})" title="Última página">»</button>`;
+
+    container.innerHTML = html;
+  }
+
+  function cambiarPagina(p) {
+    if (p < 1 || p > state.totalPaginas || p === state.paginaActual) return;
+    state.paginaActual = p;
+    cargarHistorial();
+  }
+
+  // Limpiar Formulario
+  function limpiarFormulario() {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('inp-nro-parte').value = '';
+    document.getElementById('inp-maquinista').value = '';
+    document.getElementById('inp-obra-proyecto').value = '';
+    document.getElementById('inp-cliente').value = '';
+    document.getElementById('inp-orden-compra').value = '';
+    document.getElementById('inp-hs-inicio').value = '';
+    state.advertenciaHorometroMostrada = false;
+    ocultarAdvertenciaHorometro();
+    state.advertenciaKilometroMostrada = false;
+    ocultarAdvertenciaKilometro();
+    document.getElementById('inp-hs-final').value = '';
+    document.getElementById('inp-total-hs').value = '';
+    document.getElementById('inp-km-inicio').value = '';
+    document.getElementById('inp-km-final').value = '';
+    document.getElementById('inp-km-total').value = '';
+    document.getElementById('inp-hs-reales').value = '';
+    document.getElementById('inp-hs-desplazamiento').value = '';
+    document.getElementById('inp-hs-mantenimiento').value = '';
+    document.getElementById('inp-hs-reparaciones').value = '';
+    document.getElementById('inp-hs-disposicion').value = '';
+    actualizarOpcionesNoProgramadas();
+    document.getElementById('inp-viajes').value = '';
+    document.getElementById('inp-gasoil').value = '';
+    document.getElementById('inp-aceite').value = '';
+    document.getElementById('inp-acoplado').value = '';
+    document.getElementById('inp-turno').value = 'Día';
+    document.getElementById('inp-descripcion-trabajos').value = '';
+    document.getElementById('inp-novedades').value = '';
+    document.getElementById('inp-firma-parte').value = '';
+    document.getElementById('inp-control-supervisor').value = '';
+
+    document.getElementById('inp-fecha-parte').value = new Date().toISOString().slice(0, 10);
+
+    if (state.equipoSeleccionado) {
+      document.getElementById('inp-ci').value = state.equipoSeleccionado;
+    }
+
+    state.modoEdicion = false;
+    document.getElementById('form-title-text').textContent = '';
+    document.getElementById('btn-submit-label').textContent = 'Cargar Parte';
+  }
+
+  // Enviar Formulario (Crear / Actualizar)
+  async function guardarParte() {
+    const editId = document.getElementById('edit-id').value;
+    const ci = document.getElementById('inp-ci').value.trim();
+    const fechaParte = document.getElementById('inp-fecha-parte').value.trim();
+    const nroParte = document.getElementById('inp-nro-parte').value.trim();
+    const maquinistaInput = document.getElementById('inp-maquinista');
+    const maquinistaSeleccionado = resolverMaquinistaSeleccionado(maquinistaInput.value);
+    const maquinista = maquinistaSeleccionado.nombre.trim();
+    const legajo = maquinistaSeleccionado.legajo.trim();
+    const obraProy = centroCostoSeleccionado(document.getElementById('inp-obra-proyecto').value);
+    const cliente = clienteSeleccionado(document.getElementById('inp-cliente').value);
+    const descripcion = document.getElementById('inp-descripcion-trabajos').value.trim();
+
+    // Validaciones
+    if (!ci) { showToast('Debe seleccionar el Código Interno del Equipo (CI).', 'error'); return; }
+    if (!fechaParte) { showToast('La Fecha de Parte es obligatoria.', 'error'); return; }
+    if (!nroParte) { showToast('El Nº de Parte es obligatorio.', 'error'); return; }
+    if (!maquinista) { showToast('Debe seleccionar un Maquinista.', 'error'); return; }
+    if (!obraProy) { showToast('Debe seleccionar un Centro de Costos válido.', 'error'); return; }
+    if (!cliente) { showToast('Debe seleccionar un Cliente válido.', 'error'); return; }
+    if (!descripcion) { showToast('La Descripción de Trabajos Realizados es obligatoria.', 'error'); return; }
+
+    const hsIni = parseInputNumber(document.getElementById('inp-hs-inicio').value);
+    const hsFin = parseInputNumber(document.getElementById('inp-hs-final').value);
+    if (hsFin > 0 && hsFin < hsIni) {
+      showToast('Advertencia: El Horómetro Final no puede ser menor al Inicial.', 'error');
+      return;
+    }
+
+    const kmIni = parseInputNumber(document.getElementById('inp-km-inicio').value);
+    const kmFin = parseInputNumber(document.getElementById('inp-km-final').value);
+    if (kmFin > 0 && kmFin < kmIni) {
+      showToast('Advertencia: El Kilómetro Final no puede ser menor al Inicial.', 'error');
+      return;
+    }
+
+    const payload = {
+      ci: ci,
+      fecha_parte: fechaParte,
+      nro_parte: nroParte,
+      legajo_empleado: legajo,
+      maquinista: maquinista,
+      obra: obraProy,
+      proyecto: obraProy,
+      descripcion_trabajos: descripcion,
+      turno: document.getElementById('inp-turno').value,
+      acoplado: document.getElementById('inp-acoplado').value.trim(),
+      cliente: cliente,
+      orden_compra: document.getElementById('inp-orden-compra').value.trim(),
+      hs_inicio: hsIni,
+      hs_final: hsFin,
+      total_hs: parseInputNumber(document.getElementById('inp-total-hs').value),
+      km_inicio: kmIni,
+      km_final: kmFin,
+      km_total: parseInputNumber(document.getElementById('inp-km-total').value),
+      hs_reales: parseInputNumber(document.getElementById('inp-hs-reales').value),
+      hs_desplazamiento: parseInputNumber(document.getElementById('inp-hs-desplazamiento').value),
+      hs_mantenimiento: parseInputNumber(document.getElementById('inp-hs-mantenimiento').value),
+      hs_reparaciones: parseInputNumber(document.getElementById('inp-hs-reparaciones').value),
+      hs_disposicion: parseInputNumber(document.getElementById('inp-hs-disposicion').value),
+      no_programadas: document.getElementById('inp-no-programadas').value,
+      viajes: parseInputNumber(document.getElementById('inp-viajes').value),
+      gasoil: parseInputNumber(document.getElementById('inp-gasoil').value),
+      aceite: parseInputNumber(document.getElementById('inp-aceite').value),
+      novedades: document.getElementById('inp-novedades').value.trim(),
+      firma_parte: document.getElementById('inp-firma-parte').value.trim(),
+      control_supervisor: document.getElementById('inp-control-supervisor').value
+    };
+
+    const submitBtn = document.getElementById('btn-submit-form');
+    submitBtn.disabled = true;
+
+    try {
+      const url = editId ? `/operaciones/horas-maquinas/${editId}` : '/operaciones/horas-maquinas';
+      const method = editId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Error al guardar el parte diario.');
+      }
+
+      showToast(data.mensaje || 'Parte diario guardado exitosamente.', 'success');
+      limpiarFormulario();
+      seleccionarEquipo(ci);
+
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Error al guardar el parte diario.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+
+  // Editar Parte (Carga en el formulario superior)
+  async function editarParte(idParte) {
+    try {
+      const res = await fetch(`/operaciones/horas-maquinas/${idParte}`);
+      if (!res.ok) throw new Error('No se pudo cargar el registro a editar.');
+      const resData = await res.json();
+      const d = resData.data;
+
+      document.getElementById('edit-id').value = d.id;
+      seleccionarEquipo(d.ci || '');
+      document.getElementById('inp-fecha-parte').value = d.fecha_parte || '';
+      document.getElementById('inp-nro-parte').value = d.nro_parte || '';
+      
+      const maquinistaInput = document.getElementById('inp-maquinista');
+      const nombreMaq = d.maquinista || '';
+      const legajoMaq = d.legajo_empleado || '';
+      maquinistaInput.value = legajoMaq ? `${legajoMaq} - ${nombreMaq}` : nombreMaq;
+      
+      document.getElementById('inp-obra-proyecto').value = d.obra || d.proyecto || '';
+      document.getElementById('inp-cliente').value = clienteSeleccionado(d.cliente) || d.cliente || '';
+      document.getElementById('inp-orden-compra').value = d.orden_compra || '';
+      document.getElementById('inp-hs-inicio').value = d.hs_inicio || '';
+      document.getElementById('inp-hs-final').value = d.hs_final || '';
+      document.getElementById('inp-total-hs').value = d.total_hs || '';
+      document.getElementById('inp-km-inicio').value = d.km_inicio || '';
+      document.getElementById('inp-km-final').value = d.km_final || '';
+      document.getElementById('inp-km-total').value = d.km_total || '';
+      
+      document.getElementById('inp-hs-desplazamiento').value = d.hs_desplazamiento || '';
+      document.getElementById('inp-hs-mantenimiento').value = d.hs_mantenimiento || '';
+      document.getElementById('inp-hs-reparaciones').value = d.hs_reparaciones || '';
+      document.getElementById('inp-hs-disposicion').value = d.hs_disposicion || '';
+      recalcularTotales();
+      actualizarOpcionesNoProgramadas(d.no_programadas || '');
+
+      document.getElementById('inp-viajes').value = d.viajes || '';
+      document.getElementById('inp-gasoil').value = d.gasoil || '';
+      document.getElementById('inp-aceite').value = d.aceite || '';
+      document.getElementById('inp-acoplado').value = d.acoplado || '';
+      document.getElementById('inp-turno').value = d.turno || 'Día';
+
+      document.getElementById('inp-descripcion-trabajos').value = d.descripcion_trabajos || '';
+      document.getElementById('inp-novedades').value = d.novedades || '';
+      document.getElementById('inp-firma-parte').value = d.firma_parte || '';
+      document.getElementById('inp-control-supervisor').value = d.control_supervisor || '';
+
+      state.modoEdicion = true;
+      document.getElementById('form-title-text').textContent = `Editar Parte Diario Nº ${d.nro_parte || d.id}`;
+      document.getElementById('btn-submit-label').textContent = 'Guardar Cambios';
+
+      document.getElementById('sector-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast(`Editando Parte Diario Nº ${d.nro_parte || d.id}`, 'info');
+
+    } catch (err) {
+      console.error(err);
+      showToast('Error al obtener datos para edición.', 'error');
+    }
+  }
+
+  // Ver Detalle Completo en Modal
+  async function verDetalleParte(idParte) {
+    try {
+      const res = await fetch(`/operaciones/horas-maquinas/${idParte}`);
+      if (!res.ok) throw new Error('No se pudo cargar el detalle del parte.');
+      const resData = await res.json();
+      const d = resData.data;
+
+      document.getElementById('modal-detalle-title').textContent = `Detalle de Parte Diario – Nº ${d.nro_parte || d.id} (Equipo ${d.ci})`;
+
+      const content = document.getElementById('modal-detalle-content');
+      content.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><span class="label">ID Registro</span><span class="val">${d.id}</span></div>
+          <div class="detail-item"><span class="label">Código Interno (CI)</span><span class="val" style="color: #38bdf8;">${d.ci || '--'}</span></div>
+          <div class="detail-item"><span class="label">Fecha de Parte</span><span class="val">${d.fecha_parte || '--'}</span></div>
+          <div class="detail-item"><span class="label">Nº de Parte</span><span class="val">${d.nro_parte || '--'}</span></div>
+          <div class="detail-item"><span class="label">Legajo Empleado</span><span class="val">${d.legajo_empleado || '--'}</span></div>
+          <div class="detail-item"><span class="label">Maquinista</span><span class="val">${d.maquinista || '--'}</span></div>
+          <div class="detail-item"><span class="label">Obra</span><span class="val">${d.obra || '--'}</span></div>
+          <div class="detail-item"><span class="label">Proyecto</span><span class="val">${d.proyecto || '--'}</span></div>
+          <div class="detail-item"><span class="label">Cliente</span><span class="val">${d.cliente || '--'}</span></div>
+          <div class="detail-item"><span class="label">Orden de Compra</span><span class="val">${d.orden_compra || '--'}</span></div>
+          <div class="detail-item"><span class="label">Turno</span><span class="val">${d.turno || '--'}</span></div>
+          <div class="detail-item"><span class="label">Acoplado</span><span class="val">${d.acoplado || '--'}</span></div>
+        </div>
+
+        <div class="detail-grid" style="margin-top: 6px;">
+          <div class="detail-item"><span class="label">Horómetro Inicio</span><span class="val">${formatNum(d.hs_inicio, 0)}</span></div>
+          <div class="detail-item"><span class="label">Horómetro Final</span><span class="val">${formatNum(d.hs_final, 0)}</span></div>
+          <div class="detail-item"><span class="label">Total Horas</span><span class="val" style="color: #38bdf8;">${formatNum(d.total_hs, 0)}</span></div>
+          <div class="detail-item"><span class="label">Kilómetro Inicio</span><span class="val">${formatNum(d.km_inicio, 0)}</span></div>
+          <div class="detail-item"><span class="label">Kilómetro Final</span><span class="val">${formatNum(d.km_final, 0)}</span></div>
+          <div class="detail-item"><span class="label">Total Kilómetros</span><span class="val" style="color: #22c55e;">${formatNum(d.km_total, 0)}</span></div>
+        </div>
+
+        <div class="detail-grid" style="margin-top: 6px;">
+          <div class="detail-item"><span class="label">Total Viajes</span><span class="val">${d.viajes || 0}</span></div>
+          <div class="detail-item"><span class="label">Gasoil (Lts)</span><span class="val">${formatNum(d.gasoil, 1)}</span></div>
+          <div class="detail-item"><span class="label">Aceite (Lts)</span><span class="val">${formatNum(d.aceite, 1)}</span></div>
+          <div class="detail-item"><span class="label">Hs Desplazamiento</span><span class="val">${formatNum(d.hs_desplazamiento, 1)}</span></div>
+          <div class="detail-item"><span class="label">Hs Mantenimiento</span><span class="val">${formatNum(d.hs_mantenimiento, 1)}</span></div>
+          <div class="detail-item"><span class="label">Hs Reparaciones</span><span class="val">${formatNum(d.hs_reparaciones, 1)}</span></div>
+          <div class="detail-item"><span class="label">Hs a Disposición</span><span class="val">${formatNum(d.hs_disposicion, 1)}</span></div>
+          <div class="detail-item"><span class="label">Total HS Control</span><span class="val">${formatNum(d.total_hs_control, 1)}</span></div>
+          <div class="detail-item"><span class="label">No Programadas</span><span class="val">${d.no_programadas || '--'}</span></div>
+          <div class="detail-item"><span class="label">Firma Parte</span><span class="val">${d.firma_parte || '--'}</span></div>
+          <div class="detail-item"><span class="label">Certificado</span><span class="val">${d.certificado || '--'}</span></div>
+          <div class="detail-item"><span class="label">Control Supervisor</span><span class="val">${d.control_supervisor || '--'}</span></div>
+          <div class="detail-item"><span class="label">Controlado por</span><span class="val">${d.control || '--'}</span></div>
+        </div>
+
+        <div class="detail-block" style="margin-top: 6px;">
+          <span class="label">Descripción de Trabajos Realizados</span>
+          <div class="val">${d.descripcion_trabajos || 'Sin descripción'}</div>
+        </div>
+
+        <div class="detail-block">
+          <span class="label">Novedades</span>
+          <div class="val">${d.novedades || 'Sin novedades'}</div>
+        </div>
+      `;
+
+      document.getElementById('modal-detalle').classList.add('open');
+
+    } catch (err) {
+      console.error(err);
+      showToast('Error al obtener el detalle del parte.', 'error');
+    }
+  }
+
+  function cerrarModalDetalle() {
+    document.getElementById('modal-detalle').classList.remove('open');
+  }
+
+  // Eliminar Parte con Confirmación
+  function confirmarEliminarParte(id, nroParte, ci) {
+    state.idParaEliminar = id;
+    document.getElementById('eliminar-parte-info').textContent = `Parte Nº ${nroParte} (Equipo ${ci})`;
+    document.getElementById('modal-eliminar').classList.add('open');
+  }
+
+  function cerrarModalEliminar() {
+    state.idParaEliminar = null;
+    document.getElementById('modal-eliminar').classList.remove('open');
+  }
+
+  async function controlarParte(idParte, nroParte) {
+    if (!confirm(`¿Marcar como controlado el Parte Nº ${nroParte}?`)) return;
+
+    try {
+      const res = await fetch(`/operaciones/horas-maquinas/${idParte}/controlar`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al controlar el parte diario.');
+
+      showToast(data.mensaje || 'Parte diario controlado correctamente.', 'success');
+      cargarHistorial();
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Error al controlar el parte diario.', 'error');
+    }
+  }
+
+  async function ejecutarEliminarParte() {
+    if (!state.idParaEliminar) return;
+    try {
+      const res = await fetch(`/operaciones/horas-maquinas/${state.idParaEliminar}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al eliminar el parte.');
+
+      showToast(data.mensaje || 'Parte eliminado correctamente.', 'success');
+      cerrarModalEliminar();
+      cargarHistorial();
+
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Error al eliminar el parte diario.', 'error');
+    }
+  }
+
+  // Exportar Excel
+  function exportarExcel() {
+    const params = new URLSearchParams();
+    if (state.equipoSeleccionado) params.append('ci', state.equipoSeleccionado);
+    if (state.fechaDesde) params.append('fecha_desde', state.fechaDesde);
+    if (state.fechaHasta) params.append('fecha_hasta', state.fechaHasta);
+    if (state.busqueda) params.append('q', state.busqueda);
+
+    window.open(`/operaciones/horas-maquinas/exportar?${params.toString()}`, '_blank');
+  }
+
+  function segEsc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
+  function segInput(type, name, value = '', extra = '') {
+    return `<input type="${type}" data-seg-field="${name}" value="${segEsc(value)}" ${extra}>`;
+  }
+
+  function renderOrdenesCliente(ordenes = []) {
+    const body = document.getElementById('seg-ordenes-body');
+    if (!body) return;
+    const filas = ordenes.length ? ordenes : [{}];
+    body.innerHTML = filas.map((orden, index) => `
+      <tr data-seg-orden-row>
+        <td>${index + 1}</td>
+        <td>${segInput('text', 'orden_compra', orden.orden_compra)}</td>
+        <td>${segInput('text', 'revision', orden.revision)}</td>
+        <td>${segInput('date', 'otorgada', orden.otorgada)}</td>
+        <td>${segInput('date', 'vencimiento', orden.vencimiento)}</td>
+        <td>${segInput('text', 'moneda', orden.moneda)}</td>
+        <td>${segInput('number', 'monto_oc', orden.monto_oc || '', 'step="0.01"')}</td>
+        <td>${segInput('text', 'observaciones', orden.observaciones)}</td>
+        <td><button class="mini-btn" type="button" data-seg-remove-row title="Eliminar">&#10005;</button></td>
+      </tr>`).join('');
+  }
+
+  function renderItemsCliente(items = []) {
+    const body = document.getElementById('seg-items-body');
+    if (!body) return;
+    const filas = items.length ? items : [{}];
+    body.innerHTML = filas.map((item, index) => `
+      <tr data-seg-item-row>
+        <td>${index + 1}</td>
+        <td>${segInput('text', 'descripcion', item.descripcion)}</td>
+        <td>${segInput('text', 'unidad', item.unidad)}</td>
+        <td>${segInput('number', 'cantidad', item.cantidad || '', 'step="0.01" min="0"')}</td>
+        <td>${segInput('text', 'moneda', item.moneda)}</td>
+        <td>${segInput('number', 'precio', item.precio || '', 'step="0.01" min="0"')}</td>
+        <td>${segInput('number', 'total', item.total || '', 'step="0.01" min="0" readonly')}</td>
+        <td>${segInput('text', 'observacion', item.observacion)}</td>
+        <td><button class="mini-btn" type="button" data-seg-remove-row title="Eliminar">&#10005;</button></td>
+      </tr>`).join('');
+  }
+
+  function segRowHasData(row, fields) {
+    return fields.some(field => String(row.querySelector(`[data-seg-field="${field}"]`)?.value || '').trim() !== '');
+  }
+
+  function leerFilasSeguimiento(selector, fields) {
+    return Array.from(document.querySelectorAll(selector))
+      .filter(row => segRowHasData(row, fields))
+      .map(row => Object.fromEntries(fields.map(field => [
+        field, row.querySelector(`[data-seg-field="${field}"]`)?.value || ''
+      ])));
+  }
+
+  function actualizarTotalItem(row) {
+    const cantidad = parseInputNumber(row.querySelector('[data-seg-field="cantidad"]')?.value);
+    const precio = parseInputNumber(row.querySelector('[data-seg-field="precio"]')?.value);
+    const total = row.querySelector('[data-seg-field="total"]');
+    if (total) total.value = cantidad && precio ? (cantidad * precio).toFixed(2) : '';
+    actualizarResumenItemsCliente();
+  }
+
+  function actualizarResumenItemsCliente() {
+    const totalItems = Array.from(document.querySelectorAll('[data-seg-item-row]'))
+      .reduce((suma, row) => suma + parseInputNumber(row.querySelector('[data-seg-field="total"]')?.value), 0);
+    const totalOrdenes = Array.from(document.querySelectorAll('[data-seg-orden-row]'))
+      .reduce((suma, row) => suma + parseInputNumber(row.querySelector('[data-seg-field="monto_oc"]')?.value), 0);
+    const totalEl = document.getElementById('seg-items-total');
+    if (totalEl) {
+      totalEl.textContent = totalItems.toLocaleString('es-AR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+    const warning = document.getElementById('seg-total-warning');
+    if (warning) {
+      warning.classList.toggle('visible', Math.trunc(totalItems) !== Math.trunc(totalOrdenes));
+    }
+  }
+
+  function leerSeguimientoCliente() {
+    const ordenes = leerFilasSeguimiento('[data-seg-orden-row]', [
+      'orden_compra', 'revision', 'otorgada', 'vencimiento', 'moneda', 'monto_oc', 'observaciones'
+    ]);
+    const items = leerFilasSeguimiento('[data-seg-item-row]', [
+      'descripcion', 'unidad', 'cantidad', 'moneda', 'precio', 'total', 'observacion'
+    ]);
+    if (items.length && !ordenes.length) {
+      throw new Error('Debe cargar al menos una Orden de Compra antes de agregar ítems.');
+    }
+    if (ordenes.length) ordenes[0].items = items;
+    ordenes.slice(1).forEach(orden => { orden.items = []; });
+    return {
+      seguimiento_id: document.getElementById('seg-id').value || null,
+      centro_costo: document.getElementById('seg-centro-costo').value,
+      fecha_alta_servicio: document.getElementById('seg-fecha-alta').value,
+      cotizacion: document.getElementById('seg-cotizacion').value,
+      fecha_inicio: document.getElementById('seg-fecha-inicio').value,
+      fecha_final: document.getElementById('seg-fecha-final').value,
+      cantidad_certificados: document.getElementById('seg-certificados').value,
+      estado_seguimiento: document.getElementById('seg-estado').value,
+      condiciones_comerciales: document.getElementById('seg-condiciones').value,
+      ordenes
+    };
+  }
+
+  function cargarDatosSeguimientoCliente(data) {
+    const seguimiento = data.seguimiento || {};
+    document.getElementById('seg-id').value = seguimiento.id || '';
+    document.getElementById('seg-registro').value = seguimiento.id || '';
+    document.getElementById('seg-fecha-alta').value = seguimiento.fecha_alta_servicio || '';
+    document.getElementById('seg-cotizacion').value = seguimiento.cotizacion || '';
+    document.getElementById('seg-fecha-inicio').value = seguimiento.fecha_inicio || '';
+    document.getElementById('seg-fecha-final').value = seguimiento.fecha_final || '';
+    document.getElementById('seg-certificados').value = seguimiento.cantidad_certificados || 0;
+    document.getElementById('seg-estado').value = seguimiento.estado_seguimiento || 'En preparación';
+    document.getElementById('seg-condiciones').value = seguimiento.condiciones_comerciales || '';
+    const ordenes = data.ordenes || [];
+    renderOrdenesCliente(ordenes);
+    renderItemsCliente(ordenes.flatMap(orden => orden.items || []));
+    actualizarResumenItemsCliente();
+  }
+
+  async function cargarListaSeguimientosCliente(seleccionarId = '') {
+    const selector = document.getElementById('seg-registro');
+    if (!selector) return;
+    try {
+      const res = await fetch('/operaciones/seguimientos-cliente');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar los seguimientos.');
+      selector.innerHTML = '<option value="">Nuevo seguimiento</option>';
+      data.forEach((seguimiento) => {
+        const option = document.createElement('option');
+        option.value = seguimiento.id;
+        option.textContent = seguimiento.numero_seg;
+        selector.appendChild(option);
+      });
+      selector.value = seleccionarId ? String(seleccionarId) : '';
+    } catch (err) {
+      showToast(err.message || 'Error al cargar los seguimientos.', 'error');
+    }
+  }
+
+  function prepararNuevoSeguimientoCliente() {
+    document.getElementById('seg-id').value = '';
+    document.getElementById('seg-registro').value = '';
+    document.getElementById('seg-fecha-alta').value = '';
+    document.getElementById('seg-cotizacion').value = '';
+    document.getElementById('seg-fecha-inicio').value = '';
+    document.getElementById('seg-fecha-final').value = '';
+    document.getElementById('seg-certificados').value = 0;
+    document.getElementById('seg-estado').value = 'En preparación';
+    document.getElementById('seg-condiciones').value = '';
+    renderOrdenesCliente();
+    renderItemsCliente();
+    actualizarResumenItemsCliente();
+  }
+
+  async function cargarSeguimientoCliente() {
+    const id = document.getElementById('seg-id')?.value;
+    if (!id) {
+      renderOrdenesCliente();
+      renderItemsCliente();
+      return;
+    }
+    try {
+      const res = await fetch(`/operaciones/seguimiento-cliente/${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el seguimiento.');
+      cargarDatosSeguimientoCliente(data);
+    } catch (err) {
+      showToast(err.message || 'Error al cargar el seguimiento.', 'error');
+    }
+  }
+
+  async function guardarSeguimientoCliente() {
+    try {
+      const res = await fetch('/operaciones/seguimiento-cliente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leerSeguimientoCliente())
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo guardar el seguimiento.');
+      document.getElementById('seg-id').value = data.seguimiento_id || '';
+      await cargarListaSeguimientosCliente(data.seguimiento_id);
+      showToast(data.mensaje || 'Seguimiento guardado correctamente.', 'success');
+      await cargarSeguimientoCliente();
+    } catch (err) {
+      showToast(err.message || 'Error al guardar el seguimiento.', 'error');
+    }
+  }
+
+  // Event Listeners y Configuración Inicial
+  document.addEventListener('DOMContentLoaded', () => {
+    setHeaderDate();
+    document.getElementById('inp-fecha-parte').value = new Date().toISOString().slice(0, 10);
+
+    // Metadata
+    cargarMetadata();
+
+    // Eventos de cálculo
+    [
+      'inp-hs-inicio', 'inp-hs-final', 'inp-km-inicio', 'inp-km-final',
+      'inp-hs-desplazamiento', 'inp-hs-mantenimiento',
+      'inp-hs-reparaciones', 'inp-hs-disposicion'
+    ].forEach(id => {
+      document.getElementById(id).addEventListener('input', recalcularTotales);
+    });
+    document.getElementById('inp-hs-reparaciones').addEventListener('input', () => {
+      actualizarOpcionesNoProgramadas(document.getElementById('inp-no-programadas').value);
+    });
+    document.getElementById('inp-hs-inicio').addEventListener('input', compararHorometroInicial);
+    document.getElementById('inp-km-inicio').addEventListener('input', compararKilometroInicial);
+
+    // Cambio de equipo en formulario
+    document.getElementById('inp-ci').addEventListener('change', (e) => {
+      seleccionarEquipo(e.target.value);
+    });
+
+    // Predicción de maquinista por apellido o legajo
+    document.getElementById('inp-maquinista').addEventListener('input', (e) => {
+      renderMaquinistasDatalist(e.target.value);
+    });
+
+    document.getElementById('inp-obra-proyecto').addEventListener('input', (e) => {
+      renderCentrosCostosDatalist(e.target.value);
+    });
+
+    document.getElementById('inp-cliente').addEventListener('input', (e) => {
+      renderClientesDatalist(e.target.value);
+    });
+
+    document.getElementById('inp-firma-parte').addEventListener('input', (e) => {
+      renderFirmasSupervisoresDatalist(e.target.value);
+    });
+
+    // Botones formulario
+    document.getElementById('btn-submit-form').addEventListener('click', guardarParte);
+    document.getElementById('btn-limpiar-form').addEventListener('click', limpiarFormulario);
+    document.getElementById('btn-cancelar-form').addEventListener('click', limpiarFormulario);
+
+    // Filtros de período
+    document.getElementById('filtro-periodo-preset').addEventListener('change', (e) => {
+      state.filtroPeriodo = e.target.value;
+      aplicarPresetPeriodo(e.target.value);
+      state.paginaActual = 1;
+      cargarHistorial();
+    });
+
+    document.getElementById('btn-aplicar-filtros').addEventListener('click', () => {
+      state.fechaDesde = document.getElementById('filtro-fecha-desde').value;
+      state.fechaHasta = document.getElementById('filtro-fecha-hasta').value;
+      state.paginaActual = 1;
+      cargarHistorial();
+    });
+
+    // Búsqueda en historial (debounce)
+    let timerBusq;
+    document.getElementById('filtro-busqueda-texto').addEventListener('input', (e) => {
+      clearTimeout(timerBusq);
+      timerBusq = setTimeout(() => {
+        state.busqueda = e.target.value.trim();
+        state.paginaActual = 1;
+        cargarHistorial();
+      }, 350);
+    });
+
+    // Botón Actualizar
+    document.getElementById('btn-recargar-historial').addEventListener('click', () => {
+      cargarHistorial();
+    });
+
+    // Botón Exportar
+    document.getElementById('btn-exportar-excel').addEventListener('click', exportarExcel);
+
+    // Límite de registros por página
+    document.getElementById('paginacion-limite').addEventListener('change', (e) => {
+      state.limite = parseInt(e.target.value, 10) || 30;
+      state.paginaActual = 1;
+      cargarHistorial();
+    });
+
+    // Modal Eliminar
+    document.getElementById('btn-confirmar-eliminar').addEventListener('click', ejecutarEliminarParte);
+
+    renderOrdenesCliente();
+    renderItemsCliente();
+    actualizarResumenItemsCliente();
+    document.querySelectorAll('.js-guardar-seguimiento').forEach(boton => {
+      boton.addEventListener('click', guardarSeguimientoCliente);
+    });
+    document.getElementById('seg-registro').addEventListener('change', async (event) => {
+      const id = event.target.value;
+      if (!id) {
+        prepararNuevoSeguimientoCliente();
+        return;
+      }
+      document.getElementById('seg-id').value = id;
+      await cargarSeguimientoCliente();
+    });
+    document.getElementById('btn-nuevo-seguimiento').addEventListener('click', prepararNuevoSeguimientoCliente);
+    cargarListaSeguimientosCliente();
+    document.getElementById('btn-agregar-orden-cliente').addEventListener('click', () => {
+      const actuales = Array.from(document.querySelectorAll('[data-seg-orden-row]')).map(row => ({
+        orden_compra: row.querySelector('[data-seg-field="orden_compra"]')?.value || '',
+        revision: row.querySelector('[data-seg-field="revision"]')?.value || '',
+        otorgada: row.querySelector('[data-seg-field="otorgada"]')?.value || '',
+        vencimiento: row.querySelector('[data-seg-field="vencimiento"]')?.value || '',
+        moneda: row.querySelector('[data-seg-field="moneda"]')?.value || '',
+        monto_oc: row.querySelector('[data-seg-field="monto_oc"]')?.value || '',
+        observaciones: row.querySelector('[data-seg-field="observaciones"]')?.value || ''
+      }));
+      renderOrdenesCliente([...actuales, {}]);
+      actualizarResumenItemsCliente();
+    });
+    document.getElementById('btn-agregar-item-cliente').addEventListener('click', () => {
+      const actuales = Array.from(document.querySelectorAll('[data-seg-item-row]')).map(row => ({
+        descripcion: row.querySelector('[data-seg-field="descripcion"]')?.value || '',
+        unidad: row.querySelector('[data-seg-field="unidad"]')?.value || '',
+        cantidad: row.querySelector('[data-seg-field="cantidad"]')?.value || '',
+        moneda: row.querySelector('[data-seg-field="moneda"]')?.value || '',
+        precio: row.querySelector('[data-seg-field="precio"]')?.value || '',
+        total: row.querySelector('[data-seg-field="total"]')?.value || '',
+        observacion: row.querySelector('[data-seg-field="observacion"]')?.value || ''
+      }));
+      renderItemsCliente([...actuales, {}]);
+      actualizarResumenItemsCliente();
+    });
+    document.getElementById('seg-ordenes-body').addEventListener('click', event => {
+      if (!event.target.closest('[data-seg-remove-row]')) return;
+      const filas = document.querySelectorAll('[data-seg-orden-row]');
+      if (filas.length <= 1) renderOrdenesCliente();
+      else event.target.closest('tr').remove();
+    });
+    document.getElementById('seg-items-body').addEventListener('click', event => {
+      if (!event.target.closest('[data-seg-remove-row]')) return;
+      const filas = document.querySelectorAll('[data-seg-item-row]');
+      if (filas.length <= 1) renderItemsCliente();
+      else event.target.closest('tr').remove();
+      actualizarResumenItemsCliente();
+    });
+    document.getElementById('seg-items-body').addEventListener('input', event => {
+      if (event.target.matches('[data-seg-field="cantidad"], [data-seg-field="precio"]')) {
+        actualizarTotalItem(event.target.closest('tr'));
+      }
+      actualizarResumenItemsCliente();
+    });
+    document.getElementById('seg-ordenes-body').addEventListener('input', () => {
+      actualizarResumenItemsCliente();
+    });
+
+    // Sidebar navigation
+    const btnDash = document.getElementById('btn-sidebar-dashboard');
+    const btnPartes = document.getElementById('btn-sidebar-carga-partes');
+    const btnCentrosCostos = document.getElementById('btn-sidebar-centros-costos');
+    const btnSeguimientoCliente = document.getElementById('btn-sidebar-seguimiento-cliente');
+    const panelDash = document.getElementById('panel-dashboard');
+    const panelPartes = document.getElementById('panel-carga-partes');
+    const panelCentrosCostos = document.getElementById('panel-centros-costos');
+    const panelSeguimientoCliente = document.getElementById('panel-seguimiento-cliente');
+
+    function activarPanel(panelActivo, botonActivo) {
+      [btnDash, btnPartes, btnCentrosCostos, btnSeguimientoCliente].forEach(boton => boton.classList.remove('active'));
+      [panelDash, panelPartes, panelCentrosCostos, panelSeguimientoCliente].forEach(panel => panel.classList.add('hidden'));
+      botonActivo.classList.add('active');
+      panelActivo.classList.remove('hidden');
+    }
+
+    btnDash.addEventListener('click', () => {
+      activarPanel(panelDash, btnDash);
+    });
+
+    btnPartes.addEventListener('click', () => {
+      activarPanel(panelPartes, btnPartes);
+    });
+
+    btnCentrosCostos.addEventListener('click', () => {
+      activarPanel(panelCentrosCostos, btnCentrosCostos);
+      cargarCentrosCostosPanel();
+    });
+
+    btnSeguimientoCliente.addEventListener('click', () => {
+      activarPanel(panelSeguimientoCliente, btnSeguimientoCliente);
+      cargarSeguimientoCliente();
+    });
+  });
 </script>
 </body>
 </html>
+

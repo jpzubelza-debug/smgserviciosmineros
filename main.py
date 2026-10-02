@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, UploadFile, File, Form, Query, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Query, Request, HTTPException, Body
 from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -775,48 +775,34 @@ def migrar_almacen_v2(conn):
         conn.execute("PRAGMA foreign_keys = ON")
 
 
-def migrar_catalogos_v2(conn):
-    conn.commit()
-    conn.execute("PRAGMA foreign_keys = OFF")
+    def migrar_catalogos_v2(conn):
+        conn.commit()
+        conn.execute("PRAGMA foreign_keys = OFF")
 
-    cols_cat = [r[1] for r in conn.execute("PRAGMA table_info(categorias)").fetchall()]
-    if cols_cat != ["id", "nombre"]:
-        rows = conn.execute("SELECT id, nombre FROM categorias ORDER BY id").fetchall()
-        conn.execute(
-            """
-            CREATE TABLE categorias_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL UNIQUE
+        cols_cat = [r[1] for r in conn.execute("PRAGMA table_info(categorias)").fetchall()]
+        if cols_cat != ["id", "nombre"]:
+            rows = conn.execute("SELECT id, nombre FROM categorias ORDER BY id").fetchall()
+            conn.execute("CREATE TABLE categorias_new (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL UNIQUE)")
+            conn.executemany(
+                "INSERT OR IGNORE INTO categorias_new (id, nombre) VALUES (?, ?)",
+                [(r["id"], r["nombre"]) for r in rows],
             )
-            """
-        )
-        conn.executemany(
-            "INSERT OR IGNORE INTO categorias_new (id, nombre) VALUES (?, ?)",
-            [(r["id"], r["nombre"]) for r in rows],
-        )
-        conn.execute("DROP TABLE categorias")
-        conn.execute("ALTER TABLE categorias_new RENAME TO categorias")
+            conn.execute("DROP TABLE categorias")
+            conn.execute("ALTER TABLE categorias_new RENAME TO categorias")
 
-    cols_fam = [r[1] for r in conn.execute("PRAGMA table_info(familias)").fetchall()]
-    if cols_fam != ["id", "nombre"]:
-        rows = conn.execute("SELECT id, nombre FROM familias ORDER BY id").fetchall()
-        conn.execute(
-            """
-            CREATE TABLE familias_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL UNIQUE
+        cols_fam = [r[1] for r in conn.execute("PRAGMA table_info(familias)").fetchall()]
+        if cols_fam != ["id", "nombre"]:
+            rows = conn.execute("SELECT id, nombre FROM familias ORDER BY id").fetchall()
+            conn.execute("CREATE TABLE familias_new (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL UNIQUE)")
+            conn.executemany(
+                "INSERT OR IGNORE INTO familias_new (id, nombre) VALUES (?, ?)",
+                [(r["id"], r["nombre"]) for r in rows],
             )
-            """
-        )
-        conn.executemany(
-            "INSERT OR IGNORE INTO familias_new (id, nombre) VALUES (?, ?)",
-            [(r["id"], r["nombre"]) for r in rows],
-        )
-        conn.execute("DROP TABLE familias")
-        conn.execute("ALTER TABLE familias_new RENAME TO familias")
+            conn.execute("DROP TABLE familias")
+            conn.execute("ALTER TABLE familias_new RENAME TO familias")
 
-    conn.execute("DROP INDEX IF EXISTS idx_familias_categoria")
-    conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("DROP INDEX IF EXISTS idx_familias_categoria")
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def migrar_eliminar_activos_v2(conn):
@@ -1205,21 +1191,181 @@ def migrar_habilitaciones_personal(conn):
 
 
 def sincronizar_centros_costos(conn):
-    ids_oficiales = tuple(id_centro for id_centro, _ in CENTROS_COSTOS_OFICIALES)
-    placeholders = ", ".join("?" for _ in ids_oficiales)
-    conn.execute(
-        f"DELETE FROM centros_costos WHERE id NOT IN ({placeholders})",
-        ids_oficiales,
-    )
     for id_centro, nombre in CENTROS_COSTOS_OFICIALES:
         conn.execute(
             """
             INSERT INTO centros_costos (id, nombre, activo)
             VALUES (?, ?, 1)
-            ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre, activo = 1
+            ON CONFLICT(id) DO NOTHING
             """,
             (id_centro, nombre),
         )
+
+
+def migrar_horas_maquinas(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS horas_maquinas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ci TEXT,
+            fecha_parte TEXT NOT NULL,
+            nro_parte TEXT,
+            legajo_empleado TEXT,
+            maquinista TEXT,
+            obra TEXT,
+            proyecto TEXT,
+            descripcion_trabajos TEXT,
+            turno TEXT,
+            acoplado TEXT,
+            cliente TEXT,
+            orden_compra TEXT,
+            hs_inicio TEXT,
+            hs_final TEXT,
+            total_hs REAL DEFAULT 0,
+            km_inicio REAL DEFAULT 0,
+            km_final REAL DEFAULT 0,
+            km_total REAL DEFAULT 0,
+            viajes REAL DEFAULT 0,
+            gasoil REAL DEFAULT 0,
+            aceite REAL DEFAULT 0,
+            novedades TEXT,
+            firma_parte TEXT,
+            hs_desplazamiento REAL DEFAULT 0,
+            hs_mantenimiento REAL DEFAULT 0,
+            hs_reparaciones REAL DEFAULT 0,
+            hs_disposicion REAL DEFAULT 0,
+            total_hs_control REAL DEFAULT 0,
+            no_programadas REAL DEFAULT 0,
+            certificado TEXT,
+            estado_sub_alquiler TEXT,
+            control_supervisor TEXT,
+            control TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(horas_maquinas)").fetchall()}
+        if "aceite" not in cols:
+            conn.execute("ALTER TABLE horas_maquinas ADD COLUMN aceite REAL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_ci ON horas_maquinas (ci)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_fecha ON horas_maquinas (fecha_parte)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_ci_fecha ON horas_maquinas (ci, fecha_parte DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_nro_parte ON horas_maquinas (nro_parte)")
+    except Exception as exc:
+        print(f"Error migrando indices/columnas de horas_maquinas: {exc}")
+
+
+def migrar_centros_costos(conn):
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(centros_costos)").fetchall()}
+    nuevas = {
+        "cliente_id": "INTEGER",
+        "proyecto_id": "INTEGER",
+        "ubicacion": "TEXT",
+        "responsable_id": "TEXT",
+        "contrato": "TEXT",
+        "orden_compra": "TEXT",
+        "fecha_inicio": "TEXT",
+        "fecha_fin_prevista": "TEXT",
+        "fecha_fin_real": "TEXT",
+        "estado": "TEXT DEFAULT 'Planificación'",
+        "moneda": "TEXT DEFAULT 'USD'",
+        "importe_contratado": "REAL DEFAULT 0",
+        "presupuesto": "REAL DEFAULT 0",
+        "observaciones": "TEXT",
+        "updated_at": "TEXT",
+    }
+    for nombre, definicion in nuevas.items():
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE centros_costos ADD COLUMN {nombre} {definicion}")
+
+
+def migrar_clientes_excel(conn):
+    ruta_excel = os.path.join(BASE_DIR, "Clientes.xlsx")
+    if not os.path.exists(ruta_excel):
+        print(f"No se encontro el archivo de clientes para migrar: {ruta_excel}")
+        return
+
+    try:
+        from openpyxl import load_workbook
+
+        libro = load_workbook(ruta_excel, read_only=True, data_only=True)
+        hoja = libro["Clientes"] if "Clientes" in libro.sheetnames else libro.active
+        filas = hoja.iter_rows(values_only=True)
+        next(filas, None)
+        migrados = 0
+
+        for fila in filas:
+            valores = list(fila) + [None] * 8
+            codigo = str(valores[0] or "").strip()
+            if not codigo:
+                continue
+
+            datos = {
+                "codigo": codigo,
+                "razon_social": str(valores[1] or "").strip(),
+                "nombre_comercial": str(valores[2] or "").strip(),
+                "cuit": str(valores[3] or "").strip(),
+                "telefono_1": str(valores[4] or "").strip(),
+                "movil": str(valores[5] or "").strip(),
+                "correo_electronico": str(valores[6] or "").strip(),
+                "pagina_web": str(valores[7] or "").strip(),
+            }
+            conn.execute(
+                """
+                INSERT INTO clientes (
+                    codigo, razon_social, nombre_comercial, cuit, telefono_1,
+                    movil, correo_electronico, pagina_web, raw_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(codigo) DO UPDATE SET
+                    razon_social = excluded.razon_social,
+                    nombre_comercial = excluded.nombre_comercial,
+                    cuit = excluded.cuit,
+                    telefono_1 = excluded.telefono_1,
+                    movil = excluded.movil,
+                    correo_electronico = excluded.correo_electronico,
+                    pagina_web = excluded.pagina_web,
+                    raw_json = excluded.raw_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    datos["codigo"],
+                    datos["razon_social"],
+                    datos["nombre_comercial"],
+                    datos["cuit"],
+                    datos["telefono_1"],
+                    datos["movil"],
+                    datos["correo_electronico"],
+                    datos["pagina_web"],
+                    json.dumps(datos, ensure_ascii=False),
+                ),
+            )
+            migrados += 1
+
+        libro.close()
+        print(f"Clientes migrados desde Excel: {migrados}")
+    except Exception as exc:
+        print(f"Error migrando Clientes.xlsx: {exc}")
+
+
+def migrar_catalogos_v2(conn):
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    for tabla in ("categorias", "familias"):
+        columnas = [r[1] for r in conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
+        if columnas == ["id", "nombre"]:
+            continue
+        filas = conn.execute(f"SELECT id, nombre FROM {tabla} ORDER BY id").fetchall()
+        nueva = f"{tabla}_new"
+        conn.execute(f"CREATE TABLE {nueva} (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL UNIQUE)")
+        conn.executemany(
+            f"INSERT OR IGNORE INTO {nueva} (id, nombre) VALUES (?, ?)",
+            [(fila["id"], fila["nombre"]) for fila in filas],
+        )
+        conn.execute(f"DROP TABLE {tabla}")
+        conn.execute(f"ALTER TABLE {nueva} RENAME TO {tabla}")
+    conn.execute("DROP INDEX IF EXISTS idx_familias_categoria")
+    conn.execute("PRAGMA foreign_keys = ON")
 
 
 def init_sqlite():
@@ -1275,6 +1421,9 @@ def init_sqlite():
                 migrar_email_templates(conn)
                 migrar_personal_dotacion(conn)
                 migrar_habilitaciones_personal(conn)
+                migrar_horas_maquinas(conn)
+                migrar_centros_costos(conn)
+                migrar_clientes_excel(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -3352,6 +3501,1235 @@ def operaciones_view(request: Request):
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(OPERACIONES_PATH)
+
+
+def _parse_op_num(val, default=0.0):
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip().replace(" ", "")
+    if not s:
+        return default
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "," in s:
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
+def _parse_op_entero(val, nombre):
+    numero = _parse_op_num(val, 0.0)
+    if not float(numero).is_integer():
+        raise HTTPException(status_code=400, detail=f"{nombre} debe ser un número entero.")
+    return int(numero)
+
+
+@app.get("/operaciones/metadata")
+def operaciones_metadata(request: Request):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        # Catalogo completo de equipos; un equipo nuevo puede no tener partes aun.
+        v_filas = conn.execute(
+            """
+            SELECT codigo, marca, modelo, tipo, propiedad, sector
+            FROM vehiculos
+            ORDER BY codigo ASC
+            """
+        ).fetchall()
+        equipos = []
+        for f in v_filas:
+            cod = (f["codigo"] or "").strip()
+            if not cod:
+                continue
+            desc_parts = [p for p in [(f["marca"] or "").strip(), (f["modelo"] or "").strip()] if p]
+            desc = " ".join(desc_parts) if desc_parts else (f["tipo"] or "").strip()
+            display = f"{cod} - {desc}" if desc else cod
+            equipos.append({
+                "ci": cod,
+                "codigo": cod,
+                "marca": f["marca"] or "",
+                "modelo": f["modelo"] or "",
+                "tipo": f["tipo"] or "",
+                "propiedad": f["propiedad"] or "",
+                "sector": f["sector"] or "",
+                "display": display
+            })
+
+        equipos.sort(key=lambda x: x["ci"])
+
+        # Maquinistas / Personal activo
+        p_filas = conn.execute(
+            """
+            SELECT legajo, nombre, cuil
+            FROM personal
+            WHERE UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO'
+            ORDER BY nombre ASC
+            """
+        ).fetchall()
+        maquinistas = [{"legajo": f["legajo"] or "", "nombre": f["nombre"] or "", "cuil": f["cuil"] or ""} for f in p_filas]
+
+        # Obras
+        obras_set = set()
+        for f in conn.execute("SELECT DISTINCT obra FROM horas_maquinas WHERE obra IS NOT NULL AND TRIM(obra) != ''").fetchall():
+            obras_set.add(f["obra"].strip())
+        for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
+            nombre = (f["nombre"] or "").strip()
+            if not nombre:
+                continue
+            obras_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
+        obras = sorted([o for o in obras_set if o])
+
+        # Proyectos
+        proy_set = set()
+        for f in conn.execute("SELECT DISTINCT proyecto FROM horas_maquinas WHERE proyecto IS NOT NULL AND TRIM(proyecto) != ''").fetchall():
+            proy_set.add(f["proyecto"].strip())
+        for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
+            nombre = (f["nombre"] or "").strip()
+            if not nombre:
+                continue
+            proy_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
+        for f in conn.execute("SELECT nombre FROM proyectos WHERE activo = 1").fetchall():
+            proy_set.add(f["nombre"].strip())
+        proyectos = sorted([p for p in proy_set if p])
+
+        # Clientes importados desde Clientes.xlsx
+        clientes = []
+        clientes_catalogo = []
+        for f in conn.execute(
+            "SELECT codigo, razon_social, cuit FROM clientes WHERE TRIM(COALESCE(codigo, '')) != '' ORDER BY codigo"
+        ).fetchall():
+            codigo = str(f["codigo"] or "").strip()
+            razon_social = str(f["razon_social"] or "").strip()
+            cuit = str(f["cuit"] or "").strip()
+            if codigo and razon_social:
+                clientes.append(f"{codigo} - {razon_social}")
+                clientes_catalogo.append({
+                    "codigo": codigo,
+                    "nombre": razon_social,
+                    "cuit": cuit,
+                    "display": f"{codigo} - {razon_social}",
+                })
+
+        firmas_supervisores = sorted({
+            str(f["firma_parte"] or "").strip()
+            for f in conn.execute(
+                "SELECT DISTINCT firma_parte FROM horas_maquinas WHERE TRIM(COALESCE(firma_parte, '')) != ''"
+            ).fetchall()
+            if str(f["firma_parte"] or "").strip()
+        }, key=str.lower)
+
+        # Acoplados
+        acop_set = set()
+        for f in conn.execute("SELECT DISTINCT acoplado FROM horas_maquinas WHERE acoplado IS NOT NULL AND TRIM(acoplado) != ''").fetchall():
+            acop_set.add(f["acoplado"].strip())
+        for f in conn.execute("SELECT codigo FROM vehiculos WHERE LOWER(tipo) LIKE '%acoplado%' OR LOWER(tipo) LIKE '%semi%' OR LOWER(tipo) LIKE '%trailer%' OR LOWER(tipo) LIKE '%carreton%'").fetchall():
+            acop_set.add(f["codigo"].strip())
+        acoplados = sorted([a for a in acop_set if a])
+
+        turnos = ["Día", "Noche"]
+        no_programadas = [
+            "RM",
+            "RED",
+            "LOG",
+            "MO"
+        ]
+
+        return {
+            "equipos": equipos,
+            "maquinistas": maquinistas,
+            "centros_costos": [
+                f"{f['id']} - {(f['nombre'] or '').strip()}"
+                for f in conn.execute(
+                    "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+                ).fetchall()
+                if (f['nombre'] or '').strip()
+            ],
+            "clientes": clientes,
+            "clientes_catalogo": clientes_catalogo,
+            "firmas_supervisores": firmas_supervisores,
+            "acoplados": acoplados,
+            "turnos": turnos,
+            "no_programadas_opciones": no_programadas
+        }
+
+
+def _operaciones_centro_costo_id(valor):
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    try:
+        return int(texto.split(" - ", 1)[0].strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _numero_seguimiento_cliente(seguimiento_id):
+    return f"SEG-{int(seguimiento_id):04d}"
+
+
+@app.get("/operaciones/seguimientos-cliente")
+def listar_seguimientos_cliente(request: Request):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            """
+            SELECT id, fecha_alta_servicio, cotizacion, estado_seguimiento,
+                   fecha_ultima_actualizacion
+            FROM seguimiento_cc
+            ORDER BY id DESC
+            """
+        ).fetchall()
+    return [
+        {
+            **dict(fila),
+            "numero_seg": _numero_seguimiento_cliente(fila["id"]),
+        }
+        for fila in filas
+    ]
+
+
+@app.get("/operaciones/seguimiento-cliente/{seguimiento_id}")
+def obtener_seguimiento_cliente(request: Request, seguimiento_id: int):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        seguimiento = conn.execute(
+            "SELECT * FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)
+        ).fetchone()
+        if seguimiento is None:
+            raise HTTPException(status_code=404, detail="Seguimiento de cliente no encontrado.")
+        ordenes = conn.execute(
+            """
+            SELECT id, numero, orden_compra, revision, otorgada, vencimiento,
+                   moneda, monto_oc, observaciones
+            FROM Orden_de_compra_cliente
+            WHERE seguimiento_cc_id = ?
+            ORDER BY numero, id
+            """,
+            (seguimiento_id,),
+        ).fetchall()
+        ordenes_payload = []
+        for orden in ordenes:
+            items = conn.execute(
+                """
+                SELECT id, numero, descripcion, unidad, cantidad, moneda,
+                       precio, total, observacion
+                FROM items_oc_cliente
+                WHERE orden_compra_cliente_id = ?
+                ORDER BY numero, id
+                """,
+                (orden["id"],),
+            ).fetchall()
+            ordenes_payload.append({**dict(orden), "items": [dict(item) for item in items]})
+    seguimiento_payload = {
+        **dict(seguimiento),
+        "numero_seg": _numero_seguimiento_cliente(seguimiento["id"]),
+    }
+    return {"seguimiento": seguimiento_payload, "ordenes": ordenes_payload}
+
+
+@app.post("/operaciones/seguimiento-cliente")
+async def guardar_seguimiento_cliente(request: Request):
+    _requiere_modulo(request, "operaciones")
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    ordenes = payload.get("ordenes", [])
+    if not isinstance(ordenes, list):
+        raise HTTPException(status_code=400, detail="Las órdenes de compra deben ser una lista.")
+    for orden in ordenes:
+        if not isinstance(orden, dict) or not isinstance(orden.get("items", []), list):
+            raise HTTPException(status_code=400, detail="El formato de una orden de compra no es válido.")
+
+    seguimiento_id = payload.get("seguimiento_id")
+    centro_costo_id = _operaciones_centro_costo_id(payload.get("centro_costo"))
+    fecha_alta = str(payload.get("fecha_alta_servicio") or "").strip() or None
+    cotizacion = str(payload.get("cotizacion") or "").strip() or None
+    fecha_inicio = str(payload.get("fecha_inicio") or "").strip() or None
+    fecha_final = str(payload.get("fecha_final") or "").strip() or None
+    condiciones = str(payload.get("condiciones_comerciales") or "").strip() or None
+    estado = str(payload.get("estado_seguimiento") or "En preparación").strip() or "En preparación"
+    try:
+        cantidad_certificados = int(payload.get("cantidad_certificados") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="La cantidad de certificados debe ser un entero.")
+
+    with get_sqlite_connection() as conn:
+        try:
+            if seguimiento_id:
+                seguimiento_id = int(seguimiento_id)
+                existe = conn.execute(
+                    "SELECT 1 FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)
+                ).fetchone()
+                if existe is None:
+                    raise HTTPException(status_code=404, detail="Seguimiento de cliente no encontrado.")
+                conn.execute(
+                    """
+                    UPDATE seguimiento_cc SET centro_costo_id = ?, fecha_alta_servicio = ?,
+                        cotizacion = ?, fecha_inicio = ?, fecha_final = ?,
+                        cantidad_certificados = ?, condiciones_comerciales = ?,
+                        estado_seguimiento = ?, fecha_ultima_actualizacion = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (centro_costo_id, fecha_alta, cotizacion, fecha_inicio, fecha_final,
+                     cantidad_certificados, condiciones, estado, seguimiento_id),
+                )
+            else:
+                seguimiento_id = conn.execute(
+                    "SELECT COALESCE(MAX(id), 0) + 1 FROM seguimiento_cc"
+                ).fetchone()[0]
+                conn.execute(
+                    """
+                    INSERT INTO seguimiento_cc (
+                        id, centro_costo_id, fecha_alta_servicio, cotizacion, fecha_inicio,
+                        fecha_final, cantidad_certificados, condiciones_comerciales,
+                        estado_seguimiento, fecha_ultima_actualizacion
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (seguimiento_id, centro_costo_id, fecha_alta, cotizacion, fecha_inicio,
+                     fecha_final, cantidad_certificados, condiciones, estado),
+                )
+
+            conn.execute(
+                "DELETE FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ?",
+                (seguimiento_id,),
+            )
+            for orden_index, orden in enumerate(ordenes, start=1):
+                cur_orden = conn.execute(
+                    """
+                    INSERT INTO Orden_de_compra_cliente (
+                        seguimiento_cc_id, numero, orden_compra, revision, otorgada,
+                        vencimiento, moneda, monto_oc, observaciones
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        seguimiento_id, orden_index,
+                        str(orden.get("orden_compra") or "").strip() or None,
+                        str(orden.get("revision") or "").strip() or None,
+                        str(orden.get("otorgada") or "").strip() or None,
+                        str(orden.get("vencimiento") or "").strip() or None,
+                        str(orden.get("moneda") or "").strip() or None,
+                        _parse_op_num(orden.get("monto_oc"), 0),
+                        str(orden.get("observaciones") or "").strip() or None,
+                    ),
+                )
+                orden_id = cur_orden.lastrowid
+                for item_index, item in enumerate(orden.get("items", []), start=1):
+                    cantidad = _parse_op_num(item.get("cantidad"), 0)
+                    precio = _parse_op_num(item.get("precio"), 0)
+                    total = _parse_op_num(item.get("total"), cantidad * precio)
+                    conn.execute(
+                        """
+                        INSERT INTO items_oc_cliente (
+                            orden_compra_cliente_id, numero, descripcion, unidad,
+                            cantidad, moneda, precio, total, observacion
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            orden_id, item_index,
+                            str(item.get("descripcion") or "").strip() or None,
+                            str(item.get("unidad") or "").strip() or None,
+                            cantidad, str(item.get("moneda") or "").strip() or None,
+                            precio, total,
+                            str(item.get("observacion") or "").strip() or None,
+                        ),
+                    )
+            conn.commit()
+        except HTTPException:
+            conn.rollback()
+            raise
+        except sqlite3.Error as exc:
+            conn.rollback()
+            raise HTTPException(status_code=400, detail=f"No se pudo guardar el seguimiento: {exc}")
+
+    return {
+        "ok": True,
+        "seguimiento_id": seguimiento_id,
+        "numero_seg": _numero_seguimiento_cliente(seguimiento_id),
+        "mensaje": "Seguimiento de cliente guardado correctamente.",
+    }
+
+
+@app.get("/operaciones/centros-costos")
+@app.get("/api/operaciones/centros-costos")
+def listar_centros_costos(request: Request):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        filas = conn.execute("SELECT * FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall()
+        return {"ok": True, "data": [dict(fila) for fila in filas]}
+
+
+@app.post("/operaciones/centros-costos")
+@app.post("/api/operaciones/centros-costos")
+async def crear_centro_costo(request: Request, payload: dict = Body(...)):
+    _requiere_modulo(request, "operaciones")
+    try:
+        id_centro = int(payload.get("id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="El ID del Centro de Costos debe ser un número entero.")
+    if id_centro <= 0:
+        raise HTTPException(status_code=400, detail="El ID del Centro de Costos debe ser mayor que cero.")
+
+    nombre = str(payload.get("nombre") or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre del Centro de Costos es obligatorio.")
+
+    datos = {
+        "cliente_id": payload.get("cliente_id") or None,
+        "proyecto_id": payload.get("proyecto_id") or None,
+        "ubicacion": str(payload.get("ubicacion") or "").strip() or None,
+        "responsable_id": str(payload.get("responsable_id") or "").strip() or None,
+        "contrato": str(payload.get("contrato") or "").strip() or None,
+        "orden_compra": str(payload.get("orden_compra") or "").strip() or None,
+        "fecha_inicio": str(payload.get("fecha_inicio") or "").strip() or None,
+        "fecha_fin_prevista": str(payload.get("fecha_fin_prevista") or "").strip() or None,
+        "fecha_fin_real": str(payload.get("fecha_fin_real") or "").strip() or None,
+        "estado": str(payload.get("estado") or "Planificación").strip() or "Planificación",
+        "moneda": str(payload.get("moneda") or "USD").strip() or "USD",
+        "importe_contratado": payload.get("importe_contratado") or 0,
+        "presupuesto": payload.get("presupuesto") or 0,
+        "observaciones": str(payload.get("observaciones") or "").strip() or None,
+    }
+
+    with get_sqlite_connection() as conn:
+        try:
+            if conn.execute("SELECT 1 FROM centros_costos WHERE id = ?", (id_centro,)).fetchone():
+                raise HTTPException(status_code=400, detail="Ya existe un Centro de Costos con ese ID.")
+            if conn.execute(
+                "SELECT 1 FROM centros_costos WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?))",
+                (nombre,),
+            ).fetchone():
+                raise HTTPException(status_code=400, detail="Ya existe un Centro de Costos con ese nombre.")
+            conn.execute(
+                """
+                INSERT INTO centros_costos (
+                    id, nombre, activo, cliente_id, proyecto_id, ubicacion, responsable_id,
+                    contrato, orden_compra, fecha_inicio, fecha_fin_prevista, fecha_fin_real,
+                    estado, moneda, importe_contratado, presupuesto, observaciones, updated_at
+                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (id_centro, nombre, datos["cliente_id"], datos["proyecto_id"], datos["ubicacion"], datos["responsable_id"],
+                 datos["contrato"], datos["orden_compra"], datos["fecha_inicio"], datos["fecha_fin_prevista"],
+                 datos["fecha_fin_real"], datos["estado"], datos["moneda"], datos["importe_contratado"],
+                 datos["presupuesto"], datos["observaciones"]),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=400, detail="El ID o el nombre del Centro de Costos ya existe.")
+
+        return {"ok": True, "id": id_centro, "mensaje": "Centro de Costos creado correctamente."}
+
+
+@app.put("/operaciones/centros-costos/{id_centro}")
+@app.put("/api/operaciones/centros-costos/{id_centro}")
+async def editar_centro_costo(request: Request, id_centro: int, payload: dict = Body(...)):
+    _requiere_modulo(request, "operaciones")
+    nombre = str(payload.get("nombre") or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre del Centro de Costos es obligatorio.")
+
+    datos = {
+        "cliente_id": payload.get("cliente_id") or None,
+        "proyecto_id": payload.get("proyecto_id") or None,
+        "ubicacion": str(payload.get("ubicacion") or "").strip() or None,
+        "responsable_id": str(payload.get("responsable_id") or "").strip() or None,
+        "contrato": str(payload.get("contrato") or "").strip() or None,
+        "orden_compra": str(payload.get("orden_compra") or "").strip() or None,
+        "fecha_inicio": str(payload.get("fecha_inicio") or "").strip() or None,
+        "fecha_fin_prevista": str(payload.get("fecha_fin_prevista") or "").strip() or None,
+        "fecha_fin_real": str(payload.get("fecha_fin_real") or "").strip() or None,
+        "estado": str(payload.get("estado") or "Planificación").strip() or "Planificación",
+        "moneda": str(payload.get("moneda") or "USD").strip() or "USD",
+        "importe_contratado": payload.get("importe_contratado") or 0,
+        "presupuesto": payload.get("presupuesto") or 0,
+        "observaciones": str(payload.get("observaciones") or "").strip() or None,
+    }
+
+    with get_sqlite_connection() as conn:
+        try:
+            if conn.execute(
+                "SELECT 1 FROM centros_costos WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?)) AND id != ?",
+                (nombre, id_centro),
+            ).fetchone():
+                raise HTTPException(status_code=400, detail="Ya existe un Centro de Costos con ese nombre.")
+            cursor = conn.execute(
+                """
+                UPDATE centros_costos SET
+                    nombre = ?, cliente_id = ?, proyecto_id = ?, ubicacion = ?, responsable_id = ?,
+                    contrato = ?, orden_compra = ?, fecha_inicio = ?, fecha_fin_prevista = ?,
+                    fecha_fin_real = ?, estado = ?, moneda = ?, importe_contratado = ?, presupuesto = ?,
+                    observaciones = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (nombre, datos["cliente_id"], datos["proyecto_id"], datos["ubicacion"], datos["responsable_id"],
+                 datos["contrato"], datos["orden_compra"], datos["fecha_inicio"], datos["fecha_fin_prevista"],
+                 datos["fecha_fin_real"], datos["estado"], datos["moneda"], datos["importe_contratado"],
+                 datos["presupuesto"], datos["observaciones"], id_centro),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Centro de Costos no encontrado.")
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=400, detail="Ya existe un Centro de Costos con ese nombre.")
+
+        return {"ok": True, "id": id_centro, "mensaje": "Centro de Costos actualizado correctamente."}
+
+
+@app.delete("/operaciones/centros-costos/{id_centro}")
+@app.delete("/api/operaciones/centros-costos/{id_centro}")
+def eliminar_centro_costo(request: Request, id_centro: int):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE centros_costos SET activo = 0 WHERE id = ? AND COALESCE(activo, 1) = 1",
+            (id_centro,),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Centro de Costos no encontrado.")
+        conn.commit()
+
+        return {"ok": True, "mensaje": "Centro de Costos eliminado correctamente."}
+
+
+def _validar_centro_costo_operaciones(conn, valor: str) -> str:
+    ingresado = (valor or "").strip().lower()
+    if not ingresado:
+        raise HTTPException(status_code=400, detail="El Centro de Costos es obligatorio.")
+
+    centros = conn.execute(
+        "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+    ).fetchall()
+    for centro in centros:
+        nombre = (centro["nombre"] or "").strip()
+        oficial = f"{centro['id']} - {nombre}" if centro["id"] is not None else nombre
+        if oficial.lower() == ingresado:
+            return oficial
+
+    raise HTTPException(status_code=400, detail="El Centro de Costos seleccionado no es válido.")
+
+
+def _validar_ci_operaciones(conn, valor: str) -> str:
+    ingresado = (valor or "").strip()
+    if not ingresado:
+        raise HTTPException(status_code=400, detail="El Código Interno del Equipo (CI) es obligatorio.")
+
+    fila = conn.execute(
+        "SELECT codigo FROM vehiculos WHERE UPPER(TRIM(codigo)) = UPPER(TRIM(?)) LIMIT 1",
+        (ingresado,),
+    ).fetchone()
+    if fila:
+        return str(fila["codigo"] or ingresado).strip()
+
+    historico = conn.execute(
+        "SELECT ci FROM horas_maquinas WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?)) LIMIT 1",
+        (ingresado,),
+    ).fetchone()
+    if historico:
+        return str(historico["ci"] or ingresado).strip()
+
+    raise HTTPException(status_code=400, detail="El CI seleccionado no existe en la flota ni en el historial de partes.")
+
+
+def _validar_cliente_operaciones(conn, valor: str) -> str:
+    ingresado = (valor or "").strip().lower()
+    if not ingresado:
+        raise HTTPException(status_code=400, detail="El Cliente es obligatorio.")
+
+    clientes = conn.execute(
+        "SELECT codigo, razon_social FROM clientes WHERE TRIM(COALESCE(codigo, '')) != '' ORDER BY codigo"
+    ).fetchall()
+    for cliente in clientes:
+        codigo = str(cliente["codigo"] or "").strip()
+        razon_social = str(cliente["razon_social"] or "").strip()
+        oficial = f"{codigo} - {razon_social}"
+        if oficial.lower() == ingresado:
+            return oficial
+
+    raise HTTPException(status_code=400, detail="El Cliente seleccionado no es válido.")
+
+
+def _validar_control_supervisor_operaciones(conn, valor: str) -> str:
+    ingresado = (valor or "").strip()
+    if not ingresado:
+        return ""
+
+    existe = conn.execute(
+        """
+        SELECT 1 FROM personal
+        WHERE UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO'
+          AND TRIM(nombre) = ?
+        LIMIT 1
+        """,
+        (ingresado,),
+    ).fetchone()
+    if not existe:
+        raise HTTPException(status_code=400, detail="El Control Supervisor debe ser un empleado activo.")
+    return ingresado
+
+
+def _normalizar_maquinista_operaciones(conn, legajo, nombre):
+    legajo_ingresado = str(legajo or "").strip()
+    nombre_ingresado = str(nombre or "").strip()
+    fila = None
+
+    if legajo_ingresado:
+        fila = conn.execute(
+            """
+            SELECT legajo, nombre
+            FROM personal
+            WHERE TRIM(CAST(legajo AS TEXT)) = TRIM(?)
+            LIMIT 1
+            """,
+            (legajo_ingresado,),
+        ).fetchone()
+    if not fila and nombre_ingresado:
+        fila = conn.execute(
+            """
+            SELECT legajo, nombre
+            FROM personal
+            WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?))
+            LIMIT 1
+            """,
+            (nombre_ingresado,),
+        ).fetchone()
+
+    if not fila:
+        return legajo_ingresado, nombre_ingresado
+    return str(fila["legajo"] or "").strip(), str(fila["nombre"] or "").strip()
+
+
+def _consultar_horas_maquinas_filas(conn, ci: str | None, fecha_desde: str | None, fecha_hasta: str | None, q: str | None):
+    condiciones = ["1=1"]
+    params = []
+    if ci and ci.strip():
+        condiciones.append("UPPER(ci) = UPPER(?)")
+        params.append(ci.strip())
+    if fecha_desde and fecha_desde.strip():
+        condiciones.append("fecha_parte >= ?")
+        params.append(fecha_desde.strip())
+    if fecha_hasta and fecha_hasta.strip():
+        condiciones.append("fecha_parte <= ?")
+        params.append(fecha_hasta.strip())
+    if q and q.strip():
+        busq = f"%{q.strip()}%"
+        condiciones.append(
+            """(
+                nro_parte LIKE ? OR
+                maquinista LIKE ? OR
+                obra LIKE ? OR
+                proyecto LIKE ? OR
+                cliente LIKE ? OR
+                descripcion_trabajos LIKE ? OR
+                novedades LIKE ? OR
+                legajo_empleado LIKE ? OR
+                acoplado LIKE ? OR
+                turno LIKE ? OR
+                firma_parte LIKE ?
+            )"""
+        )
+        params.extend([busq] * 11)
+
+    where_clause = " AND ".join(condiciones)
+    return where_clause, params
+
+
+@app.get("/operaciones/horas-maquinas")
+@app.get("/api/horas-maquinas")
+def listar_horas_maquinas(
+    request: Request,
+    ci: str | None = Query(None),
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    q: str | None = Query(None),
+    busqueda: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(30, ge=1, le=500),
+):
+    _requiere_modulo(request, "operaciones")
+    search_term = q or busqueda
+    with get_sqlite_connection() as conn:
+        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+
+        total_row = conn.execute(
+            f"SELECT COUNT(*) FROM horas_maquinas WHERE {where_clause}",
+            params,
+        ).fetchone()
+        total = total_row[0] if total_row else 0
+
+        offset = (page - 1) * limit
+        query = f"""
+            SELECT * FROM horas_maquinas
+            WHERE {where_clause}
+            ORDER BY fecha_parte DESC, id DESC
+            LIMIT ? OFFSET ?
+        """
+        filas = conn.execute(query, params + [limit, offset]).fetchall()
+        data = [dict(f) for f in filas]
+
+        total_pages = max(1, math.ceil(total / limit)) if total > 0 else 1
+
+        return {
+            "ok": True,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "ci_seleccionado": ci or "",
+            "data": data
+        }
+
+@app.get("/operaciones/horas-maquinas/ultimo-horometro")
+@app.get("/api/horas-maquinas/ultimo-horometro")
+def obtener_ultimo_horometro(request: Request, ci: str = Query(..., min_length=1)):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        fila = conn.execute(
+            """
+            SELECT hs_final, fecha_parte, id
+            FROM horas_maquinas
+            WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))
+              AND hs_final IS NOT NULL
+              AND TRIM(CAST(hs_final AS TEXT)) != ''
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (ci.strip(),),
+        ).fetchone()
+
+        if not fila:
+            return {"ok": True, "encontrado": False, "hs_final": None}
+
+        return {
+            "ok": True,
+            "encontrado": True,
+            "hs_final": float(fila["hs_final"] or 0),
+            "fecha_parte": fila["fecha_parte"] or "",
+            "id": fila["id"],
+        }
+
+
+@app.get("/operaciones/horas-maquinas/ultimo-kilometro")
+@app.get("/api/horas-maquinas/ultimo-kilometro")
+def obtener_ultimo_kilometro(request: Request, ci: str = Query(..., min_length=1)):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        fila = conn.execute(
+            """
+            SELECT km_final, fecha_parte, id
+            FROM horas_maquinas
+            WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))
+              AND km_final IS NOT NULL
+              AND TRIM(CAST(km_final AS TEXT)) != ''
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (ci.strip(),),
+        ).fetchone()
+
+        if not fila:
+            return {"ok": True, "encontrado": False, "km_final": None}
+
+        return {
+            "ok": True,
+            "encontrado": True,
+            "km_final": float(fila["km_final"] or 0),
+            "fecha_parte": fila["fecha_parte"] or "",
+            "id": fila["id"],
+        }
+
+
+@app.get("/operaciones/horas-maquinas/{id_parte}")
+@app.get("/api/horas-maquinas/{id_parte}")
+def obtener_hora_maquina_detalle(request: Request, id_parte: int):
+    _requiere_modulo(request, "operaciones")
+    with get_sqlite_connection() as conn:
+        fila = conn.execute(
+            "SELECT * FROM horas_maquinas WHERE id = ?",
+            (id_parte,),
+        ).fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="Parte diario no encontrado")
+        return {"ok": True, "data": dict(fila)}
+
+
+@app.post("/operaciones/horas-maquinas")
+@app.post("/api/horas-maquinas")
+async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
+    perfil = _requiere_modulo(request, "operaciones")
+
+    ci = str(payload.get("ci") or "").strip()
+    fecha_parte = str(payload.get("fecha_parte") or "").strip()
+    nro_parte = str(payload.get("nro_parte") or "").strip()
+    maquinista = str(payload.get("maquinista") or "").strip()
+    descripcion_trabajos = str(payload.get("descripcion_trabajos") or "").strip()
+
+    if not ci:
+        raise HTTPException(status_code=400, detail="El Código Interno del Equipo (CI) es obligatorio.")
+    if not fecha_parte:
+        raise HTTPException(status_code=400, detail="La Fecha de Parte es obligatoria.")
+    if not nro_parte:
+        raise HTTPException(status_code=400, detail="El Nº de Parte es obligatorio.")
+    if not maquinista:
+        raise HTTPException(status_code=400, detail="El Maquinista es obligatorio.")
+    if not descripcion_trabajos:
+        raise HTTPException(status_code=400, detail="La Descripción de Trabajos Realizados es obligatoria.")
+
+    # Validar duplicados por ci + fecha_parte + nro_parte
+    with get_sqlite_connection() as conn:
+        ci = _validar_ci_operaciones(conn, ci)
+        centro_costo = _validar_centro_costo_operaciones(conn, payload.get("obra") or payload.get("proyecto"))
+        cliente = _validar_cliente_operaciones(conn, payload.get("cliente"))
+        control_supervisor = _validar_control_supervisor_operaciones(conn, payload.get("control_supervisor"))
+        legajo_empleado, maquinista = _normalizar_maquinista_operaciones(
+            conn, payload.get("legajo_empleado"), maquinista
+        )
+        dup = conn.execute(
+            """
+            SELECT id FROM horas_maquinas
+            WHERE UPPER(ci) = UPPER(?) AND fecha_parte = ? AND UPPER(nro_parte) = UPPER(?)
+            """,
+            (ci, fecha_parte, nro_parte),
+        ).fetchone()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un parte registrado con el Nº {nro_parte} para el equipo {ci} en la fecha {fecha_parte}."
+            )
+
+        # Calculo y validaciones numericas
+        hs_inicio = _parse_op_entero(payload.get("hs_inicio"), "El horómetro inicial")
+        hs_final = _parse_op_entero(payload.get("hs_final"), "El horómetro final")
+        total_hs = _parse_op_entero(payload.get("total_hs"), "El total de horas")
+        if hs_final >= hs_inicio and hs_final > 0:
+            total_hs = hs_final - hs_inicio
+
+        km_inicio = _parse_op_entero(payload.get("km_inicio"), "El kilómetro inicial")
+        km_final = _parse_op_entero(payload.get("km_final"), "El kilómetro final")
+        km_total = _parse_op_entero(payload.get("km_total"), "El total de kilómetros")
+        if km_final >= km_inicio and km_final > 0:
+            km_total = km_final - km_inicio
+
+        hs_desplazamiento = _parse_op_num(payload.get("hs_desplazamiento"), 0.0)
+        hs_mantenimiento = _parse_op_num(payload.get("hs_mantenimiento"), 0.0)
+        hs_reparaciones = _parse_op_num(payload.get("hs_reparaciones"), 0.0)
+        hs_disposicion = _parse_op_num(payload.get("hs_disposicion"), 0.0)
+        hs_reales = round(total_hs + hs_desplazamiento + hs_mantenimiento + hs_reparaciones + hs_disposicion, 2)
+        total_hs_control = hs_reales
+
+        viajes = _parse_op_num(payload.get("viajes") or payload.get("total_viajes"), 0.0)
+        gasoil = _parse_op_num(payload.get("gasoil"), 0.0)
+        aceite = _parse_op_num(payload.get("aceite"), 0.0)
+
+        no_programadas = str(payload.get("no_programadas") or "").strip()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO horas_maquinas (
+                ci, fecha_parte, nro_parte, legajo_empleado, maquinista,
+                obra, proyecto, descripcion_trabajos, turno, acoplado,
+                cliente, orden_compra, hs_inicio, hs_final, total_hs,
+                km_inicio, km_final, km_total, viajes, gasoil, aceite,
+                novedades, firma_parte, hs_desplazamiento, hs_mantenimiento,
+                hs_reparaciones, hs_disposicion, total_hs_control, no_programadas,
+                certificado, estado_sub_alquiler, control_supervisor, control, created_at
+            ) VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, CURRENT_TIMESTAMP
+            )
+            """,
+            (
+                ci,
+                fecha_parte,
+                nro_parte,
+                legajo_empleado,
+                maquinista,
+                centro_costo,
+                centro_costo,
+                descripcion_trabajos,
+                str(payload.get("turno") or "").strip(),
+                str(payload.get("acoplado") or "").strip(),
+                cliente,
+                str(payload.get("orden_compra") or "").strip(),
+                str(payload.get("hs_inicio") or hs_inicio),
+                str(payload.get("hs_final") or hs_final),
+                total_hs,
+                km_inicio,
+                km_final,
+                km_total,
+                viajes,
+                gasoil,
+                aceite,
+                str(payload.get("novedades") or "").strip(),
+                str(payload.get("firma_parte") or "").strip(),
+                hs_desplazamiento,
+                hs_mantenimiento,
+                hs_reparaciones,
+                hs_disposicion,
+                total_hs_control,
+                no_programadas,
+                str(payload.get("certificado") or "").strip() or None,
+                str(payload.get("estado_sub_alquiler") or "").strip() or None,
+                control_supervisor or None,
+                str(payload.get("control") or "").strip() or None,
+            ),
+        )
+        nuevo_id = cursor.lastrowid
+        conn.commit()
+
+        return {
+            "ok": True,
+            "id": nuevo_id,
+            "mensaje": f"Parte Diario Nº {nro_parte} cargado exitosamente para el equipo {ci}."
+        }
+
+
+@app.put("/operaciones/horas-maquinas/{id_parte}")
+@app.put("/api/horas-maquinas/{id_parte}")
+async def actualizar_hora_maquina(request: Request, id_parte: int, payload: dict = Body(...)):
+    perfil = _requiere_modulo(request, "operaciones")
+
+    ci = str(payload.get("ci") or "").strip()
+    fecha_parte = str(payload.get("fecha_parte") or "").strip()
+    nro_parte = str(payload.get("nro_parte") or "").strip()
+    maquinista = str(payload.get("maquinista") or "").strip()
+    descripcion_trabajos = str(payload.get("descripcion_trabajos") or "").strip()
+
+    if not ci:
+        raise HTTPException(status_code=400, detail="El Código Interno del Equipo (CI) es obligatorio.")
+    if not fecha_parte:
+        raise HTTPException(status_code=400, detail="La Fecha de Parte es obligatoria.")
+    if not nro_parte:
+        raise HTTPException(status_code=400, detail="El Nº de Parte es obligatorio.")
+    if not maquinista:
+        raise HTTPException(status_code=400, detail="El Maquinista es obligatorio.")
+    if not descripcion_trabajos:
+        raise HTTPException(status_code=400, detail="La Descripción de Trabajos Realizados es obligatoria.")
+
+    with get_sqlite_connection() as conn:
+        ci = _validar_ci_operaciones(conn, ci)
+        centro_costo = _validar_centro_costo_operaciones(conn, payload.get("obra") or payload.get("proyecto"))
+        cliente = _validar_cliente_operaciones(conn, payload.get("cliente"))
+        control_supervisor = _validar_control_supervisor_operaciones(conn, payload.get("control_supervisor"))
+        legajo_empleado, maquinista = _normalizar_maquinista_operaciones(
+            conn, payload.get("legajo_empleado"), maquinista
+        )
+        actual = conn.execute("SELECT id FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()
+        if not actual:
+            raise HTTPException(status_code=404, detail="El registro a modificar no existe.")
+
+        # Validar duplicados contra otros registros
+        dup = conn.execute(
+            """
+            SELECT id FROM horas_maquinas
+            WHERE UPPER(ci) = UPPER(?) AND fecha_parte = ? AND UPPER(nro_parte) = UPPER(?) AND id != ?
+            """,
+            (ci, fecha_parte, nro_parte, id_parte),
+        ).fetchone()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe otro parte registrado con el Nº {nro_parte} para el equipo {ci} en la fecha {fecha_parte}."
+            )
+
+        hs_inicio = _parse_op_entero(payload.get("hs_inicio"), "El horómetro inicial")
+        hs_final = _parse_op_entero(payload.get("hs_final"), "El horómetro final")
+        total_hs = _parse_op_entero(payload.get("total_hs"), "El total de horas")
+        if hs_final >= hs_inicio and hs_final > 0:
+            total_hs = hs_final - hs_inicio
+
+        km_inicio = _parse_op_entero(payload.get("km_inicio"), "El kilómetro inicial")
+        km_final = _parse_op_entero(payload.get("km_final"), "El kilómetro final")
+        km_total = _parse_op_entero(payload.get("km_total"), "El total de kilómetros")
+        if km_final >= km_inicio and km_final > 0:
+            km_total = km_final - km_inicio
+
+        hs_desplazamiento = _parse_op_num(payload.get("hs_desplazamiento"), 0.0)
+        hs_mantenimiento = _parse_op_num(payload.get("hs_mantenimiento"), 0.0)
+        hs_reparaciones = _parse_op_num(payload.get("hs_reparaciones"), 0.0)
+        hs_disposicion = _parse_op_num(payload.get("hs_disposicion"), 0.0)
+
+        hs_reales = round(total_hs + hs_desplazamiento + hs_mantenimiento + hs_reparaciones + hs_disposicion, 2)
+        total_hs_control = hs_reales
+
+        viajes = _parse_op_num(payload.get("viajes") or payload.get("total_viajes"), 0.0)
+        gasoil = _parse_op_num(payload.get("gasoil"), 0.0)
+        aceite = _parse_op_num(payload.get("aceite"), 0.0)
+        no_programadas = str(payload.get("no_programadas") or "").strip()
+
+        conn.execute(
+            """
+            UPDATE horas_maquinas SET
+                ci = ?,
+                fecha_parte = ?,
+                nro_parte = ?,
+                legajo_empleado = ?,
+                maquinista = ?,
+                obra = ?,
+                proyecto = ?,
+                descripcion_trabajos = ?,
+                turno = ?,
+                acoplado = ?,
+                cliente = ?,
+                orden_compra = ?,
+                hs_inicio = ?,
+                hs_final = ?,
+                total_hs = ?,
+                km_inicio = ?,
+                km_final = ?,
+                km_total = ?,
+                viajes = ?,
+                gasoil = ?,
+                aceite = ?,
+                novedades = ?,
+                firma_parte = ?,
+                hs_desplazamiento = ?,
+                hs_mantenimiento = ?,
+                hs_reparaciones = ?,
+                hs_disposicion = ?,
+                total_hs_control = ?,
+                no_programadas = ?,
+                certificado = ?,
+                estado_sub_alquiler = ?,
+                control_supervisor = ?,
+                control = ?
+            WHERE id = ?
+            """,
+            (
+                ci,
+                fecha_parte,
+                nro_parte,
+                legajo_empleado,
+                maquinista,
+                centro_costo,
+                centro_costo,
+                descripcion_trabajos,
+                str(payload.get("turno") or "").strip(),
+                str(payload.get("acoplado") or "").strip(),
+                cliente,
+                str(payload.get("orden_compra") or "").strip(),
+                str(payload.get("hs_inicio") or hs_inicio),
+                str(payload.get("hs_final") or hs_final),
+                total_hs,
+                km_inicio,
+                km_final,
+                km_total,
+                viajes,
+                gasoil,
+                aceite,
+                str(payload.get("novedades") or "").strip(),
+                str(payload.get("firma_parte") or "").strip(),
+                hs_desplazamiento,
+                hs_mantenimiento,
+                hs_reparaciones,
+                hs_disposicion,
+                total_hs_control,
+                no_programadas,
+                str(payload.get("certificado") or "").strip() or None,
+                str(payload.get("estado_sub_alquiler") or "").strip() or None,
+                control_supervisor or None,
+                str(payload.get("control") or "").strip() or None,
+                id_parte,
+            ),
+        )
+        conn.commit()
+
+        return {
+            "ok": True,
+            "id": id_parte,
+            "mensaje": f"Parte Diario Nº {nro_parte} actualizado exitosamente."
+        }
+
+
+@app.post("/operaciones/horas-maquinas/{id_parte}/controlar")
+@app.post("/api/horas-maquinas/{id_parte}/controlar")
+def controlar_hora_maquina(request: Request, id_parte: int):
+    perfil = _requiere_modulo(request, "operaciones")
+    usuario = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
+    if not usuario:
+        raise HTTPException(status_code=401, detail="No se pudo identificar al usuario de la sesión.")
+
+    with get_sqlite_connection() as conn:
+        parte = conn.execute(
+            "SELECT id, nro_parte, control FROM horas_maquinas WHERE id = ?",
+            (id_parte,),
+        ).fetchone()
+        if not parte:
+            raise HTTPException(status_code=404, detail="Parte diario no encontrado")
+
+        if parte["control"]:
+            return {
+                "ok": True,
+                "id": id_parte,
+                "control": parte["control"],
+                "mensaje": f"El parte diario Nº {parte['nro_parte'] or id_parte} ya fue controlado.",
+            }
+
+        conn.execute(
+            "UPDATE horas_maquinas SET control = ? WHERE id = ?",
+            (usuario, id_parte),
+        )
+        conn.commit()
+
+        return {
+            "ok": True,
+            "id": id_parte,
+            "control": usuario,
+            "mensaje": f"Parte diario Nº {parte['nro_parte'] or id_parte} controlado por {usuario}.",
+        }
+
+
+@app.delete("/operaciones/horas-maquinas/{id_parte}")
+@app.delete("/api/horas-maquinas/{id_parte}")
+def eliminar_hora_maquina(request: Request, id_parte: int):
+    perfil = _requiere_modulo(request, "operaciones")
+
+    with get_sqlite_connection() as conn:
+        fila = conn.execute("SELECT id, nro_parte, ci FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="El parte diario a eliminar no existe.")
+
+        conn.execute("DELETE FROM horas_maquinas WHERE id = ?", (id_parte,))
+        conn.commit()
+
+        return {
+            "ok": True,
+            "mensaje": f"Parte Diario Nº {fila['nro_parte'] or id_parte} del equipo {fila['ci']} eliminado correctamente."
+        }
+
+
+@app.get("/operaciones/horas-maquinas-exportar")
+@app.get("/operaciones/horas-maquinas/exportar")
+def exportar_horas_maquinas_excel(
+    request: Request,
+    ci: str | None = Query(None),
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    q: str | None = Query(None),
+    busqueda: str | None = Query(None),
+):
+    _requiere_modulo(request, "operaciones")
+    search_term = q or busqueda
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"No se pudo cargar generador Excel: {exc}")
+
+    with get_sqlite_connection() as conn:
+        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+        query = f"""
+            SELECT * FROM horas_maquinas
+            WHERE {where_clause}
+            ORDER BY fecha_parte DESC, id DESC
+            LIMIT 5000
+        """
+        filas = conn.execute(query, params).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Partes_{ci or 'General'}"[:31]
+
+    # Encabezados
+    columnas_export = [
+        ("ID", "id"),
+        ("CI", "ci"),
+        ("FECHA PARTE", "fecha_parte"),
+        ("NRO PARTE", "nro_parte"),
+        ("LEGAJO", "legajo_empleado"),
+        ("MAQUINISTA", "maquinista"),
+        ("OBRA", "obra"),
+        ("PROYECTO", "proyecto"),
+        ("DESCRIPCIÓN TRABAJOS", "descripcion_trabajos"),
+        ("TURNO", "turno"),
+        ("ACOPLADO", "acoplado"),
+        ("CLIENTE", "cliente"),
+        ("ORDEN COMPRA", "orden_compra"),
+        ("HS INICIO", "hs_inicio"),
+        ("HS FINAL", "hs_final"),
+        ("TOTAL HS", "total_hs"),
+        ("KM INICIO", "km_inicio"),
+        ("KM FINAL", "km_final"),
+        ("KM TOTAL", "km_total"),
+        ("VIAJES", "viajes"),
+        ("GASOIL (LTS)", "gasoil"),
+        ("ACEITE (LTS)", "aceite"),
+        ("NOVEDADES", "novedades"),
+        ("FIRMA PARTE", "firma_parte"),
+        ("HS DESPLAZAMIENTO", "hs_desplazamiento"),
+        ("HS MANTENIMIENTO", "hs_mantenimiento"),
+        ("HS REPARACIONES", "hs_reparaciones"),
+        ("HS DISPOSICION", "hs_disposicion"),
+        ("TOTAL HS CONTROL", "total_hs_control"),
+        ("NO PROGRAMADAS", "no_programadas"),
+        ("CERTIFICADO", "certificado"),
+        ("ESTADO SUB ALQUILER", "estado_sub_alquiler"),
+        ("CONTROL SUPERVISOR", "control_supervisor"),
+        ("CONTROL", "control"),
+    ]
+
+    header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1")
+    )
+
+    ws.append([c[0] for c in columnas_export])
+    for col_idx in range(1, len(columnas_export) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    row_font = Font(name="Segoe UI", size=10)
+    for r_idx, f in enumerate(filas, start=2):
+        row_data = []
+        for _, col_name in columnas_export:
+            val = f[col_name] if col_name in f.keys() else ""
+            if val is None:
+                val = ""
+            row_data.append(val)
+        ws.append(row_data)
+        for col_idx in range(1, len(columnas_export) + 1):
+            cell = ws.cell(row=r_idx, column=col_idx)
+            cell.font = row_font
+            cell.border = thin_border
+
+    for column_cells in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in column_cells)
+        ws.column_dimensions[column_cells[0].column_letter].width = min(max(12, max_len + 3), 45)
+
+    out = io.BytesIO()
+    wb.save(out)
+    contenido = out.getvalue()
+    out.close()
+
+    tag_ci = f"_{ci}" if ci else ""
+    nombre = f"Partes_Diarios{tag_ci}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 @app.get("/compras", response_class=HTMLResponse)
