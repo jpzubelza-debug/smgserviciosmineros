@@ -10935,12 +10935,16 @@ def _filtrar_movimientos_v2_rows(
     documento: str = "",
     producto: str = "",
     tipo: str = "",
+    codigo: str = "",
+    detalle: str = "",
 ):
+    codigo_filtro = (codigo or "").strip().lower()
+    detalle_filtro = (detalle or "").strip().lower()
     documento_filtro = (documento or "").strip().lower()
     producto_filtro = (producto or "").strip().lower()
     tipo_filtro = (tipo or "").strip().upper()
 
-    if not documento_filtro and not producto_filtro and not tipo_filtro:
+    if not (documento_filtro or producto_filtro or tipo_filtro or codigo_filtro or detalle_filtro):
         return filas
 
     filtradas = []
@@ -10960,6 +10964,10 @@ def _filtrar_movimientos_v2_rows(
             continue
         if producto_filtro and producto_filtro not in producto_txt:
             continue
+        if codigo_filtro and codigo_filtro not in (fila.get("producto_codigo") or "").strip().lower():
+            continue
+        if detalle_filtro and detalle_filtro not in (fila.get("observaciones") or "").strip().lower():
+            continue
         filtradas.append(fila)
 
     return filtradas
@@ -10978,6 +10986,8 @@ def movimientos_v2_pdf(
     documento: str = "",
     producto: str = "",
     tipo: str = "",
+    codigo: str = "",
+    detalle: str = "",
 ):
     with get_sqlite_connection() as conn:
         filas = _listar_movimientos_v2_rows(
@@ -10986,7 +10996,7 @@ def movimientos_v2_pdf(
             fecha_hasta=fecha_hasta,
             tipo=tipo,
         )
-    filas = _filtrar_movimientos_v2_rows(filas, documento=documento, producto=producto, tipo=tipo)
+    filas = _filtrar_movimientos_v2_rows(filas, documento=documento, producto=producto, tipo=tipo, codigo=codigo, detalle=detalle)
 
     try:
         from reportlab.lib.pagesizes import landscape, A4
@@ -11158,6 +11168,8 @@ def movimientos_v2_excel(
     documento: str = "",
     producto: str = "",
     tipo: str = "",
+    codigo: str = "",
+    detalle: str = "",
 ):
     with get_sqlite_connection() as conn:
         filas = _listar_movimientos_v2_rows(
@@ -11166,7 +11178,7 @@ def movimientos_v2_excel(
             fecha_hasta=fecha_hasta,
             tipo=tipo,
         )
-    filas = _filtrar_movimientos_v2_rows(filas, documento=documento, producto=producto, tipo=tipo)
+    filas = _filtrar_movimientos_v2_rows(filas, documento=documento, producto=producto, tipo=tipo, codigo=codigo, detalle=detalle)
 
     try:
         from openpyxl import Workbook

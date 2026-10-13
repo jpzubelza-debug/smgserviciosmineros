@@ -486,6 +486,14 @@
           <datalist id="mov-filtro-documento-lista"></datalist>
         </div>
         <div class="field">
+          <label class="field-label" for="mov-filtro-codigo">Codigo</label>
+          <input id="mov-filtro-codigo" autocomplete="off" placeholder="Codigo de producto" oninput="renderMovimientosFiltrados()">
+        </div>
+        <div class="field">
+          <label class="field-label" for="mov-filtro-detalle">Detalle</label>
+          <input id="mov-filtro-detalle" autocomplete="off" placeholder="Detalle / observaciones" oninput="renderMovimientosFiltrados()">
+        </div>
+        <div class="field">
           <label class="field-label" for="mov-filtro-producto">Producto</label>
           <input id="mov-filtro-producto" name="mov_filtro_producto" autocomplete="off" list="mov-filtro-producto-lista" placeholder="Codigo o descripcion" oninput="renderMovimientosFiltrados()" onchange="renderMovimientosFiltrados()">
           <datalist id="mov-filtro-producto-lista"></datalist>
@@ -500,7 +508,10 @@
       </div>
       <p class="msg" id="mov-msg"></p>
       <div class="table-wrap movimientos-list-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th>Producto</th><th>Empleado</th><th>Cantidad</th><th>Stock ant</th><th>Stock nuevo</th></tr></thead><tbody id="mov-body"></tbody></table></div>
-        </div>
+            <div class="inline" style="margin-top:8px;">
+              <span id="mov-info" class="msg"></span>
+              <button type="button" id="btn-mov-mas" onclick="mostrarMasMovimientos()" style="display:none;">Mostrar 30 más</button>
+            </div>        </div>
       </section>
 
       <section class="panel" id="panel-inv">
@@ -1624,7 +1635,16 @@ function actualizarSugerenciasMovimientos(){
   }
 }
 
-function renderMovimientosFiltrados(){
+let limiteMovimientos = 30;
+function mostrarMasMovimientos(){
+  limiteMovimientos += 30;
+  renderMovimientosFiltrados(false);
+}
+
+function renderMovimientosFiltrados(reiniciar = true){
+  if (reiniciar !== false) limiteMovimientos = 30;
+  const filtroCodigo = normalizarFiltroMovimiento(document.getElementById('mov-filtro-codigo')?.value || '');
+  const filtroDetalle = normalizarFiltroMovimiento(document.getElementById('mov-filtro-detalle')?.value || '');
   const filtroTipo = normalizarFiltroMovimiento(document.getElementById('mov-filtro-tipo')?.value || '');
   const filtroFecha = normalizarFiltroMovimiento(document.getElementById('mov-filtro-fecha')?.value || '');
   const filtroDocumento = normalizarFiltroMovimiento(document.getElementById('mov-filtro-documento')?.value || '');
@@ -1639,6 +1659,8 @@ function renderMovimientosFiltrados(){
     if (filtroFecha && fecha !== filtroFecha) return false;
     if (filtroDocumento && !documento.includes(filtroDocumento)) return false;
     if (filtroProducto && !producto.includes(filtroProducto)) return false;
+    if (filtroCodigo && !normalizarFiltroMovimiento(m.producto_codigo).includes(filtroCodigo)) return false;
+    if (filtroDetalle && !normalizarFiltroMovimiento(m.observaciones).includes(filtroDetalle)) return false;
     return true;
   });
 
@@ -1649,7 +1671,10 @@ function renderMovimientosFiltrados(){
     return `${signo}${cantidad}`;
   };
 
-  document.getElementById('mov-body').innerHTML = data.map(m=>`<tr><td>${esc(m.fecha)}</td><td>${esc(m.tipo)}</td><td>${esc(m.documento||'')}</td><td>${esc(m.producto||'')}</td><td>${esc(m.empleado||'')}</td><td>${esc(formatearCantidadMovimiento(m))}</td><td>${m.stock_anterior||0}</td><td>${m.stock_nuevo||0}</td></tr>`).join('');
+  const visibles = data.slice(0, limiteMovimientos);
+  document.getElementById('mov-info').textContent = `Mostrando ${visibles.length} de ${data.length}`;
+  document.getElementById('btn-mov-mas').style.display = data.length > visibles.length ? '' : 'none';
+  document.getElementById('mov-body').innerHTML = visibles.map(m=>`<tr><td>${esc(m.fecha)}</td><td>${esc(m.tipo)}</td><td>${esc(m.documento||'')}</td><td>${esc(m.producto||'')}</td><td>${esc(m.empleado||'')}</td><td>${esc(formatearCantidadMovimiento(m))}</td><td>${m.stock_anterior||0}</td><td>${m.stock_nuevo||0}</td></tr>`).join('');
   document.getElementById('mov-msg').textContent = `${data.length} movimiento(s) encontrado(s).`;
 }
 
@@ -1670,6 +1695,10 @@ function construirQueryExportMovimientos(){
   }
   if (documento) params.set('documento', documento);
   if (producto) params.set('producto', producto);
+  const codigo = document.getElementById('mov-filtro-codigo')?.value || '';
+  const detalle = document.getElementById('mov-filtro-detalle')?.value || '';
+  if (codigo) params.set('codigo', codigo);
+  if (detalle) params.set('detalle', detalle);
   return params.toString();
 }
 
@@ -1693,7 +1722,7 @@ function descargarMovimientosExcel(){
 }
 
 function limpiarFiltrosMovimientos(){
-  ['mov-filtro-tipo','mov-filtro-fecha','mov-filtro-documento','mov-filtro-producto'].forEach(id=>{
+  ['mov-filtro-tipo','mov-filtro-fecha','mov-filtro-documento','mov-filtro-producto','mov-filtro-codigo','mov-filtro-detalle'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
