@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -883,6 +883,10 @@ canvas {
             <tbody id="tablaSolicitudesBody"></tbody>
           </table>
         </div>
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
+          <span id="solicitudesInfo"></span>
+          <button id="btnMasSolicitudes" type="button" style="display:none;" onclick="mostrarMasSolicitudes()">Mostrar 30 más</button>
+        </div>
       </section>
 
       <p id="statusMsg"></p>
@@ -924,6 +928,7 @@ let datosFiltrados = {
 let autoTransitionTimer = null;
 let autoModeType = "bar";
 let filtroEstadoSolicitudes = "ALL";
+let limiteSolicitudes = 30;
 
 Chart.defaults.animation = {
   duration: 1100,
@@ -1363,10 +1368,21 @@ function renderSolicitudesFila(viajes) {
 
   if (filtrados.length === 0) {
     body.innerHTML = '<tr><td colspan="7">No hay solicitudes para el estado seleccionado.</td></tr>';
+    const infoVacio = document.getElementById("solicitudesInfo");
+    if (infoVacio) infoVacio.textContent = "";
+    const btnVacio = document.getElementById("btnMasSolicitudes");
+    if (btnVacio) btnVacio.style.display = "none";
     return;
   }
 
-  body.innerHTML = filtrados.map(v => {
+  const total = filtrados.length;
+  const mostrados = filtrados.slice(0, limiteSolicitudes);
+  const info = document.getElementById("solicitudesInfo");
+  if (info) info.textContent = `Mostrando ${mostrados.length} de ${total}`;
+  const btnMas = document.getElementById("btnMasSolicitudes");
+  if (btnMas) btnMas.style.display = total > limiteSolicitudes ? "" : "none";
+
+  body.innerHTML = mostrados.map(v => {
     return `
       <tr ondblclick="abrirDetalleSolicitudPorId('${v.id ?? ""}')" title="Doble clic para ver el detalle completo">
         <td>${v.id ?? ""}</td>
@@ -1381,8 +1397,14 @@ function renderSolicitudesFila(viajes) {
   }).join("");
 }
 
+function mostrarMasSolicitudes() {
+  limiteSolicitudes += 30;
+  renderSolicitudesFila(datosFiltrados.viajes);
+}
+
 function setFiltroEstadoSolicitudes(estado) {
   filtroEstadoSolicitudes = estado;
+  limiteSolicitudes = 30;
   ["all", "pendiente", "aprobado", "rechazado", "anulado"].forEach(key => {
     const btn = document.getElementById(`estado-${key}`);
     if (btn) {
@@ -2127,6 +2149,7 @@ aplicarPermisosPanelLogistica().finally(() => {
 });
 </script>
 
+<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:14px;bottom:14px;z-index:9999;padding:9px 16px;background:#0f172a;color:#fff;border:1px solid #38bdf8;border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);">&#8962; Menu Principal</a>
 </body>
 </html>
 

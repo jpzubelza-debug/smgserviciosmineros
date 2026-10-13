@@ -364,6 +364,21 @@
           <tbody id="tabla-body"></tbody>
         </table>
       </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+        <label for="f-limite">Lineas a visualizar</label>
+        <input id="f-limite" type="number" min="1" value="30" style="width:90px;" onchange="renderTabla(window._tablaGO)">
+        <label for="f-orden-por" style="margin-left:16px;">Ordenar por</label>
+        <select id="f-orden-por" onchange="renderTabla(window._tablaGO)">
+          <option value="nro_orden">Orden de Salida</option>
+          <option value="fecha_inicio_os">Inicio OS</option>
+          <option value="fecha_fin_os">Fin OS</option>
+        </select>
+        <select id="f-orden-dir" onchange="renderTabla(window._tablaGO)">
+          <option value="desc">Mayor a menor</option>
+          <option value="asc">Menor a mayor</option>
+        </select>
+        <span id="tabla-info"></span>
+      </div>
     </section>
   </main>
 </div>
@@ -469,7 +484,24 @@ function formatFechaCorta(v) {
 function renderTabla(data) {
   const tbody = document.getElementById('tabla-body');
   if (!tbody) return;
-  const rows = Array.isArray(data) ? data : [];
+  const todas = Array.isArray(data) ? data : [];
+  window._tablaGO = todas;
+  const limite = Math.max(1, parseInt(document.getElementById('f-limite')?.value, 10) || 30);
+  const campo = document.getElementById('f-orden-por')?.value || 'nro_orden';
+  const factor = (document.getElementById('f-orden-dir')?.value || 'desc') === 'asc' ? 1 : -1;
+  const ordenadas = todas.slice().sort((a, b) => {
+    const va = String(a[campo] || '');
+    const vb = String(b[campo] || '');
+    if (va !== vb) {
+      if (!va) return 1;
+      if (!vb) return -1;
+      return va.localeCompare(vb, undefined, { numeric: true }) * factor;
+    }
+    return String(b.nro_orden || '').localeCompare(String(a.nro_orden || ''), undefined, { numeric: true });
+  });
+  const rows = ordenadas.slice(0, limite);
+  const info = document.getElementById('tabla-info');
+  if (info) info.textContent = 'Mostrando ' + rows.length + ' de ' + todas.length;
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="13">Sin datos para los filtros seleccionados.</td></tr>';
     return;
@@ -552,5 +584,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarGestionOperativa();
 });
 </script>
+<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:14px;bottom:14px;z-index:9999;padding:9px 16px;background:#0f172a;color:#fff;border:1px solid #38bdf8;border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);">&#8962; Menu Principal</a>
 </body>
 </html>

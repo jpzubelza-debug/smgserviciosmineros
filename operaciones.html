@@ -1370,15 +1370,6 @@
 
   <!-- Main Content Area -->
   <main class="main">
-    <!-- Top Header Bar -->
-    <header class="card top-banner">
-      <div class="top-left">
-        <h1>Carga de Partes Diarios</h1>
-        <p>Registro de horas, kilómetros, consumo y novedades de equipos.</p>
-      </div>
-      <div class="top-right"></div>
-    </header>
-
     <!-- Dashboard Panel Placeholder (si se selecciona) -->
     <section class="card form-card hidden" id="panel-dashboard" style="padding: 24px;">
       <h2>Dashboard Operaciones</h2>
@@ -1684,7 +1675,10 @@
       <section class="card form-card" id="sector-formulario">
         <div class="card-header-bar">
           <div class="card-title-group">
-            <h2 id="form-title-text"></h2>
+            <div>
+              <h2 id="form-title-text" style="margin: 0; font-size: 17px; font-weight: 700; color: #ffffff;">Carga de Partes Diarios</h2>
+              <div id="form-subtitle-text" style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Registro de horas, kilómetros, consumo y novedades de equipos.</div>
+            </div>
           </div>
           <div class="header-meta">
             <span id="current-date-badge">Cargando fecha...</span>
@@ -3004,7 +2998,8 @@
     }
 
     state.modoEdicion = false;
-    document.getElementById('form-title-text').textContent = '';
+    document.getElementById('form-title-text').textContent = 'Carga de Partes Diarios';
+    document.getElementById('form-subtitle-text').textContent = 'Registro de horas, kilómetros, consumo y novedades de equipos.';
     document.getElementById('btn-submit-label').textContent = 'Cargar Parte';
   }
 
@@ -3156,6 +3151,7 @@
 
       state.modoEdicion = true;
       document.getElementById('form-title-text').textContent = `Editar Parte Diario Nº ${d.nro_parte || d.id}`;
+      document.getElementById('form-subtitle-text').textContent = `Modificando registro del equipo ${d.ci || ''}.`;
       document.getElementById('btn-submit-label').textContent = 'Guardar Cambios';
 
       document.getElementById('sector-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3295,9 +3291,17 @@
   function exportarExcel() {
     const params = new URLSearchParams();
     if (state.equipoSeleccionado) params.append('ci', state.equipoSeleccionado);
-    if (state.fechaDesde) params.append('fecha_desde', state.fechaDesde);
-    if (state.fechaHasta) params.append('fecha_hasta', state.fechaHasta);
     if (state.busqueda) params.append('q', state.busqueda);
+
+    // 1. Si hay filtro de período (fechas seleccionadas), se exporta según ese período
+    if (state.fechaDesde || state.fechaHasta) {
+      if (state.fechaDesde) params.append('fecha_desde', state.fechaDesde);
+      if (state.fechaHasta) params.append('fecha_hasta', state.fechaHasta);
+    } else if (state.filtroPeriodo === 'ultimos_30') {
+      // 2. Si no hay período seleccionado y está en "Últimos registros", exporta la cantidad de registros que se están mostrando
+      if (state.limite) params.append('limit', state.limite);
+    }
+    // 3. Si no hay período ni límite específico, el backend exporta todos los registros del equipo (o general)
 
     window.open(`/operaciones/horas-maquinas/exportar?${params.toString()}`, '_blank');
   }
@@ -3694,6 +3698,7 @@
     });
   });
 </script>
+<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:14px;bottom:14px;z-index:9999;padding:9px 16px;background:#0f172a;color:#fff;border:1px solid #38bdf8;border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);">&#8962; Menu Principal</a>
 </body>
 </html>
 

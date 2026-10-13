@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -269,7 +269,9 @@
 
     <div>
       <label>Centro de Costo</label>
-      <input type="text" id="centro_costo" placeholder="Ej: CC-001" required>
+      <select id="centro_costo" required>
+        <option value="">Seleccione el Centro de Costo</option>
+      </select>
     </div>
   </div>
 
@@ -794,6 +796,27 @@ async function procesarAsignacionRecursos() {
   }
 }
 
+async function cargarCentrosCosto() {
+  const select = document.getElementById("centro_costo");
+  try {
+    const res = await fetch("/recursos/centros-costos");
+    const centros = await res.json();
+    centros.forEach(c => {
+      const op = document.createElement("option");
+      op.value = String(c.id);
+      op.textContent = `${c.id} - ${c.nombre}`;
+      select.appendChild(op);
+    });
+  } catch (error) {
+    console.error("Error al cargar centros de costo:", error);
+  }
+  const otro = document.createElement("option");
+  otro.value = "OTRO";
+  otro.textContent = "OTRO";
+  select.appendChild(otro);
+}
+
+cargarCentrosCosto();
 cargarViajes();
 cargarVehiculos();
 cargarChoferes();
@@ -811,5 +834,6 @@ resetAcompanantes();
 
 </div>
 
+<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:14px;bottom:14px;z-index:9999;padding:9px 16px;background:#0f172a;color:#fff;border:1px solid #38bdf8;border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);">&#8962; Menu Principal</a>
 </body>
 </html>

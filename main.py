@@ -1874,6 +1874,16 @@ def _participantes_operativos(recursos_data: dict, conn):
     return out
 
 
+def _proyecto_desde_centro_costo(conn, codigo):
+    match = re.search(r"\d+", str(codigo or ""))
+    if not match:
+        return ""
+    fila = conn.execute(
+        "SELECT nombre FROM centros_costos WHERE id = ?", (int(match.group()),)
+    ).fetchone()
+    return str(fila["nombre"] or "").strip() if fila else ""
+
+
 def sincronizar_gestion_operativa_asignado(conn, orden: dict, recursos_data: dict):
     if not isinstance(orden, dict):
         return
@@ -1909,7 +1919,8 @@ def sincronizar_gestion_operativa_asignado(conn, orden: dict, recursos_data: dic
                 "ASIGNADO",
                 orden.get("id_viaje"),
                 str(recursos.get("centro_costo") or ""),
-                str(recursos.get("proyecto") or viaje.get("proyecto") or ""),
+                _proyecto_desde_centro_costo(conn, recursos.get("centro_costo"))
+                or str(recursos.get("proyecto") or viaje.get("proyecto") or ""),
                 str(recursos.get("partida") or viaje.get("origen") or ""),
                 str(recursos.get("destino") or viaje.get("destino") or ""),
                 str(recursos.get("fecha_salida_viaje") or viaje.get("fecha_salida") or ""),
@@ -2042,6 +2053,16 @@ def reconciliar_gestion_operativa_cerradas(conn):
         if not payload_data:
             continue
         sincronizar_gestion_operativa_cierre(conn, row["nro_orden"], orden, payload_data)
+
+    for fila in conn.execute(
+        "SELECT DISTINCT centro_costo, proyecto FROM gestion_operativa WHERE TRIM(COALESCE(centro_costo, '')) != ''"
+    ).fetchall():
+        nombre = _proyecto_desde_centro_costo(conn, fila["centro_costo"])
+        if nombre and nombre != fila["proyecto"]:
+            conn.execute(
+                "UPDATE gestion_operativa SET proyecto = ? WHERE centro_costo = ?",
+                (nombre, fila["centro_costo"]),
+            )
 
 
 init_sqlite()
@@ -4246,6 +4267,131 @@ def obtener_ultimo_kilometro(request: Request, ci: str = Query(..., min_length=1
         }
 
 
+@app.get("/operaciones/horas-maquinas-exportar")
+@app.get("/operaciones/horas-maquinas/exportar")
+@app.get("/api/horas-maquinas-exportar")
+@app.get("/api/horas-maquinas/exportar")
+def exportar_horas_maquinas_excel(
+    request: Request,
+    ci: str | None = Query(None),
+    fecha_desde: str | None = Query(None),
+    fecha_hasta: str | None = Query(None),
+    q: str | None = Query(None),
+    busqueda: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=10000),
+):
+    _requiere_modulo(request, "operaciones")
+    search_term = q or busqueda
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"No se pudo cargar generador Excel: {exc}")
+
+    with get_sqlite_connection() as conn:
+        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+        limite_sql = limit if limit and limit > 0 else 5000
+        query = f"""
+            SELECT * FROM horas_maquinas
+            WHERE {where_clause}
+            ORDER BY fecha_parte DESC, id DESC
+            LIMIT {int(limite_sql)}
+        """
+        filas = conn.execute(query, params).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Partes_{ci or 'General'}"[:31]
+
+    # Encabezados
+    columnas_export = [
+        ("ID", "id"),
+        ("CI", "ci"),
+        ("FECHA PARTE", "fecha_parte"),
+        ("NRO PARTE", "nro_parte"),
+        ("LEGAJO", "legajo_empleado"),
+        ("MAQUINISTA", "maquinista"),
+        ("OBRA", "obra"),
+        ("PROYECTO", "proyecto"),
+        ("DESCRIPCIÓN TRABAJOS", "descripcion_trabajos"),
+        ("TURNO", "turno"),
+        ("ACOPLADO", "acoplado"),
+        ("CLIENTE", "cliente"),
+        ("ORDEN COMPRA", "orden_compra"),
+        ("HS INICIO", "hs_inicio"),
+        ("HS FINAL", "hs_final"),
+        ("TOTAL HS", "total_hs"),
+        ("KM INICIO", "km_inicio"),
+        ("KM FINAL", "km_final"),
+        ("KM TOTAL", "km_total"),
+        ("VIAJES", "viajes"),
+        ("GASOIL (LTS)", "gasoil"),
+        ("ACEITE (LTS)", "aceite"),
+        ("NOVEDADES", "novedades"),
+        ("FIRMA PARTE", "firma_parte"),
+        ("HS DESPLAZAMIENTO", "hs_desplazamiento"),
+        ("HS MANTENIMIENTO", "hs_mantenimiento"),
+        ("HS REPARACIONES", "hs_reparaciones"),
+        ("HS DISPOSICION", "hs_disposicion"),
+        ("TOTAL HS CONTROL", "total_hs_control"),
+        ("NO PROGRAMADAS", "no_programadas"),
+        ("CERTIFICADO", "certificado"),
+        ("ESTADO SUB ALQUILER", "estado_sub_alquiler"),
+        ("CONTROL SUPERVISOR", "control_supervisor"),
+        ("CONTROL", "control"),
+    ]
+
+    header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1")
+    )
+
+    ws.append([c[0] for c in columnas_export])
+    for col_idx in range(1, len(columnas_export) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    row_font = Font(name="Segoe UI", size=10)
+    for r_idx, f in enumerate(filas, start=2):
+        row_data = []
+        for _, col_name in columnas_export:
+            val = f[col_name] if col_name in f.keys() else ""
+            if val is None:
+                val = ""
+            row_data.append(val)
+        ws.append(row_data)
+        for col_idx in range(1, len(columnas_export) + 1):
+            cell = ws.cell(row=r_idx, column=col_idx)
+            cell.font = row_font
+            cell.border = thin_border
+
+    for column_cells in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in column_cells)
+        ws.column_dimensions[column_cells[0].column_letter].width = min(max(12, max_len + 3), 45)
+
+    out = io.BytesIO()
+    wb.save(out)
+    contenido = out.getvalue()
+    out.close()
+
+    tag_ci = f"_{ci}" if ci else ""
+    nombre = f"Partes_Diarios{tag_ci}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 @app.get("/operaciones/horas-maquinas/{id_parte}")
 @app.get("/api/horas-maquinas/{id_parte}")
 def obtener_hora_maquina_detalle(request: Request, id_parte: int):
@@ -4609,127 +4755,6 @@ def eliminar_hora_maquina(request: Request, id_parte: int):
             "ok": True,
             "mensaje": f"Parte Diario Nº {fila['nro_parte'] or id_parte} del equipo {fila['ci']} eliminado correctamente."
         }
-
-
-@app.get("/operaciones/horas-maquinas-exportar")
-@app.get("/operaciones/horas-maquinas/exportar")
-def exportar_horas_maquinas_excel(
-    request: Request,
-    ci: str | None = Query(None),
-    fecha_desde: str | None = Query(None),
-    fecha_hasta: str | None = Query(None),
-    q: str | None = Query(None),
-    busqueda: str | None = Query(None),
-):
-    _requiere_modulo(request, "operaciones")
-    search_term = q or busqueda
-
-    try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"No se pudo cargar generador Excel: {exc}")
-
-    with get_sqlite_connection() as conn:
-        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
-        query = f"""
-            SELECT * FROM horas_maquinas
-            WHERE {where_clause}
-            ORDER BY fecha_parte DESC, id DESC
-            LIMIT 5000
-        """
-        filas = conn.execute(query, params).fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"Partes_{ci or 'General'}"[:31]
-
-    # Encabezados
-    columnas_export = [
-        ("ID", "id"),
-        ("CI", "ci"),
-        ("FECHA PARTE", "fecha_parte"),
-        ("NRO PARTE", "nro_parte"),
-        ("LEGAJO", "legajo_empleado"),
-        ("MAQUINISTA", "maquinista"),
-        ("OBRA", "obra"),
-        ("PROYECTO", "proyecto"),
-        ("DESCRIPCIÓN TRABAJOS", "descripcion_trabajos"),
-        ("TURNO", "turno"),
-        ("ACOPLADO", "acoplado"),
-        ("CLIENTE", "cliente"),
-        ("ORDEN COMPRA", "orden_compra"),
-        ("HS INICIO", "hs_inicio"),
-        ("HS FINAL", "hs_final"),
-        ("TOTAL HS", "total_hs"),
-        ("KM INICIO", "km_inicio"),
-        ("KM FINAL", "km_final"),
-        ("KM TOTAL", "km_total"),
-        ("VIAJES", "viajes"),
-        ("GASOIL (LTS)", "gasoil"),
-        ("ACEITE (LTS)", "aceite"),
-        ("NOVEDADES", "novedades"),
-        ("FIRMA PARTE", "firma_parte"),
-        ("HS DESPLAZAMIENTO", "hs_desplazamiento"),
-        ("HS MANTENIMIENTO", "hs_mantenimiento"),
-        ("HS REPARACIONES", "hs_reparaciones"),
-        ("HS DISPOSICION", "hs_disposicion"),
-        ("TOTAL HS CONTROL", "total_hs_control"),
-        ("NO PROGRAMADAS", "no_programadas"),
-        ("CERTIFICADO", "certificado"),
-        ("ESTADO SUB ALQUILER", "estado_sub_alquiler"),
-        ("CONTROL SUPERVISOR", "control_supervisor"),
-        ("CONTROL", "control"),
-    ]
-
-    header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    thin_border = Border(
-        left=Side(style="thin", color="CBD5E1"),
-        right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"),
-        bottom=Side(style="thin", color="CBD5E1")
-    )
-
-    ws.append([c[0] for c in columnas_export])
-    for col_idx in range(1, len(columnas_export) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-        cell.border = thin_border
-
-    row_font = Font(name="Segoe UI", size=10)
-    for r_idx, f in enumerate(filas, start=2):
-        row_data = []
-        for _, col_name in columnas_export:
-            val = f[col_name] if col_name in f.keys() else ""
-            if val is None:
-                val = ""
-            row_data.append(val)
-        ws.append(row_data)
-        for col_idx in range(1, len(columnas_export) + 1):
-            cell = ws.cell(row=r_idx, column=col_idx)
-            cell.font = row_font
-            cell.border = thin_border
-
-    for column_cells in ws.columns:
-        max_len = max(len(str(cell.value or "")) for cell in column_cells)
-        ws.column_dimensions[column_cells[0].column_letter].width = min(max(12, max_len + 3), 45)
-
-    out = io.BytesIO()
-    wb.save(out)
-    contenido = out.getvalue()
-    out.close()
-
-    tag_ci = f"_{ci}" if ci else ""
-    nombre = f"Partes_Diarios{tag_ci}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    return Response(
-        content=contenido,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
-    )
 
 
 @app.get("/compras", response_class=HTMLResponse)
@@ -6858,7 +6883,7 @@ def _gestion_operativa_resumen_payload(
                 "viaticos": round(item["viaticos"], 2),
             }
         )
-    tabla.sort(key=lambda x: (x["hh"], x["compensables"]), reverse=True)
+    tabla.sort(key=lambda x: (x["nro_orden"], x["hh"], x["compensables"]), reverse=True)
 
     def _acumular_por(campo, valor):
         m = {}
@@ -7333,6 +7358,15 @@ def personal_form(request: Request):
     
 
     
+@app.get("/recursos/centros-costos")
+def centros_costos_para_recursos():
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
+        ).fetchall()
+    return [{"id": f["id"], "nombre": (f["nombre"] or "").strip()} for f in filas]
+
+
 @app.get("/vehiculos")
 def obtener_vehiculos():
     return obtener_vehiculos_data()
