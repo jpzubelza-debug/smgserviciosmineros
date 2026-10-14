@@ -159,6 +159,26 @@
     padding: 20px;
   }
 
+  .compras-dashboard-toolbar {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(200px, 1.5fr) auto;
+    gap: 12px;
+    align-items: end;
+    margin: 4px 0 12px 0;
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+  }
+  .compras-dashboard-toolbar .field { min-width: 0; }
+  .compras-dashboard-toolbar .btn-secondary { height: 38px; white-space: nowrap; }
+  @media (max-width: 900px) {
+    .compras-dashboard-toolbar { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 520px) {
+    .compras-dashboard-toolbar { grid-template-columns: 1fr; }
+  }
+
   .compras-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .compras-kpi { padding: 16px; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 10px; background: rgba(15, 23, 42, 0.5); }
   .compras-kpi-label { color: #bfdbfe; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -549,6 +569,12 @@
   <main class="main">
     <section class="content-panel card form-card hidden" id="dashboard-compras-panel">
       <div class="oc-header"><div><h2>Dashboard de Compras</h2><p class="empty-message">Indicadores generales del módulo de compras.</p></div><button class="btn-secondary" id="btn-actualizar-dashboard-compras" type="button">Actualizar</button></div>
+      <div class="compras-dashboard-toolbar" aria-label="Filtros del dashboard de compras">
+        <div class="field"><label for="compras-filtro-desde">Desde</label><input id="compras-filtro-desde" type="date"></div>
+        <div class="field"><label for="compras-filtro-hasta">Hasta</label><input id="compras-filtro-hasta" type="date"></div>
+        <div class="field"><label for="compras-filtro-centro-costo">Centro de Costos / Proyecto</label><select id="compras-filtro-centro-costo"><option value="">Todos los centros de costo</option></select></div>
+        <button class="btn-secondary" id="btn-limpiar-filtros-dashboard" type="button">Limpiar Filtros</button>
+      </div>
       <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
       <div class="compras-charts-grid">
         <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div><div class="compras-overdue-detail hidden" id="compras-solicitudes-detail"><h3 id="compras-solicitudes-detail-title">Solicitudes por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Destino</th><th>Prioridad</th></tr></thead><tbody id="compras-solicitudes-detail-body"></tbody></table></div></div></div>
@@ -1225,13 +1251,32 @@
           });
         }
       };
+      const comprasFiltroDesde = document.getElementById('compras-filtro-desde');
+      const comprasFiltroHasta = document.getElementById('compras-filtro-hasta');
+      const comprasFiltroCentroCosto = document.getElementById('compras-filtro-centro-costo');
+      const btnLimpiarFiltrosDashboard = document.getElementById('btn-limpiar-filtros-dashboard');
+
+      const construirQueryDashboard = () => {
+        const params = new URLSearchParams();
+        if (comprasFiltroDesde && comprasFiltroDesde.value) params.set('desde', comprasFiltroDesde.value);
+        if (comprasFiltroHasta && comprasFiltroHasta.value) params.set('hasta', comprasFiltroHasta.value);
+        if (comprasFiltroCentroCosto && comprasFiltroCentroCosto.value) params.set('centro_costo_id', comprasFiltroCentroCosto.value);
+        const query = params.toString();
+        return query ? `?${query}` : '';
+      };
+
       const mostrarDetalleSolicitudesEstado = async (estado) => {
         comprasSolicitudesDetailTitle.textContent = `Solicitudes: ${estado}`;
         comprasSolicitudesDetail.classList.remove('hidden');
         comprasSolicitudesChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
         comprasSolicitudesDetailBody.innerHTML = '<tr><td colspan="5" class="empty-message">Cargando solicitudes...</td></tr>';
         try {
-          const response = await fetch(`/compras/dashboard/solicitudes?estado=${encodeURIComponent(estado)}`, { credentials: 'same-origin' });
+          const params = new URLSearchParams();
+          params.set('estado', estado);
+          if (comprasFiltroDesde && comprasFiltroDesde.value) params.set('desde', comprasFiltroDesde.value);
+          if (comprasFiltroHasta && comprasFiltroHasta.value) params.set('hasta', comprasFiltroHasta.value);
+          if (comprasFiltroCentroCosto && comprasFiltroCentroCosto.value) params.set('centro_costo_id', comprasFiltroCentroCosto.value);
+          const response = await fetch(`/compras/dashboard/solicitudes?${params.toString()}`, { credentials: 'same-origin' });
           if (!response.ok) throw new Error('No se pudieron cargar las solicitudes del estado seleccionado.');
           const solicitudes = await response.json();
           comprasSolicitudesDetailBody.innerHTML = solicitudes.length ? solicitudes.map((solicitud) => `
@@ -1248,7 +1293,12 @@
         comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
         comprasItemsDetailBody.innerHTML = '<tr><td colspan="6" class="empty-message">Cargando ítems...</td></tr>';
         try {
-          const response = await fetch(`/compras/dashboard/items?estado=${encodeURIComponent(estado)}`, { credentials: 'same-origin' });
+          const params = new URLSearchParams();
+          params.set('estado', estado);
+          if (comprasFiltroDesde && comprasFiltroDesde.value) params.set('desde', comprasFiltroDesde.value);
+          if (comprasFiltroHasta && comprasFiltroHasta.value) params.set('hasta', comprasFiltroHasta.value);
+          if (comprasFiltroCentroCosto && comprasFiltroCentroCosto.value) params.set('centro_costo_id', comprasFiltroCentroCosto.value);
+          const response = await fetch(`/compras/dashboard/items?${params.toString()}`, { credentials: 'same-origin' });
           if (!response.ok) throw new Error('No se pudieron cargar los ítems del estado seleccionado.');
           const items = await response.json();
           comprasItemsDetailBody.innerHTML = items.length ? items.map((item) => `
@@ -1512,7 +1562,8 @@
         btnEmisionOrdenCompra.classList.remove('active');
         btnOrdenesCompraEmitidas.classList.remove('active');
         try {
-          const response = await fetch('/compras/dashboard', { credentials: 'same-origin' });
+          const query = construirQueryDashboard();
+          const response = await fetch(`/compras/dashboard${query}`, { credentials: 'same-origin' });
           if (!response.ok) throw new Error('No se pudieron cargar los indicadores de compras.');
           const data = await response.json();
           const kpis = [
@@ -1726,6 +1777,20 @@
 
       btnDashboardCompras.addEventListener('click', mostrarDashboardCompras);
       document.getElementById('btn-actualizar-dashboard-compras').addEventListener('click', mostrarDashboardCompras);
+      [comprasFiltroDesde, comprasFiltroHasta, comprasFiltroCentroCosto].forEach((control) => {
+        if (control) {
+          control.addEventListener('input', mostrarDashboardCompras);
+          control.addEventListener('change', mostrarDashboardCompras);
+        }
+      });
+      if (btnLimpiarFiltrosDashboard) {
+        btnLimpiarFiltrosDashboard.addEventListener('click', () => {
+          if (comprasFiltroDesde) comprasFiltroDesde.value = '';
+          if (comprasFiltroHasta) comprasFiltroHasta.value = '';
+          if (comprasFiltroCentroCosto) comprasFiltroCentroCosto.value = '';
+          mostrarDashboardCompras();
+        });
+      }
       comprasPrioridadesBody.addEventListener('click', (event) => {
         const row = event.target.closest('.compras-deadline-row');
         if (row) mostrarDetalleFueraPlazo(row.dataset.prioridad);
@@ -2041,6 +2106,13 @@
           const destinoOption = document.createElement('option');
           destinoOption.value = `${item.id} ${item.nombre}`;
           listaCentrosCostos.appendChild(destinoOption);
+
+          if (comprasFiltroCentroCosto) {
+            const filtroOption = document.createElement('option');
+            filtroOption.value = item.id;
+            filtroOption.textContent = `${item.id} - ${item.nombre}`;
+            comprasFiltroCentroCosto.appendChild(filtroOption);
+          }
         });
         ocCentrosCostos = data.centros_costos || [];
 
@@ -2245,6 +2317,6 @@
     });
   </script>
 </div>
-<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;padding:11px 14px;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:all .18s ease;" onmouseover="this.style.background='rgba(56,189,248,.25)';this.style.color='#fff'" onmouseout="this.style.background='rgba(15,23,42,.92)';this.style.color='#e2e8f0'"><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg><span>Men&uacute; Principal</span></a>
+<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

@@ -211,6 +211,12 @@ CREATE TABLE IF NOT EXISTS seguimiento_cc (
     estado_seguimiento TEXT,
     fecha_ultima_actualizacion DATETIME,
     usuario_ultima_actualizacion INTEGER,
+    cliente_codigo TEXT,
+    telefono TEXT,
+    solicitado_por TEXT,
+    direccion TEXT,
+    contacto TEXT,
+    disponibilidad TEXT,
     FOREIGN KEY (centro_costo_id) REFERENCES centros_costos(id)
 );
 

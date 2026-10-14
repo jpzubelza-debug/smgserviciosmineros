@@ -21,12 +21,14 @@
     .pager .paglabel { color:var(--muted); font-size:.86rem; white-space:nowrap; }
     .pager .lim-wrap { display:flex; align-items:center; gap:6px; margin-left:auto; }
     .pager input[type=number] { width:80px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:6px 8px; font:inherit; }
+    .book { display:grid; grid-template-columns:230px minmax(0,1fr); } .book-main { min-width:0; } .sheet-tabs { flex-direction:column; gap:4px; padding:10px; overflow-y:auto; overflow-x:hidden; max-height:calc(100vh - 150px); border-bottom:0; border-right:1px solid var(--line); background:var(--panel2); } .sheet { display:flex; justify-content:space-between; gap:8px; text-align:left; border:1px solid var(--line); border-radius:8px; white-space:normal; word-break:break-word; } .grid-wrap { max-height:calc(100vh - 235px); }
+    @media(max-width:900px) { .book { grid-template-columns:1fr; } .sheet-tabs { flex-direction:row; flex-wrap:wrap; max-height:none; border-right:0; border-bottom:1px solid var(--line); } }
     @media(max-width:650px) { .page { padding:14px; } .head { align-items:flex-start; } h1 { font-size:1.35rem; } .status { width:100%; margin-left:0; } .grid-wrap { max-height:calc(100vh - 330px); } .pager .lim-wrap { margin-left:0; width:100%; } }
   </style>
 </head>
 <body>
   <main class="page"><header class="head"><div><h1>Base de Datos</h1><p class="subtitle">Vista de consulta en hojas, filas y columnas.</p></div><a class="back" href="/">← Menú principal</a></header>
-  <section class="book"><div class="tools"><input id="filter" type="search" placeholder="Filtrar filas de la página actual…" /><span class="status" id="status">Cargando tablas…</span></div><nav class="sheet-tabs" id="tabs" aria-label="Hojas de datos"></nav><div class="grid-wrap" id="grid"><div class="empty">Cargando datos…</div></div>
+  <section class="book"><nav class="sheet-tabs" id="tabs" aria-label="Hojas de datos"></nav><div class="book-main"><div class="tools"><input id="filter" type="search" placeholder="Filtrar filas de la página actual…" /><span class="status" id="status">Cargando tablas…</span></div><div class="grid-wrap" id="grid"><div class="empty">Cargando datos…</div></div>
   <div class="pager" id="pager" hidden>
     <button id="btnPrimero" title="Primera página">«</button>
     <button id="btnAnterior" title="Página anterior">‹ Anterior</button>
@@ -35,7 +37,7 @@
     <button id="btnUltimo" title="Última página">»</button>
     <div class="lim-wrap"><label class="paglabel" for="limite">Filas por página:</label><input id="limite" type="number" min="1" max="2000" step="1" value="100" /></div>
   </div>
-  </section></main>
+  </div></section></main>
   <script>
     const tabs = document.getElementById('tabs'), grid = document.getElementById('grid'), status = document.getElementById('status'), filter = document.getElementById('filter');
     const pager = document.getElementById('pager'), pagLabel = document.getElementById('pagLabel'), limiteInput = document.getElementById('limite');
@@ -65,6 +67,6 @@
     limiteInput.addEventListener('change', () => { let v = parseInt(limiteInput.value, 10); if (!v || v < 1) v = 1; if (v > 2000) v = 2000; limiteInput.value = v; limite = v; pagina = 1; cargarPagina(); });
     iniciar();
   </script>
-<a id="btn-menu-principal-flotante" href="/" style="position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;padding:11px 14px;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:all .18s ease;" onmouseover="this.style.background='rgba(56,189,248,.25)';this.style.color='#fff'" onmouseout="this.style.background='rgba(15,23,42,.92)';this.style.color='#e2e8f0'"><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg><span>Men&uacute; Principal</span></a>
+<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

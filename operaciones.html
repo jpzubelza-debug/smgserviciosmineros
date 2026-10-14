@@ -1476,7 +1476,7 @@
             </div>
             <div class="field">
               <label>Teléfono</label>
-              <input type="text" placeholder="Teléfono">
+              <input id="seg-telefono" type="text" placeholder="Teléfono">
             </div>
             <div class="field">
               <label for="seg-cuit">CUIT</label>
@@ -1484,15 +1484,15 @@
             </div>
             <div class="field">
               <label>Solicitado Por</label>
-              <input type="text" placeholder="Solicitado Por">
+              <input id="seg-solicitado-por" type="text" placeholder="Solicitado Por">
             </div>
             <div class="field field-wide">
               <label>Dirección</label>
-              <input type="text" placeholder="Dirección">
+              <input id="seg-direccion" type="text" placeholder="Dirección">
             </div>
             <div class="field field-wide">
               <label>Contacto</label>
-              <input type="text" placeholder="Contacto">
+              <input id="seg-contacto" type="text" placeholder="Contacto">
             </div>
             <div class="field">
               <label for="seg-centro-costo">Centro de Costo</label>
@@ -1584,7 +1584,7 @@
               <div class="details-client-grid">
                 <div class="field">
                   <label>Disponibilidad</label>
-                  <input type="text" placeholder="Disponibilidad">
+                  <input id="seg-disponibilidad" type="text" placeholder="Disponibilidad">
                 </div>
                 <div class="field">
                   <label>Condiciones Comerciales</label>
@@ -3404,6 +3404,12 @@
     ordenes.slice(1).forEach(orden => { orden.items = []; });
     return {
       seguimiento_id: document.getElementById('seg-id').value || null,
+      empresa: document.getElementById('seg-empresa').value,
+      telefono: document.getElementById('seg-telefono').value,
+      solicitado_por: document.getElementById('seg-solicitado-por').value,
+      direccion: document.getElementById('seg-direccion').value,
+      contacto: document.getElementById('seg-contacto').value,
+      disponibilidad: document.getElementById('seg-disponibilidad').value,
       centro_costo: document.getElementById('seg-centro-costo').value,
       fecha_alta_servicio: document.getElementById('seg-fecha-alta').value,
       cotizacion: document.getElementById('seg-cotizacion').value,
@@ -3421,6 +3427,14 @@
     document.getElementById('seg-id').value = seguimiento.id || '';
     document.getElementById('seg-registro').value = seguimiento.id || '';
     document.getElementById('seg-fecha-alta').value = seguimiento.fecha_alta_servicio || '';
+    document.getElementById('seg-empresa').value = seguimiento.empresa_texto || '';
+    document.getElementById('seg-cuit').value = seguimiento.cuit || '';
+    document.getElementById('seg-telefono').value = seguimiento.telefono || '';
+    document.getElementById('seg-solicitado-por').value = seguimiento.solicitado_por || '';
+    document.getElementById('seg-direccion').value = seguimiento.direccion || '';
+    document.getElementById('seg-contacto').value = seguimiento.contacto || '';
+    document.getElementById('seg-disponibilidad').value = seguimiento.disponibilidad || '';
+    document.getElementById('seg-centro-costo').value = seguimiento.centro_costo_texto || '';
     document.getElementById('seg-cotizacion').value = seguimiento.cotizacion || '';
     document.getElementById('seg-fecha-inicio').value = seguimiento.fecha_inicio || '';
     document.getElementById('seg-fecha-final').value = seguimiento.fecha_final || '';
@@ -3457,6 +3471,8 @@
     document.getElementById('seg-id').value = '';
     document.getElementById('seg-registro').value = '';
     document.getElementById('seg-fecha-alta').value = '';
+    ['empresa', 'cuit', 'telefono', 'solicitado-por', 'direccion', 'contacto', 'disponibilidad', 'centro-costo']
+      .forEach(campo => { document.getElementById(`seg-${campo}`).value = ''; });
     document.getElementById('seg-cotizacion').value = '';
     document.getElementById('seg-fecha-inicio').value = '';
     document.getElementById('seg-fecha-final').value = '';

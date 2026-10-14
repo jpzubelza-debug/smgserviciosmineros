@@ -1280,6 +1280,15 @@ def migrar_centros_costos(conn):
             conn.execute(f"ALTER TABLE centros_costos ADD COLUMN {nombre} {definicion}")
 
 
+def migrar_seguimiento_cc(conn):
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(seguimiento_cc)").fetchall()}
+    if not columnas:
+        return
+    for nombre in ("cliente_codigo", "telefono", "solicitado_por", "direccion", "contacto", "disponibilidad"):
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE seguimiento_cc ADD COLUMN {nombre} TEXT")
+
+
 def migrar_clientes_excel(conn):
     ruta_excel = os.path.join(BASE_DIR, "Clientes.xlsx")
     if not os.path.exists(ruta_excel):
@@ -1423,6 +1432,7 @@ def init_sqlite():
                 migrar_habilitaciones_personal(conn)
                 migrar_horas_maquinas(conn)
                 migrar_centros_costos(conn)
+                migrar_seguimiento_cc(conn)
                 migrar_clientes_excel(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
@@ -3748,9 +3758,31 @@ def obtener_seguimiento_cliente(request: Request, seguimiento_id: int):
                 (orden["id"],),
             ).fetchall()
             ordenes_payload.append({**dict(orden), "items": [dict(item) for item in items]})
+        centro_costo_texto = ""
+        if seguimiento["centro_costo_id"] is not None:
+            cc = conn.execute(
+                "SELECT id, nombre FROM centros_costos WHERE id = ?", (seguimiento["centro_costo_id"],)
+            ).fetchone()
+            if cc:
+                centro_costo_texto = f"{cc['id']} - {(cc['nombre'] or '').strip()}"
+        empresa_texto = ""
+        cuit = ""
+        codigo_cliente = (seguimiento["cliente_codigo"] or "").strip() if "cliente_codigo" in seguimiento.keys() else ""
+        if codigo_cliente:
+            cli = conn.execute(
+                "SELECT codigo, razon_social, cuit FROM clientes WHERE codigo = ?", (codigo_cliente,)
+            ).fetchone()
+            if cli:
+                empresa_texto = f"{cli['codigo']} - {cli['razon_social']}"
+                cuit = cli["cuit"] or ""
+            else:
+                empresa_texto = codigo_cliente
     seguimiento_payload = {
         **dict(seguimiento),
         "numero_seg": _numero_seguimiento_cliente(seguimiento["id"]),
+        "centro_costo_texto": centro_costo_texto,
+        "empresa_texto": empresa_texto,
+        "cuit": cuit,
     }
     return {"seguimiento": seguimiento_payload, "ordenes": ordenes_payload}
 
@@ -3778,6 +3810,12 @@ async def guardar_seguimiento_cliente(request: Request):
     fecha_final = str(payload.get("fecha_final") or "").strip() or None
     condiciones = str(payload.get("condiciones_comerciales") or "").strip() or None
     estado = str(payload.get("estado_seguimiento") or "En preparación").strip() or "En preparación"
+    cliente_codigo = str(payload.get("empresa") or "").split(" - ", 1)[0].strip() or None
+    telefono = str(payload.get("telefono") or "").strip() or None
+    solicitado_por = str(payload.get("solicitado_por") or "").strip() or None
+    direccion = str(payload.get("direccion") or "").strip() or None
+    contacto = str(payload.get("contacto") or "").strip() or None
+    disponibilidad = str(payload.get("disponibilidad") or "").strip() or None
     try:
         cantidad_certificados = int(payload.get("cantidad_certificados") or 0)
     except (TypeError, ValueError):
@@ -3797,11 +3835,14 @@ async def guardar_seguimiento_cliente(request: Request):
                     UPDATE seguimiento_cc SET centro_costo_id = ?, fecha_alta_servicio = ?,
                         cotizacion = ?, fecha_inicio = ?, fecha_final = ?,
                         cantidad_certificados = ?, condiciones_comerciales = ?,
-                        estado_seguimiento = ?, fecha_ultima_actualizacion = CURRENT_TIMESTAMP
+                        estado_seguimiento = ?, cliente_codigo = ?, telefono = ?,
+                        solicitado_por = ?, direccion = ?, contacto = ?, disponibilidad = ?,
+                        fecha_ultima_actualizacion = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
                     (centro_costo_id, fecha_alta, cotizacion, fecha_inicio, fecha_final,
-                     cantidad_certificados, condiciones, estado, seguimiento_id),
+                     cantidad_certificados, condiciones, estado, cliente_codigo, telefono,
+                     solicitado_por, direccion, contacto, disponibilidad, seguimiento_id),
                 )
             else:
                 seguimiento_id = conn.execute(
@@ -3812,11 +3853,13 @@ async def guardar_seguimiento_cliente(request: Request):
                     INSERT INTO seguimiento_cc (
                         id, centro_costo_id, fecha_alta_servicio, cotizacion, fecha_inicio,
                         fecha_final, cantidad_certificados, condiciones_comerciales,
-                        estado_seguimiento, fecha_ultima_actualizacion
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        estado_seguimiento, cliente_codigo, telefono, solicitado_por,
+                        direccion, contacto, disponibilidad, fecha_ultima_actualizacion
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
                     (seguimiento_id, centro_costo_id, fecha_alta, cotizacion, fecha_inicio,
-                     fecha_final, cantidad_certificados, condiciones, estado),
+                     fecha_final, cantidad_certificados, condiciones, estado, cliente_codigo,
+                     telefono, solicitado_por, direccion, contacto, disponibilidad),
                 )
 
             conn.execute(
@@ -4929,35 +4972,147 @@ def compras_listar_solicitudes(request: Request):
 
 
 @app.get("/compras/dashboard")
-def compras_dashboard(request: Request):
+def compras_dashboard(
+    request: Request,
+    desde: str = Query(None),
+    hasta: str = Query(None),
+    centro_costo_id: str = Query(None),
+):
     _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+
+    desde_val = desde.strip() if desde and desde.strip() else None
+    hasta_val = hasta.strip() if hasta and hasta.strip() else None
+    cc_id_val = None
+    if centro_costo_id and str(centro_costo_id).strip():
+        try:
+            cc_id_val = int(str(centro_costo_id).strip())
+        except ValueError:
+            cc_id_val = None
 
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_solicitudes(conn)
-        solicitudes = conn.execute("SELECT COUNT(*) AS total FROM solicitud_compra").fetchone()["total"]
-        ordenes = conn.execute("SELECT COUNT(*) AS total FROM OrdenCompra").fetchone()["total"]
-        ordenes_anuladas = conn.execute("SELECT COUNT(*) AS total FROM OrdenCompra WHERE UPPER(COALESCE(estado, '')) = 'ANULADA'").fetchone()["total"]
+
+        # Filtros para Solicitud de Compra
+        sc_where = []
+        sc_params = []
+        if desde_val:
+            sc_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
+            sc_params.append(desde_val)
+        if hasta_val:
+            sc_where.append("substr(sc.fecha_solicitud, 1, 10) <= ?")
+            sc_params.append(hasta_val)
+        if cc_id_val is not None:
+            sc_where.append("EXISTS (SELECT 1 FROM solicitud_compra_detalle scd WHERE scd.id_solicitud = sc.id AND scd.id_centro_costo = ?)")
+            sc_params.append(cc_id_val)
+        sc_where_clause = ("WHERE " + " AND ".join(sc_where)) if sc_where else ""
+
+        # Filtros para Orden de Compra
+        oc_where = []
+        oc_params = []
+        if desde_val:
+            oc_where.append("substr(oc.fecha, 1, 10) >= ?")
+            oc_params.append(desde_val)
+        if hasta_val:
+            oc_where.append("substr(oc.fecha, 1, 10) <= ?")
+            oc_params.append(hasta_val)
+        if cc_id_val is not None:
+            oc_where.append("EXISTS (SELECT 1 FROM OrdenCompraDetalle ocd WHERE ocd.orden_compra_id = oc.id AND ocd.centro_costo_id = ?)")
+            oc_params.append(cc_id_val)
+        oc_where_clause = ("WHERE " + " AND ".join(oc_where)) if oc_where else ""
+
+        # Filtros para detalles de ítems de solicitud
+        d_where = []
+        d_params = []
+        if desde_val:
+            d_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
+            d_params.append(desde_val)
+        if hasta_val:
+            d_where.append("substr(sc.fecha_solicitud, 1, 10) <= ?")
+            d_params.append(hasta_val)
+        if cc_id_val is not None:
+            d_where.append("d.id_centro_costo = ?")
+            d_params.append(cc_id_val)
+        d_where_clause = ("WHERE " + " AND ".join(d_where)) if d_where else ""
+
+        solicitudes = conn.execute(
+            f"SELECT COUNT(*) AS total FROM solicitud_compra sc {sc_where_clause}",
+            sc_params
+        ).fetchone()["total"]
+
+        ordenes = conn.execute(
+            f"SELECT COUNT(*) AS total FROM OrdenCompra oc {oc_where_clause}",
+            oc_params
+        ).fetchone()["total"]
+
+        oc_anuladas_where = (oc_where[:] if oc_where else []) + ["UPPER(COALESCE(oc.estado, '')) = 'ANULADA'"]
+        ordenes_anuladas = conn.execute(
+            f"SELECT COUNT(*) AS total FROM OrdenCompra oc WHERE {' AND '.join(oc_anuladas_where)}",
+            oc_params
+        ).fetchone()["total"]
+
         proveedores = conn.execute("SELECT COUNT(*) AS total FROM proveedores").fetchone()["total"]
+
+        # Items pendientes
+        d_pend_where = (d_where[:] if d_where else []) + ["UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) IN ('PENDIENTE', 'APROBADA')"]
         items_pendientes = conn.execute(
-            "SELECT COUNT(*) AS total FROM solicitud_compra_detalle WHERE UPPER(COALESCE(estado_aprobacion, 'PENDIENTE')) IN ('PENDIENTE', 'APROBADA')"
+            f'''
+            SELECT COUNT(*) AS total
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            WHERE {' AND '.join(d_pend_where)}
+            ''',
+            d_params
         ).fetchone()["total"]
+
+        # Total neto
+        tot_neto_where = ["UPPER(COALESCE(oc.estado, '')) <> 'ANULADA'"]
+        tot_neto_params = []
+        if desde_val:
+            tot_neto_where.append("substr(oc.fecha, 1, 10) >= ?")
+            tot_neto_params.append(desde_val)
+        if hasta_val:
+            tot_neto_where.append("substr(oc.fecha, 1, 10) <= ?")
+            tot_neto_params.append(hasta_val)
+        if cc_id_val is not None:
+            tot_neto_where.append("ocd.centro_costo_id = ?")
+            tot_neto_params.append(cc_id_val)
+
         total_neto = conn.execute(
-            "SELECT COALESCE(SUM(ocd.subtotal), 0) AS total FROM OrdenCompra oc INNER JOIN OrdenCompraDetalle ocd ON ocd.orden_compra_id = oc.id WHERE UPPER(COALESCE(oc.estado, '')) <> 'ANULADA'"
+            f'''
+            SELECT COALESCE(SUM(ocd.subtotal), 0) AS total
+            FROM OrdenCompra oc
+            INNER JOIN OrdenCompraDetalle ocd ON ocd.orden_compra_id = oc.id
+            WHERE {' AND '.join(tot_neto_where)}
+            ''',
+            tot_neto_params
         ).fetchone()["total"]
+
+        # Solicitudes aprobadas (ítems aprobados)
+        d_aprob_where = (d_where[:] if d_where else []) + ["UPPER(COALESCE(d.estado_aprobacion, '')) = 'APROBADA'"]
         solicitudes_aprobadas = conn.execute(
-            "SELECT COUNT(*) AS total FROM solicitud_compra_detalle WHERE UPPER(COALESCE(estado_aprobacion, '')) = 'APROBADA'"
+            f'''
+            SELECT COUNT(*) AS total
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            WHERE {' AND '.join(d_aprob_where)}
+            ''',
+            d_params
         ).fetchone()["total"]
+
         estados_solicitudes = conn.execute(
-            '''
+            f'''
             SELECT COALESCE(ec.nombre, 'Sin estado') AS estado, COUNT(*) AS total
             FROM solicitud_compra sc
             LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            {sc_where_clause}
             GROUP BY COALESCE(ec.nombre, 'Sin estado')
             ORDER BY total DESC, estado
-            '''
+            ''',
+            sc_params
         ).fetchall()
+
         estados_items = conn.execute(
-            '''
+            f'''
             SELECT CASE
                 WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
                 WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
@@ -4965,14 +5120,18 @@ def compras_dashboard(request: Request):
                 ELSE 'Pendiente'
             END AS estado, COUNT(*) AS total
             FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
+            {d_where_clause}
             GROUP BY estado
             ORDER BY total DESC, estado
-            '''
+            ''',
+            d_params
         ).fetchall()
+
         detalles_items = conn.execute(
-            '''
+            f'''
             SELECT CASE
                 WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
                 WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
@@ -4990,22 +5149,27 @@ def compras_dashboard(request: Request):
             LEFT JOIN personal p ON p.legajo = sc.id_solicitante
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
+            {d_where_clause}
             ORDER BY sc.id DESC, d.id
-            '''
+            ''',
+            d_params
         ).fetchall()
+
         solicitudes_plazo = conn.execute(
-            '''
-                 SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
-                     COALESCE(pc.nombre, 'Sin prioridad') AS prioridad,
-                     d.id AS detalle_id, d.descripcion_articulo, d.estado_aprobacion,
-                     vinculo.id AS vinculo_id
+            f'''
+            SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
+                   COALESCE(pc.nombre, 'Sin prioridad') AS prioridad,
+                   d.id AS detalle_id, d.descripcion_articulo, d.estado_aprobacion,
+                   vinculo.id AS vinculo_id
             FROM solicitud_compra sc
             LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
             LEFT JOIN solicitud_compra_detalle d ON d.id_solicitud = sc.id
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
+            {d_where_clause}
             ORDER BY sc.id
-            '''
+            ''',
+            d_params
         ).fetchall()
 
     prioridad_config = {
@@ -5079,16 +5243,50 @@ def compras_dashboard(request: Request):
 
 
 @app.get("/compras/dashboard/items")
-def compras_dashboard_items(estado: str, request: Request):
+def compras_dashboard_items(
+    estado: str,
+    request: Request,
+    desde: str = Query(None),
+    hasta: str = Query(None),
+    centro_costo_id: str = Query(None),
+):
     _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
     estados_validos = {"Gestionado", "Pendiente de gestionar", "Rechazado", "Pendiente"}
     if estado not in estados_validos:
         raise HTTPException(status_code=400, detail="Estado de ítems inválido.")
 
+    desde_val = desde.strip() if desde and desde.strip() else None
+    hasta_val = hasta.strip() if hasta and hasta.strip() else None
+    cc_id_val = None
+    if centro_costo_id and str(centro_costo_id).strip():
+        try:
+            cc_id_val = int(str(centro_costo_id).strip())
+        except ValueError:
+            cc_id_val = None
+
+    d_where = [
+        """CASE
+            WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
+            WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
+            WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
+            ELSE 'Pendiente'
+        END = ?"""
+    ]
+    d_params = [estado]
+    if desde_val:
+        d_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
+        d_params.append(desde_val)
+    if hasta_val:
+        d_where.append("substr(sc.fecha_solicitud, 1, 10) <= ?")
+        d_params.append(hasta_val)
+    if cc_id_val is not None:
+        d_where.append("d.id_centro_costo = ?")
+        d_params.append(cc_id_val)
+
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_solicitudes(conn)
         filas = conn.execute(
-            '''
+            f'''
             SELECT sc.numero_solicitud,
                    sc.fecha_solicitud,
                    COALESCE(p.nombre, '') AS solicitante,
@@ -5100,26 +5298,48 @@ def compras_dashboard_items(estado: str, request: Request):
             LEFT JOIN personal p ON p.legajo = sc.id_solicitante
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
-            WHERE CASE
-                WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
-                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
-                WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
-                ELSE 'Pendiente'
-            END = ?
+            WHERE {' AND '.join(d_where)}
             ORDER BY sc.id DESC, d.id
             ''',
-            (estado,),
+            d_params,
         ).fetchall()
     return [dict(fila) for fila in filas]
 
 
 @app.get("/compras/dashboard/solicitudes")
-def compras_dashboard_solicitudes(estado: str, request: Request):
+def compras_dashboard_solicitudes(
+    estado: str,
+    request: Request,
+    desde: str = Query(None),
+    hasta: str = Query(None),
+    centro_costo_id: str = Query(None),
+):
     _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+
+    desde_val = desde.strip() if desde and desde.strip() else None
+    hasta_val = hasta.strip() if hasta and hasta.strip() else None
+    cc_id_val = None
+    if centro_costo_id and str(centro_costo_id).strip():
+        try:
+            cc_id_val = int(str(centro_costo_id).strip())
+        except ValueError:
+            cc_id_val = None
+
+    sc_where = ["COALESCE(ec.nombre, 'Sin estado') = ?"]
+    sc_params = [estado]
+    if desde_val:
+        sc_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
+        sc_params.append(desde_val)
+    if hasta_val:
+        sc_where.append("substr(sc.fecha_solicitud, 1, 10) <= ?")
+        sc_params.append(hasta_val)
+    if cc_id_val is not None:
+        sc_where.append("EXISTS (SELECT 1 FROM solicitud_compra_detalle scd WHERE scd.id_solicitud = sc.id AND scd.id_centro_costo = ?)")
+        sc_params.append(cc_id_val)
 
     with get_sqlite_connection() as conn:
         filas = conn.execute(
-            '''
+            f'''
             SELECT sc.numero_solicitud,
                    sc.fecha_solicitud,
                    COALESCE(p.nombre, '') AS solicitante,
@@ -5130,10 +5350,10 @@ def compras_dashboard_solicitudes(estado: str, request: Request):
             LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
             LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
             LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
-            WHERE COALESCE(ec.nombre, 'Sin estado') = ?
+            WHERE {' AND '.join(sc_where)}
             ORDER BY sc.id DESC
             ''',
-            (estado,),
+            sc_params,
         ).fetchall()
     return [dict(fila) for fila in filas]
 
