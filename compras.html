@@ -161,7 +161,7 @@
 
   .compras-dashboard-toolbar {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(200px, 1.5fr) auto;
+    grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(200px, 1.5fr) auto auto;
     gap: 12px;
     align-items: end;
     margin: 4px 0 12px 0;
@@ -171,7 +171,8 @@
     border-radius: 10px;
   }
   .compras-dashboard-toolbar .field { min-width: 0; }
-  .compras-dashboard-toolbar .btn-secondary { height: 38px; white-space: nowrap; }
+  .compras-dashboard-toolbar .btn-secondary,
+  .compras-dashboard-toolbar .btn-primary { height: 38px; white-space: nowrap; }
   @media (max-width: 900px) {
     .compras-dashboard-toolbar { grid-template-columns: 1fr 1fr; }
   }
@@ -574,11 +575,12 @@
         <div class="field"><label for="compras-filtro-hasta">Hasta</label><input id="compras-filtro-hasta" type="date"></div>
         <div class="field"><label for="compras-filtro-centro-costo">Centro de Costos / Proyecto</label><select id="compras-filtro-centro-costo"><option value="">Todos los centros de costo</option></select></div>
         <button class="btn-secondary" id="btn-limpiar-filtros-dashboard" type="button">Limpiar Filtros</button>
+        <button class="btn-primary" id="btn-exportar-dashboard-excel" type="button">Exportar Excel</button>
       </div>
       <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
       <div class="compras-charts-grid">
         <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div><div class="compras-overdue-detail hidden" id="compras-solicitudes-detail"><h3 id="compras-solicitudes-detail-title">Solicitudes por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Destino</th><th>Prioridad</th></tr></thead><tbody id="compras-solicitudes-detail-body"></tbody></table></div></div></div>
-        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
+        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th><th>Precio Unit.</th><th>Total</th><th>N.º OC</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
       </div>
       <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
     </section>
@@ -1291,7 +1293,7 @@
         comprasItemsDetailTitle.textContent = `Ítems: ${estado}`;
         comprasItemsDetail.classList.remove('hidden');
         comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
-        comprasItemsDetailBody.innerHTML = '<tr><td colspan="6" class="empty-message">Cargando ítems...</td></tr>';
+        comprasItemsDetailBody.innerHTML = '<tr><td colspan="9" class="empty-message">Cargando ítems...</td></tr>';
         try {
           const params = new URLSearchParams();
           params.set('estado', estado);
@@ -1302,11 +1304,21 @@
           if (!response.ok) throw new Error('No se pudieron cargar los ítems del estado seleccionado.');
           const items = await response.json();
           comprasItemsDetailBody.innerHTML = items.length ? items.map((item) => `
-            <tr><td>${escapeHtml(item.numero_solicitud)}</td><td>${escapeHtml(item.fecha_solicitud || '')}</td><td>${escapeHtml(item.solicitante || '')}</td><td>${escapeHtml(item.descripcion_articulo || '')}</td><td>${escapeHtml(item.cantidad)}</td><td>${escapeHtml(item.unidad_medida || '')}</td></tr>
-          `).join('') : '<tr><td colspan="6" class="empty-message">No hay ítems para este estado.</td></tr>';
+            <tr>
+              <td>${escapeHtml(item.numero_solicitud)}</td>
+              <td>${escapeHtml(item.fecha_solicitud || '')}</td>
+              <td>${escapeHtml(item.solicitante || '')}</td>
+              <td>${escapeHtml(item.descripcion_articulo || '')}</td>
+              <td>${escapeHtml(item.cantidad)}</td>
+              <td>${escapeHtml(item.unidad_medida || '')}</td>
+              <td>${item.precio_unitario != null ? formatCurrency(item.precio_unitario) : '-'}</td>
+              <td>${item.total != null ? formatCurrency(item.total) : '-'}</td>
+              <td>${escapeHtml(item.numero_oc || '-')}</td>
+            </tr>
+          `).join('') : '<tr><td colspan="9" class="empty-message">No hay ítems para este estado.</td></tr>';
         } catch (error) {
           console.error(error);
-          comprasItemsDetailBody.innerHTML = `<tr><td colspan="6" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
+          comprasItemsDetailBody.innerHTML = `<tr><td colspan="9" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
         }
       };
       document.addEventListener('keydown', (event) => {
@@ -1775,6 +1787,28 @@
         }
       };
 
+      const btnExportarDashboardExcel = document.getElementById('btn-exportar-dashboard-excel');
+      if (btnExportarDashboardExcel) {
+        btnExportarDashboardExcel.addEventListener('click', async () => {
+          try {
+            const query = construirQueryDashboard();
+            const response = await fetch(`/compras/dashboard/excel${query}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('No se pudo generar el archivo Excel.');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = obtenerNombreDescarga(response, 'Dashboard_Compras.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error(error);
+            alert(error.message || 'Error al exportar a Excel.');
+          }
+        });
+      }
       btnDashboardCompras.addEventListener('click', mostrarDashboardCompras);
       document.getElementById('btn-actualizar-dashboard-compras').addEventListener('click', mostrarDashboardCompras);
       [comprasFiltroDesde, comprasFiltroHasta, comprasFiltroCentroCosto].forEach((control) => {

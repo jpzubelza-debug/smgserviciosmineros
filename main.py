@@ -5143,12 +5143,19 @@ def compras_dashboard(
                    COALESCE(p.nombre, '') AS solicitante,
                    COALESCE(d.descripcion_articulo, '') AS descripcion_articulo,
                    d.cantidad,
-                   COALESCE(d.unidad_medida, '') AS unidad_medida
+                   COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   ocd.precio_unitario,
+                   ocd.subtotal AS total,
+                   oc.numero_oc
             FROM solicitud_compra_detalle d
             INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
             LEFT JOIN personal p ON p.legajo = sc.id_solicitante
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
+            LEFT JOIN OrdenCompraDetalle ocd
+                   ON ocd.id = vinculo.orden_compra_detalle_id
+            LEFT JOIN OrdenCompra oc
+                   ON oc.id = ocd.orden_compra_id
             {d_where_clause}
             ORDER BY sc.id DESC, d.id
             ''',
@@ -5292,12 +5299,19 @@ def compras_dashboard_items(
                    COALESCE(p.nombre, '') AS solicitante,
                    COALESCE(d.descripcion_articulo, '') AS descripcion_articulo,
                    d.cantidad,
-                   COALESCE(d.unidad_medida, '') AS unidad_medida
+                   COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   ocd.precio_unitario,
+                   ocd.subtotal AS total,
+                   oc.numero_oc
             FROM solicitud_compra_detalle d
             INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
             LEFT JOIN personal p ON p.legajo = sc.id_solicitante
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
+            LEFT JOIN OrdenCompraDetalle ocd
+                   ON ocd.id = vinculo.orden_compra_detalle_id
+            LEFT JOIN OrdenCompra oc
+                   ON oc.id = ocd.orden_compra_id
             WHERE {' AND '.join(d_where)}
             ORDER BY sc.id DESC, d.id
             ''',
@@ -5356,6 +5370,170 @@ def compras_dashboard_solicitudes(
             sc_params,
         ).fetchall()
     return [dict(fila) for fila in filas]
+
+
+@app.get("/compras/dashboard/excel")
+def compras_dashboard_excel(
+    request: Request,
+    desde: str = Query(None),
+    hasta: str = Query(None),
+    centro_costo_id: str = Query(None),
+):
+    _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+
+    desde_val = desde.strip() if desde and desde.strip() else None
+    hasta_val = hasta.strip() if hasta and hasta.strip() else None
+    cc_id_val = None
+    if centro_costo_id and str(centro_costo_id).strip():
+        try:
+            cc_id_val = int(str(centro_costo_id).strip())
+        except ValueError:
+            cc_id_val = None
+
+    d_where = []
+    d_params = []
+    if desde_val:
+        d_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
+        d_params.append(desde_val)
+    if hasta_val:
+        d_where.append("substr(sc.fecha_solicitud, 1, 10) <= ?")
+        d_params.append(hasta_val)
+    if cc_id_val is not None:
+        d_where.append("d.id_centro_costo = ?")
+        d_params.append(cc_id_val)
+    d_where_clause = ("WHERE " + " AND ".join(d_where)) if d_where else ""
+
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_solicitudes(conn)
+        filas = conn.execute(
+            f'''
+            SELECT sc.numero_solicitud,
+                   sc.fecha_solicitud,
+                   COALESCE(p.nombre, '') AS solicitante,
+                   COALESCE(cc.nombre, '') AS centro_costo,
+                   COALESCE(d.descripcion_articulo, '') AS descripcion_articulo,
+                   d.cantidad,
+                   COALESCE(d.unidad_medida, '') AS unidad_medida,
+                   CASE
+                       WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
+                       WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
+                       WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
+                       ELSE 'Pendiente'
+                   END AS estado_item,
+                   COALESCE(ec.nombre, 'Sin estado') AS estado_solicitud,
+                   COALESCE(pc.nombre, 'Sin prioridad') AS prioridad,
+                   oc.numero_oc,
+                   oc.fecha AS fecha_oc,
+                   COALESCE(prov."NOM_PROVEE", '') AS proveedor,
+                   ocd.precio_unitario,
+                   ocd.subtotal AS total
+            FROM solicitud_compra_detalle d
+            INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            LEFT JOIN centros_costos cc ON cc.id = d.id_centro_costo
+            LEFT JOIN personal p ON p.legajo = sc.id_solicitante
+            LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN estados_compra ec ON ec.id = sc.id_estado
+            LEFT JOIN OrdenCompraDetalleSolicitud vinculo
+                   ON vinculo.solicitud_compra_detalle_id = d.id
+            LEFT JOIN OrdenCompraDetalle ocd
+                   ON ocd.id = vinculo.orden_compra_detalle_id
+            LEFT JOIN OrdenCompra oc
+                   ON oc.id = ocd.orden_compra_id
+            LEFT JOIN proveedores prov
+                   ON prov.id = oc.proveedor_id
+            {d_where_clause}
+            ORDER BY sc.id DESC, d.id
+            ''',
+            d_params
+        ).fetchall()
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except Exception as exc:
+        return Response(content=f"No se pudo generar el XLSX: {exc}", status_code=500)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Indicadores Compras"
+
+    headers = [
+        "N.º Solicitud", "Fecha Solicitud", "Solicitante", "Centro de Costos",
+        "Artículo / Descripción", "Cantidad", "Unidad", "Estado Ítem",
+        "Estado Solicitud", "Prioridad", "N.º OC", "Fecha OC",
+        "Proveedor", "Precio Unitario", "Total"
+    ]
+    ws.append(headers)
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    thin_border = Border(
+        left=Side(style='thin', color='D1D5DB'),
+        right=Side(style='thin', color='D1D5DB'),
+        top=Side(style='thin', color='D1D5DB'),
+        bottom=Side(style='thin', color='D1D5DB')
+    )
+
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+
+    for row_idx, fila in enumerate(filas, start=2):
+        cant = float(fila["cantidad"]) if fila["cantidad"] is not None else 0.0
+        pu = float(fila["precio_unitario"]) if fila["precio_unitario"] is not None else (0.0 if fila["numero_oc"] else None)
+        tot = float(fila["total"]) if fila["total"] is not None else (0.0 if fila["numero_oc"] else None)
+
+        valores = [
+            fila["numero_solicitud"] or "",
+            (fila["fecha_solicitud"] or "")[:10],
+            fila["solicitante"] or "",
+            fila["centro_costo"] or "",
+            fila["descripcion_articulo"] or "",
+            cant,
+            fila["unidad_medida"] or "",
+            fila["estado_item"] or "",
+            fila["estado_solicitud"] or "",
+            fila["prioridad"] or "",
+            fila["numero_oc"] or "",
+            (fila["fecha_oc"] or "")[:10],
+            fila["proveedor"] or "",
+            pu if pu is not None else "",
+            tot if tot is not None else ""
+        ]
+        ws.append(valores)
+
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = thin_border
+            if col_idx in (1, 2, 7, 8, 9, 10, 11, 12):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (6, 14, 15):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if col_idx in (14, 15) and isinstance(cell.value, (int, float)):
+                    cell.number_format = '$ #,##0.00'
+                elif col_idx == 6 and isinstance(cell.value, (int, float)):
+                    cell.number_format = '#,##0.00'
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = col[0].column_letter
+        ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 45)
+
+    out = io.BytesIO()
+    wb.save(out)
+    contenido = out.getvalue()
+    out.close()
+
+    nombre = f"Dashboard_Compras_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 @app.get("/compras/proveedores")

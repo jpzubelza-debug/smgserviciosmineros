@@ -119,6 +119,49 @@ class ComprasRouteTests(unittest.TestCase):
         self.assertTrue(any("2026-01-01" in p for p in params_usados))
         self.assertTrue(any(10 in p for p in params_usados))
 
+    def test_dashboard_compras_excel(self):
+        class DummyRequest:
+            pass
+
+        class FakeResult:
+            def __init__(self, rows=None):
+                self._rows = list(rows or [])
+
+            def fetchall(self):
+                return list(self._rows)
+
+        fake_rows = [{
+            "numero_solicitud": "SC-0001",
+            "fecha_solicitud": "2026-05-10",
+            "solicitante": "Carlos",
+            "centro_costo": "10 - Minera",
+            "descripcion_articulo": "Filtro",
+            "cantidad": 2,
+            "unidad_medida": "UN",
+            "estado_item": "Gestionado",
+            "estado_solicitud": "Completada",
+            "prioridad": "Alta",
+            "numero_oc": "OC-0001",
+            "fecha_oc": "2026-05-12",
+            "proveedor": "Filtros SA",
+            "precio_unitario": 1500.0,
+            "total": 3000.0
+        }]
+
+        fake_conn = MagicMock()
+        fake_conn.__enter__.return_value = fake_conn
+        fake_conn.__exit__.return_value = None
+        fake_conn.execute.return_value = FakeResult(fake_rows)
+
+        with patch.object(main, "_requiere_accion_compras_por_tipo", return_value={"usuario": "admin"}), \
+             patch.object(main, "get_sqlite_connection", return_value=fake_conn), \
+             patch.object(main, "_ensure_orden_compra_solicitudes"):
+            response = main.compras_dashboard_excel(DummyRequest(), desde="2026-01-01", hasta="2026-12-31")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.assertTrue(len(response.body) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()
