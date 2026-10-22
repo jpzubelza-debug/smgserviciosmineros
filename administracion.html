@@ -466,6 +466,7 @@
       ["almacen", "Almacen"],
       ["operaciones", "Operaciones"],
       ["compras", "Compras"],
+      ["facturacion", "Facturacion y Cobranzas"],
       ["rrhh", "Recursos Humanos"],
       ["mantenimiento", "Mantenimiento"],
       ["dashboard_ejecutivo", "Dashboard Ejecutivo"],
@@ -503,6 +504,7 @@
       operaciones: [
         ["dashboard", "Dashboard"],
         ["carga_partes_diarios", "Carga de Partes Diarios"],
+        ["seguimiento_cliente", "Seguimiento de Cliente – Certificados"],
       ],
     };
 
@@ -589,6 +591,20 @@
         emision_orden_compra: [["emitir", "Emitir orden de compra"]],
         ordenes_compra_emitidas: [["consultar", "Consultar OC emitidas"], ["editar", "Editar OC"], ["anular", "Anular OC"], ["ver_pdf", "Descargar PDF"]],
         proveedores: [["consultar", "Consultar proveedores"], ["crear", "Crear proveedor"], ["editar", "Editar proveedor"], ["eliminar", "Eliminar proveedor"]],
+      },
+      // Las acciones marcadas "usuario nominal" no pueden ejecutarse con la cuenta de contingencia.
+      operaciones: {
+        seguimiento_cliente: [
+          ["consultar", "Consultar certificados"],
+          ["certificar", "Crear y editar borradores"],
+          ["emitir_certificado", "Emitir certificados (usuario nominal)"],
+          ["anular_certificado", "Anular certificados (usuario nominal)"],
+          ["autorizar_exceso", "Autorizar exceso de saldo en certificados (usuario nominal)"],
+          ["cambiar_modalidad", "Cambiar modalidad de certificación (usuario nominal)"],
+          ["configurar_reajuste", "Configurar fórmula de reajuste y previsión (usuario nominal)"],
+          ["cargar_indices", "Cargar y corregir índices de reajuste (usuario nominal)"],
+          ["incorporar_historico", "Incorporar acumulado inicial y certificados anteriores (usuario nominal)"],
+        ],
       },
     };
 

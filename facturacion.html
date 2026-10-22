@@ -1,0 +1,1720 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Facturación y Cobranzas · SMG</title>
+<style>
+  /* ======================================================================
+     Facturación y Cobranzas. Mismo tema que la maqueta aprobada y que
+     Certificados (app-shell, sidebar azul marino, panel-section, tablas .t,
+     badges, modales).
+     ====================================================================== */
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --line: #dbe3ee; --line-strong: #c3d0e0;
+    --text: #0f2440; --muted: #5b6b80; --navy: #0f2847; --navy-2: #12305a;
+    --blue: #1565c0; --blue-hover: #0f4f9c; --blue-soft: #e3edf9; --blue-head: #dce8f7; --blue-tot: #e8f1fb;
+    --amber: #b45309; --amber-soft: #fff7e6; --amber-line: #f5c46b;
+    --red: #b91c1c; --red-soft: #fdecec; --green: #15803d; --green-soft: #e7f6ec;
+    --violet: #6d28d9; --violet-soft: #f1ebfd; --grey-soft: #eef2f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); font-size: 13px; overflow-x: hidden; }
+  button, input, select, textarea { font: inherit; }
+  a { color: var(--blue); cursor: pointer; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+
+  .app-shell { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; min-height: 100vh; padding: 0 14px 14px 0; transition: grid-template-columns 0.22s ease; }
+  .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 250px minmax(0, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+  .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 14px; }
+
+  .sidebar.card { background: linear-gradient(180deg, var(--navy), var(--navy-2)); color: #e6edf7; border: 0; border-radius: 0; position: sticky; top: 0; height: 100vh; }
+  .sidebar { padding: 12px; display: flex; flex-direction: column; gap: 12px; width: 100%; overflow: hidden; }
+  .brand { display: flex; justify-content: center; align-items: center; min-height: 90px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(255,255,255,0.95); }
+  .brand img { width: 78%; max-width: 160px; object-fit: contain; }
+  .sidebar:not(:hover):not(:focus-within) .brand img { width: 38px; }
+  .menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .menu-btn { border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: inherit; border-radius: 8px; padding: 11px 12px; font-weight: 600; font-size: 13px;
+              cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: background 0.18s ease; }
+  .menu-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .menu-btn.active { background: var(--blue); border-color: #8fb4e6; color: #fff; box-shadow: 0 4px 12px rgba(21,101,192,0.35); }
+  .menu-icon { width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .menu-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sidebar:not(:hover):not(:focus-within) .menu-label { display: none; }
+  .sidebar:not(:hover):not(:focus-within) .menu-btn { justify-content: center; padding: 11px 0; }
+  .menu-sep { border-top: 1px solid rgba(255,255,255,0.14); margin: 4px 0; }
+
+  .maqueta { padding: 6px 12px; background: #fff8e1; border: 1px solid #f1d58a; border-radius: 8px; color: #7a5300; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .crumbs { color: var(--muted); } .crumbs b { color: var(--text); } .crumbs i { font-style: normal; margin: 0 6px; }
+
+  .seguimiento-panel { padding: 0; overflow: hidden; }
+  .seguimiento-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  .seguimiento-header h2 { margin: 0; font-size: 24px; line-height: 1.2; color: var(--navy); }
+  .seguimiento-header p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .seguimiento-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .seguimiento-main { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel-section { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .panel-section-header { background: #f7faff; color: var(--navy); padding: 9px 12px; font-size: 14px; font-weight: 700; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel-section-header .right { margin-left: auto; display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .panel-section-body { padding: 10px 12px 12px; }
+  .wrap { overflow-x: auto; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .filters .field { min-width: 150px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 5px; border: 1px solid var(--blue);
+         background: #fff; color: var(--blue); font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: var(--blue-soft); }
+  .btn.primary { background: var(--blue); color: #fff; } .btn.primary:hover { background: var(--blue-hover); }
+  .btn.danger { border-color: var(--red); color: var(--red); } .btn.danger:hover { background: var(--red-soft); }
+  .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  input, select, textarea { border: 1px solid var(--line-strong); border-radius: 5px; padding: 6px 8px; background: #fff; color: var(--text); }
+  .field input, .field select, .field textarea { width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(21,101,192,0.25); border-color: var(--blue); }
+  input[readonly] { background: #eef2f7; color: var(--muted); }
+  input.num { text-align: right; }
+  .field { display: flex; flex-direction: column; gap: 3px; } .field > label { color: var(--muted); font-size: 12.5px; }
+  .field > label .req { color: var(--red); }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px 14px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px 14px; }
+  .span2 { grid-column: span 2; } .span3 { grid-column: span 3; } .span4 { grid-column: 1 / -1; }
+  .seg-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 5px; overflow: hidden; }
+  .seg-toggle button { border: 0; background: #fff; color: var(--text); padding: 6px 16px; cursor: pointer; }
+  .seg-toggle button.on { background: var(--blue); color: #fff; font-weight: 600; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .b-ok { background: var(--green-soft); color: var(--green); }
+  .b-warn { background: var(--amber-soft); color: var(--amber); }
+  .b-err { background: var(--red-soft); color: var(--red); }
+  .b-info { background: var(--blue-head); color: var(--navy); }
+  .b-nc { background: var(--violet-soft); color: var(--violet); }
+  .b-grey { background: var(--grey-soft); color: var(--muted); text-decoration: line-through; }
+  .tipo { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+  .tipo-FC { background: var(--blue-head); color: var(--navy); } .tipo-ND { background: var(--amber-soft); color: var(--amber); } .tipo-NC { background: var(--violet-soft); color: var(--violet); }
+  .tipo-REC { background: var(--green-soft); color: var(--green); }
+  .mon { font-size: 10.5px; font-weight: 700; color: var(--muted); margin-right: 3px; }
+  .alert { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--amber-line); background: var(--amber-soft); color: #7a4a06; border-radius: 6px; padding: 9px 12px; }
+  .alert b { color: var(--amber); }
+  .alert.info { border-color: #b7cff0; background: var(--blue-soft); color: #1d3c66; } .alert.info b { color: var(--blue); }
+  .alert.err { border-color: #f1b4b4; background: var(--red-soft); color: #7f1d1d; } .alert.err b { color: var(--red); }
+  .alert.ok { border-color: #a7dcb8; background: var(--green-soft); color: #14532d; } .alert.ok b { color: var(--green); }
+  .tag { font-size: 10.5px; color: #8a5a00; border: 1px dashed #d9a521; border-radius: 4px; padding: 0 5px; margin-left: 4px; font-weight: 400; }
+
+  table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .t th, .t td { border: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; text-align: left; }
+  .t thead th { background: var(--blue-head); color: var(--navy); font-weight: 700; text-align: center; }
+  .t td.r, .t th.r { text-align: right; } .t td.c { text-align: center; }
+  .t tbody tr:hover td { background: #f7faff; }
+  .t tbody tr.click { cursor: pointer; }
+  .t tr.tot td { background: var(--blue-tot); font-weight: 700; }
+  .t tr.anul td { color: #94a3b8; text-decoration: line-through; }
+  .t td.neg { color: var(--red); } .t td.pos { color: var(--green); }
+  .t td.wrapc { white-space: normal; min-width: 220px; }
+  table.t[style*="white-space:normal"] td, table.t[style*="white-space:normal"] th { white-space: normal; }
+  .t input, .t select { padding: 3px 5px; }
+
+  .kpis { display: grid; grid-template-columns: 70px repeat(6, minmax(0,1fr)); gap: 8px; align-items: stretch; }
+  .kpi { border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; background: #fbfdff; }
+  .kpi .lbl { color: var(--muted); font-size: 11.5px; display: block; margin-bottom: 3px; }
+  .kpi b { font-size: 17px; color: var(--navy); }
+  .kpi small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .kpi.warn b { color: var(--amber); } .kpi.err b { color: var(--red); } .kpi.ok b { color: var(--green); }
+  .kpi-mon { display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #fff; background: var(--navy); border-radius: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  .kv.final { background: var(--blue-tot); font-weight: 700; padding: 9px 8px; border: 0; margin-top: 4px; border-radius: 4px; }
+  .timeline { list-style: none; margin: 0; padding: 0; } .timeline li { border-left: 3px solid var(--blue); padding: 3px 0 9px 10px; }
+  .timeline li.nc { border-color: var(--violet); } .timeline li.rec { border-color: var(--green); } .timeline li.anul { border-color: var(--red); }
+  .timeline small { color: var(--muted); }
+
+  /* Modales */
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,36,64,0.45); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 24px 14px; overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #fff; border-radius: 10px; width: min(1180px, 100%); box-shadow: 0 20px 50px rgba(15,36,64,0.3); }
+  .modal.sm { width: min(600px, 100%); }
+  .modal-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .modal-h h3 { margin: 0; font-size: 18px; color: var(--navy); }
+  .modal-b { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-f { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .modal-f .muted { margin-right: auto; }
+  .close { border: 0; background: none; font-size: 22px; color: var(--muted); cursor: pointer; }
+  .toast { position: fixed; right: 20px; bottom: 20px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 6px; z-index: 200; display: none; max-width: 460px; }
+
+  /* Editor de pedido: formulario + vista previa del formulario oficial D.C. 1-9-14 */
+  .editor { display: grid; grid-template-columns: minmax(0, 1fr) 620px; gap: 14px; align-items: start; }
+  .preview-wrap { background: #e2e8f0; padding: 14px; border-radius: 8px; position: sticky; top: 14px; }
+  .hoja { background: #fff; color: #000; font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 10.5px; padding: 22px 22px 18px; box-shadow: 0 4px 18px rgba(15,36,64,0.18); aspect-ratio: 210 / 297; display: flex; flex-direction: column; }
+  .hoja .marco { border: 2px solid #000; padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .hoja table { border-collapse: collapse; width: 100%; }
+  .hoja .enc td { border: 1px solid #000; }
+  .hoja .enc .logo { width: 26%; text-align: center; } .hoja .enc .logo img { height: 34px; }
+  .hoja .enc .tit { text-align: center; font-weight: 700; font-size: 15px; }
+  .hoja .enc .tit .rojo { color: #e00000; font-size: 15px; display: block; margin-top: 3px; }
+  .hoja .enc .meta td { border: 1px solid #000; padding: 1px 4px; font-size: 9px; text-align: center; }
+  .hoja .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .hoja .cam { display: flex; gap: 6px; border-bottom: 1px solid #000; padding: 2px 0; min-height: 17px; align-items: flex-end; }
+  .hoja .cam b { white-space: nowrap; } .hoja .cam span { flex: 1; text-align: center; }
+  .hoja .cam.der span { text-align: right; }
+  .hoja .rojo { color: #e00000; font-weight: 700; }
+  .hoja .intro { text-align: center; font-weight: 700; margin: 6px 0 2px; }
+  .hoja .det { width: 84%; margin: 0 auto; }
+  .hoja .det th { border: 1px solid #000; padding: 4px; font-size: 10px; }
+  .hoja .det td { border-left: 1px solid #000; border-right: 1px solid #000; padding: 4px 5px; vertical-align: middle; font-weight: 700; }
+  .hoja .det tbody tr:last-child td { border-bottom: 1px solid #000; height: 34px; }
+  .hoja .det td.d { white-space: pre-line; }
+  .hoja .det td.m { text-align: right; white-space: nowrap; font-weight: 400; }
+  .hoja .tots { width: 84%; margin: 0 auto; } .hoja .tots td { padding: 1px 5px; text-align: right; } .hoja .tots td.l { font-weight: 700; width: 70%; }
+  .hoja .obs { display: grid; grid-template-columns: 26% 1fr; border: 1px solid #000; min-height: 26px; }
+  .hoja .obs > div { padding: 5px; display: flex; align-items: center; justify-content: center; } .hoja .obs > div + div { border-left: 1px solid #000; }
+  .hoja .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 6px; }
+  .hoja .firma { border: 1px solid #000; display: flex; flex-direction: column; }
+  .hoja .firma .h { border-bottom: 1px solid #000; padding: 1px 4px; } .hoja .firma .c { flex: 1; min-height: 52px; display: grid; place-items: center; text-align: center; white-space: pre-line; padding: 4px; }
+  .hoja .firma .p { border-top: 1px solid #000; text-align: center; padding: 1px; }
+  .hoja .pie { border: 1px solid #000; text-align: center; font-weight: 700; padding: 7px 10px; margin-top: 6px; }
+  .hoja .sello { margin-top: auto; text-align: right; font-size: 8px; color: #555; }
+  .lineas td input { width: 100%; }
+  .lineas td textarea { width: 100%; min-height: 54px; resize: vertical; }
+  table.lineas { table-layout: fixed; } .lineas select { width: 100%; }
+
+  /* Diagrama de entidades */
+  .er { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .ent { border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; font-size: 11.5px; overflow: hidden; }
+  .ent h4 { margin: 0; padding: 6px 8px; background: var(--navy); color: #fff; font-size: 12px; }
+  .ent.ext h4 { background: #64748b; }
+  .ent ul { margin: 0; padding: 6px 8px 8px 22px; } .ent li { margin: 1px 0; }
+  .ent li.k { font-weight: 700; } .ent li.fk { color: var(--blue); }
+  .formula { font-family: Consolas, monospace; background: var(--blue-soft); border-radius: 5px; padding: 8px 10px; white-space: pre-wrap; line-height: 1.5; }
+  .flujo { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+  .paso { flex: 1 1 150px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; background: #fbfdff; position: relative; }
+  .paso b { display: block; color: var(--navy); margin-bottom: 3px; } .paso .who { font-size: 11px; color: var(--muted); }
+  .paso .n { position: absolute; top: -9px; left: 8px; background: var(--blue); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800; padding: 0 7px; }
+  ol.dec li { margin-bottom: 7px; }
+
+  @media (max-width: 1250px) { .editor { grid-template-columns: 1fr; } .preview-wrap { position: static; } .kpis { grid-template-columns: repeat(3, 1fr); } .kpi-mon { grid-column: 1 / -1; padding: 4px; } .er { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; padding: 0 8px 8px; } .sidebar { display: none; } .two, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } .span2, .span3 { grid-column: auto; } .er { grid-template-columns: 1fr; } }
+  /* ---- Agregados v2 ---- */
+  .si { display: inline-block; font-size: 10px; font-weight: 800; color: #7a4a06; background: var(--amber-soft); border: 1px solid var(--amber-line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  .menu-card { border: 1px solid #cfdff3; border-radius: 12px; padding: 14px 16px; background: linear-gradient(180deg, #fff, #f3f8ff); max-width: 360px; }
+  .menu-card b { display: block; font-size: 16px; color: var(--navy); margin-bottom: 4px; } .menu-card span { color: var(--muted); font-size: 12.5px; }
+  .tot-box .kv { padding: 5px 4px; }
+  .t td.sub { color: var(--muted); font-size: 11.5px; }
+  .t tr.ini td { background: #fffaf0; }
+  .t tfoot td { background: #f7faff; font-weight: 700; }
+  .cobro-x td { background: #fbfdff; }
+  .mini { font-size: 11px; color: var(--muted); display: block; }
+  @media (max-width: 1500px) { .editor { grid-template-columns: 1fr; } .preview-wrap { position: static; max-width: 720px; } }
+  #barra-estado { background: var(--blue-soft); border-color: #b7cff0; color: #1d3c66; }
+  #barra-estado b { color: var(--navy); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar card" aria-label="Menú de Facturación y Cobranzas">
+    <div class="brand"><img src="/Imagenes/09-smg.png" alt="Logo SMG"></div>
+    <nav class="menu">
+      <button class="menu-btn active" data-vista="tablero"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span class="menu-label">Tablero de Seguimiento</span></button>
+      <button class="menu-btn" data-vista="pedidos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span><span class="menu-label">Pedidos de Facturación</span></button>
+      <button class="menu-btn" data-vista="documentos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 1V2l-1 1-3-2-3 2-3-2-3 2-3-2z"></path><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></span><span class="menu-label">Facturas, ND y NC</span></button>
+      <button class="menu-btn" data-vista="cobranzas"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg></span><span class="menu-label">Cobranzas y Recibos</span></button>
+      <button class="menu-btn" data-vista="ctacte"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg></span><span class="menu-label">Cuenta Corriente</span></button>
+      <button class="menu-btn" data-vista="saldos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 22V4"></path><path d="M4 4h12l-2 4 2 4H4"></path></svg></span><span class="menu-label">Puesta en marcha</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-btn" data-vista="config"><span class="menu-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></span><span class="menu-label">Configuración y permisos</span></button>
+      <a class="menu-btn" href="/" style="margin-top: auto;"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span><span class="menu-label">Menú Principal</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="maqueta" id="barra-estado"><span id="estado-corte"></span><span class="crumbs" id="crumbs"></span></div>
+
+    <!-- ===================================================== TABLERO ===================================================== -->
+    <section class="card seguimiento-panel vista" id="v-tablero">
+      <div class="seguimiento-header">
+        <div><h2>Facturación y Cobranzas</h2><p>Seguimiento de pedidos, comprobantes cargados desde Tango, vencimientos y saldos. Cada moneda tiene su propio saldo: nunca se suman entre sí.</p></div>
+        <div class="seguimiento-actions carga">
+          <button class="btn" onclick="nuevoPedido()">+ Pedido de facturación</button>
+          <button class="btn" onclick="abrirDoc({})">+ Registrar comprobante</button>
+          <button class="btn primary" onclick="abrirCobro({})">+ Registrar cobranza</button>
+        </div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="filters"><div class="field"><label>Cliente</label><select id="f-cli" onchange="renderTablero()"><option value="">Todos</option></select></div></div>
+        <div id="kpis"></div>
+        <div class="two">
+          <div class="panel-section"><div class="panel-section-header">Pedidos pendientes de facturar <span class="badge b-warn" id="cnt-pend"></span></div><div class="wrap"><table class="t" id="t-pend"></table></div></div>
+          <div class="panel-section"><div class="panel-section-header">Antigüedad de la deuda (días desde el vencimiento)</div><div class="wrap"><table class="t" id="t-aging"></table></div></div>
+        </div>
+        <div class="panel-section"><div class="panel-section-header">Vencidos y próximos vencimientos (30 días)</div><div class="wrap"><table class="t" id="t-venc"></table></div></div>
+      </div>
+    </section>
+
+    <!-- ===================================================== PEDIDOS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-pedidos">
+      <div class="seguimiento-header">
+        <div><h2>Pedidos de facturación</h2><p>Formulario oficial «Solicitud de Emisión» D.C. 1-9-14 Rev. 02 para pedir Factura, Nota de Crédito o Nota de Débito al Departamento Contable.</p></div>
+        <div class="seguimiento-actions carga"><button class="btn primary" onclick="nuevoPedido()">+ Nuevo pedido</button></div>
+      </div>
+      <div class="seguimiento-main" id="ped-lista">
+        <div class="filters">
+          <div class="field"><label>Estado</label><select id="fp-est" onchange="renderPedidos()"><option value="">Todos</option><option>BORRADOR</option><option>PENDIENTE DE FACTURAR</option><option>FACTURADO PARCIAL</option><option>FACTURADO</option><option>ANULADO</option></select></div>
+          <div class="field"><label>Cliente</label><select id="fp-cli" onchange="renderPedidos()"><option value="">Todos</option></select></div>
+        </div>
+        <div class="wrap"><table class="t" id="t-ped"></table></div>
+        <p class="muted" style="margin:0">«Facturado» = suma de los netos que cada comprobante vigente le asigna al pedido. Un pedido puede tener varias facturas y una factura puede cubrir varios pedidos.</p>
+      </div>
+
+      <div class="seguimiento-main hidden" id="ped-editor">
+        <div class="alert info" id="ped-origen"></div>
+        <div class="editor">
+          <div style="display:flex; flex-direction:column; gap:12px">
+            <div class="panel-section">
+              <div class="panel-section-header">Vínculos <span class="tag">opcionales</span></div>
+              <div class="panel-section-body grid3">
+                <div class="field span2"><label>Agregar certificado emitido del cliente (se agrega como línea; un pedido puede incluir varios)</label>
+                  <div style="display:flex; gap:6px"><select id="pe-cert-add" style="flex:1"></select><button class="btn sm" style="height:32px" onclick="agregarCert()">Agregar</button></div></div>
+                <div class="field"><label>Centro de costos / obra</label><select id="pe-cc" onchange="previa()"></select></div>
+                <div class="field span2"><label>Orden de compra del cliente (texto impreso)</label><input id="pe-oc" oninput="previa()"></div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Encabezado del formulario</div>
+              <div class="panel-section-body grid3">
+                <div class="field"><label>Comprobante solicitado <span class="req">*</span></label><select id="pe-tipo" onchange="previa()"><option value="FACTURA">FACTURA</option><option value="NOTA_CREDITO">NOTA DE CREDITO</option><option value="NOTA_DEBITO">NOTA DE DEBITO</option></select></div>
+                <div class="field"><label>Solicitud Nº</label><input id="pe-num" readonly value="se asigna al emitir"></div>
+                <div class="field"><label>Fecha de emisión <span class="req">*</span></label><input id="pe-fecha" type="date" oninput="previa()"></div>
+                <div class="field"><label>Depto. origen</label><input id="pe-depto" value="15" oninput="previa()"></div>
+                <div class="field"><label>Cotización</label><input id="pe-cot" oninput="previa()"></div>
+                <div class="field"><label>Moneda <span class="req">*</span></label><select id="pe-mon" onchange="ajustarTc(); previa(); opcionesCert()"><option>USD</option><option>ARS</option><option>EUR</option></select></div>
+                <div class="field span2"><label>Cliente <span class="req">*</span> <span class="tag">tabla clientes (código Tango)</span></label><select id="pe-cli" onchange="aplicarCli()"></select></div>
+                <div class="field"><label>CUIT</label><input id="pe-cuit" readonly></div>
+                <div class="field span2"><label>Domicilio</label><input id="pe-dom" value=".-" oninput="previa()"></div>
+                <div class="field"><label>Condición de pago</label><input id="pe-cond" list="conds" oninput="previa()"><datalist id="conds"><option>30 FF</option><option>45 FF</option><option>15 FF</option><option>Al día</option><option>Inmediato</option><option>Contado</option></datalist></div>
+                <div class="field span3"><label>Tipo de cambio a informar (factura en moneda extranjera que se cobra en pesos)</label><input id="pe-tc" oninput="previa()" placeholder="TC de la fecha efectiva de pago"></div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Detalle <span class="tag">alícuota de IVA por línea</span> <span class="right"><button class="btn sm" onclick="agregarLinea()">+ Línea</button></span></div>
+              <div class="panel-section-body">
+                <table class="t lineas"><thead><tr><th style="width:70px">Cant.</th><th>Detalle</th><th style="width:150px">Certificado</th><th style="width:96px">IVA</th><th style="width:130px">Precio unitario</th><th style="width:120px">Subtotal</th><th style="width:34px"></th></tr></thead><tbody id="pe-lineas"></tbody></table>
+                <div class="grid2" style="margin-top:10px">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div class="field"><label>Observaciones (se imprimen en rojo)</label><input id="pe-obs" oninput="previa()"></div>
+                    <div class="field"><label>Justificación (obligatoria si el importe de un certificado no coincide con su total a facturar)</label><input id="pe-just"></div>
+                  </div>
+                  <div class="tot-box" id="pe-tot"></div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Firmas y adjunto</div>
+              <div class="panel-section-body grid2">
+                <div class="field"><label>Solicitó</label><textarea id="pe-sol" rows="3" oninput="previa()"></textarea></div>
+                <div class="field"><label>Recibe (en blanco para firma manuscrita)</label><textarea id="pe-rec" rows="3" oninput="previa()"></textarea></div>
+                <div class="field span2"><label>Enlace a documentación de respaldo <span class="tag">opcional</span></label><input id="pe-adj" placeholder="https://drive.google.com/… (opcional)"></div>
+              </div>
+            </div>
+            <div id="ped-val"></div>
+            <div style="display:flex; gap:8px; justify-content:flex-end">
+              <button class="btn" onclick="cerrarEditor()">Cancelar</button>
+              <button class="btn danger hidden" id="pe-descartar" onclick="descartarPedido()">Descartar borrador</button>
+              <button class="btn" onclick="guardarPedido(false)">Guardar borrador</button>
+              <button class="btn primary" onclick="guardarPedido(true)">Emitir y generar PDF</button>
+            </div>
+          </div>
+          <div class="preview-wrap">
+            <div class="hoja" id="hoja"></div>
+            <p class="muted" style="margin:8px 2px 0; font-size:12px">Vista previa del formulario D.C. 1-9-14. Al emitir se asigna el número, se congela el contenido y se guarda la huella SHA-256 del PDF.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== DOCUMENTOS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-documentos">
+      <div class="seguimiento-header">
+        <div><h2>Facturas, notas de débito y notas de crédito</h2><p>Comprobantes emitidos en Tango y cargados a mano en SMG. El estado de cobro se calcula solo; no se edita.</p></div>
+        <div class="seguimiento-actions carga"><button class="btn primary" onclick="abrirDoc({})">+ Registrar comprobante</button></div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="filters">
+          <div class="field"><label>Tipo</label><select id="fd-tipo" onchange="renderDocs()"><option value="">Todos</option><option value="FC">Factura</option><option value="ND">Nota de débito</option><option value="NC">Nota de crédito</option></select></div>
+          <div class="field"><label>Estado</label><select id="fd-est" onchange="renderDocs()"><option value="">Todos</option><option>PENDIENTE</option><option>PARCIAL</option><option>VENCIDA</option><option>CANCELADA</option><option>CANCELADA POR NC</option><option>SIN APLICAR</option><option>APLICADA PARCIAL</option><option>APLICADA</option></select></div>
+          <div class="field"><label>Moneda</label><select id="fd-mon" onchange="renderDocs()"><option value="">Todas</option><option>USD</option><option>ARS</option><option>EUR</option></select></div>
+          <div class="field"><label>Cliente</label><select id="fd-cli" onchange="renderDocs()"><option value="">Todos</option></select></div>
+          <label style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="fd-anul" onchange="renderDocs()"> Mostrar registros anulados</label>
+        </div>
+        <div class="wrap"><table class="t" id="t-docs"></table></div>
+        <p class="muted" style="margin:0"><span class="si">SI</span> = comprobante cargado como saldo inicial al corte. <span class="badge b-warn">EST.</span> = lo cancelado antes del corte es una estimación por antigüedad, no una imputación real.</p>
+      </div>
+    </section>
+
+    <!-- ===================================================== COBRANZAS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-cobranzas">
+      <div class="seguimiento-header">
+        <div><h2>Cobranzas y recibos</h2><p>Cada recibo de Tango se carga una sola vez, con sus valores (transferencias, cheques, retenciones) y la asignación a facturas y notas de débito. Un cobro en pesos de una factura en USD guarda los pesos recibidos, el tipo de cambio de la fecha de pago y el equivalente en USD.</p></div>
+        <div class="seguimiento-actions carga"><button class="btn primary" onclick="abrirCobro({})">+ Registrar cobranza</button></div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="filters"><div class="field"><label>Cliente</label><select id="fr-cli" onchange="renderRecibos()"><option value="">Todos</option></select></div></div>
+        <div class="wrap"><table class="t" id="t-rec"></table></div>
+        <p class="muted" style="margin:0">«A cuenta» = parte del recibo que no se asignó a ningún comprobante, en la moneda del recibo. Se puede asignar más adelante.</p>
+      </div>
+    </section>
+
+    <!-- ===================================================== CUENTA CORRIENTE ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-ctacte">
+      <div class="seguimiento-header">
+        <div><h2>Cuenta corriente por cliente</h2><p>Fecha · Tipo · Número · Vencimiento · Debe · Haber · Saldo, como en Tango. Cada moneda se muestra por separado.</p></div>
+        <div class="seguimiento-actions">
+          <div class="field" style="min-width:300px"><select id="cc-cli" onchange="renderCtaCte()"></select></div>
+          <span class="seg-toggle" id="tg-mon"><button class="on" data-m="USD">USD</button><button data-m="ARS">ARS</button><button data-m="EUR">EUR</button></span>
+        </div>
+      </div>
+      <div class="seguimiento-main"><div id="ctacte"></div></div>
+    </section>
+
+    <!-- ===================================================== SALDOS INICIALES ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-saldos">
+      <div class="seguimiento-header">
+        <div><h2>Puesta en marcha</h2><p>Carga inicial manual por cliente, sin importar el histórico: cada cliente se declara sin antecedentes (saldo cero) o con su deuda, anticipos y certificados ya facturados, conciliados con el informe de Tango a la fecha de la carga inicial. Solo hace falta para los clientes con antecedentes: el seguimiento de los demás empieza con los certificados, pedidos, comprobantes y cobranzas que se generan en adelante. Un cliente con carga inicial opera cuando un responsable la valida.</p></div>
+        <div class="seguimiento-actions" id="corte-acciones"></div>
+      </div>
+      <div class="seguimiento-main" id="saldos"></div>
+    </section>
+
+    <!-- ===================================================== CONFIGURACIÓN ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-config">
+      <div class="seguimiento-header"><div><h2>Configuración y permisos</h2><p>Los responsables del módulo se asignan en Administración › Responsables por módulo. Cada cambio de configuración queda en el historial.</p></div></div>
+      <div class="seguimiento-main" id="config"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ===================================================== MODAL: DETALLE DE COMPROBANTE ===================================================== -->
+<!-- ===================================================== MODAL: PUESTA EN MARCHA DE UN CLIENTE ===================================================== -->
+<div class="modal-bg" id="m-ini"><div class="modal">
+  <div class="modal-h"><h3 id="ini-tit">Estado inicial del cliente</h3><button class="close" onclick="cerrar('m-ini')">×</button></div>
+  <div class="modal-b" id="ini-body"></div>
+  <div class="modal-f" id="ini-pie"></div>
+</div></div>
+
+<!-- ===================================================== MODAL: PEGAR RESUMEN DE CUENTA DE TANGO ===================================================== -->
+<div class="modal-bg" id="m-tango"><div class="modal">
+  <div class="modal-h"><h3>Pegar resumen de cuenta de Tango</h3><button class="close" onclick="cerrar('m-tango')">×</button></div>
+  <div class="modal-b">
+    <div class="alert info"><div><b>Desde acá no se guarda nada.</b> Copiá en Excel las filas del resumen de cuenta de Tango junto con su fila de encabezados (RAZON_SOC, FECHA_EMIS, T_COMP, N_COMP, ESTADO, FECHA_VTO, DEBE, HABER, SALDO, LEYENDA) y pegalas abajo. Cada FAC, N/C, N/D o REC abre su formulario para revisarlo y confirmarlo. El resumen no informa la moneda, el desglose de IVA, el motivo de las notas, los valores del recibo ni a qué facturas se aplicó: esos datos los completás o confirmás vos.</div></div>
+    <div class="grid4">
+      <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="tgo-cli" onchange="TANGO.confirma = false; tangoContexto()"></select></div>
+      <div class="field"><label>Moneda del resumen <span class="req">*</span> <span class="tag">Tango no la informa</span></label><select id="tgo-mon" onchange="tangoPintar()"><option value="">— confirmar —</option><option>ARS</option><option>USD</option><option>EUR</option></select></div>
+      <div class="field"><label>Formato de las fechas</label><select id="tgo-ord" onchange="tangoReconocer()"><option value="auto">Detectar</option><option value="dmy">Día/mes/año</option><option value="mdy">Mes/día/año</option></select></div>
+      <div class="field span4"><label>Filas copiadas desde Excel</label><textarea id="tgo-txt" rows="6" placeholder="Pegá acá (Ctrl+V) las celdas copiadas, con la fila de encabezados" oninput="tangoReconocer()"></textarea></div>
+    </div>
+    <div id="tgo-res"></div>
+  </div>
+  <div class="modal-f"><span class="muted">Cada registro se guarda desde su formulario, con tu usuario y las validaciones de siempre.</span><button class="btn" onclick="cerrar('m-tango')">Cerrar</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: ANTECEDENTE DE CERTIFICADO ===================================================== -->
+<div class="modal-bg" id="m-ant"><div class="modal sm">
+  <div class="modal-h"><h3 id="ant-tit">Certificado ya facturado antes del inicio</h3><button class="close" onclick="cerrar('m-ant')">×</button></div>
+  <div class="modal-b">
+    <div class="alert info"><div><b>Antecedente, no comprobante.</b> Registra que el certificado ya se facturó en Tango antes del inicio operativo y que esa factura no tiene saldo a cobrar. No crea deuda, factura ni cobranza: solo evita volver a pedir o facturar lo mismo. Si la factura todavía tiene saldo, cargala como comprobante abierto al inicio.</div></div>
+    <div class="grid2">
+      <div class="field span2"><label>Certificado emitido <span class="req">*</span></label><select id="a-cert" onchange="antPendiente()"></select></div>
+      <div class="field"><label>Neto facturado <span class="req">*</span></label><input id="a-neto" class="num"></div>
+      <div class="field"><label>Fecha de la factura</label><input id="a-fecha" type="date"></div>
+      <div class="field"><label>Factura de Tango: letra</label><select id="a-letra"><option value="">—</option><option>A</option><option>B</option><option>C</option><option>E</option><option>M</option></select></div>
+      <div class="field"><label>Punto de venta y número</label><div style="display:flex;gap:6px"><input id="a-pv" class="num" placeholder="PV" style="width:80px"><input id="a-nro" class="num" placeholder="Número"></div></div>
+      <div class="field"><label>TC de la factura <span class="tag">informativo</span></label><input id="a-tc" class="num"></div>
+      <div class="field span2"><label>Nota / respaldo</label><input id="a-nota" placeholder="p. ej. Cobrada con REC 0001-00000412 según Tango"></div>
+    </div>
+    <div id="a-val"></div>
+  </div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-ant')">Cancelar</button><button class="btn primary" onclick="guardarAnt()">Registrar antecedente</button></div>
+</div></div>
+
+<div class="modal-bg" id="m-det"><div class="modal">
+  <div class="modal-h"><h3 id="det-tit"></h3><button class="close" onclick="cerrar('m-det')">×</button></div>
+  <div class="modal-b" id="det-body"></div>
+  <div class="modal-f" id="det-pie"></div>
+</div></div>
+
+<!-- ===================================================== MODAL: DETALLE DE PEDIDO / RECIBO ===================================================== -->
+<div class="modal-bg" id="m-ver"><div class="modal">
+  <div class="modal-h"><h3 id="ver-tit"></h3><button class="close" onclick="cerrar('m-ver')">×</button></div>
+  <div class="modal-b" id="ver-body"></div>
+  <div class="modal-f" id="ver-pie"></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REGISTRAR COMPROBANTE ===================================================== -->
+<div class="modal-bg" id="m-doc"><div class="modal">
+  <div class="modal-h"><h3 id="d-tit">Registrar comprobante emitido en Tango</h3><button class="close" onclick="cerrar('m-doc')">×</button></div>
+  <div class="modal-b">
+    <div class="alert hidden" id="d-si-aviso"></div>
+    <div class="alert info hidden" id="d-tango"></div>
+    <div class="panel-section">
+      <div class="panel-section-header">Comprobante <span class="right"><span class="seg-toggle" id="tg-tipo"><button class="on" data-t="FC">Factura</button><button data-t="ND">Nota de débito</button><button data-t="NC">Nota de crédito</button></span></span></div>
+      <div class="panel-section-body grid4">
+        <div class="field"><label>Letra <span class="req">*</span></label><select id="d-letra" onchange="valDoc()"><option>A</option><option>B</option><option>C</option><option>E</option><option>M</option></select></div>
+        <div class="field"><label>Punto de venta <span class="req">*</span></label><input id="d-pv" class="num" oninput="valDoc()"></div>
+        <div class="field"><label>Número <span class="req">*</span></label><input id="d-nro" class="num" oninput="valDoc()"></div>
+        <div class="field"><label>Número completo (como Tango)</label><input id="d-num-full" readonly></div>
+        <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="d-cli" onchange="cambioClienteDoc()"></select></div>
+        <div class="field"><label>CUIT (tabla clientes)</label><input id="d-cuit" readonly></div>
+        <div class="field"><label>Moneda <span class="req">*</span></label><select id="d-mon" onchange="cambioClienteDoc()"><option>USD</option><option>ARS</option><option>EUR</option></select></div>
+        <div class="field"><label>Fecha de emisión <span class="req">*</span></label><input id="d-fe" type="date" oninput="sugerirVto(); valDoc()"></div>
+        <div class="field" id="d-vto-w"><label>Vencimiento <span class="req">*</span> <span class="tag">sugerido por la condición de pago</span></label><input id="d-vto" type="date" oninput="valDoc()"></div>
+        <div class="field"><label>TC de emisión <span class="tag">informativo</span></label><input id="d-tcem" class="num"></div>
+        <div class="field"><label>Condición de pago</label><input id="d-cond" list="conds" oninput="sugerirVto()"></div>
+        <div class="field span4"><label>Detalle</label><input id="d-det"></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-header">Detalle por alícuota de IVA <span class="tag">el IVA se calcula solo</span><span class="right"><button class="btn sm" onclick="DL.push({descripcion:'', alicuota_iva:'21', neto:''}); renderDL()">+ Línea</button></span></div>
+      <div class="panel-section-body"><table class="t lineas"><thead><tr><th>Descripción</th><th style="width:110px">Alícuota</th><th style="width:150px">Neto</th><th style="width:130px">IVA</th><th style="width:34px"></th></tr></thead><tbody id="d-lineas"></tbody></table></div>
+    </div>
+    <div class="two">
+      <div class="panel-section">
+        <div class="panel-section-header">Percepciones y otros tributos <span class="right"><button class="btn sm" onclick="TR.push({tipo:'PERCEPCION_IIBB', jurisdiccion:'', base:'', alicuota:'', importe:''}); renderTR()">+ Tributo</button></span></div>
+        <div class="panel-section-body"><table class="t lineas"><thead><tr><th>Tipo</th><th>Jurisdicción</th><th>Base</th><th style="width:70px">Alíc. %</th><th>Importe</th><th style="width:34px"></th></tr></thead><tbody id="d-tribs"></tbody></table>
+          <p class="muted" style="margin:6px 0 0">Importe = base × alícuota. Si no hay base, se carga el importe.</p></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-header">Totales <span class="tag">calculados</span></div>
+        <div class="panel-section-body tot-box" id="d-tot"></div>
+      </div>
+    </div>
+    <div class="panel-section hidden" id="d-mot-w"><div class="panel-section-header">Motivo <span class="req" style="color:var(--red)">*</span></div><div class="panel-section-body grid3">
+      <div class="field"><label>Motivo</label><select id="d-mot"><option value="DESCUENTO_COMBUSTIBLE">Descuento de combustible</option><option value="DIFERENCIA_CAMBIO">Diferencia de cambio</option><option value="ANULACION_TOTAL">Anulación total de factura</option><option value="AJUSTE_PRECIO">Ajuste de precio</option><option value="DESACOPIO_ANTICIPO">Desacopio de anticipo financiero</option><option value="OTRO">Otro (detallar)</option></select></div>
+      <div class="field"><label>Comprobante que corrige</label><select id="d-origen"></select></div>
+      <div class="field"><label>Detalle (texto del comprobante de Tango)</label><input id="d-motdet"></div>
+    </div></div>
+    <div class="panel-section" id="d-vin-w">
+      <div class="panel-section-header">Vínculos con pedidos y certificados <span class="tag">opcionales · un comprobante puede cubrir varios</span><span class="right"><button class="btn sm" onclick="VL.push({clase:'pedido', ref:'', neto:''}); renderVL()">+ Vínculo</button></span></div>
+      <div class="panel-section-body"><table class="t lineas"><thead><tr><th style="width:120px">Tipo</th><th>Pedido / certificado</th><th style="width:150px">Pendiente</th><th style="width:150px">Neto asignado</th><th style="width:34px"></th></tr></thead><tbody id="d-vin"></tbody></table></div>
+    </div>
+    <div class="panel-section hidden" id="d-apl-w"><div class="panel-section-header">Aplicación de la nota de crédito <span class="tag">a FC/ND del mismo cliente y moneda</span></div>
+      <div class="panel-section-body"><div class="wrap"><table class="t" id="d-apl"></table></div></div></div>
+    <div class="panel-section hidden" id="d-si-w"><div class="panel-section-header">Saldo al inicio operativo</div><div class="panel-section-body grid3">
+      <div class="field span3" id="d-si-pagos-w"><label>Pagos previos al inicio (según Tango) <span class="tag">opcional · se conservan la moneda y el TC originales</span></label>
+        <table class="t lineas"><thead><tr><th style="width:140px">Fecha de pago</th><th style="width:80px">Moneda</th><th>Importe pagado</th><th style="width:100px">TC</th><th style="width:70px">Rec. PV</th><th style="width:110px">Rec. Nº</th><th style="width:140px">Total del recibo <span class="tag">Tango</span></th><th>Aplicado</th><th style="width:34px"></th></tr></thead><tbody id="d-si-pagos"></tbody></table>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="btn sm" onclick="PP.push({fecha_pago:'', moneda_pago:$('d-mon').value, importe_pago:'', tipo_cambio:'', recibo_punto_venta:'', recibo_numero:'', recibo_total:''}); renderPP()">+ Pago previo</button><span class="muted" id="d-si-res"></span></div></div>
+      <div class="field span3"><label>Nota / respaldo</label><input id="d-si-nota" placeholder="p. ej. Informe de Tango de comprobantes pendientes"></div>
+      <div class="field span3 hidden" id="d-si-post-w"><label>Motivo del alta con el corte confirmado <span class="req">*</span> (mínimo 20 caracteres)</label><input id="d-si-post"></div>
+      <p class="muted span3" style="margin:0">Cargá solo lo que seguía pendiente al inicio. Una factura cobrada antes del inicio no se carga: si corresponde a un certificado, registrala como antecedente del certificado; si no tiene certificado, no se registra. Si informás el número de recibo de Tango, cargá también su total: lo usado de ese recibo (en todas las facturas y el anticipo) no puede superarlo. Si Tango no informa qué parte se cobró, no cargues pagos y usá «Estimar por antigüedad» en la ficha del cliente: queda marcado como estimado y se puede revisar.</p>
+    </div></div>
+    <div class="panel-section"><div class="panel-section-header">Adjunto <span class="tag">opcional</span></div><div class="panel-section-body">
+      <div class="grid3">
+        <div class="field span2"><label>Enlace al PDF del comprobante (Drive)</label><input id="d-adj" placeholder="https://drive.google.com/… (opcional)"></div>
+        <div class="field"><label>Subir archivo</label><input type="file" disabled title="Deshabilitado hasta resolver el almacenamiento del servidor"></div>
+      </div>
+      <p class="muted" style="margin:6px 0 0" id="d-adj-nota"></p>
+    </div></div>
+    <div id="d-val"></div>
+  </div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-doc')">Cancelar</button><button class="btn primary" id="d-ok" onclick="guardarDoc()">Registrar</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REGISTRAR COBRANZA ===================================================== -->
+<div class="modal-bg" id="m-cob"><div class="modal">
+  <div class="modal-h"><h3 id="c-tit">Registrar cobranza (recibo de Tango)</h3><button class="close" onclick="cerrar('m-cob')">×</button></div>
+  <div class="modal-b">
+    <div class="alert hidden" id="c-si-aviso"></div>
+    <div class="alert info hidden" id="c-tango"></div>
+    <div class="panel-section"><div class="panel-section-header">Recibo</div><div class="panel-section-body grid4">
+      <div class="field"><label>Punto de venta <span class="req">*</span></label><input id="c-pv" class="num" value="1"></div>
+      <div class="field"><label>Número de recibo <span class="req">*</span></label><input id="c-nro" class="num"></div>
+      <div class="field"><label>Fecha efectiva de pago <span class="req">*</span></label><input id="c-fecha" type="date"></div>
+      <div class="field"><label>Moneda recibida <span class="req">*</span></label><select id="c-mon" onchange="renderCobro()"><option>ARS</option><option>USD</option><option>EUR</option></select></div>
+      <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="c-cli" onchange="cargarPendientesCobro()"></select></div>
+      <div class="field"><label>TC de la fecha de pago <span class="tag">el del recibo de Tango</span></label><input id="c-tc" class="num" oninput="aplicarTcGeneral()"></div>
+      <div class="field"><label>Enlace al recibo <span class="tag">opcional</span></label><input id="c-adj" placeholder="https://drive.google.com/…"></div>
+      <div class="field span4"><label>Observaciones</label><input id="c-obs"></div>
+    </div></div>
+    <div class="panel-section"><div class="panel-section-header">Valores recibidos <span class="tag">retenciones incluidas</span><span class="right"><button class="btn sm" onclick="VALORES.push({medio:'TRANSFERENCIA', importe:'', banco_emisor:'', referencia:''}); renderCobro()">+ Valor</button></span></div><div class="panel-section-body">
+      <table class="t lineas"><thead><tr><th style="width:190px">Medio de pago</th><th style="width:150px">Importe</th><th>Banco / emisor</th><th>Nº operación / cheque / certificado de retención</th><th style="width:150px">Acreditación</th><th style="width:34px"></th></tr></thead><tbody id="c-val"></tbody></table>
+    </div></div>
+    <div class="panel-section" id="c-imp-w"><div class="panel-section-header">Asignación a comprobantes pendientes del cliente
+      <span class="right"><button class="btn sm" onclick="sugerirFifo()">Sugerir por vencimiento</button><button class="btn sm" onclick="limpiarImp()">Limpiar</button></span></div>
+      <div class="panel-section-body"><div class="wrap"><table class="t" id="c-imp"></table></div></div></div>
+    <div id="c-val-res"></div>
+  </div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-cob')">Cancelar</button><button class="btn primary" id="c-ok" onclick="guardarCobro()">Registrar cobranza</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REVISAR CANCELADO ANTES DEL CORTE ===================================================== -->
+<div class="modal-bg" id="m-rev"><div class="modal">
+  <div class="modal-h"><h3 id="rev-tit">Revisar cancelado antes del corte</h3><button class="close" onclick="cerrar('m-rev')">×</button></div>
+  <div class="modal-b" id="rev-body"></div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-rev')">Cancelar</button><button class="btn primary" id="rev-ok" disabled onclick="guardarRev()">Guardar revisión</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: CONCILIACIÓN ===================================================== -->
+<div class="modal-bg" id="m-conc"><div class="modal sm">
+  <div class="modal-h"><h3>Saldo según el informe de Tango</h3><button class="close" onclick="cerrar('m-conc')">×</button></div>
+  <div class="modal-b">
+    <div class="grid2">
+      <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="k-cli"></select></div>
+      <div class="field"><label>Moneda <span class="req">*</span></label><select id="k-mon"><option>ARS</option><option>USD</option><option>EUR</option></select></div>
+      <div class="field"><label>Saldo según Tango al corte <span class="req">*</span></label><input id="k-saldo" class="num"></div>
+      <div class="field span2"><label>Nota (obligatoria si queda diferencia)</label><input id="k-nota"></div>
+    </div>
+  </div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-conc')">Cancelar</button><button class="btn primary" onclick="guardarConciliacion()">Guardar</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: ANULAR ===================================================== -->
+<div class="modal-bg" id="m-anu"><div class="modal sm">
+  <div class="modal-h"><h3 id="anu-tit">Anular registro</h3><button class="close" onclick="cerrar('m-anu')">×</button></div>
+  <div class="modal-b">
+    <div class="alert err"><div><b>Esto no anula nada en Tango.</b> Solo marca como anulado un registro de SMG cargado por error. Si en Tango se anuló una factura con una NC, registrá la NC y aplicala: la factura queda «Cancelada por NC».</div></div>
+    <div id="anu-aviso"></div>
+    <div class="field"><label>Motivo <span class="req">*</span> (mínimo 20 caracteres)</label><textarea id="anu-mot" rows="3" oninput="document.getElementById('anu-ok').disabled = this.value.trim().length < 20"></textarea></div>
+  </div>
+  <div class="modal-f"><span class="muted">Queda registrado con tu usuario, la fecha y el motivo.</span><button class="btn" onclick="cerrar('m-anu')">Cancelar</button><button class="btn danger" id="anu-ok" disabled onclick="confirmarAnul()">Anular registro</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script>
+/* =========================================================================
+   Facturación y Cobranzas. Todos los importes definitivos los calcula el
+   servidor (Decimal, HALF_UP); acá solo se muestran vistas previas con las
+   mismas reglas. Cada moneda tiene su propio saldo: nunca se suman.
+   ========================================================================= */
+const API = '/api/facturacion';
+const S = { sesion: null, cat: { clientes: [], certificados: [], ordenes_compra: [], centros_costos: [] }, vista: 'tablero' };
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nf4 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const r2 = n => Math.sign(n) * Math.round(Number(Math.abs(n).toFixed(6) + 'e2')) / 100;
+const m = (n, mon) => `${mon ? `<span class="mon">${mon}</span>` : ''}${nf.format(n || 0)}`;
+const f = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+const fh = s => s ? `${f(s)} ${String(s).slice(11, 16)}` : '—';
+const pad = (n, l) => String(n).padStart(l, '0');
+const numDoc = d => `${d.letra}-${pad(d.punto_venta, 4)}-${pad(d.numero, 8)}`;
+const numRec = r => `${pad(r.punto_venta, 4)}-${pad(r.numero, 8)}`;
+const ALIS = { '27': 0.27, '21': 0.21, '10.5': 0.105 };
+const ALI_TXT = { '27': '27 %', '21': '21 %', '10.5': '10,5 %', '0': 'Exento', 'NG': 'No gravado' };
+const TIPO_PED_TXT = { FACTURA: 'FACTURA', NOTA_CREDITO: 'NOTA DE CREDITO', NOTA_DEBITO: 'NOTA DE DEBITO' };
+const TIPO_PED_DE_DOC = { FC: 'FACTURA', ND: 'NOTA_DEBITO', NC: 'NOTA_CREDITO' };
+const MOTIVOS = { DESCUENTO_COMBUSTIBLE: 'Descuento de combustible', DIFERENCIA_CAMBIO: 'Diferencia de cambio', ANULACION_TOTAL: 'Anulación total', AJUSTE_PRECIO: 'Ajuste de precio', DESACOPIO_ANTICIPO: 'Desacopio de anticipo', OTRO: 'Otro' };
+const MEDIOS = { TRANSFERENCIA: 'Transferencia', CHEQUE: 'Cheque', ECHEQ: 'E-Cheq', EFECTIVO: 'Efectivo', RETENCION_IVA: 'Retención IVA', RETENCION_GANANCIAS: 'Retención Ganancias', RETENCION_IIBB: 'Retención IIBB', RETENCION_SUSS: 'Retención SUSS', OTRO: 'Otro' };
+const TRIBUTOS = { PERCEPCION_IIBB: 'Percepción IIBB', PERCEPCION_IVA: 'Percepción IVA', PERCEPCION_GANANCIAS: 'Percepción Ganancias', IMPUESTO_INTERNO: 'Impuesto interno', OTRO: 'Otro', REDONDEO: 'Redondeo vs. Tango' };
+const CRIT_TXT = { ESTIMADO_ANTIGUEDAD: 'ESTIMADO POR ANTIGÜEDAD', SEGUN_TANGO: 'SEGÚN TANGO', REVISADO: 'REVISADO' };
+const BADGE = { 'PENDIENTE': 'b-info', 'PARCIAL': 'b-warn', 'VENCIDA': 'b-err', 'CANCELADA': 'b-ok', 'CANCELADA POR NC': 'b-nc', 'SIN APLICAR': 'b-warn', 'APLICADA PARCIAL': 'b-warn', 'APLICADA': 'b-ok', 'ANULADO': 'b-grey',
+  'BORRADOR': 'b-warn', 'EMITIDO': 'b-info', 'PENDIENTE DE FACTURAR': 'b-warn', 'FACTURADO PARCIAL': 'b-info', 'FACTURADO': 'b-ok', 'VIGENTE': 'b-ok', 'CONCILIADO': 'b-ok', 'DIFERENCIA': 'b-err', 'SIN SALDO TANGO': 'b-warn', 'CONFIRMADO': 'b-ok' };
+const badge = e => `<span class="badge ${BADGE[e] || 'b-info'}">${esc(e)}</span>`;
+const tipoB = t => `<span class="tipo tipo-${t}">${t}</span>`;
+const critB = c => c ? `<span class="badge ${c === 'ESTIMADO_ANTIGUEDAD' ? 'b-warn' : 'b-ok'}">${CRIT_TXT[c] || c}</span>` : '';
+const cliNombre = cod => (S.cat.clientes.find(c => c.codigo === cod) || {}).razon_social || cod || '—';
+const optsCli = () => S.cat.clientes.map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo)} · ${esc(c.razon_social)}</option>`).join('');
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+function num(s) {
+  let t = String(s ?? '').trim().replace(/\s/g, '');
+  if (!t) return 0;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  const x = parseFloat(t); return isNaN(x) ? 0 : x;
+}
+function toast(t, error) { const el = $('toast'); el.style.background = error ? 'var(--red)' : ''; el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', error ? 9000 : 4500); }
+function abrir(id) { $(id).classList.add('open'); } function cerrar(id) { $(id).classList.remove('open'); }
+const puedeCargar = () => !!(S.sesion && S.sesion.puede_cargar);
+const esResp = () => !!(S.sesion && S.sesion.es_responsable);
+
+async function api(metodo, ruta, cuerpo, extra = {}) {
+  const opciones = { method: metodo, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
+  if (cuerpo !== undefined) { opciones.headers['Content-Type'] = 'application/json'; opciones.body = JSON.stringify(cuerpo); }
+  if (extra.idem) opciones.headers['Idempotency-Key'] = extra.idem;
+  const resp = await fetch(API + ruta, opciones);
+  if (resp.status === 401) { window.location.href = '/login'; throw new Error('Sesión vencida'); }
+  const datos = await resp.json().catch(() => ({}));
+  if (!resp.ok) { const e = new Error(typeof datos.detail === 'string' ? datos.detail : 'Error ' + resp.status); e.codigo = datos.codigo; e.status = resp.status; throw e; }
+  return datos;
+}
+const qs = o => { const p = Object.entries(o).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&'); return p ? '?' + p : ''; };
+
+/* ============================== NAVEGACIÓN ============================== */
+const TITULOS = { tablero: 'Tablero de Seguimiento', pedidos: 'Pedidos de Facturación', documentos: 'Facturas, ND y NC', cobranzas: 'Cobranzas y Recibos', ctacte: 'Cuenta Corriente', saldos: 'Puesta en marcha', config: 'Configuración y permisos' };
+const RENDER = { tablero: () => renderTablero(), pedidos: () => renderPedidos(), documentos: () => renderDocs(), cobranzas: () => renderRecibos(), ctacte: () => renderCtaCte(), saldos: () => renderSaldos(), config: () => renderConfig() };
+function ir(v) {
+  S.vista = v;
+  document.querySelectorAll('.vista').forEach(s => s.classList.toggle('hidden', s.id !== 'v-' + v));
+  document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.classList.toggle('active', b.dataset.vista === v));
+  $('crumbs').innerHTML = `Menú Principal<i>›</i>Facturación y Cobranzas<i>›</i><b>${TITULOS[v]}</b>`;
+  if (v !== 'pedidos') cerrarEditor();
+  history.replaceState(null, '', '#' + v);
+  RENDER[v]();
+}
+document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.addEventListener('click', () => ir(b.dataset.vista)));
+function refrescar() { RENDER[S.vista](); }
+function barraEstado() {
+  const c = S.sesion.corte;
+  const hab = S.sesion.clientes_validados || 0;
+  const txt = 'Seguimiento desde las operaciones nuevas: <b>comprobantes y cobranzas habilitados</b>'
+    + (c ? ` · carga inicial por cliente: fecha <b>${c.fecha_corte ? f(c.fecha_corte) : 'pendiente'}</b>${c.estado === 'CONFIRMADO' ? ' (cerrada)' : ''}, <b>${hab}</b> cliente(s) validado(s)` : '');
+  $('estado-corte').innerHTML = `${txt} · Usuario: <b>${esc(S.sesion.nombre || S.sesion.usuario)}</b>${esResp() ? ' (responsable)' : puedeCargar() ? '' : ' (consulta)'}`;
+  document.querySelectorAll('.carga').forEach(el => el.classList.toggle('hidden', !puedeCargar()));
+}
+
+/* ============================== TABLERO ============================== */
+async function renderTablero() {
+  const t = await api('GET', '/tablero' + qs({ cliente: $('f-cli').value }));
+  const monedas = Object.keys(t.saldos_por_moneda).sort();
+  $('kpis').innerHTML = monedas.length ? monedas.map(mon => {
+    const ag = t.antiguedad[mon] || {}, vencido = r2((ag['1-30'] || 0) + (ag['31-60'] || 0) + (ag['61-90'] || 0) + (ag['+90'] || 0));
+    const prox = r2(t.vencimientos.filter(d => d.moneda === mon && d.dias_vencimiento >= 0).reduce((s, d) => s + d.saldo, 0));
+    return `<div class="kpis" style="margin-bottom:8px"><div class="kpi-mon">${mon}</div>
+      <div class="kpi"><span class="lbl">Saldo del cliente</span><b>${m(t.saldos_por_moneda[mon])}</b><small>FC/ND − NC sin aplicar − a cuenta</small></div>
+      <div class="kpi err"><span class="lbl">Vencido</span><b>${m(vencido)}</b></div>
+      <div class="kpi warn"><span class="lbl">Vence en 30 días</span><b>${m(prox)}</b></div>
+      <div class="kpi"><span class="lbl">Sin vencer</span><b>${m(ag['sin vencer'] || 0)}</b></div>
+      <div class="kpi"><span class="lbl">Más de 90 días</span><b>${m(ag['+90'] || 0)}</b></div>
+      <div class="kpi"><span class="lbl">Pedidos sin facturar</span><b>${t.pedidos_pendientes.filter(p => p.moneda === mon).length}</b></div></div>`;
+  }).join('') : '<div class="alert info"><div>Todavía no hay comprobantes registrados.</div></div>';
+  $('cnt-pend').textContent = t.pedidos_pendientes.length;
+  $('t-pend').innerHTML = '<thead><tr><th>Pedido</th><th>Cliente</th><th>Neto</th><th>Pendiente</th><th>Estado</th></tr></thead><tbody>' +
+    (t.pedidos_pendientes.map(p => `<tr class="click" onclick="verPedido(${p.id})"><td>${esc(p.numero_solicitud)}</td><td>${esc(p.cliente_razon_social || cliNombre(p.cliente_codigo))}</td><td class="r">${m(p.subtotal, p.moneda)}</td><td class="r">${m(p.pendiente, p.moneda)}</td><td>${badge(p.estado_facturacion)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Sin pedidos pendientes.</td></tr>') + '</tbody>';
+  const tramos = ['sin vencer', '1-30', '31-60', '61-90', '+90'];
+  $('t-aging').innerHTML = `<thead><tr><th>Moneda</th>${tramos.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>` +
+    (Object.entries(t.antiguedad).map(([mon, ag]) => `<tr><td class="c"><b>${mon}</b></td>${tramos.map(x => `<td class="r">${nf.format(ag[x] || 0)}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="6" class="muted">Sin deuda.</td></tr>') + '</tbody>';
+  $('t-venc').innerHTML = '<thead><tr><th>Comprobante</th><th>Cliente</th><th>Vencimiento</th><th>Días</th><th>Saldo</th><th>Estado</th></tr></thead><tbody>' +
+    (t.vencimientos.map(d => `<tr class="click" onclick="verDoc(${d.id})"><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${esc(d.cliente_razon_social)}</td><td>${f(d.fecha_vencimiento)}</td><td class="r ${d.dias_vencimiento < 0 ? 'neg' : ''}">${d.dias_vencimiento < 0 ? -d.dias_vencimiento + ' vencido' : 'en ' + d.dias_vencimiento}</td><td class="r">${m(d.saldo, d.moneda)}</td><td>${badge(d.estado_saldo)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin vencimientos en los próximos 30 días.</td></tr>') + '</tbody>';
+}
+
+/* ============================== PEDIDOS ============================== */
+async function renderPedidos() {
+  const est = $('fp-est').value;
+  let filas = await api('GET', '/pedidos' + qs({ cliente: $('fp-cli').value }));
+  if (est) filas = filas.filter(p => (p.estado === 'EMITIDO' ? p.estado_facturacion : p.estado) === est);
+  $('t-ped').innerHTML = '<thead><tr><th>Solicitud Nº</th><th>Fecha</th><th>Tipo</th><th>Cliente</th><th>OC</th><th>Neto</th><th>Total</th><th>Facturado</th><th>Pendiente</th><th>Estado</th><th>Comprobantes</th><th></th></tr></thead><tbody>' +
+    (filas.map(p => `<tr class="click ${p.estado === 'ANULADO' ? 'anul' : ''}" onclick="verPedido(${p.id})"><td>${esc(p.numero_solicitud || 'borrador #' + p.id)}</td><td>${f(p.fecha_emision)}</td><td>${TIPO_PED_TXT[p.tipo_solicitado]}</td>
+      <td>${esc(p.cliente_razon_social || cliNombre(p.cliente_codigo))}</td><td>${esc(p.oc_texto || '—')}</td><td class="r">${m(p.subtotal, p.moneda)}</td><td class="r">${m(p.total, p.moneda)}</td>
+      <td class="r">${p.estado === 'EMITIDO' ? nf.format(p.facturado) : '—'}</td><td class="r">${p.estado === 'EMITIDO' ? nf.format(p.pendiente) : '—'}</td>
+      <td>${badge(p.estado === 'EMITIDO' ? p.estado_facturacion : p.estado)}</td><td>${p.documentos.map(d => `${d.tipo} ${d.punto_venta}-${d.numero}`).join(', ') || '—'}</td>
+      <td><a href="${API}/pedidos/${p.id}/pdf" target="_blank" onclick="event.stopPropagation()">PDF</a></td></tr>`).join('') || '<tr><td colspan="12" class="muted">Sin pedidos.</td></tr>') + '</tbody>';
+}
+async function verPedido(id) {
+  const p = await api('GET', '/pedidos/' + id);
+  $('ver-tit').innerHTML = `Pedido ${esc(p.numero_solicitud || 'borrador #' + p.id)} · ${TIPO_PED_TXT[p.tipo_solicitado]} ${badge(p.estado === 'EMITIDO' ? p.estado_facturacion : p.estado)}`;
+  $('ver-body').innerHTML = `
+    ${p.estado === 'ANULADO' ? `<div class="alert err"><div><b>Pedido anulado</b> por ${esc(p.anulado_por)} el ${fh(p.anulado_en)}. Motivo: ${esc(p.motivo_anulacion)}</div></div>` : ''}
+    <div class="two"><div class="panel-section"><div class="panel-section-header">Datos</div><div class="panel-section-body">
+      <div class="kv"><span>Cliente</span><span>${esc(p.cliente_codigo)} · ${esc(p.cliente_razon_social)} · CUIT ${esc(p.cliente_cuit || '—')}</span></div>
+      <div class="kv"><span>Fecha · moneda</span><span>${f(p.fecha_emision)} · ${p.moneda}</span></div>
+      <div class="kv"><span>Condición de pago</span><span>${esc(p.condicion_pago || '—')}</span></div>
+      <div class="kv"><span>OC · CC</span><span>${esc(p.oc_texto || '—')} · ${esc(p.centro_costo_id || '—')}</span></div>
+      <div class="kv"><span>Huella del PDF (SHA-256)</span><span style="font-family:Consolas,monospace;font-size:11px">${esc(p.pdf_sha256 ? p.pdf_sha256.slice(0, 24) + '…' : '—')}</span></div>
+      <div class="kv"><span>Adjuntos <span class="tag">opcional</span></span><span>${adjuntosHtml(p.adjuntos, 'PEDIDO', p.id)}</span></div>
+    </div></div>
+    <div class="panel-section"><div class="panel-section-header">Importes (${p.moneda})</div><div class="panel-section-body">
+      <table class="t" style="white-space:normal"><thead><tr><th>Cant.</th><th>Detalle</th><th>IVA</th><th>Subtotal</th></tr></thead><tbody>${p.lineas.map(l => `<tr><td class="c">${l.cantidad}</td><td style="white-space:pre-line">${esc(l.detalle)}</td><td class="c">${ALI_TXT[l.alicuota_iva]}</td><td class="r">${nf.format(l.subtotal)}</td></tr>`).join('')}</tbody></table>
+      <div class="kv"><span>Neto</span><span>${m(p.subtotal, p.moneda)}</span></div><div class="kv"><span>IVA</span><span>${m(p.iva_total, p.moneda)}</span></div><div class="kv final"><span>Total</span><span>${m(p.total, p.moneda)}</span></div>
+      ${p.estado === 'EMITIDO' ? `<div class="kv"><span>Facturado (neto)</span><span>${m(p.facturado, p.moneda)}</span></div>` : ''}
+    </div></div></div>
+    ${historialHtml(p.eventos)}`;
+  const b = [];
+  b.push(`<a class="btn" href="${API}/pedidos/${p.id}/pdf" target="_blank">Ver PDF</a>`);
+  if (puedeCargar() && p.estado === 'BORRADOR') b.push(`<button class="btn primary" onclick="cerrar('m-ver'); editarPedido(${p.id})">Editar borrador</button>`);
+  if (puedeCargar() && p.estado === 'EMITIDO' && p.estado_facturacion !== 'FACTURADO') b.push(`<button class="btn primary" onclick="cerrar('m-ver'); abrirDoc({pedido_id:${p.id}})">Registrar comprobante</button>`);
+  if (esResp() && p.estado === 'EMITIDO' && !(p.facturado > 0)) b.push(`<button class="btn danger" onclick="abrirAnul('/pedidos/${p.id}/anular', 'Anular pedido ${esc(p.numero_solicitud)}', 'Solo si no tiene comprobantes vigentes vinculados.')">Anular…</button>`);
+  $('ver-pie').innerHTML = `<span class="muted">Creado por ${esc(p.creado_por)} · ${fh(p.creado_en)}</span>` + b.join('');
+  abrir('m-ver');
+}
+
+let LINEAS = [], PED_ID = null, PED_IDEM = null;
+function opcionesCC(sel) { $(sel).innerHTML = '<option value="">—</option>' + S.cat.centros_costos.map(c => `<option value="${c.id}">${c.id} · ${esc(c.nombre)}</option>`).join(''); }
+function opcionesCert() {
+  const cli = $('pe-cli').value, mon = $('pe-mon').value;
+  const certs = S.cat.certificados.filter(c => c.cliente_codigo === cli && c.moneda === mon);
+  $('pe-cert-add').innerHTML = certs.length ? certs.map(c => `<option value="${c.id}">${esc(c.numero_texto)} · pendiente ${m(c.pendiente, c.moneda)}</option>`).join('') : '<option value="">— Sin certificados emitidos del cliente en esta moneda —</option>';
+}
+function abrirEditor(titulo) {
+  $('ped-lista').classList.add('hidden'); $('ped-editor').classList.remove('hidden');
+  $('ped-origen').innerHTML = titulo; $('ped-val').innerHTML = '';
+  if (S.vista !== 'pedidos') { S.vista = 'pedidos'; document.querySelectorAll('.vista').forEach(s => s.classList.toggle('hidden', s.id !== 'v-pedidos')); }
+}
+function nuevoPedido() {
+  PED_ID = null; PED_IDEM = uuid(); LINEAS = [];
+  $('pe-cli').innerHTML = optsCli(); opcionesCC('pe-cc');
+  $('pe-tipo').value = 'FACTURA'; $('pe-num').value = 'se asigna al emitir'; $('pe-fecha').value = S.sesion.hoy; $('pe-depto').value = '15';
+  ['pe-cot', 'pe-oc', 'pe-obs', 'pe-just', 'pe-rec', 'pe-adj', 'pe-cond'].forEach(i => $(i).value = '');
+  $('pe-dom').value = '.-'; $('pe-tc').value = 'TC de la fecha efectiva de pago'; $('pe-mon').value = 'USD';
+  $('pe-sol').value = `${(S.sesion.nombre || '').toUpperCase()}\nADMINISTRACIÓN DE OBRA\nSMG S.R.L.`;
+  $('pe-descartar').classList.add('hidden');
+  aplicarCli(); agregarLinea();
+  abrirEditor('<div><b>Pedido nuevo.</b> Podés agregar certificados emitidos del cliente (se precargan cliente, OC, moneda y período) o completar líneas a mano.</div>');
+}
+async function editarPedido(id) {
+  const p = await api('GET', '/pedidos/' + id);
+  PED_ID = id; PED_IDEM = null;
+  $('pe-cli').innerHTML = optsCli(); opcionesCC('pe-cc');
+  $('pe-tipo').value = p.tipo_solicitado; $('pe-fecha').value = p.fecha_emision; $('pe-depto').value = p.depto_origen || '15'; $('pe-cot').value = p.cotizacion || '';
+  $('pe-mon').value = p.moneda; $('pe-cli').value = p.cliente_codigo; $('pe-dom').value = p.cliente_domicilio || '.-'; $('pe-cond').value = p.condicion_pago || '';
+  $('pe-tc').value = p.tipo_cambio_informar || ''; $('pe-cc').value = p.centro_costo_id || ''; $('pe-oc').value = p.oc_texto || ''; $('pe-obs').value = p.observaciones || '';
+  $('pe-just').value = p.justificacion_diferencia || ''; $('pe-sol').value = p.solicitante_texto || ''; $('pe-rec').value = p.recibe_texto || ''; $('pe-adj').value = '';
+  LINEAS = p.lineas.map(l => ({ cantidad: l.cantidad, detalle: l.detalle, precio_unitario: l.precio_unitario, alicuota_iva: l.alicuota_iva, certificado_id: l.certificado_id || '' }));
+  $('pe-descartar').classList.remove('hidden');
+  $('pe-cuit').value = (S.cat.clientes.find(c => c.codigo === p.cliente_codigo) || {}).cuit || '';
+  opcionesCert(); renderLineas();
+  abrirEditor(`<div><b>Borrador #${id}.</b> Se puede editar hasta emitirlo.</div>`);
+}
+function cerrarEditor() { $('ped-lista').classList.remove('hidden'); $('ped-editor').classList.add('hidden'); }
+// El TC a informar solo aplica a pedidos en moneda extranjera (especificación: default para USD).
+function ajustarTc() { const def = 'TC de la fecha efectiva de pago', el = $('pe-tc'); if ($('pe-mon').value === 'ARS') { if (el.value === def) el.value = ''; } else if (!el.value) el.value = def; }
+function aplicarCli() { $('pe-cuit').value = (S.cat.clientes.find(c => c.codigo === $('pe-cli').value) || {}).cuit || ''; opcionesCert(); previa(); }
+async function agregarCert() {
+  const id = $('pe-cert-add').value; if (!id) return;
+  if (LINEAS.some(l => String(l.certificado_id) === String(id))) return toast('Ese certificado ya está en el pedido.');
+  try {
+    const p = await api('GET', `/certificados/${id}/precarga`);
+    if (!$('pe-cot').value) $('pe-cot').value = p.cotizacion || '';
+    if (!$('pe-oc').value) $('pe-oc').value = p.oc_texto || '';
+    if (!$('pe-cc').value && p.centro_costo_id) $('pe-cc').value = p.centro_costo_id;
+    if (!$('pe-obs').value) $('pe-obs').value = p.observaciones || '';
+    LINEAS = LINEAS.filter(l => l.detalle || num(l.precio_unitario));
+    LINEAS.push({ ...p.linea, precio_unitario: p.linea.precio_unitario });
+    if (p.comprometido_en_pedidos > 0) toast(`El certificado ya tiene pedidos emitidos por ${nf.format(p.comprometido_en_pedidos)}: se propone el pendiente.`);
+    renderLineas();
+  } catch (e) { toast(e.message, true); }
+}
+function agregarLinea() { LINEAS.push({ cantidad: 1, detalle: '', precio_unitario: '', alicuota_iva: '21', certificado_id: '' }); renderLineas(); }
+function renderLineas() {
+  const certs = S.cat.certificados.filter(c => c.cliente_codigo === $('pe-cli').value);
+  $('pe-lineas').innerHTML = LINEAS.map((l, i) => `<tr>
+    <td><input class="num" value="${esc(l.cantidad)}" oninput="LINEAS[${i}].cantidad=this.value; previa()"></td>
+    <td><textarea oninput="LINEAS[${i}].detalle=this.value; previa()">${esc(l.detalle)}</textarea></td>
+    <td><select onchange="LINEAS[${i}].certificado_id=this.value"><option value="">—</option>${certs.map(c => `<option value="${c.id}" ${String(c.id) === String(l.certificado_id) ? 'selected' : ''}>${esc(c.numero_texto)}</option>`).join('')}</select></td>
+    <td><select onchange="LINEAS[${i}].alicuota_iva=this.value; previa()">${Object.entries(ALI_TXT).map(([k, v]) => `<option value="${k}" ${k === String(l.alicuota_iva) ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+    <td><input class="num" value="${esc(l.precio_unitario)}" oninput="LINEAS[${i}].precio_unitario=this.value; previa()"></td>
+    <td class="r" id="pl-sub-${i}"></td>
+    <td><button class="btn sm danger" onclick="LINEAS.splice(${i},1); renderLineas()">×</button></td></tr>`).join('');
+  previa();
+}
+function ivaPorAlicuota(lineas) {
+  const g = {}; lineas.forEach(l => { const a = String(l.alicuota_iva); g[a] = (g[a] || 0) + r2(num(l.neto)); });
+  return Object.keys(ALIS).filter(a => g[a]).map(a => ({ ali: a, base: r2(g[a]), iva: r2(g[a] * ALIS[a]) }));
+}
+function previa() {
+  const mon = $('pe-mon').value;
+  const lin = LINEAS.map(l => ({ ...l, neto: r2(num(l.cantidad) * num(l.precio_unitario)) }));
+  lin.forEach((l, i) => { const c = $('pl-sub-' + i); if (c) c.innerHTML = nf.format(l.neto); });
+  const neto = r2(lin.reduce((s, l) => s + l.neto, 0)), ivas = ivaPorAlicuota(lin), total = r2(neto + ivas.reduce((s, x) => s + x.iva, 0));
+  $('pe-tot').innerHTML = `<div class="kv"><span>Neto</span><span>${m(neto, mon)}</span></div>${ivas.map(x => `<div class="kv"><span>IVA ${ALI_TXT[x.ali]} s/ ${nf.format(x.base)}</span><span>${m(x.iva, mon)}</span></div>`).join('')}<div class="kv final"><span>Total</span><span>${m(total, mon)}</span></div>`;
+  const varias = new Set(lin.map(l => l.alicuota_iva)).size > 1;
+  const cliente = S.cat.clientes.find(c => c.codigo === $('pe-cli').value) || {};
+  $('hoja').innerHTML = `<div class="marco">
+    <table class="enc"><tr><td class="logo"><img src="/Imagenes/09-smg.png" alt="SMG"></td><td class="tit">SOLICITUD DE EMISION<span class="rojo">${TIPO_PED_TXT[$('pe-tipo').value]}</span></td>
+      <td style="width:26%"><table class="meta"><tr><td>Código</td><td>D.C. 1-9-14</td></tr><tr><td>Rev.</td><td>02</td></tr><tr><td>Vigencia</td><td>24/8/2017</td></tr><tr><td>Páginas</td><td>1 de 1</td></tr></table></td></tr></table>
+    <div class="fila"><div class="cam"><b>SOLICITUD Nº</b><span>${esc($('pe-num').value)}</span></div><div class="cam der"><b>FECHA DE EMISION:</b><span>${f($('pe-fecha').value)}</span></div></div>
+    <div class="fila"><div class="cam"><b>DEPTO. ORIGEN:</b><span>${esc($('pe-depto').value)}</span></div><div></div></div>
+    <div class="fila"><div class="cam"><b>PARA: DEPARTAMENTO CONTABLE</b><span></span></div><div class="cam"><b>COTIZACION :</b><span>${esc($('pe-cot').value)}</span></div></div>
+    <div class="fila"><div class="cam"><b>CLIENTE:</b><span>${esc(cliente.razon_social || '')}</span></div><div class="cam"><b>CUIT:</b><span>${esc(cliente.cuit || '')}</span></div></div>
+    <div class="fila"><div class="cam"><b>DOMICILIO:</b><span>${esc($('pe-dom').value)}</span></div><div class="cam"><b>MONEDA:</b><span>${mon}</span></div></div>
+    <div class="fila"><div class="cam"><b>CONDICIÓN DE PAGO:</b><span class="rojo">${esc($('pe-cond').value)}</span></div><div class="cam"><b>ORDEN DE COMPRA Nº: ${esc($('pe-oc').value)}</b></div></div>
+    ${$('pe-tc').value ? `<div class="cam"><b>TIPO DE CAMBIO:</b><span>${esc($('pe-tc').value)}</span></div>` : ''}
+    <div class="intro">Se solicita la Facturación y gestión de cobro del siguiente servicio realizado al cliente de referencia.</div>
+    <table class="det"><thead><tr><th>CANTIDAD</th><th>DETALLE</th><th>PRECIO UNITARIO</th><th>SUBTOTAL</th></tr></thead><tbody>
+      ${lin.map(l => `<tr><td style="text-align:center">${esc(l.cantidad)}</td><td class="d">${esc(l.detalle)}${varias ? `\nIVA ${ALI_TXT[l.alicuota_iva]}` : ''}</td><td class="m">${mon} ${nf.format(num(l.precio_unitario))}</td><td class="m">${mon} ${nf.format(l.neto)}</td></tr>`).join('')}<tr><td></td><td></td><td></td><td></td></tr></tbody></table>
+    <table class="tots"><tr><td class="l"></td><td>${mon} ${nf.format(neto)}</td></tr>${ivas.map(x => `<tr><td class="l">IVA ${ALI_TXT[x.ali]}</td><td>${mon} ${nf.format(x.iva)}</td></tr>`).join('')}<tr><td class="l">TOTAL</td><td><b>${mon} ${nf.format(total)}</b></td></tr></table>
+    <div class="obs"><div>Observaciones:</div><div class="rojo">${esc($('pe-obs').value)}</div></div>
+    <div class="firmas"><div class="firma"><div class="h">SOLICITÓ</div><div class="c">${esc($('pe-sol').value)}</div><div class="p">Firma y Aclaración</div></div><div class="firma"><div class="h">RECIBE</div><div class="c">${esc($('pe-rec').value)}</div><div class="p">Firma y Aclaración</div></div></div>
+    <div class="pie">UNA VEZ EMITIDA LA FACTURA EL DEPARTAMENTO CONTABLE PONDRÁ A DISPOSICIÓN LA MISMA EN LA NUBE DE LA EMPRESA PARA QUE EL SOLICITANTE TENGA ACCESO A LA MISMA</div></div>`;
+}
+function datosPedido() {
+  return {
+    tipo_solicitado: $('pe-tipo').value, fecha_emision: $('pe-fecha').value, depto_origen: $('pe-depto').value, cotizacion: $('pe-cot').value,
+    moneda: $('pe-mon').value, cliente_codigo: $('pe-cli').value, cliente_domicilio: $('pe-dom').value, condicion_pago: $('pe-cond').value,
+    tipo_cambio_informar: $('pe-tc').value, centro_costo_id: $('pe-cc').value ? Number($('pe-cc').value) : null, oc_texto: $('pe-oc').value,
+    observaciones: $('pe-obs').value, justificacion_diferencia: $('pe-just').value, solicitante_texto: $('pe-sol').value, recibe_texto: $('pe-rec').value,
+    lineas: LINEAS.filter(l => l.detalle || num(l.precio_unitario)).map(l => ({ cantidad: num(l.cantidad), detalle: l.detalle, precio_unitario: num(l.precio_unitario), alicuota_iva: l.alicuota_iva, certificado_id: l.certificado_id ? Number(l.certificado_id) : null })),
+  };
+}
+async function guardarPedido(emitir) {
+  try {
+    let id = PED_ID;
+    if (id) await api('PUT', '/pedidos/' + id, datosPedido());
+    else { id = (await api('POST', '/pedidos', datosPedido(), { idem: PED_IDEM })).id; PED_ID = id; }
+    if (emitir) {
+      const adj = $('pe-adj').value.trim();
+      const r = await api('POST', `/pedidos/${id}/emitir`, { adjuntos: adj ? [{ tipo: 'RESPALDO', nombre: 'Respaldo del pedido', url_externa: adj }] : [] });
+      toast(`Pedido emitido: Nº ${r.numero_solicitud}. El PDF quedó sellado.`);
+      window.open(`${API}/pedidos/${id}/pdf`, '_blank');
+    } else toast('Borrador guardado. Se puede editar hasta emitirlo.');
+    cerrarEditor(); renderPedidos();
+  } catch (e) { $('ped-val').innerHTML = `<div class="alert err"><div><b>No se pudo guardar.</b> ${esc(e.message)}</div></div>`; }
+}
+async function descartarPedido() {
+  if (!PED_ID || !confirm('¿Descartar este borrador? No tiene número asignado.')) return;
+  try { await api('DELETE', '/pedidos/' + PED_ID); toast('Borrador descartado.'); cerrarEditor(); renderPedidos(); } catch (e) { toast(e.message, true); }
+}
+
+/* ============================== COMPROBANTES ============================== */
+async function renderDocs() {
+  let filas = await api('GET', '/documentos' + qs({ tipo: $('fd-tipo').value, moneda: $('fd-mon').value, cliente: $('fd-cli').value }));
+  if (!$('fd-anul').checked) filas = filas.filter(d => d.estado === 'VIGENTE');
+  if ($('fd-est').value) filas = filas.filter(d => d.estado_saldo === $('fd-est').value);
+  $('t-docs').innerHTML = '<thead><tr><th>Tipo</th><th>Número</th><th>Cliente</th><th>Emisión</th><th>Vencimiento</th><th>Total</th><th>NC aplicadas</th><th>Cobrado</th><th>Saldo</th><th>Estado</th><th>Vínculos</th></tr></thead><tbody>' +
+    (filas.map(d => `<tr class="click ${d.estado === 'ANULADO' ? 'anul' : ''}" onclick="verDoc(${d.id})"><td>${tipoB(d.tipo)}</td>
+      <td>${numDoc(d)}${d.origen === 'SALDO_INICIAL' ? ' <span class="si">SI</span>' : ''}${d.cancelado_estimado > 0 ? ' <span class="badge b-warn" title="Cancelado antes del corte estimado por antigüedad: no es una imputación real">EST.</span>' : ''}${d.sin_adjunto ? '' : ' 📎'}</td>
+      <td>${esc(d.cliente_razon_social)}</td><td>${f(d.fecha_emision)}</td><td>${f(d.fecha_vencimiento)}</td><td class="r">${m(d.total, d.moneda)}</td>
+      <td class="r">${d.tipo === 'NC' ? '—' : d.aplicado_nc ? nf.format(d.aplicado_nc) : '—'}</td><td class="r">${d.tipo === 'NC' ? '—' : d.cobrado ? nf.format(d.cobrado) : '—'}</td>
+      <td class="r"><b>${nf.format(d.saldo)}</b></td><td>${badge(d.estado_saldo)}</td>
+      <td>${d.vinculos.map(v => v.pedido_id ? 'Ped. ' + esc(v.numero_solicitud) : 'Cert. ' + v.certificado_id).join(' + ') || '—'}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">Sin comprobantes.</td></tr>') + '</tbody>';
+}
+function adjuntosHtml(adjs, entidad, id) {
+  const vig = (adjs || []).filter(a => a.estado === 'VIGENTE');
+  return (vig.map(a => `<a href="${esc(a.url_externa)}" target="_blank" rel="noopener">${esc(a.nombre || 'enlace')}</a>`).join(' · ') || '<span class="muted">Sin adjuntos</span>')
+    + (puedeCargar() ? ` · <a onclick="agregarEnlace('${entidad}', ${id})">+ Agregar enlace</a>` : '');
+}
+async function agregarEnlace(entidad, id) {
+  const url = prompt('Enlace al documento (Drive u otro):'); if (!url) return;
+  try { await api('POST', '/adjuntos', { entidad, entidad_id: id, nombre: url.split('/').slice(-1)[0] || 'enlace', url_externa: url }); toast('Enlace agregado.'); cerrar('m-det'); cerrar('m-ver'); refrescar(); } catch (e) { toast(e.message, true); }
+}
+function historialHtml(eventos) {
+  const txt = { REGISTRADO: 'Registrado', ANULADO: 'Registro anulado', NC_APLICADA: 'NC aplicada', NC_DESAPLICADA: 'Aplicación de NC anulada', ADJUNTO_AGREGADO: 'Adjunto agregado', EMITIDO: 'Emitido', BORRADOR_GUARDADO: 'Borrador guardado', IMPUTACION_ANULADA: 'Asignación de cobro anulada', IMPUTADO_A_CUENTA: 'Asignado lo que estaba a cuenta' };
+  return `<div class="panel-section"><div class="panel-section-header">Historial de auditoría</div><div class="panel-section-body"><ul class="timeline">${(eventos || []).map(e => `<li class="${e.evento.includes('ANUL') ? 'anul' : ''}"><b>${txt[e.evento] || esc(e.evento)}</b> por ${esc(e.usuario)} · ${fh(e.fecha)}${e.detalle && e.detalle.motivo ? `<br><small>Motivo: ${esc(e.detalle.motivo)}</small>` : ''}</li>`).join('') || '<li class="muted">Sin eventos.</li>'}</ul></div></div>`;
+}
+async function verDoc(id) {
+  const d = await api('GET', '/documentos/' + id);
+  $('det-tit').innerHTML = `${tipoB(d.tipo)} ${numDoc(d)} · ${esc(d.cliente_razon_social)} ${badge(d.estado_saldo)}`;
+  let movs;
+  if (d.tipo === 'NC') {
+    movs = `<table class="t"><thead><tr><th>Fecha</th><th>Aplicada a</th><th>Importe</th><th>Disponible</th><th></th></tr></thead><tbody>
+      <tr><td>${f(d.fecha_emision)}</td><td>Importe de la NC</td><td></td><td class="r"><b>${m(d.total, d.moneda)}</b></td><td></td></tr>
+      ${d.movimientos.map(x => `<tr class="${x.estado === 'ANULADO' ? 'anul' : ''}"><td>${f(x.fecha)}</td><td><a onclick="verDoc(${x.documento_id})">${esc(x.referencia)}</a></td><td class="r">− ${nf.format(x.importe)}</td><td class="r">${m(x.saldo_restante, d.moneda)}</td>
+        <td>${esResp() && x.estado === 'VIGENTE' ? `<a onclick="abrirAnul('/aplicaciones/${x.id}/anular', 'Anular aplicación de la NC', 'El importe vuelve a quedar sin aplicar.')">Anular</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  } else {
+    const filas = [`<tr><td>${f(d.fecha_emision)}</td><td>Importe original del comprobante</td><td></td><td></td><td></td><td class="r"><b>${m(d.total, d.moneda)}</b></td><td></td></tr>`];
+    if (d.origen === 'SALDO_INICIAL' && d.cancelado_antes_corte > 0) {
+      const est = d.cancelado_estimado > 0, crit = d.cancelaciones_corte.filter(c => c.estado === 'VIGENTE');
+      filas.push(`<tr class="ini"><td>${f(S.sesion.corte && S.sesion.corte.fecha_corte)}</td><td class="wrapc">Cancelado antes del corte <span class="si">SI</span> ${crit.map(c => critB(c.criterio)).join(' ')}
+        ${est ? '<span class="mini">Estimado por antigüedad porque Tango no informa qué facturas canceló cada recibo. <b>No es una imputación real.</b></span>' : ''}
+        ${crit.filter(c => c.criterio !== 'ESTIMADO_ANTIGUEDAD' && (c.nota || c.moneda_pago)).map(c => `<span class="mini">${c.moneda_pago ? `Pago ${f(c.fecha_pago)}: ${m(c.importe_pago, c.moneda_pago)}${c.tipo_cambio ? ` a TC ${nf4.format(c.tipo_cambio)}` : ''} = ${m(c.importe, d.moneda)}${c.recibo_numero ? ` · REC ${pad(c.recibo_punto_venta, 4)}-${pad(c.recibo_numero, 8)}${c.recibo_total ? ` (total ${m(c.recibo_total, c.recibo_moneda)})` : ''}` : ''} · ` : ''}${esc(c.nota || '')}</span>`).join('')}
+        ${puedeCargar() ? `<span class="mini"><a onclick="abrirRev('${d.cliente_codigo}','${d.moneda}')">Revisar asignación…</a></span>` : ''}</td>
+        <td></td><td></td><td class="r">− ${nf.format(d.cancelado_antes_corte)}</td><td class="r"><b>${m(d.total - d.cancelado_antes_corte, d.moneda)}</b></td><td></td></tr>`);
+    }
+    d.movimientos.forEach(x => filas.push(`<tr class="${x.estado === 'ANULADO' ? 'anul' : ''}"><td>${f(x.fecha)}</td>
+      <td class="wrapc">${x.tipo === 'NC' ? tipoB('NC') + ` <a onclick="verDoc(${x.documento_id})">${esc(x.referencia.slice(3))}</a> <span class="mini">${esc(MOTIVOS[x.detalle] || x.detalle || '')}</span>` : tipoB('REC') + ` <a onclick="verRecibo(${x.recibo_id})">${esc(x.referencia.slice(4))}</a> <span class="mini">${esc((x.detalle || '').split(' + ').map(v => MEDIOS[v] || v).join(' + '))}</span>`}</td>
+      <td class="r">${x.importe_recibido != null ? m(x.importe_recibido, x.moneda_recibida) : ''}</td><td class="r">${x.tipo_cambio ? nf4.format(x.tipo_cambio) : x.tipo === 'COBRO' ? '—' : ''}</td>
+      <td class="r">− ${m(x.importe, d.moneda)}</td><td class="r"><b>${m(x.saldo_restante, d.moneda)}</b></td>
+      <td>${esResp() && x.estado === 'VIGENTE' ? `<a onclick="abrirAnul('${x.tipo === 'NC' ? '/aplicaciones/' : '/imputaciones/'}${x.id}/anular', 'Anular ${x.tipo === 'NC' ? 'aplicación de NC' : 'asignación del cobro'}', '${x.tipo === 'NC' ? 'El importe vuelve a la NC sin aplicar.' : 'El importe vuelve «a cuenta» del recibo.'}')">Anular</a>` : ''}</td></tr>`));
+    movs = `<table class="t"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Importe recibido</th><th>TC fecha de pago</th><th>Asignado (${d.moneda})</th><th>Saldo restante (${d.moneda})</th><th></th></tr></thead><tbody>${filas.join('')}</tbody></table>`;
+  }
+  const ivas = Object.entries(d.iva_por_alicuota || {});
+  $('det-body').innerHTML = `
+    ${d.estado === 'ANULADO' ? `<div class="alert err"><div><b>Registro anulado en SMG</b> por ${esc(d.anulado_por)} el ${fh(d.anulado_en)}. Motivo: ${esc(d.motivo_anulacion)}. No suma en saldos; se conserva para auditoría.</div></div>` : ''}
+    <div class="two">
+      <div class="panel-section"><div class="panel-section-header">Datos del comprobante</div><div class="panel-section-body">
+        <div class="kv"><span>Cliente</span><span>${esc(d.cliente_codigo)} · ${esc(d.cliente_razon_social)} · CUIT ${esc(d.cliente_cuit || '—')}</span></div>
+        <div class="kv"><span>Emisión / vencimiento</span><span>${f(d.fecha_emision)} · ${f(d.fecha_vencimiento)}</span></div>
+        <div class="kv"><span>Moneda</span><span>${d.moneda}${d.tipo_cambio_emision ? ` · TC de emisión ${nf4.format(d.tipo_cambio_emision)} (informativo)` : ''}</span></div>
+        ${d.motivo_codigo ? `<div class="kv"><span>Motivo</span><span>${esc(MOTIVOS[d.motivo_codigo] || d.motivo_codigo)}${d.motivo_detalle ? ' · ' + esc(d.motivo_detalle) : ''}</span></div>` : ''}
+        ${d.documento_origen_id ? `<div class="kv"><span>Comprobante que corrige</span><span><a onclick="verDoc(${d.documento_origen_id})">ver</a></span></div>` : ''}
+        <div class="kv"><span>Vínculos</span><span>${d.vinculos.map(v => (v.pedido_id ? 'Pedido ' + esc(v.numero_solicitud) : 'Certificado ' + v.certificado_id) + ` (neto ${nf.format(v.neto_asignado)})`).join('<br>') || 'Independiente'}</span></div>
+        <div class="kv"><span>Adjuntos <span class="tag">opcional</span></span><span>${adjuntosHtml(d.adjuntos, 'DOCUMENTO', d.id)}</span></div>
+        ${d.detalle ? `<div class="kv"><span>Detalle</span><span>${esc(d.detalle)}</span></div>` : ''}
+      </div></div>
+      <div class="panel-section"><div class="panel-section-header">Importes (${d.moneda})</div><div class="panel-section-body">
+        <table class="t" style="white-space:normal"><thead><tr><th>Detalle</th><th>Alícuota</th><th>Neto</th></tr></thead><tbody>${d.lineas.map(l => `<tr><td>${esc(l.descripcion || '—')}</td><td class="c">${ALI_TXT[l.alicuota_iva]}</td><td class="r">${nf.format(l.neto)}</td></tr>`).join('')}</tbody></table>
+        ${ivas.map(([a, v]) => `<div class="kv"><span>IVA ${ALI_TXT[a]}</span><span>${m(v, d.moneda)}</span></div>`).join('')}
+        ${d.tributos.map(t => `<div class="kv"><span>${esc(TRIBUTOS[t.tipo] || t.tipo)}${t.jurisdiccion ? ' ' + esc(t.jurisdiccion) : ''}</span><span>${m(t.importe, d.moneda)}</span></div>`).join('')}
+        <div class="kv final"><span>Total</span><span>${m(d.total, d.moneda)}</span></div>
+      </div></div>
+    </div>
+    <div class="panel-section"><div class="panel-section-header">${d.tipo === 'NC' ? 'Aplicaciones' : 'Saldo y movimientos'} <span class="right"><b>${d.tipo === 'NC' ? 'Disponible' : 'Saldo pendiente'} ${m(d.saldo, d.moneda)}</b></span></div><div class="wrap">${movs}</div></div>
+    ${historialHtml(d.eventos)}`;
+  const b = [];
+  if (puedeCargar() && d.estado === 'VIGENTE' && d.tipo === 'NC' && d.saldo > 0) b.push(`<button class="btn" onclick="aplicarNcExistente(${d.id})">Aplicar a comprobantes…</button>`);
+  if (esResp() && d.estado === 'VIGENTE') b.push(`<button class="btn danger" onclick="abrirAnul('/documentos/${d.id}/anular', 'Anular ${d.tipo} ${numDoc(d)}', '${d.movimientos.some(x => x.estado === 'VIGENTE') ? 'Tiene aplicaciones o cobros: también se anulan (los recibos no) y esos importes vuelven a «sin aplicar» o «a cuenta».' : ''}')">Anular registro…</button>`);
+  if (puedeCargar() && d.estado === 'VIGENTE' && d.tipo !== 'NC' && d.saldo > 0) b.push(`<button class="btn primary" onclick="cerrar('m-det'); abrirCobro({cliente:'${d.cliente_codigo}'})">Registrar cobranza</button>`);
+  $('det-pie').innerHTML = `<span class="muted">Los importes no se editan: para corregir, se anula el registro y se carga de nuevo.</span>` + b.join('');
+  abrir('m-det');
+}
+
+/* ---------- Registrar comprobante ---------- */
+let TIPO_DOC = 'FC', DL = [], TR = [], VL = [], APL_DOCS = [], PEDIDOS_CLI = [], DOC_IDEM = null, DOC_MODO = 'NORMAL';
+document.querySelectorAll('#tg-tipo button').forEach(b => b.addEventListener('click', () => { TIPO_DOC = b.dataset.t; document.querySelectorAll('#tg-tipo button').forEach(x => x.classList.toggle('on', x === b)); formTipo(); }));
+async function abrirDoc(op) {
+  DOC_IDEM = uuid(); DOC_MODO = op.saldo_inicial ? 'SALDO_INICIAL' : 'NORMAL'; window._dpdf = ''; delete $('d-vto').dataset.manual;
+  $('d-tango').classList.add('hidden');
+  DL = [{ descripcion: '', alicuota_iva: '21', neto: '' }]; TR = []; VL = [];
+  $('d-cli').innerHTML = optsCli();
+  ['d-pv', 'd-nro', 'd-det', 'd-tcem', 'd-cond', 'd-adj', 'd-motdet', 'd-si-nota', 'd-si-post'].forEach(i => $(i).value = '');
+  PP = []; renderPP();
+  $('d-fe').value = DOC_MODO === 'SALDO_INICIAL' ? (S.sesion.corte && S.sesion.corte.fecha_corte) || '' : S.sesion.hoy; $('d-vto').value = '';
+  $('d-tit').textContent = DOC_MODO === 'SALDO_INICIAL' ? 'Comprobante abierto al corte (saldo inicial)' : 'Registrar comprobante emitido en Tango';
+  $('d-si-w').classList.toggle('hidden', DOC_MODO !== 'SALDO_INICIAL');
+  const corte = S.sesion.corte;
+  $('d-si-post-w').classList.toggle('hidden', !(DOC_MODO === 'SALDO_INICIAL' && corte && corte.estado === 'CONFIRMADO'));
+  $('d-si-aviso').classList.toggle('hidden', DOC_MODO !== 'SALDO_INICIAL');
+  $('d-si-aviso').innerHTML = '<div><b>Saldo inicial.</b> Cargá solo comprobantes con saldo pendiente según el informe de Tango a la fecha de corte. No cargues saldos definitivos hasta tener ese informe conciliado.</div>';
+  const req = (S.sesion.config.adjuntos_requeridos || {});
+  $('d-adj-nota').textContent = 'Se puede registrar sin adjunto y agregarlo después. La subida de archivos queda deshabilitada hasta resolver el almacenamiento del servidor.';
+  TIPO_DOC = 'FC'; document.querySelectorAll('#tg-tipo button').forEach(x => x.classList.toggle('on', x.dataset.t === 'FC'));
+  if (op.pedido_id) {
+    const p = await api('GET', '/pedidos/' + op.pedido_id);
+    TIPO_DOC = Object.keys(TIPO_PED_DE_DOC).find(k => TIPO_PED_DE_DOC[k] === p.tipo_solicitado);
+    document.querySelectorAll('#tg-tipo button').forEach(x => x.classList.toggle('on', x.dataset.t === TIPO_DOC));
+    $('d-cli').value = p.cliente_codigo; $('d-mon').value = p.moneda; $('d-cond').value = p.condicion_pago || '';
+    DL = p.lineas.map(l => ({ descripcion: l.detalle.split('\n')[0], alicuota_iva: l.alicuota_iva, neto: l.subtotal }));
+    VL = [{ clase: 'pedido', ref: String(p.id), neto: p.subtotal - p.facturado }];
+  } else if (op.cliente) $('d-cli').value = op.cliente;
+  formTipo(); await cambioClienteDoc(); sugerirVto();
+  abrir('m-doc');
+}
+let PP = [];
+function renderPP() {
+  const mon = $('d-mon').value;
+  $('d-si-pagos').innerHTML = PP.map((p, i) => {
+    const otra = p.moneda_pago !== mon, ap = otra ? (num(p.tipo_cambio) ? r2(num(p.importe_pago) / num(p.tipo_cambio)) : null) : num(p.importe_pago);
+    return `<tr><td><input type="date" value="${esc(p.fecha_pago)}" oninput="PP[${i}].fecha_pago=this.value"></td>
+      <td><select onchange="PP[${i}].moneda_pago=this.value; renderPP()">${['ARS', 'USD', 'EUR'].map(x => `<option ${x === p.moneda_pago ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+      <td><input class="num" value="${esc(p.importe_pago)}" oninput="PP[${i}].importe_pago=this.value; resPP()"></td>
+      <td>${otra ? `<input class="num" value="${esc(p.tipo_cambio)}" oninput="PP[${i}].tipo_cambio=this.value; resPP()">` : '<span class="muted">—</span>'}</td>
+      <td><input class="num" value="${esc(p.recibo_punto_venta)}" oninput="PP[${i}].recibo_punto_venta=this.value"></td>
+      <td><input class="num" value="${esc(p.recibo_numero)}" oninput="PP[${i}].recibo_numero=this.value; resPP()"></td>
+      <td><input class="num" value="${esc(p.recibo_total || '')}" placeholder="${p.moneda_pago} (obligatorio con Nº)" oninput="PP[${i}].recibo_total=this.value; resPP()"></td>
+      <td class="r" id="pp-ap-${i}">${ap == null ? '—' : m(ap, mon)}</td><td><button class="btn sm danger" onclick="PP.splice(${i},1); renderPP()">×</button></td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="muted">Sin pagos previos: el comprobante estaba completo pendiente al inicio.</td></tr>';
+  resPP();
+}
+function resPP() {
+  if (!$('d-si-res')) return;
+  const mon = $('d-mon').value; let tot = 0;
+  PP.forEach((p, i) => { const ap = p.moneda_pago !== mon ? (num(p.tipo_cambio) ? r2(num(p.importe_pago) / num(p.tipo_cambio)) : 0) : num(p.importe_pago); tot += ap; const el = $('pp-ap-' + i); if (el) el.innerHTML = ap ? m(ap, mon) : '—'; });
+  const total = calcDoc().total;
+  // Aviso local: lo usado de un mismo recibo en esta carga no supera su total (el servidor controla también lo ya cargado y los anticipos).
+  const porRecibo = {};
+  PP.filter(p => num(p.recibo_numero)).forEach(p => { const k = `${num(p.recibo_punto_venta)}-${num(p.recibo_numero)}`; porRecibo[k] = porRecibo[k] || { usado: 0, total: num(p.recibo_total), mon: p.moneda_pago }; porRecibo[k].usado += num(p.importe_pago); });
+  const avisos = Object.entries(porRecibo).filter(([, r]) => !r.total || r2(r.usado) > r.total).map(([k, r]) => !r.total ? `Recibo ${k}: falta su total en Tango.` : `Recibo ${k}: los pagos suman ${m(r2(r.usado), r.mon)} y el recibo es de ${m(r.total, r.mon)}.`);
+  $('d-si-res').innerHTML = (PP.length ? `Pagado antes del inicio ${m(r2(tot), mon)} · <b>saldo al inicio ${m(r2(total - tot), mon)}</b>` : '')
+    + avisos.map(a => `<br><span style="color:var(--red)">${a}</span>`).join('');
+}
+function formTipo() {
+  const nc = TIPO_DOC === 'NC';
+  $('d-vto-w').classList.toggle('hidden', nc);
+  $('d-mot-w').classList.toggle('hidden', TIPO_DOC === 'FC');
+  $('d-apl-w').classList.toggle('hidden', !nc || DOC_MODO === 'SALDO_INICIAL');
+  $('d-si-pagos-w').classList.toggle('hidden', nc);
+  renderVL(); valDoc();
+}
+async function cambioClienteDoc() {
+  const cli = $('d-cli').value, mon = $('d-mon').value;
+  $('d-cuit').value = (S.cat.clientes.find(c => c.codigo === cli) || {}).cuit || '';
+  const [docs, peds] = await Promise.all([api('GET', '/documentos' + qs({ cliente: cli, moneda: mon, estado: 'VIGENTE' })), api('GET', '/pedidos' + qs({ cliente: cli, estado: 'EMITIDO' }))]);
+  APL_DOCS = docs.filter(d => d.tipo !== 'NC' && d.saldo > 0);
+  PEDIDOS_CLI = peds.filter(p => p.moneda === mon);
+  $('d-origen').innerHTML = '<option value="">—</option>' + docs.filter(d => d.tipo === 'FC').map(d => `<option value="${d.id}">${numDoc(d)} · ${m(d.total, d.moneda)}</option>`).join('')
+    + '<option disabled>── otras monedas: cargá el número en el detalle ──</option>';
+  $('d-apl').innerHTML = '<thead><tr><th>Comprobante</th><th>Emisión</th><th>Saldo</th><th>Aplicar</th></tr></thead><tbody>' + (APL_DOCS.map((d, i) => `<tr><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${f(d.fecha_emision)}</td><td class="r">${m(d.saldo, d.moneda)}</td><td><input class="num apl" data-id="${d.id}" data-saldo="${d.saldo}" oninput="valDoc()"></td></tr>`).join('') || '<tr><td colspan="4" class="muted">El cliente no tiene FC/ND con saldo en esta moneda.</td></tr>') + '</tbody>';
+  renderDL(); renderVL();
+}
+function sugerirVto() {
+  const t = ($('d-cond').value || '').trim().toUpperCase(), fe = $('d-fe').value;
+  if (!fe || TIPO_DOC === 'NC') return;
+  const n = /^\d+/.test(t) ? parseInt(t, 10) : (['AL DÍA', 'AL DIA', 'INMEDIATO', 'CONTADO'].includes(t) ? 0 : null);
+  if (n !== null && !$('d-vto').dataset.manual) { const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + n); $('d-vto').value = d.toISOString().slice(0, 10); }
+}
+function renderDL() {
+  $('d-lineas').innerHTML = DL.map((l, i) => `<tr><td><input value="${esc(l.descripcion)}" oninput="DL[${i}].descripcion=this.value"></td>
+    <td><select onchange="DL[${i}].alicuota_iva=this.value; valDoc()">${Object.entries(ALI_TXT).map(([k, v]) => `<option value="${k}" ${k === String(l.alicuota_iva) ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+    <td><input class="num" value="${esc(l.neto)}" oninput="DL[${i}].neto=this.value; valDoc()"></td><td class="r" id="dl-iva-${i}"></td>
+    <td><button class="btn sm danger" onclick="DL.splice(${i},1); renderDL()">×</button></td></tr>`).join('');
+  valDoc();
+}
+function renderTR() {
+  $('d-tribs').innerHTML = TR.map((t, i) => `<tr><td><select onchange="TR[${i}].tipo=this.value">${Object.entries(TRIBUTOS).filter(([k]) => k !== 'REDONDEO').map(([k, v]) => `<option value="${k}" ${k === t.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+    <td><input value="${esc(t.jurisdiccion)}" oninput="TR[${i}].jurisdiccion=this.value"></td><td><input class="num" value="${esc(t.base)}" oninput="TR[${i}].base=this.value; valDoc()"></td>
+    <td><input class="num" value="${esc(t.alicuota)}" oninput="TR[${i}].alicuota=this.value; valDoc()"></td><td><input class="num" id="tr-imp-${i}" value="${esc(t.importe)}" oninput="TR[${i}].importe=this.value; valDoc()"></td>
+    <td><button class="btn sm danger" onclick="TR.splice(${i},1); renderTR()">×</button></td></tr>`).join('');
+  valDoc();
+}
+function renderVL() {
+  const certs = S.cat.certificados.filter(c => c.cliente_codigo === $('d-cli').value && c.moneda === $('d-mon').value);
+  const peds = PEDIDOS_CLI.filter(p => p.tipo_solicitado === TIPO_PED_DE_DOC[TIPO_DOC]);
+  $('d-vin').innerHTML = VL.map((v, i) => {
+    const opciones = v.clase === 'pedido' ? peds.map(p => `<option value="${p.id}" ${String(p.id) === String(v.ref) ? 'selected' : ''}>${esc(p.numero_solicitud)} · neto ${nf.format(p.subtotal)}</option>`)
+      : certs.map(c => `<option value="${c.id}" ${String(c.id) === String(v.ref) ? 'selected' : ''}>${esc(c.numero_texto)} · ${nf.format(c.total_a_facturar)}</option>`);
+    const sel = v.clase === 'pedido' ? peds.find(p => String(p.id) === String(v.ref)) : certs.find(c => String(c.id) === String(v.ref));
+    const pend = sel ? (v.clase === 'pedido' ? sel.pendiente : sel.pendiente) : null;
+    return `<tr><td><select onchange="VL[${i}].clase=this.value; VL[${i}].ref=''; renderVL()"><option value="pedido" ${v.clase === 'pedido' ? 'selected' : ''}>Pedido</option><option value="cert" ${v.clase === 'cert' ? 'selected' : ''}>Certificado</option></select></td>
+      <td><select onchange="VL[${i}].ref=this.value; renderVL()"><option value="">— elegir —</option>${opciones.join('')}</select></td><td class="r">${pend != null ? m(pend, $('d-mon').value) : '—'}</td>
+      <td><input class="num" value="${esc(v.neto)}" oninput="VL[${i}].neto=this.value; valDoc()"></td><td><button class="btn sm danger" onclick="VL.splice(${i},1); renderVL()">×</button></td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="muted">Sin vínculos (comprobante independiente).</td></tr>';
+  valDoc();
+}
+function calcDoc() {
+  const lin = DL.filter(l => num(l.neto) > 0);
+  const ivas = ivaPorAlicuota(lin);
+  const neto = r2(lin.reduce((s, l) => s + num(l.neto), 0));
+  const tribs = TR.map((t, i) => { const imp = num(t.base) && num(t.alicuota) ? r2(num(t.base) * num(t.alicuota) / 100) : r2(num(t.importe)); const el = $('tr-imp-' + i); if (el && num(t.base) && num(t.alicuota)) el.value = nf.format(imp); return imp; });
+  const total = r2(neto + ivas.reduce((s, x) => s + x.iva, 0) + tribs.reduce((s, x) => s + x, 0));
+  return { lin, ivas, neto, tribs, total };
+}
+function valDoc() {
+  $('d-num-full').value = `${$('d-letra').value}-${pad(num($('d-pv').value), 4)}-${pad(num($('d-nro').value), 8)}`;
+  const c = calcDoc(), mon = $('d-mon').value;
+  DL.forEach((l, i) => { const el = $('dl-iva-' + i); if (el) el.textContent = ALIS[l.alicuota_iva] ? nf.format(r2(num(l.neto) * ALIS[l.alicuota_iva])) : '—'; });
+  $('d-tot').innerHTML = `<div class="kv"><span>Neto</span><span>${m(c.neto, mon)}</span></div>${c.ivas.map(x => `<div class="kv"><span>IVA ${ALI_TXT[x.ali]} s/ ${nf.format(x.base)}</span><span>${m(x.iva, mon)}</span></div>`).join('')}
+    ${c.tribs.length ? `<div class="kv"><span>Percepciones y tributos</span><span>${m(c.tribs.reduce((s, x) => s + x, 0), mon)}</span></div>` : ''}<div class="kv final"><span>Total del comprobante</span><span>${m(c.total, mon)}</span></div>
+    <div class="field" style="margin-top:8px"><label>Control: total impreso en el PDF de Tango</label><input id="d-pdf" class="num" placeholder="opcional, para detectar errores de tipeo" value="${esc(window._dpdf || '')}" oninput="window._dpdf=this.value; valDocMsg()"></div><div id="d-pdf-msg"></div>`;
+  valDocMsg();
+}
+function valDocMsg() {
+  const c = calcDoc(), pdf = num(window._dpdf), el = $('d-pdf-msg'); if (!el) return;
+  if (!pdf) { el.innerHTML = ''; return; }
+  const dif = r2(pdf - c.total);
+  el.innerHTML = Math.abs(dif) < 0.005 ? '<div class="alert ok"><div>Coincide con el PDF de Tango.</div></div>'
+    : Math.abs(dif) <= num((S.sesion.config.tolerancia_redondeo) || '0.05') ? `<div class="alert"><div>Diferencia de redondeo de ${nf.format(dif)}: se registrará un ajuste «Redondeo» para que el total quede igual al de Tango.</div></div>`
+      : `<div class="alert err"><div><b>El total calculado difiere en ${nf.format(dif)} del PDF de Tango.</b> Revisá netos, alícuotas o percepciones.</div></div>`;
+}
+function datosDoc(confirmar) {
+  const adj = $('d-adj').value.trim();
+  const d = {
+    tipo: TIPO_DOC, letra: $('d-letra').value, punto_venta: num($('d-pv').value), numero: num($('d-nro').value), cliente_codigo: $('d-cli').value,
+    fecha_emision: $('d-fe').value, fecha_vencimiento: TIPO_DOC === 'NC' ? null : $('d-vto').value || null, moneda: $('d-mon').value,
+    tipo_cambio_emision: num($('d-tcem').value) || null, condicion_pago: $('d-cond').value, detalle: $('d-det').value,
+    lineas: DL.filter(l => num(l.neto) > 0).map(l => ({ descripcion: l.descripcion, alicuota_iva: l.alicuota_iva, neto: num(l.neto) })),
+    tributos: TR.filter(t => num(t.importe) || (num(t.base) && num(t.alicuota))).map(t => ({ tipo: t.tipo, jurisdiccion: t.jurisdiccion, base: num(t.base) || null, alicuota: num(t.alicuota) || null, importe: num(t.importe) || null })),
+    total_pdf: num(window._dpdf) || null,
+    vinculos: VL.filter(v => v.ref && num(v.neto) > 0).map(v => v.clase === 'pedido' ? { pedido_id: Number(v.ref), neto_asignado: num(v.neto) } : { certificado_id: Number(v.ref), neto_asignado: num(v.neto) }),
+    adjuntos: adj ? [{ tipo: 'COMPROBANTE', nombre: $('d-num-full').value + '.pdf', url_externa: adj }] : [],
+    confirmar_excedente: !!confirmar,
+  };
+  if (TIPO_DOC !== 'FC') { d.motivo_codigo = $('d-mot').value; d.motivo_detalle = $('d-motdet').value; d.documento_origen_id = $('d-origen').value ? Number($('d-origen').value) : null; }
+  if (TIPO_DOC === 'NC' && DOC_MODO === 'NORMAL') d.aplicaciones = [...document.querySelectorAll('#d-apl input.apl')].filter(i => num(i.value) > 0).map(i => ({ documento_id: Number(i.dataset.id), importe: num(i.value) }));
+  if (DOC_MODO === 'SALDO_INICIAL') {
+    d.origen = 'SALDO_INICIAL'; d.corte_id = S.sesion.corte && S.sesion.corte.id; d.nota = $('d-si-nota').value;
+    if (TIPO_DOC !== 'NC') d.pagos_previos = PP.filter(p => num(p.importe_pago) > 0).map(p => ({ fecha_pago: p.fecha_pago || null, moneda_pago: p.moneda_pago,
+      importe_pago: num(p.importe_pago), tipo_cambio: p.moneda_pago !== $('d-mon').value ? (num(p.tipo_cambio) || null) : null,
+      recibo_punto_venta: num(p.recibo_punto_venta) || null, recibo_numero: num(p.recibo_numero) || null,
+      recibo_total: num(p.recibo_numero) ? (num(p.recibo_total) || null) : null, recibo_moneda: num(p.recibo_numero) ? p.moneda_pago : null }));
+    if ($('d-si-post').value) d.motivo_alta_post_corte = $('d-si-post').value;
+  }
+  return d;
+}
+async function guardarDoc(confirmar) {
+  const datos = datosDoc(confirmar);
+  try {
+    if (!confirmar) {
+      const v = await api('POST', '/documentos/validar', datos);
+      if (v.avisos.length && !window.confirm(v.avisos.map(a => a.mensaje).join('\n') + '\n\n¿Registrar igual?')) return;
+    }
+    const r = await api('POST', '/documentos', datos, { idem: DOC_IDEM });
+    cerrar('m-doc'); window._dpdf = '';
+    toast(r.repetido ? 'Ese comprobante ya se había registrado (reintento).' : 'Comprobante registrado. Pedidos, certificados y saldos recalculados.');
+    await recargarSesion(); refrescar(); refrescarIni();
+  } catch (e) {
+    if (e.codigo === 'EXCEDE_PENDIENTE' && window.confirm(e.message + '\n\n¿Confirmás el registro? Queda en el historial.')) return guardarDoc(true);
+    $('d-val').innerHTML = `<div class="alert err"><div><b>No se registró.</b> ${esc(e.message)}</div></div>`;
+  }
+}
+async function aplicarNcExistente(id) {
+  const d = await api('GET', '/documentos/' + id);
+  const docs = (await api('GET', '/documentos' + qs({ cliente: d.cliente_codigo, moneda: d.moneda, estado: 'VIGENTE' }))).filter(x => x.tipo !== 'NC' && x.saldo > 0);
+  $('ver-tit').innerHTML = `Aplicar NC ${numDoc(d)} · disponible ${m(d.saldo, d.moneda)}`;
+  $('ver-body').innerHTML = `<table class="t"><thead><tr><th>Comprobante</th><th>Emisión</th><th>Saldo</th><th>Aplicar</th></tr></thead><tbody>${docs.map(x => `<tr><td>${tipoB(x.tipo)} ${numDoc(x)}</td><td>${f(x.fecha_emision)}</td><td class="r">${m(x.saldo, x.moneda)}</td><td><input class="num aplx" data-id="${x.id}"></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Sin comprobantes con saldo en esta moneda.</td></tr>'}</tbody></table>`;
+  $('ver-pie').innerHTML = `<button class="btn" onclick="cerrar('m-ver')">Cancelar</button><button class="btn primary" onclick="confirmarAplicacion(${id})">Aplicar</button>`;
+  cerrar('m-det'); abrir('m-ver');
+}
+async function confirmarAplicacion(id) {
+  const aplicaciones = [...document.querySelectorAll('input.aplx')].filter(i => num(i.value) > 0).map(i => ({ documento_id: Number(i.dataset.id), importe: num(i.value) }));
+  try { await api('POST', `/documentos/${id}/aplicaciones`, { aplicaciones }); cerrar('m-ver'); toast('NC aplicada.'); refrescar(); } catch (e) { toast(e.message, true); }
+}
+
+/* ============================== COBRANZAS ============================== */
+async function renderRecibos() {
+  const filas = await api('GET', '/recibos' + qs({ cliente: $('fr-cli').value }));
+  $('t-rec').innerHTML = '<thead><tr><th>Recibo</th><th>Fecha de pago</th><th>Cliente</th><th>Valores</th><th>Total</th><th>Asignado a</th><th>A cuenta</th><th>Estado</th></tr></thead><tbody>' +
+    (filas.map(r => `<tr class="click ${r.estado === 'ANULADO' ? 'anul' : ''}" onclick="verRecibo(${r.id})"><td>${tipoB('REC')} ${numRec(r)}${r.origen === 'SALDO_INICIAL' ? ' <span class="si">SI</span>' : ''}</td><td>${f(r.fecha_pago)}</td><td>${esc(cliNombre(r.cliente_codigo))}</td>
+      <td>${r.valores.map(v => MEDIOS[v.medio] || v.medio).join(' + ')}</td><td class="r">${m(r.total, r.moneda)}</td>
+      <td class="wrapc">${r.imputaciones.filter(i => i.estado === 'VIGENTE').map(i => `${i.tipo} ${i.punto_venta}-${i.numero}: ${m(i.importe_documento, i.moneda)}${i.tipo_cambio ? ` (TC ${nf4.format(i.tipo_cambio)})` : ''}`).join('<br>') || '—'}</td>
+      <td class="r">${r.a_cuenta ? m(r.a_cuenta, r.moneda) : '—'}</td><td>${badge(r.estado)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Sin recibos.</td></tr>') + '</tbody>';
+}
+async function verRecibo(id) {
+  const r = (await api('GET', '/recibos')).find(x => x.id === id); if (!r) return;
+  $('ver-tit').innerHTML = `${tipoB('REC')} ${numRec(r)} · ${esc(cliNombre(r.cliente_codigo))} ${badge(r.estado)}`;
+  $('ver-body').innerHTML = `
+    ${r.estado === 'ANULADO' ? `<div class="alert err"><div><b>Recibo anulado</b> por ${esc(r.anulado_por)} el ${fh(r.anulado_en)}. Motivo: ${esc(r.motivo_anulacion)}</div></div>` : ''}
+    <div class="two"><div class="panel-section"><div class="panel-section-header">Valores (${r.moneda})</div><div class="panel-section-body">
+      <table class="t"><thead><tr><th>Medio</th><th>Importe</th><th>Referencia</th></tr></thead><tbody>${r.valores.map(v => `<tr><td>${MEDIOS[v.medio] || v.medio}</td><td class="r">${nf.format(v.importe)}</td><td>${esc(v.referencia || v.numero_certificado_retencion || '—')}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td class="r">${m(r.total, r.moneda)}</td><td></td></tr></tbody></table>
+      <div class="kv"><span>Fecha efectiva de pago</span><span>${f(r.fecha_pago)}</span></div><div class="kv"><span>A cuenta</span><span>${m(r.a_cuenta, r.moneda)}</span></div>
+      <div class="kv"><span>Adjuntos <span class="tag">opcional</span></span><span>${adjuntosHtml(r.adjuntos, 'RECIBO', r.id)}</span></div></div></div>
+    <div class="panel-section"><div class="panel-section-header">Asignación</div><div class="panel-section-body">
+      <table class="t"><thead><tr><th>Comprobante</th><th>Recibido asignado</th><th>TC</th><th>Equivalente</th><th>Saldo después</th><th></th></tr></thead><tbody>${r.imputaciones.map(i => `<tr class="${i.estado === 'ANULADO' ? 'anul' : ''}"><td><a onclick="cerrar('m-ver'); verDoc(${i.documento_id})">${i.tipo} ${i.letra}-${pad(i.punto_venta, 4)}-${pad(i.numero, 8)}</a></td><td class="r">${m(i.importe_recibo, r.moneda)}</td><td class="r">${i.tipo_cambio ? nf4.format(i.tipo_cambio) : '—'}</td><td class="r">${m(i.importe_documento, i.moneda)}</td><td class="r">${m(i.saldo_documento_despues, i.moneda)}</td>
+        <td>${esResp() && i.estado === 'VIGENTE' ? `<a onclick="abrirAnul('/imputaciones/${i.id}/anular', 'Anular asignación del cobro', 'El importe vuelve «a cuenta» del recibo.')">Anular</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Todo el recibo está a cuenta.</td></tr>'}</tbody></table></div></div></div>
+    ${historialHtml(r.eventos)}`;
+  const b = [];
+  if (puedeCargar() && r.estado === 'VIGENTE' && r.a_cuenta > 0) b.push(`<button class="btn primary" onclick="cerrar('m-ver'); abrirCobro({cliente:'${r.cliente_codigo}', recibo:${r.id}})">Asignar lo que está a cuenta…</button>`);
+  if (esResp() && r.estado === 'VIGENTE') b.push(`<button class="btn danger" onclick="abrirAnul('/recibos/${r.id}/anular', 'Anular recibo ${numRec(r)}', 'Se anulan también sus asignaciones; los comprobantes recuperan su saldo.')">Anular recibo…</button>`);
+  $('ver-pie').innerHTML = `<span class="muted">Registrado por ${esc(r.creado_por)} · ${fh(r.creado_en)}</span>` + b.join('');
+  abrir('m-ver');
+}
+let VALORES = [], PEND_COB = [], COB_IDEM = null, COB_RECIBO = null, COB_MODO = 'NORMAL';
+async function abrirCobro(op) {
+  COB_IDEM = uuid(); COB_RECIBO = op.recibo || null; COB_MODO = op.saldo_inicial ? 'SALDO_INICIAL' : 'NORMAL';
+  $('c-tango').classList.add('hidden');
+  $('c-cli').innerHTML = optsCli(); if (op.cliente) $('c-cli').value = op.cliente;
+  ['c-nro', 'c-tc', 'c-adj', 'c-obs'].forEach(i => $(i).value = ''); $('c-pv').value = '1';
+  $('c-fecha').value = COB_MODO === 'SALDO_INICIAL' ? (S.sesion.corte.fecha_corte || '') : S.sesion.hoy;
+  VALORES = [{ medio: 'TRANSFERENCIA', importe: '', banco_emisor: '', referencia: '' }];
+  $('c-tit').textContent = COB_RECIBO ? 'Asignar lo que quedó a cuenta' : COB_MODO === 'SALDO_INICIAL' ? 'Anticipo a cuenta al corte (saldo inicial)' : 'Registrar cobranza (recibo de Tango)';
+  $('c-si-aviso').classList.toggle('hidden', COB_MODO !== 'SALDO_INICIAL');
+  $('c-si-aviso').innerHTML = '<div><b>Anticipo al corte.</b> Entra a cuenta, sin asignar; después del corte se asigna a las facturas.</div>';
+  $('c-imp-w').classList.toggle('hidden', COB_MODO === 'SALDO_INICIAL');
+  ['c-pv', 'c-nro', 'c-fecha', 'c-mon', 'c-cli', 'c-adj', 'c-obs'].forEach(i => $(i).disabled = !!COB_RECIBO);
+  if (COB_RECIBO) {
+    const r = (await api('GET', '/recibos')).find(x => x.id === COB_RECIBO);
+    $('c-pv').value = r.punto_venta; $('c-nro').value = r.numero; $('c-fecha').value = r.fecha_pago; $('c-mon').value = r.moneda;
+    VALORES = [{ medio: 'OTRO', importe: r.a_cuenta, referencia: 'A cuenta del recibo' }];
+  }
+  await cargarPendientesCobro(); abrir('m-cob');
+}
+async function cargarPendientesCobro() {
+  PEND_COB = (await api('GET', '/documentos' + qs({ cliente: $('c-cli').value, estado: 'VIGENTE' }))).filter(d => d.tipo !== 'NC' && d.saldo > 0).sort((a, b) => (a.fecha_vencimiento || '').localeCompare(b.fecha_vencimiento || ''));
+  renderCobro();
+}
+function renderCobro() {
+  const mon = $('c-mon').value;
+  $('c-val').innerHTML = VALORES.map((v, i) => `<tr><td><select ${COB_RECIBO ? 'disabled' : ''} onchange="VALORES[${i}].medio=this.value">${Object.entries(MEDIOS).map(([k, t]) => `<option value="${k}" ${k === v.medio ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+    <td><input class="num" ${COB_RECIBO ? 'disabled' : ''} value="${esc(v.importe)}" oninput="VALORES[${i}].importe=this.value; valCob()"></td><td><input value="${esc(v.banco_emisor || '')}" oninput="VALORES[${i}].banco_emisor=this.value"></td>
+    <td><input value="${esc(v.referencia || '')}" oninput="VALORES[${i}].referencia=this.value"></td><td><input type="date" value="${esc(v.fecha_acreditacion || '')}" oninput="VALORES[${i}].fecha_acreditacion=this.value"></td>
+    <td>${COB_RECIBO ? '' : `<button class="btn sm danger" onclick="VALORES.splice(${i},1); renderCobro()">×</button>`}</td></tr>`).join('');
+  $('c-imp').innerHTML = `<thead><tr><th>Comprobante</th><th>Moneda</th><th>Vencimiento</th><th>Saldo</th><th>Asignar (${mon} recibidos)</th><th>TC fecha de pago</th><th>Equivalente</th><th>Saldo restante</th></tr></thead><tbody>` +
+    (PEND_COB.map((d, i) => `<tr><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td class="c">${d.moneda}</td><td>${f(d.fecha_vencimiento)}</td><td class="r">${m(d.saldo, d.moneda)}</td>
+      <td><input class="num imp" data-i="${i}" oninput="valCob()"></td><td>${d.moneda !== mon ? `<input class="num tc" data-i="${i}" value="${esc($('c-tc').value)}" oninput="valCob()">` : '<span class="muted">—</span>'}</td>
+      <td class="r" id="ci-eq-${i}">—</td><td class="r" id="ci-sr-${i}">—</td></tr>`).join('') || '<tr><td colspan="8" class="muted">El cliente no tiene comprobantes pendientes.</td></tr>') + '</tbody>';
+  valCob();
+}
+function aplicarTcGeneral() { document.querySelectorAll('#c-imp input.tc').forEach(i => i.value = $('c-tc').value); valCob(); }
+function equivalente(r, s, tc) { if (Math.abs(r - r2(s * tc)) <= r2(0.01 * tc)) return s; return r2(r / tc); }
+async function sugerirFifo() {
+  const total = r2(VALORES.reduce((s, v) => s + num(v.importe), 0));
+  try {
+    const sug = await api('POST', '/recibos/sugerencia', { cliente_codigo: $('c-cli').value, moneda: $('c-mon').value, importe: total, tipo_cambio: num($('c-tc').value) || null });
+    limpiarImp(false);
+    sug.forEach(s => { const i = PEND_COB.findIndex(d => d.id === s.documento_id); const el = document.querySelector(`#c-imp input.imp[data-i="${i}"]`); if (el) el.value = nf.format(s.importe_recibo); });
+    valCob();
+  } catch (e) { toast(e.message, true); }
+}
+function limpiarImp(v = true) { document.querySelectorAll('#c-imp input.imp').forEach(i => i.value = ''); if (v) valCob(); }
+function valCob() {
+  const mon = $('c-mon').value, total = r2(VALORES.reduce((s, v) => s + num(v.importe), 0));
+  let asignado = 0, ok = true; const al = [];
+  PEND_COB.forEach((d, i) => {
+    const imp = num((document.querySelector(`#c-imp input.imp[data-i="${i}"]`) || {}).value); if (!imp) { $('ci-eq-' + i).textContent = '—'; $('ci-sr-' + i).textContent = '—'; return; }
+    asignado += imp; let eq = imp;
+    if (d.moneda !== mon) { const tc = num((document.querySelector(`#c-imp input.tc[data-i="${i}"]`) || {}).value); if (!tc) { ok = false; al.push(`${numDoc(d)}: falta el TC de la fecha de pago.`); $('ci-eq-' + i).textContent = '—'; return; } eq = equivalente(imp, d.saldo, tc); }
+    if (eq > d.saldo + 0.001) { ok = false; al.push(`${numDoc(d)}: el equivalente supera el saldo.`); }
+    $('ci-eq-' + i).innerHTML = m(eq, d.moneda); $('ci-sr-' + i).innerHTML = m(r2(d.saldo - eq), d.moneda);
+  });
+  asignado = r2(asignado);
+  if (asignado > total + 0.001) { ok = false; al.push('Lo asignado supera el total del recibo.'); }
+  $('c-val-res').innerHTML = `<div class="alert ${ok ? 'info' : 'err'}"><div>Total ${m(total, mon)} · asignado ${m(asignado, mon)} · <b>a cuenta ${m(r2(total - asignado), mon)}</b>${al.length ? '<br>' + al.map(esc).join('<br>') : ''}</div></div>`;
+  $('c-ok').disabled = !ok || (!COB_RECIBO && total <= 0);
+}
+async function guardarCobro() {
+  const mon = $('c-mon').value;
+  const imputaciones = PEND_COB.map((d, i) => ({ d, imp: num((document.querySelector(`#c-imp input.imp[data-i="${i}"]`) || {}).value), tc: num((document.querySelector(`#c-imp input.tc[data-i="${i}"]`) || {}).value) }))
+    .filter(x => x.imp > 0).map(x => ({ documento_id: x.d.id, importe_recibo: x.imp, tipo_cambio: x.d.moneda !== mon ? x.tc : null }));
+  try {
+    if (COB_RECIBO) { await api('POST', `/recibos/${COB_RECIBO}/imputaciones`, { imputaciones }); toast('Asignación registrada.'); }
+    else {
+      const adj = $('c-adj').value.trim();
+      const datos = { punto_venta: num($('c-pv').value), numero: num($('c-nro').value), cliente_codigo: $('c-cli').value, fecha_pago: $('c-fecha').value, moneda: mon, observaciones: $('c-obs').value,
+        valores: VALORES.filter(v => num(v.importe) > 0).map(v => ({ medio: v.medio, importe: num(v.importe), banco_emisor: v.banco_emisor, referencia: v.referencia, fecha_acreditacion: v.fecha_acreditacion || null })),
+        imputaciones: COB_MODO === 'SALDO_INICIAL' ? [] : imputaciones, adjuntos: adj ? [{ tipo: 'RECIBO', nombre: 'Recibo ' + $('c-nro').value, url_externa: adj }] : [] };
+      if (COB_MODO === 'SALDO_INICIAL') { datos.origen = 'SALDO_INICIAL'; datos.corte_id = S.sesion.corte.id; }
+      const r = await api('POST', '/recibos', datos, { idem: COB_IDEM });
+      toast(r.repetido ? 'Ese recibo ya se había registrado (reintento).' : 'Cobranza registrada. Saldos y estados recalculados.');
+    }
+    cerrar('m-cob'); refrescar(); refrescarIni();
+  } catch (e) { $('c-val-res').innerHTML = `<div class="alert err"><div><b>No se registró.</b> ${esc(e.message)}</div></div>`; }
+}
+
+/* ============================== CUENTA CORRIENTE ============================== */
+let MON_CC = 'USD';
+document.querySelectorAll('#tg-mon button').forEach(b => b.addEventListener('click', () => { MON_CC = b.dataset.m; document.querySelectorAll('#tg-mon button').forEach(x => x.classList.toggle('on', x === b)); renderCtaCte(); }));
+let CC_INICIAL = false;
+async function renderCtaCte() {
+  if (!CC_INICIAL) {  // primera vez: el primer cliente con comprobantes, en la moneda de su primer comprobante
+    CC_INICIAL = true;
+    const docs = await api('GET', '/documentos' + qs({ estado: 'VIGENTE' }));
+    if (docs.length) { $('cc-cli').value = docs[0].cliente_codigo; MON_CC = docs[0].moneda; document.querySelectorAll('#tg-mon button').forEach(x => x.classList.toggle('on', x.dataset.m === MON_CC)); }
+  }
+  if (!$('cc-cli').value) return;
+  const cc = await api('GET', '/cuenta-corriente' + qs({ cliente: $('cc-cli').value, moneda: MON_CC }));
+  const debe = r2(cc.movimientos.reduce((s, x) => s + x.debe, 0)), haber = r2(cc.movimientos.reduce((s, x) => s + x.haber, 0));
+  $('ctacte').innerHTML = `<div class="wrap"><table class="t"><thead><tr><th>Fecha</th><th>Tipo</th><th>Número</th><th>Vencimiento</th><th>Detalle</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr></thead><tbody>
+    ${cc.movimientos.map(x => `<tr class="${x.saldo_inicial ? 'ini' : ''} click" onclick="${x.documento_id ? `verDoc(${x.documento_id})` : `verRecibo(${x.recibo_id})`}"><td>${f(x.fecha)}</td><td>${tipoB(x.tipo)}${x.saldo_inicial ? ' <span class="si">SI</span>' : ''}${x.estimado ? ' <span class="badge b-warn">EST.</span>' : ''}</td><td>${esc(x.numero)}</td><td>${f(x.vencimiento)}</td><td class="wrapc">${esc(x.detalle)}</td>
+      <td class="r">${x.debe ? nf.format(x.debe) : ''}</td><td class="r">${x.haber ? nf.format(x.haber) : ''}</td><td class="r"><b>${nf.format(x.saldo)}</b></td></tr>`).join('') || `<tr><td colspan="8" class="muted">Sin movimientos en ${MON_CC}.</td></tr>`}</tbody>
+    <tfoot><tr><td colspan="5">Totales en ${MON_CC}</td><td class="r">${nf.format(debe)}</td><td class="r">${nf.format(haber)}</td><td class="r">${m(cc.saldo, MON_CC)}</td></tr></tfoot></table></div>
+    <p class="muted" style="margin:8px 0 0">Σ Debe − Σ Haber = saldo del cliente en ${MON_CC} (${nf.format(cc.saldo_calculado)}). Los cobros en otra moneda aplicados a comprobantes en ${MON_CC} figuran por su equivalente.</p>`;
+}
+
+/* ============================== SALDOS INICIALES ============================== */
+async function renderSaldos() {
+  const r = await api('GET', '/corte'); const c = r.corte;
+  const acc = [];
+  if (!c) {
+    if (puedeCargar()) acc.push('<button class="btn primary" onclick="crearCorte()">Iniciar puesta en marcha (fecha pendiente)</button>');
+    $('corte-acciones').innerHTML = acc.join('');
+    $('saldos').innerHTML = `<div class="alert"><div><b>Todavía no se inició la puesta en marcha.</b> La fecha de inicio operativo está pendiente de confirmar con Contabilidad. Se puede iniciar sin fecha y preparar la carga por cliente; no se cargan saldos definitivos hasta tener el informe de Tango conciliado.</div></div>`;
+    return;
+  }
+  const borrador = c.estado === 'BORRADOR';
+  acc.push(`<span class="badge ${borrador ? 'b-warn' : 'b-ok'}" style="height:26px;display:inline-flex;align-items:center">${borrador ? 'BORRADOR' : 'CONFIRMADO'} · ${c.fecha_corte ? f(c.fecha_corte) : 'fecha pendiente'}</span>`);
+  if (puedeCargar()) {
+    acc.push(`<button class="btn" onclick="abrirTango()">Pegar resumen de Tango…</button>`);
+    acc.push(`<button class="btn" onclick="abrirDoc({saldo_inicial:true})">+ Comprobante abierto al corte…</button>`);
+    if (borrador) acc.push(`<button class="btn" onclick="abrirCobro({saldo_inicial:true})">+ Anticipo a cuenta…</button><button class="btn" onclick="abrirConc()">+ Saldo según Tango…</button>`);
+  }
+  if (borrador) acc.push(`<button class="btn primary" ${esResp() && c.fecha_corte ? '' : 'disabled'} title="Cierre final: requiere la fecha definida, todas las filas conciliadas, los clientes con carga inicial validados y ser responsable del módulo" onclick="confirmarCorte()">Cerrar puesta en marcha</button>`);
+  $('corte-acciones').innerHTML = acc.join('');
+  const est = r.documentos.filter(d => d.cancelado_estimado > 0);
+  $('saldos').innerHTML = `
+    ${borrador ? `<div class="alert"><div><b>Puesta en marcha abierta.</b> ${c.fecha_corte ? '' : 'La fecha de inicio operativo está pendiente de confirmar con Contabilidad: sin ella no se valida ningún cliente. '}No se cargan saldos definitivos hasta tener el informe de Tango conciliado.</div></div>` : ''}
+    <div class="grid4">
+      <div class="field"><label>Fecha de inicio operativo (corte)</label><input type="date" id="corte-fecha" value="${c.fecha_corte || ''}" ${borrador && puedeCargar() ? '' : 'disabled'}>${borrador && puedeCargar() ? '<button class="btn sm" style="margin-top:4px" onclick="guardarFechaCorte()">Guardar fecha</button>' : ''}</div>
+      <div class="field"><label>Estado</label><input value="${borrador ? 'BORRADOR (editable)' : `CONFIRMADO por ${esc(c.confirmado_por || '')} · ${fh(c.confirmado_en)}`}" readonly></div>
+      <div class="field span2"><label>Informe de Tango que respalda el corte <span class="tag">adjunto opcional</span></label><div>${adjuntosHtml(r.adjuntos, 'CORTE', c.id)}</div></div>
+    </div>
+    <div class="alert info"><div><b>Reglas del corte.</b> (1) Solo FC/ND con saldo pendiente al corte, NC sin aplicar y anticipos a cuenta. (2) Cada comprobante guarda su importe original y lo «cancelado antes del corte». (3) Si Tango no informa a qué facturas se aplicó cada recibo, se puede <b>estimar por antigüedad</b>: queda marcado <span class="badge b-warn">ESTIMADO</span>, no es una imputación real y se puede revisar. (4) Se confirma con la fecha definida y todas las filas conciliadas o justificadas. (5) Con el corte confirmado, una revisión solo redistribuye entre comprobantes del mismo cliente y moneda. (6) Pedidos, comprobantes y cobranzas nuevos no dependen de esta fecha. Solo un cliente <b>con carga inicial</b> (deuda, pagos previos, anticipos, certificados ya facturados o saldo según Tango) queda bloqueado para operaciones nuevas hasta que un responsable valida esa carga; validada, opera con fechas posteriores a la carga inicial. (7) Validado, la carga inicial del cliente queda congelada; para corregirla un responsable lo reabre con motivo, solo si todavía no tiene operaciones nuevas.</div></div>
+    <div class="panel-section"><div class="panel-section-header">Estado inicial por cliente <span class="right" style="display:flex;gap:6px"><input id="pm-q" placeholder="Buscar cliente…" oninput="pintarClientesPM()" style="height:28px"><select id="pm-f" onchange="pintarClientesPM()" style="height:28px"><option value="">Todos</option><option value="pend">Con carga, sin validar</option><option value="sin">Sin carga inicial</option><option value="val">Carga validada</option></select></span></div><div id="pm-res" class="panel-section-body" style="padding-bottom:0"></div><div class="wrap" id="pm-clientes"><p class="muted" style="padding:8px">Cargando…</p></div></div>
+    ${est.length ? `<div class="alert"><div><b>${est.length} comprobante(s) con cancelación estimada.</b> Revisalos con Contabilidad: se pasan a «según Tango» o «revisado» con una nota. Cada cambio queda en el historial.</div></div>` : ''}
+    <div class="panel-section"><div class="panel-section-header">Conciliación por cliente y moneda</div><div class="wrap">
+      <table class="t"><thead><tr><th>Cliente</th><th>Moneda</th><th>Saldo SMG al corte</th><th>Saldo según Tango</th><th>Diferencia</th><th>Cancelado estimado</th><th>Nota</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${r.conciliacion.map(x => `<tr><td>${esc(cliNombre(x.cliente))}</td><td class="c">${x.moneda}</td><td class="r">${nf.format(x.saldo_smg)}</td><td class="r">${x.saldo_tango == null ? '—' : nf.format(x.saldo_tango)}</td><td class="r">${x.diferencia == null ? '—' : nf.format(x.diferencia)}</td>
+        <td class="r">${x.cancelado_estimado ? `<span class="badge b-warn">EST.</span> ${nf.format(x.cancelado_estimado)}` : '—'}</td><td class="wrapc">${esc(x.nota || '')}</td>
+        <td>${badge(x.saldo_tango == null ? 'SIN SALDO TANGO' : x.conciliada ? 'CONCILIADO' : 'DIFERENCIA')}</td>
+        <td>${puedeCargar() ? [borrador ? `<a onclick="abrirConc('${x.cliente}','${x.moneda}')">Saldo Tango</a>` : '',
+          borrador && x.saldo_tango != null && !x.cancelado_estimado ? `<a onclick="estimar('${x.cliente}','${x.moneda}',${x.saldo_tango})">Estimar por antigüedad</a>` : '',
+          `<a onclick="abrirRev('${x.cliente}','${x.moneda}')">Revisar</a>`].filter(Boolean).join(' · ') : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Todavía no hay saldos iniciales cargados.</td></tr>'}</tbody></table></div></div>
+    <div class="panel-section"><div class="panel-section-header">Comprobantes abiertos al corte</div><div class="wrap">
+      <table class="t"><thead><tr><th>Cliente</th><th>Comprobante</th><th>Emisión</th><th>Vencimiento</th><th>Importe original</th><th>Cancelado antes del corte</th><th>Saldo al corte</th><th>Saldo actual</th><th>Nota / respaldo</th></tr></thead><tbody>
+      ${r.documentos.map(d => `<tr class="click ${d.estado === 'ANULADO' ? 'anul' : ''}" onclick="verDoc(${d.id})"><td>${esc(d.cliente_razon_social)}</td><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${f(d.fecha_emision)}</td><td>${f(d.fecha_vencimiento)}</td><td class="r">${m(d.total, d.moneda)}</td>
+        <td class="r">${d.cancelado_antes_corte ? nf.format(d.cancelado_antes_corte) + '<br>' + d.criterios.map(critB).join(' ') : '—'}</td><td class="r"><b>${nf.format(d.total - d.cancelado_antes_corte)}</b></td><td class="r">${nf.format(d.saldo)}<br>${badge(d.estado_saldo)}</td><td class="wrapc">${esc(d.nota_cancelacion || d.nota || '')}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Sin comprobantes cargados al corte.</td></tr>'}</tbody></table></div></div>
+    ${r.anticipos.length ? `<div class="panel-section"><div class="panel-section-header">Anticipos a cuenta al corte</div><div class="wrap"><table class="t"><thead><tr><th>Recibo</th><th>Cliente</th><th>Total</th><th>A cuenta</th></tr></thead><tbody>${r.anticipos.map(a => `<tr class="click" onclick="verRecibo(${a.id})"><td>${numRec(a)}</td><td>${esc(cliNombre(a.cliente_codigo))}</td><td class="r">${m(a.total, a.moneda)}</td><td class="r">${m(a.a_cuenta, a.moneda)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+  await renderClientesPM();
+}
+let PM = null, INI_CLI = null;
+async function renderClientesPM() { PM = await api('GET', '/puesta-en-marcha'); pintarClientesPM(); }
+// Estado del cliente: sin carga inicial opera normalmente; con carga sin validar, sus operaciones nuevas esperan la validación.
+function estadoIniB(e, carga) { return e ? `<span class="badge b-ok">HABILITADO · ${e.situacion === 'SIN_ANTECEDENTES' ? 'SIN ANTECEDENTES' : 'CON ANTECEDENTES'}</span>`
+  : carga ? '<span class="badge b-warn">CARGA SIN VALIDAR</span>' : '<span class="badge b-info">SIN CARGA INICIAL</span>'; }
+const conCargaPM = c => !!(c.comprobantes || c.anticipos || c.antecedentes || (c.saldos || []).length);
+function pintarClientesPM() {
+  if (!PM || !$('pm-clientes')) return;
+  const q = ($('pm-q').value || '').toLowerCase(), fl = $('pm-f').value, rz = PM.resumen;
+  $('pm-res').innerHTML = `<div class="kv"><span>Clientes</span><span>${rz.clientes} · carga validada ${rz.validados || 0} (sin antecedentes ${rz.sin_antecedentes || 0}, con antecedentes ${rz.con_antecedentes || 0}) · con carga sin validar <b>${PM.clientes.filter(c => !c.estado_inicial && conCargaPM(c)).length}</b> (sin operaciones nuevas hasta validarla) · los demás operan sin carga inicial</span></div>`;
+  const filas = PM.clientes.filter(c => (!q || `${c.codigo} ${c.razon_social} ${c.cuit || ''}`.toLowerCase().includes(q))
+    && (!fl || (fl === 'val' ? !!c.estado_inicial : fl === 'sin' ? !c.estado_inicial && !conCargaPM(c) : !c.estado_inicial && conCargaPM(c))));
+  $('pm-clientes').innerHTML = `<table class="t"><thead><tr><th>Cliente</th><th>Estado inicial</th><th>Comprobantes</th><th>Anticipos</th><th>Antecedentes</th><th>Saldo SMG / Tango por moneda</th><th>Operaciones nuevas</th></tr></thead><tbody>
+    ${filas.slice(0, 300).map(c => `<tr class="click" onclick="verInicial('${esc(c.codigo)}')"><td>${esc(c.codigo)} · ${esc(c.razon_social)}</td><td>${estadoIniB(c.estado_inicial, conCargaPM(c))}</td><td class="c">${c.comprobantes || '—'}</td><td class="c">${c.anticipos || '—'}</td><td class="c">${c.antecedentes || '—'}</td>
+      <td class="wrapc">${(c.saldos || []).map(x => `${x.moneda} ${nf.format(x.saldo_smg)} / ${x.saldo_tango == null ? '—' : nf.format(x.saldo_tango)} ${badge(x.saldo_tango == null ? 'SIN SALDO TANGO' : x.conciliada ? 'CONCILIADO' : 'DIFERENCIA')}`).join('<br>') || '—'}</td><td class="c">${c.operaciones || '—'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin clientes para el filtro.</td></tr>'}</tbody></table>`;
+}
+async function verInicial(cli) {
+  INI_CLI = cli;
+  const r = await api('GET', '/puesta-en-marcha/' + encodeURIComponent(cli)), e = r.estado_inicial, c = r.corte, abierto = !e && c && c.estado !== undefined;
+  const nombre = cliNombre(cli);
+  // Mismo criterio que el servidor: comprobantes o anticipos vigentes y saldo según Tango (filas de conciliación) o antecedentes vigentes.
+  const carga = !!(r.saldos.length || (r.antecedentes || []).some(a => a.estado === 'VIGENTE'));
+  $('ini-tit').innerHTML = `${esc(cli)} · ${esc(nombre)} ${estadoIniB(e, carga)}`;
+  const ants = r.antecedentes || [];
+  $('ini-body').innerHTML = `
+    ${!c ? '<div class="alert"><div>Primero iniciá la puesta en marcha (fecha de inicio operativo).</div></div>'
+      : e ? `<div class="alert ok"><div><b>Habilitado ${e.situacion === 'SIN_ANTECEDENTES' ? 'sin antecedentes (saldo inicial cero)' : 'con antecedentes'}</b> por ${esc(e.validado_por)} el ${fh(e.validado_en)}. La carga inicial quedó congelada al ${f(e.resumen.fecha_inicio)}.${(e.resumen.con_estimados || []).length ? ` Incluye cancelaciones <span class="badge b-warn">ESTIMADAS</span> en ${e.resumen.con_estimados.join(', ')} (revisables por un responsable sin cambiar el total).` : ''}</div></div>`
+      : carga ? `<div class="alert"><div><b>Carga inicial sin validar.</b> Mientras tanto el cliente no puede registrar comprobantes ni cobranzas nuevos. Completá su situación al ${c.fecha_corte ? f(c.fecha_corte) : 'inicio (fecha pendiente)'} (deuda abierta, pagos previos, anticipos o certificados ya facturados) y que un responsable la valide.</div></div>`
+        : `<div class="alert info"><div><b>Sin carga inicial.</b> El cliente opera normalmente: su seguimiento empieza con los certificados, pedidos, comprobantes y cobranzas nuevos. Cargá antecedentes solo si tiene deuda, anticipos o certificados facturados en Tango antes de empezar a usar SMG; desde ese momento sus operaciones nuevas esperan la validación.</div></div>`}
+    <div class="panel-section"><div class="panel-section-header">Saldo por moneda al inicio</div><div class="wrap"><table class="t"><thead><tr><th>Moneda</th><th>Saldo SMG</th><th>Saldo según Tango</th><th>Diferencia</th><th>Cancelado estimado</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${r.saldos.map(x => `<tr><td class="c">${x.moneda}</td><td class="r">${nf.format(x.saldo_smg)}</td><td class="r">${x.saldo_tango == null ? '—' : nf.format(x.saldo_tango)}</td><td class="r">${x.diferencia == null ? '—' : nf.format(x.diferencia)}</td>
+        <td class="r">${x.cancelado_estimado ? `<span class="badge b-warn">EST.</span> ${nf.format(x.cancelado_estimado)}` : '—'}</td><td>${badge(x.saldo_tango == null ? 'SIN SALDO TANGO' : x.conciliada ? 'CONCILIADO' : 'DIFERENCIA')}</td>
+        <td>${puedeCargar() ? [!e ? `<a onclick="abrirConc('${esc(cli)}','${x.moneda}')">Saldo Tango</a>` : '', !e && x.saldo_tango != null && !x.cancelado_estimado ? `<a onclick="estimar('${esc(cli)}','${x.moneda}',${x.saldo_tango})">Estimar por antigüedad</a>` : '', `<a onclick="abrirRev('${esc(cli)}','${x.moneda}')">Revisar</a>`].filter(Boolean).join(' · ') : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin saldos iniciales: si el cliente no tiene deuda ni antecedentes, su saldo inicial es cero.</td></tr>'}</tbody></table></div></div>
+    <div class="panel-section"><div class="panel-section-header">Comprobantes abiertos al inicio</div><div class="wrap"><table class="t"><thead><tr><th>Comprobante</th><th>Emisión</th><th>Importe original</th><th>Pagado antes del inicio</th><th>Saldo al inicio</th><th>Saldo actual</th></tr></thead><tbody>
+      ${r.comprobantes.map(d => `<tr class="click ${d.estado === 'ANULADO' ? 'anul' : ''}" onclick="verDoc(${d.id})"><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${f(d.fecha_emision)}</td><td class="r">${m(d.total, d.moneda)}</td>
+        <td class="r">${d.cancelado_antes_corte ? nf.format(d.cancelado_antes_corte) + '<br>' + [...new Set(d.cancelaciones_corte.filter(x => x.estado === 'VIGENTE').map(x => x.criterio))].map(critB).join(' ') : '—'}</td><td class="r"><b>${nf.format(d.total - d.cancelado_antes_corte)}</b></td><td class="r">${nf.format(d.saldo)} ${badge(d.estado_saldo)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin comprobantes iniciales.</td></tr>'}</tbody></table></div></div>
+    ${r.anticipos.length ? `<div class="panel-section"><div class="panel-section-header">Anticipos a cuenta al inicio</div><div class="wrap"><table class="t"><thead><tr><th>Recibo</th><th>Fecha</th><th>Total</th><th>A cuenta</th></tr></thead><tbody>${r.anticipos.map(a => `<tr class="click" onclick="verRecibo(${a.id})"><td>${numRec(a)}</td><td>${f(a.fecha_pago)}</td><td class="r">${m(a.total, a.moneda)}</td><td class="r">${m(a.a_cuenta, a.moneda)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    <div class="panel-section"><div class="panel-section-header">Certificados emitidos <span class="tag">lo ya facturado en Tango no se vuelve a pedir</span></div><div class="wrap"><table class="t"><thead><tr><th>Certificado</th><th>Período</th><th>Total a facturar</th><th>Facturado en SMG</th><th>Antecedentes</th><th>Pendiente</th><th></th></tr></thead><tbody>
+      ${r.certificados.map(x => `<tr><td>Nº ${x.numero} · seg. ${x.seguimiento_cc_id}</td><td>${f(x.periodo_desde)} – ${f(x.periodo_hasta)}</td><td class="r">${m(x.total_a_facturar, x.moneda)}</td><td class="r">${nf.format(x.facturado)}</td><td class="r">${x.antecedentes ? nf.format(x.antecedentes) : '—'}</td><td class="r"><b>${nf.format(x.pendiente)}</b></td>
+        <td>${puedeCargar() && !e && c && x.pendiente > 0 ? `<a onclick="abrirAnt('${esc(cli)}', ${x.id})">Ya facturado antes del inicio…</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">El cliente no tiene certificados emitidos.</td></tr>'}</tbody></table></div></div>
+    ${ants.length ? `<div class="panel-section"><div class="panel-section-header">Antecedentes registrados</div><div class="wrap"><table class="t"><thead><tr><th>Certificado</th><th>Factura de Tango</th><th>Fecha</th><th>Neto facturado</th><th>TC</th><th>Nota</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${ants.map(a => `<tr class="${a.estado === 'ANULADO' ? 'anul' : ''}"><td>Nº ${a.certificado_numero}</td><td>${a.factura_numero ? `${a.factura_tipo} ${a.factura_letra}-${pad(a.factura_punto_venta, 4)}-${pad(a.factura_numero, 8)}` : '—'}</td><td>${f(a.fecha_factura)}</td><td class="r">${m(a.neto_facturado, a.moneda)}</td><td class="r">${a.tipo_cambio ? nf4.format(a.tipo_cambio) : '—'}</td><td class="wrapc">${esc(a.nota || '')}</td><td>${badge(a.estado)}</td>
+        <td>${esResp() && !e && a.estado === 'VIGENTE' ? `<a onclick="abrirAnul('/antecedentes/${a.id}/anular', 'Anular antecedente', 'El certificado vuelve a quedar pendiente por ese importe.')">Anular</a>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    ${historialHtml(r.eventos)}`;
+  const b = [];
+  if (c && !e && puedeCargar()) b.push(`<button class="btn" onclick="abrirDoc({saldo_inicial:true, cliente:'${esc(cli)}'})">+ Comprobante abierto…</button>`,
+    c.estado === 'BORRADOR' ? `<button class="btn" onclick="abrirCobro({saldo_inicial:true, cliente:'${esc(cli)}'})">+ Anticipo…</button><button class="btn" onclick="abrirConc('${esc(cli)}')">+ Saldo según Tango…</button>` : '');
+  if (c && puedeCargar()) b.push(`<button class="btn" onclick="abrirTango('${esc(cli)}')">Pegar resumen de Tango…</button>`);
+  if (c && !e && esResp()) b.push(`<button class="btn primary" ${c.fecha_corte ? '' : 'disabled'} onclick="validarInicial('${esc(cli)}','SIN_ANTECEDENTES')">Validar sin antecedentes (saldo 0)</button><button class="btn primary" ${c.fecha_corte ? '' : 'disabled'} onclick="validarInicial('${esc(cli)}','CON_ANTECEDENTES')">Validar con antecedentes</button>`);
+  if (e && esResp()) b.push(`<button class="btn danger" onclick="abrirAnul('/puesta-en-marcha/${encodeURIComponent(cli)}/reabrir', 'Reabrir estado inicial de ${esc(nombre)}', 'La validación queda anulada en el historial y el cliente vuelve a quedar sin habilitar hasta validarlo de nuevo. No se puede si ya tiene comprobantes o cobranzas nuevos.')">Reabrir…</button>`);
+  $('ini-pie').innerHTML = `<span class="muted">${c && !c.fecha_corte ? 'Sin fecha de inicio operativo no se valida ningún cliente.' : esResp() ? '' : 'La validación la hace un responsable del módulo.'}</span>` + b.join('');
+  abrir('m-ini');
+}
+function refrescarIni() { if ($('m-ini').classList.contains('open') && INI_CLI) verInicial(INI_CLI); refrescarTango(); }
+async function validarInicial(cli, situacion) {
+  const txt = situacion === 'SIN_ANTECEDENTES' ? 'sin antecedentes: su saldo inicial es CERO en todas las monedas' : 'con antecedentes: su saldo inicial es el cargado y conciliado con Tango';
+  if (!confirm(`Validar a ${cliNombre(cli)} ${txt}.\n\nSu carga inicial queda congelada y se habilitan sus comprobantes y cobranzas posteriores al inicio. ¿Confirmar?`)) return;
+  try { await api('POST', `/puesta-en-marcha/${encodeURIComponent(cli)}/validar`, { situacion }); toast('Estado inicial validado: el cliente quedó habilitado.'); await recargarSesion(); verInicial(cli); if (S.vista === 'saldos') renderClientesPM(); }
+  catch (e) { toast(e.message, true); }
+}
+let ANT_CERTS = [];
+async function abrirAnt(cli, certId) {
+  const r = await api('GET', '/puesta-en-marcha/' + encodeURIComponent(cli));
+  ANT_CERTS = r.certificados.filter(x => x.pendiente > 0);
+  $('a-cert').innerHTML = ANT_CERTS.map(x => `<option value="${x.id}">Nº ${x.numero} · seg. ${x.seguimiento_cc_id} · pendiente ${m(x.pendiente, x.moneda)}</option>`).join('');
+  if (certId) $('a-cert').value = String(certId);
+  ['a-fecha', 'a-letra', 'a-pv', 'a-nro', 'a-tc', 'a-nota'].forEach(i => $(i).value = '');
+  $('a-fecha').max = (S.sesion.corte && S.sesion.corte.fecha_corte) || '';
+  $('a-val').innerHTML = ''; window._antIdem = uuid(); antPendiente(); abrir('m-ant');
+}
+function antPendiente() { const x = ANT_CERTS.find(c => String(c.id) === $('a-cert').value); $('a-neto').value = x ? String(x.pendiente).replace('.', ',') : ''; }
+async function guardarAnt() {
+  const datos = { certificado_id: Number($('a-cert').value), neto_facturado: num($('a-neto').value), fecha_factura: $('a-fecha').value || null,
+    factura_letra: $('a-letra').value || null, factura_punto_venta: num($('a-pv').value) || null, factura_numero: num($('a-nro').value) || null,
+    tipo_cambio: num($('a-tc').value) || null, nota: $('a-nota').value || null };
+  try { const r = await api('POST', '/antecedentes', datos, { idem: window._antIdem }); cerrar('m-ant'); toast(r.repetido ? 'Ese antecedente ya se había registrado (reintento).' : 'Antecedente registrado: el certificado ya no figura como pendiente por ese importe.'); refrescarIni(); if (S.vista === 'saldos') renderClientesPM(); }
+  catch (e) { $('a-val').innerHTML = `<div class="alert err"><div><b>No se registró.</b> ${esc(e.message)}</div></div>`; }
+}
+async function crearCorte() { try { await api('POST', '/corte', {}); toast('Corte creado en borrador, sin fecha.'); await recargarSesion(); renderSaldos(); } catch (e) { toast(e.message, true); } }
+async function guardarFechaCorte() { try { await api('PUT', '/corte/fecha', { fecha_corte: $('corte-fecha').value }); toast('Fecha de corte guardada (el corte sigue en borrador).'); await recargarSesion(); renderSaldos(); } catch (e) { toast(e.message, true); } }
+function abrirConc(cli, mon) { $('k-cli').innerHTML = optsCli(); if (cli) $('k-cli').value = cli; if (mon) $('k-mon').value = mon; $('k-saldo').value = ''; $('k-nota').value = ''; abrir('m-conc'); }
+async function guardarConciliacion() {
+  try { await api('POST', '/corte/conciliacion', { cliente_codigo: $('k-cli').value, moneda: $('k-mon').value, saldo_tango: num($('k-saldo').value), nota: $('k-nota').value || null }); cerrar('m-conc'); toast('Saldo según Tango cargado.'); refrescar(); refrescarIni(); }
+  catch (e) { toast(e.message, true); }
+}
+async function estimar(cli, mon, saldo) {
+  if (!confirm(`Se va a ESTIMAR por antigüedad lo cancelado antes del corte para ${cliNombre(cli)} ${mon}, para igualar el saldo de Tango (${nf.format(saldo)}).\n\nQueda marcado como estimado (no es una imputación real) y se puede revisar. ¿Continuar?`)) return;
+  try { const r = await api('POST', '/corte/estimar', { cliente_codigo: cli, moneda: mon, saldo_tango: saldo }); toast(`Estimación registrada en ${r.filas.length} comprobante(s), marcada como ESTIMADA.`); refrescar(); refrescarIni(); } catch (e) { toast(e.message, true); }
+}
+async function confirmarCorte() {
+  if (!confirm('Cerrar la puesta en marcha deja inmutables la fecha de inicio y la conciliación. Requiere que todos los clientes con carga inicial estén validados. ¿Confirmar?')) return;
+  try { await api('POST', '/corte/confirmar'); toast('Corte confirmado.'); await recargarSesion(); renderSaldos(); } catch (e) { toast(e.message, true); }
+}
+let REV = null;
+async function abrirRev(cli, mon) {
+  const r = await api('GET', '/corte');
+  REV = { cli, mon, docs: r.documentos.filter(d => d.estado === 'VIGENTE' && d.cliente_codigo === cli && d.moneda === mon && d.tipo !== 'NC'), confirmado: r.corte.estado === 'CONFIRMADO' };
+  REV.fila = r.conciliacion.find(x => x.cliente === cli && x.moneda === mon) || {};
+  $('rev-tit').textContent = `Revisar cancelado antes del corte · ${cliNombre(cli)} · ${mon}`;
+  $('rev-body').innerHTML = `
+    <div class="alert"><div><b>Lo marcado como estimado es una estimación por antigüedad</b>, no una imputación real. Cargá lo que informe Tango o Contabilidad. La fila anterior no se borra: queda anulada en el historial y vinculada con la nueva.${REV.confirmado ? ' <b>Con el corte confirmado</b>, solo un responsable puede revisar y el total cancelado del cliente en esta moneda no puede cambiar.' : ''}</div></div>
+    <div class="wrap"><table class="t"><thead><tr><th>Comprobante</th><th>Emisión</th><th>Importe original</th><th>Actual</th><th>Criterio actual</th><th>Nuevo cancelado</th><th>Saldo al corte</th></tr></thead><tbody>
+    ${REV.docs.map((d, i) => `<tr><td>${numDoc(d)}</td><td>${f(d.fecha_emision)}</td><td class="r">${nf.format(d.total)}</td><td class="r">${nf.format(d.cancelado_antes_corte)}</td><td>${d.criterios.map(critB).join(' ') || '—'}</td>
+      <td><input class="num" id="rev-i${i}" value="${d.cancelado_antes_corte.toFixed(2)}" oninput="valRev()"></td><td class="r" id="rev-s${i}"></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label>Nuevo criterio <span class="req">*</span></label><select id="rev-crit"><option value="SEGUN_TANGO">Según Tango (imputación informada)</option><option value="REVISADO">Revisado con Contabilidad</option></select></div>
+      <div class="field span2"><label>Nota / respaldo <span class="req">*</span> (mínimo 10 caracteres)</label><input id="rev-nota" oninput="valRev()"></div>
+    </div><div id="rev-val"></div>`;
+  abrir('m-rev'); valRev();
+}
+function valRev() {
+  let ok = $('rev-nota').value.trim().length >= 10, tot = 0, antes = 0; const al = [];
+  REV.docs.forEach((d, i) => { const v = num($('rev-i' + i).value); tot += v; antes += d.cancelado_antes_corte;
+    if (v < 0 || v >= d.total) { ok = false; al.push(`<div class="alert err"><div>${numDoc(d)}: lo cancelado debe ser ≥ 0 y menor que el importe original.</div></div>`); }
+    $('rev-s' + i).innerHTML = `<b>${nf.format(r2(d.total - v))}</b>`; });
+  if (REV.confirmado && Math.abs(r2(tot) - r2(antes)) > 0.001) { ok = false; al.push(`<div class="alert err"><div>Con el corte confirmado el total cancelado debe seguir siendo ${nf.format(antes)} (queda ${nf.format(tot)}).</div></div>`); }
+  if (REV.confirmado && !esResp()) { ok = false; al.push('<div class="alert err"><div>Solo un responsable del módulo puede revisar con el corte confirmado.</div></div>'); }
+  $('rev-val').innerHTML = al.join(''); $('rev-ok').disabled = !ok;
+}
+async function guardarRev() {
+  const nuevas = {}; REV.docs.forEach((d, i) => nuevas[d.id] = num($('rev-i' + i).value));
+  try { await api('POST', '/corte/revisar', { cliente_codigo: REV.cli, moneda: REV.mon, nuevas, criterio: $('rev-crit').value, nota: $('rev-nota').value }); cerrar('m-rev'); cerrar('m-det'); toast('Revisión guardada. La fila anterior quedó anulada en el historial.'); refrescar(); refrescarIni(); }
+  catch (e) { $('rev-val').innerHTML = `<div class="alert err"><div>${esc(e.message)}</div></div>`; }
+}
+
+/* ============================== PEGAR RESUMEN DE CUENTA DE TANGO ============================== */
+// Lee las celdas copiadas desde Excel del resumen de cuenta de Tango y prepara un formulario por fila. No guarda nada: cada
+// comprobante o cobranza se revisa y se confirma en su formulario, con las validaciones de siempre. La moneda, el IVA y la
+// aplicación de los recibos no se deducen: los completa o confirma el usuario.
+const TANGO_COLS = ['RAZON_SOC', 'FECHA_EMIS', 'T_COMP', 'N_COMP', 'ESTADO', 'FECHA_VTO', 'DEBE', 'HABER', 'SALDO', 'LEYENDA'];
+const TANGO_OBLIG = ['FECHA_EMIS', 'T_COMP', 'N_COMP', 'DEBE', 'HABER', 'SALDO'];
+const TANGO_TIPOS = { 'FAC': 'FC', 'N/C': 'NC', 'N/D': 'ND', 'REC': 'REC' };
+function tsvFilas(texto) {  // celdas separadas por tabulación, como las copia Excel (con comillas si la celda tiene saltos de línea)
+  const t = String(texto || '').replace(/\r\n?/g, '\n'), filas = [];
+  let fila = [], celda = '', comillas = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (comillas) { if (ch !== '"') celda += ch; else if (t[i + 1] === '"') { celda += '"'; i++; } else comillas = false; }
+    else if (ch === '"' && celda === '') comillas = true;
+    else if (ch === '\t') { fila.push(celda); celda = ''; }
+    else if (ch === '\n') { fila.push(celda); filas.push(fila); fila = []; celda = ''; }
+    else celda += ch;
+  }
+  if (celda !== '' || fila.length) { fila.push(celda); filas.push(fila); }
+  return filas.filter(f => f.some(c => c.trim() !== ''));
+}
+function tangoPartesFecha(s) {
+  const t = String(s || '').trim();
+  if (!t) return null;
+  let x = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (x) return { iso: true, a: +x[3], b: +x[2], y: +x[1] };
+  x = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/);
+  return x ? { a: +x[1], b: +x[2], y: x[3].length === 2 ? 2000 + +x[3] : +x[3] } : { invalida: true };
+}
+function tangoFecha(p, orden) {  // 'AAAA-MM-DD' o null si no es una fecha real
+  if (!p || p.invalida || (!p.iso && !orden)) return null;
+  const [d, mes] = p.iso || orden === 'dmy' ? [p.a, p.b] : [p.b, p.a];
+  const dt = new Date(Date.UTC(p.y, mes - 1, d));
+  if (dt.getUTCFullYear() !== p.y || dt.getUTCMonth() !== mes - 1 || dt.getUTCDate() !== d) return null;
+  return `${p.y}-${pad(mes, 2)}-${pad(d, 2)}`;
+}
+const tangoLimpio = s => String(s ?? '').replace(/[\s\u00a0$]/g, '');
+function tangoSeparador(celdas) {  // separador decimal: el que va seguido de 1 o 2 dígitos al final ('mezcla' si se contradicen)
+  const votos = new Set();
+  celdas.forEach(c => {
+    const t = tangoLimpio(c).replace(/^[(-]+|[)-]+$/g, '');
+    if (t.includes('.') && t.includes(',')) votos.add(t.lastIndexOf('.') > t.lastIndexOf(',') ? '.' : ',');
+    else { const x = t.match(/([.,])\d{1,2}$/); if (x) votos.add(x[1]); }
+  });
+  return votos.size > 1 ? 'mezcla' : [...votos][0] || null;
+}
+function tangoImporte(s, dec, mil) {  // número, 0 para «-» o vacío (formato contable de Excel), NaN si no es un importe
+  let t = tangoLimpio(s), neg = false;
+  if (t === '' || t === '-') return 0;
+  if (/^\(.*\)$/.test(t)) { neg = true; t = t.slice(1, -1); }
+  if (t.startsWith('-')) { neg = !neg; t = t.slice(1); } else if (t.endsWith('-')) { neg = !neg; t = t.slice(0, -1); }
+  const e = c => c === '.' ? '\\.' : c;
+  const x = t.match(new RegExp(`^(\\d{1,3}(?:${e(mil)}\\d{3})+|\\d+)(?:${dec ? e(dec) : '§'}(\\d{1,2}))?$`));
+  if (!x) return NaN;
+  const v = Number(x[1].split(mil).join('') + '.' + (x[2] || '0'));
+  return r2(neg ? -v : v);
+}
+function parsearTango(texto, orden = 'auto') {
+  const fallo = error => ({ ok: false, error, filas: [] });
+  const filas = tsvFilas(texto);
+  if (!filas.length) return fallo('No hay nada pegado. Copiá en Excel las filas del resumen de cuenta de Tango, con la fila de encabezados, y pegalas acá.');
+  const enc = filas[0].map(c => c.trim().toUpperCase());
+  if (enc.length < 2) return fallo('No se reconocen columnas: pegá las celdas copiadas desde Excel (separadas por tabulaciones), no texto de un PDF ni de un CSV.');
+  const faltan = TANGO_OBLIG.filter(c => !enc.includes(c));
+  if (faltan.length) return fallo(`La primera fila debe ser la de encabezados del resumen de Tango; faltan: ${faltan.join(', ')}. Se esperan ${TANGO_COLS.join(', ')} (RAZON_SOC, ESTADO, FECHA_VTO y LEYENDA son opcionales).`);
+  const repetidos = TANGO_COLS.filter(c => enc.filter(x => x === c).length > 1);
+  if (repetidos.length) return fallo(`Encabezado repetido: ${repetidos.join(', ')}.`);
+  const col = Object.fromEntries(TANGO_COLS.map(c => [c, enc.indexOf(c)]));
+  const val = (f, c) => col[c] < 0 ? '' : String(f[col[c]] ?? '').trim();
+  const datos = filas.slice(1).map((f, i) => ({ f, linea: i + 2 }));
+  if (!datos.length) return fallo('Solo se pegó la fila de encabezados: faltan los movimientos.');
+  // Excel pega las fechas según la configuración regional: el orden día/mes se deduce de las fechas con un número mayor que 12.
+  let dmy = false, mdy = false, sinOrden = false;
+  datos.forEach(({ f }) => ['FECHA_EMIS', 'FECHA_VTO'].forEach(c => {
+    const p = tangoPartesFecha(val(f, c));
+    if (p && !p.invalida && !p.iso) { sinOrden = true; if (p.a > 12) dmy = true; if (p.b > 12) mdy = true; }
+  }));
+  if (orden === 'auto') {
+    if (dmy && mdy) return fallo('Las fechas mezclan día/mes y mes/día: revisá las columnas FECHA_EMIS y FECHA_VTO.');
+    orden = dmy ? 'dmy' : mdy ? 'mdy' : null;
+    if (!orden && sinOrden) return { ...fallo('No se puede saber si las fechas son día/mes o mes/día (ningún número pasa de 12). Elegí el formato de las fechas.'), ambiguo: true };
+  }
+  const celdas = datos.flatMap(({ f }) => ['DEBE', 'HABER', 'SALDO'].map(c => val(f, c)));
+  const dec = tangoSeparador(celdas);
+  if (dec === 'mezcla') return fallo('Los importes mezclan coma y punto como separador decimal: revisá las columnas DEBE, HABER y SALDO.');
+  const mil = dec ? (dec === '.' ? ',' : '.') : (celdas.some(c => tangoLimpio(c).includes(',')) ? ',' : '.');
+  const razones = [...new Set(datos.map(({ f }) => val(f, 'RAZON_SOC')).filter(Boolean))];
+  if (razones.length > 1) return fallo(`El pegado incluye más de un cliente (${razones.join(', ')}): pegá el resumen de un cliente por vez.`);
+  const out = [], ignoradas = [];
+  datos.forEach(({ f, linea }) => {
+    const tt = val(f, 'T_COMP').toUpperCase().replace(/\s/g, ''), nc = val(f, 'N_COMP').toUpperCase().replace(/\s/g, '');
+    if (!tt && !nc) { ignoradas.push(linea); return; }  // p. ej. una fila de totales
+    const r = { linea, tipo_tango: val(f, 'T_COMP'), tipo: TANGO_TIPOS[tt] || null, n_comp: val(f, 'N_COMP'), estado: val(f, 'ESTADO'), leyenda: val(f, 'LEYENDA'), errores: [], avisos: [] };
+    if (!r.tipo) r.errores.push(`tipo «${r.tipo_tango}» no reconocido (se reconocen FAC, N/C, N/D y REC)`);
+    const x = nc.match(/^([A-Z])?-?(\d{4,5})-?(\d{8})$/);
+    if (!x || !Number(x[2]) || !Number(x[3])) r.errores.push(`número «${r.n_comp}» no reconocido (se espera letra, punto de venta y número, como A0000600000474)`);
+    else {
+      r.letra = x[1] || null; r.punto_venta = Number(x[2]); r.numero = Number(x[3]);
+      if (r.tipo && r.tipo !== 'REC' && !r.letra) r.errores.push('falta la letra del comprobante');
+      if (r.letra && !'ABCEM'.includes(r.letra)) r.errores.push(`letra «${r.letra}» no válida`);
+      if (r.tipo === 'REC' && r.letra) r.errores.push('un recibo no lleva letra');
+    }
+    r.fecha = tangoFecha(tangoPartesFecha(val(f, 'FECHA_EMIS')), orden);
+    if (!r.fecha) r.errores.push(`fecha de emisión «${val(f, 'FECHA_EMIS')}» no reconocida`);
+    const vto = val(f, 'FECHA_VTO');
+    r.vencimiento = vto ? tangoFecha(tangoPartesFecha(vto), orden) : null;
+    if (vto && !r.vencimiento) r.errores.push(`vencimiento «${vto}» no reconocido`);
+    ['DEBE', 'HABER', 'SALDO'].forEach(c => { const v = tangoImporte(val(f, c), dec, mil); if (Number.isNaN(v)) r.errores.push(`${c} «${val(f, c)}» no es un importe`); else r[c.toLowerCase()] = v; });
+    if (r.tipo && r.debe != null && r.haber != null) {
+      const alDebe = r.tipo === 'FC' || r.tipo === 'ND';
+      if (alDebe ? r.debe > 0 && r.haber === 0 : r.haber > 0 && r.debe === 0) r.importe = alDebe ? r.debe : r.haber;
+      else r.errores.push(`${r.tipo_tango} lleva su importe solo en ${alDebe ? 'DEBE' : 'HABER'}`);
+    }
+    if (r.fecha && r.vencimiento && r.vencimiento < r.fecha) r.avisos.push('el vencimiento es anterior a la emisión');
+    out.push(r);
+  });
+  let saldo = null, fecha = null;
+  out.forEach(r => {  // controles de lectura: el SALDO de Tango es acumulado y las filas van en orden de fecha
+    if (saldo != null && r.saldo != null && r.debe != null && r.haber != null && Math.abs(r2(saldo + r.debe - r.haber) - r.saldo) > 0.005)
+      r.avisos.push(`el SALDO no sigue al de la fila anterior (${nf.format(saldo)} + DEBE − HABER = ${nf.format(r2(saldo + r.debe - r.haber))}): puede faltar una fila o estar fuera de orden`);
+    if (fecha && r.fecha && r.fecha < fecha) r.avisos.push('la fecha es anterior a la de la fila previa');
+    saldo = r.saldo ?? null; fecha = r.fecha || fecha;
+  });
+  const grupos = {};
+  out.filter(r => r.tipo && r.numero).forEach(r => (grupos[`${r.tipo}|${r.letra || ''}|${r.punto_venta}|${r.numero}`] ||= []).push(r));
+  Object.values(grupos).filter(g => g.length > 1).forEach(g => g.forEach(r => { r.repetido = g.length; r.avisos.push(`el mismo número figura en ${g.length} filas (líneas ${g.map(x => x.linea).join(', ')})`); }));
+  const conSaldo = out.filter(r => r.saldo != null), p = conSaldo[0];
+  return { ok: true, orden, decimal: dec, razon_social: razones[0] || '', filas: out, ignoradas,
+    saldo_anterior: p && p.debe != null && p.haber != null ? r2(p.saldo - p.debe + p.haber) : null, saldo_final: conSaldo.length ? conSaldo[conSaldo.length - 1].saldo : null };
+}
+function tangoSaldoAl(res, fecha) {  // SALDO de Tango de la última fila hasta esa fecha (null si el resumen no llega)
+  const filas = res.filas.filter(r => r.fecha && r.fecha <= fecha && r.saldo != null);
+  return filas.length ? filas[filas.length - 1].saldo : null;
+}
+const tangoRazon = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const TANGO = { res: null, reg: null, regCli: null, confirma: false };
+function abrirTango(cli) {
+  $('tgo-cli').innerHTML = '<option value="">— elegir —</option>' + optsCli();
+  $('tgo-cli').value = cli || ''; $('tgo-mon').value = ''; TANGO.confirma = false; TANGO.regCli = null;
+  tangoReconocer(); abrir('m-tango');
+}
+function tangoReconocer() {
+  TANGO.res = $('tgo-txt').value.trim() ? parsearTango($('tgo-txt').value, $('tgo-ord').value) : null;
+  tangoContexto();
+}
+async function tangoContexto() {  // marca lo que ya está registrado en SMG para el cliente elegido (solo consulta)
+  const cli = $('tgo-cli').value;
+  if (cli && TANGO.regCli !== cli) {
+    TANGO.regCli = cli; TANGO.reg = null;
+    try {
+      const [docs, recs] = await Promise.all([api('GET', '/documentos' + qs({ cliente: cli, estado: 'VIGENTE' })), api('GET', '/recibos' + qs({ cliente: cli }))]);
+      if (TANGO.regCli === cli) TANGO.reg = new Set([...docs.map(d => `${d.tipo}|${d.letra}|${d.punto_venta}|${d.numero}`), ...recs.filter(r => r.estado === 'VIGENTE').map(r => `REC||${r.punto_venta}|${r.numero}`)]);
+    } catch (e) { toast(e.message, true); }
+  }
+  tangoPintar();
+}
+function refrescarTango() { if ($('m-tango').classList.contains('open')) { TANGO.regCli = null; tangoContexto(); } }
+const tangoClave = r => `${r.tipo}|${r.letra || ''}|${r.punto_venta}|${r.numero}`;
+function tangoModo(r) {  // hasta la fecha de la carga inicial (si está definida) es saldo inicial; el resto, operación nueva
+  const c = S.sesion.corte;
+  return c && c.fecha_corte && r.fecha <= c.fecha_corte ? 'SALDO_INICIAL' : 'NORMAL';
+}
+function tangoListo() {
+  const res = TANGO.res, cli = S.cat.clientes.find(c => c.codigo === $('tgo-cli').value);
+  const distinto = !!(res && res.ok && res.razon_social && cli && tangoRazon(res.razon_social) !== tangoRazon(cli.razon_social));
+  return { cli, distinto, listo: !!(cli && $('tgo-mon').value && puedeCargar() && (!distinto || TANGO.confirma)) };
+}
+function tangoPintar() {
+  const res = TANGO.res, el = $('tgo-res');
+  if (!res) { el.innerHTML = ''; return; }
+  if (!res.ok) { el.innerHTML = `<div class="alert err"><div><b>No se reconocieron las filas.</b> ${esc(res.error)}</div></div>`; return; }
+  const { cli, distinto, listo } = tangoListo(), mon = $('tgo-mon').value, c = S.sesion.corte, fc = c && c.fecha_corte;
+  const cuenta = t => res.filas.filter(r => r.tipo === t).length, conErr = res.filas.filter(r => r.errores.length).length;
+  const fechas = res.filas.map(r => r.fecha).filter(Boolean).sort(), saldoCorte = fc ? tangoSaldoAl(res, fc) : null;
+  const avisos = [];
+  if (!cli) avisos.push('Elegí el cliente.');
+  if (!mon) avisos.push('Confirmá la moneda del resumen: sin ella no se preparan formularios.');
+  if (distinto) avisos.push(`La RAZON_SOC del resumen («${esc(res.razon_social)}») no coincide con el cliente elegido («${esc(cli.razon_social)}»). <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="tgo-conf" ${TANGO.confirma ? 'checked' : ''} onchange="TANGO.confirma = this.checked; tangoPintar()"> Confirmo que el resumen es de este cliente</label>`);
+  if (!puedeCargar()) avisos.push('Tu perfil es de consulta: no podés registrar.');
+  const accion = (r, i) => {
+    if (r.errores.length) return '<span class="muted">—</span>';
+    if (TANGO.reg && TANGO.reg.has(tangoClave(r))) return '<span class="badge b-ok">YA REGISTRADO</span>';
+    const si = tangoModo(r) === 'SALDO_INICIAL', txt = r.tipo !== 'REC' ? 'Revisar…' : si ? 'Anticipo…' : 'Cobranza…';
+    return `<span class="muted">${si ? 'Saldo inicial' : 'Operación nueva'}</span><br><button class="btn sm" ${listo ? '' : 'disabled'} onclick="${r.tipo === 'REC' ? 'tangoPrepararRec' : 'tangoPrepararDoc'}(${i})">${txt}</button>`;
+  };
+  el.innerHTML = `
+    <div class="alert ${conErr ? 'err' : 'ok'}"><div><b>${res.filas.length} fila(s) reconocida(s):</b> ${cuenta('FC')} FAC · ${cuenta('NC')} N/C · ${cuenta('ND')} N/D · ${cuenta('REC')} REC${conErr ? ` · <b>${conErr} con errores</b> (no se preparan)` : ''}${res.ignoradas.length ? ` · ${res.ignoradas.length} fila(s) sin tipo ni número ignorada(s) (líneas ${res.ignoradas.join(', ')})` : ''}.
+      Fechas ${res.orden === 'mdy' ? 'mes/día/año' : 'día/mes/año'}${fechas.length ? `, del ${f(fechas[0])} al ${f(fechas[fechas.length - 1])}` : ''}. Saldo de Tango antes del primer movimiento ${res.saldo_anterior == null ? '—' : nf.format(res.saldo_anterior)} · saldo final ${res.saldo_final == null ? '—' : nf.format(res.saldo_final)}${fc ? ` · <b>saldo al inicio operativo (${f(fc)}): ${saldoCorte == null ? 'el resumen no llega a esa fecha' : nf.format(saldoCorte)}</b>` : ''}.</div></div>
+    ${avisos.map(a => `<div class="alert"><div>${a}</div></div>`).join('')}
+    ${fc ? `<div class="alert info"><div>Hasta ${f(fc)} (fecha de la carga inicial) las filas se cargan como <b>saldo inicial</b>: solo lo que seguía pendiente. Una factura cobrada antes no se carga (si corresponde a un certificado, va como antecedente del certificado). Los REC previos se informan como pagos previos dentro de cada comprobante o, si quedaron a cuenta, como anticipo. Después de esa fecha, cada fila es una operación nueva.</div></div>`
+      : `<div class="alert info"><div>Sin fecha de carga inicial, cada fila se prepara como <b>operación nueva</b>. Registrá solo lo que forma parte del seguimiento desde ahora: el historial ya cerrado en Tango no se carga. Si el cliente tiene antecedentes (deuda o anticipos previos), definí la fecha de la carga inicial en Puesta en marcha.</div></div>`}
+    ${c && c.estado === 'BORRADOR' && fc && saldoCorte != null ? `<div style="margin:0 0 8px"><button class="btn sm" ${listo ? '' : 'disabled'} onclick="tangoConciliar()">Usar ${nf.format(saldoCorte)} como saldo según Tango al inicio…</button></div>` : ''}
+    <div class="wrap"><table class="t"><thead><tr><th>Línea</th><th>Fecha</th><th>Tipo</th><th>Número</th><th>Vencimiento</th><th>Debe</th><th>Haber</th><th>Saldo</th><th>Estado</th><th>Leyenda</th><th>Se carga como</th></tr></thead><tbody>
+    ${res.filas.map((r, i) => `<tr><td class="c">${r.linea}</td><td>${f(r.fecha)}</td><td>${r.tipo ? tipoB(r.tipo) : esc(r.tipo_tango)}</td><td>${r.numero ? (r.tipo === 'REC' ? numRec(r) : numDoc(r)) : esc(r.n_comp)}</td><td>${f(r.vencimiento)}</td>
+      <td class="r">${r.debe ? nf.format(r.debe) : ''}</td><td class="r">${r.haber ? nf.format(r.haber) : ''}</td><td class="r">${r.saldo == null ? '' : nf.format(r.saldo)}</td><td class="c">${esc(r.estado)}</td><td class="wrapc">${esc(r.leyenda)}</td><td>${accion(r, i)}</td></tr>
+      ${r.errores.length || r.avisos.length ? `<tr><td></td><td colspan="10" class="wrapc" style="padding-top:0">${r.errores.map(x => `<span style="color:var(--red)">✗ ${esc(x)}</span>`).concat(r.avisos.map(x => `<span style="color:var(--amber)">⚠ ${esc(x)}</span>`)).join('<br>')}</td></tr>` : ''}`).join('')}
+    </tbody></table></div>`;
+}
+async function tangoPrepararDoc(i) {
+  const r = TANGO.res.filas[i], cli = $('tgo-cli').value, mon = $('tgo-mon').value, si = tangoModo(r) === 'SALDO_INICIAL';
+  if (!tangoListo().listo) return;
+  await abrirDoc(si ? { saldo_inicial: true, cliente: cli } : { cliente: cli });
+  TIPO_DOC = r.tipo; document.querySelectorAll('#tg-tipo button').forEach(x => x.classList.toggle('on', x.dataset.t === TIPO_DOC));
+  $('d-letra').value = r.letra; $('d-pv').value = r.punto_venta; $('d-nro').value = r.numero; $('d-mon').value = mon;
+  $('d-fe').value = r.fecha; $('d-vto').value = r.vencimiento || ''; if (r.vencimiento) $('d-vto').dataset.manual = '1';
+  window._dpdf = nf.format(r.importe);  // control existente: el total calculado debe coincidir con el de Tango
+  if (si) $('d-si-nota').value = `Resumen de cuenta de Tango: ${r.tipo_tango} ${r.n_comp.trim()}${r.estado ? ` (estado ${r.estado})` : ''}`;
+  formTipo(); await cambioClienteDoc();
+  const recs = si && r.tipo !== 'NC' ? TANGO.res.filas.filter(x => x.tipo === 'REC' && !x.errores.length && tangoModo(x) === 'SALDO_INICIAL') : [];
+  $('d-tango').innerHTML = `<div><b>Preparado desde el resumen de Tango (línea ${r.linea}).</b> Total según Tango ${m(r.importe, mon)}, cargado en el control del total. Completá el neto por alícuota de IVA${r.tipo !== 'FC' ? ', el motivo y el comprobante que corrige' : ''}${r.vencimiento || r.tipo === 'NC' ? '' : ' y el vencimiento (el resumen no lo trae)'}; confirmá la moneda (${mon}) y los vínculos. Nada se registra hasta que lo confirmes.
+    ${recs.length ? `<br>Recibos de Tango hasta el inicio, para informar pagos previos (el importe aplicado a este comprobante lo cargás vos):
+      ${recs.map(x => `<br>REC ${numRec(x)} del ${f(x.fecha)} · total ${m(x.importe, mon)}${x.leyenda ? ` · ${esc(x.leyenda)}` : ''} <a onclick="tangoPagoPrevio(${TANGO.res.filas.indexOf(x)})">+ pago previo</a>`).join('')}` : ''}</div>`;
+  $('d-tango').classList.remove('hidden');
+}
+function tangoPagoPrevio(i) {  // agrega el recibo como pago previo sin importe aplicado: la aplicación no se deduce
+  const x = TANGO.res.filas[i];
+  PP.push({ fecha_pago: x.fecha, moneda_pago: $('tgo-mon').value, importe_pago: '', tipo_cambio: '', recibo_punto_venta: String(x.punto_venta), recibo_numero: String(x.numero), recibo_total: x.repetido ? '' : nf.format(x.importe) });
+  renderPP();
+}
+async function tangoPrepararRec(i) {
+  const r = TANGO.res.filas[i], cli = $('tgo-cli').value, mon = $('tgo-mon').value, si = tangoModo(r) === 'SALDO_INICIAL';
+  if (!tangoListo().listo) return;
+  await abrirCobro(si ? { saldo_inicial: true, cliente: cli } : { cliente: cli });
+  $('c-pv').value = r.punto_venta; $('c-nro').value = r.numero; $('c-fecha').value = r.fecha; $('c-mon').value = mon;
+  VALORES = [{ medio: 'TRANSFERENCIA', importe: r.repetido ? '' : nf.format(r.importe), banco_emisor: '', referencia: '' }];
+  renderCobro();
+  $('c-tango').innerHTML = `<div><b>Preparado desde el resumen de Tango (línea ${r.linea}).</b> ${r.repetido ? `El número figura en ${r.repetido} filas del resumen: cargá el total del recibo según Tango.` : `Total según Tango ${m(r.importe, mon)}.`} Confirmá la moneda (${mon}), el medio de pago y las retenciones (el resumen no los informa)${si ? '' : ' y asigná a qué comprobantes se aplica'}${r.leyenda ? `; Tango indica: «${esc(r.leyenda)}»` : ''}. Nada se registra hasta que lo confirmes.</div>`;
+  $('c-tango').classList.remove('hidden');
+}
+function tangoConciliar() {
+  const fc = S.sesion.corte.fecha_corte, saldo = tangoSaldoAl(TANGO.res, fc);
+  if (!tangoListo().listo || saldo == null) return;
+  abrirConc($('tgo-cli').value, $('tgo-mon').value);
+  $('k-saldo').value = nf.format(saldo); $('k-nota').value = `Resumen de cuenta de Tango: SALDO al ${f(fc)} (última fila hasta esa fecha)`;
+}
+
+/* ============================== CONFIGURACIÓN ============================== */
+const ENT_TXT = { PEDIDO: 'Pedido', FC: 'Factura', ND: 'Nota de débito', NC: 'Nota de crédito', RECIBO: 'Cobranza', CORTE: 'Corte (informe Tango)' };
+function renderConfig() {
+  const cfg = S.sesion.config, req = cfg.adjuntos_requeridos || {};
+  $('config').innerHTML = `
+    <div class="panel-section"><div class="panel-section-header">Tus permisos en el módulo</div><div class="panel-section-body">
+      <div class="kv"><span>Consulta</span><span>Sí</span></div><div class="kv"><span>Carga (pedidos, comprobantes, cobranzas, saldos iniciales en borrador)</span><span>${puedeCargar() ? 'Sí' : 'No (perfil CONSULTOR)'}</span></div>
+      <div class="kv"><span>Responsable (validar y reabrir el estado inicial de cada cliente, anular, cerrar la puesta en marcha, revisar estimaciones de clientes validados, cambiar la configuración)</span><span>${esResp() ? 'Sí' : 'No'}</span></div></div></div>
+    <div class="panel-section"><div class="panel-section-header">Adjuntos obligatorios <span class="tag">aplica solo a altas nuevas</span></div><div class="panel-section-body">
+      <div class="wrap"><table class="t"><thead><tr>${Object.values(ENT_TXT).map(t => `<th>${t}</th>`).join('')}</tr></thead><tbody><tr>${Object.keys(ENT_TXT).map(k => `<td class="c"><label><input type="checkbox" data-adj="${k}" ${req[k] ? 'checked' : ''} ${esResp() ? '' : 'disabled'}> ${req[k] ? 'Sí' : 'No'}</label></td>`).join('')}</tr></tbody></table></div>
+      ${esResp() ? '<button class="btn sm" style="margin-top:8px" onclick="guardarAdjReq()">Guardar</button>' : ''}
+      <p class="muted" style="margin:6px 0 0">Hoy ningún adjunto es obligatorio. Si se exige uno, los registros anteriores no se bloquean.</p></div></div>
+    <div class="panel-section"><div class="panel-section-header">Otros parámetros</div><div class="panel-section-body grid3">
+      <div class="field"><label>Almacenamiento de adjuntos</label><input value="${cfg.adjuntos_almacenamiento === 'DISCO' ? 'Archivos en el servidor' : 'Solo enlaces externos (Drive)'}" readonly></div>
+      <div class="field"><label>Comprobantes y cobranzas</label><input value="${cfg.requiere_corte_confirmado ? 'Habilitados; un cliente con carga inicial espera su validación' : 'Habilitados sin control de carga inicial'}" readonly></div>
+      <div class="field"><label>Tolerancia de redondeo vs. Tango</label><input value="± ${esc(cfg.tolerancia_redondeo)}" readonly></div></div></div>`;
+}
+async function guardarAdjReq() {
+  const valor = {}; document.querySelectorAll('input[data-adj]').forEach(i => valor[i.dataset.adj] = i.checked);
+  try { await api('PUT', '/config/adjuntos_requeridos', { valor }); toast('Configuración guardada.'); await recargarSesion(); renderConfig(); } catch (e) { toast(e.message, true); }
+}
+
+/* ============================== ANULACIONES ============================== */
+let ANUL = null;
+function abrirAnul(ruta, titulo, aviso) {
+  ANUL = ruta; $('anu-tit').textContent = titulo; $('anu-mot').value = ''; $('anu-ok').disabled = true;
+  $('anu-aviso').innerHTML = aviso ? `<div class="alert"><div>${esc(aviso)}</div></div>` : ''; abrir('m-anu');
+}
+async function confirmarAnul() {
+  try { await api('POST', ANUL, { motivo: $('anu-mot').value.trim() }); cerrar('m-anu'); cerrar('m-det'); cerrar('m-ver'); toast('Registro anulado. Quedaron el usuario, la fecha y el motivo en el historial.'); await recargarSesion(); refrescar(); refrescarIni(); }
+  catch (e) { toast(e.message, true); }
+}
+
+/* ============================== INICIO ============================== */
+async function recargarSesion() { S.sesion = await api('GET', '/sesion'); barraEstado(); }
+(async function init() {
+  try {
+    await recargarSesion();
+    S.cat = await api('GET', '/catalogos');
+    const o = optsCli();
+    ['f-cli', 'fd-cli', 'fp-cli', 'fr-cli'].forEach(id => $(id).innerHTML = '<option value="">Todos</option>' + o);
+    $('cc-cli').innerHTML = o;
+    $('d-vto').addEventListener('input', () => $('d-vto').dataset.manual = '1');
+    // Enlaces directos: #<vista>, #documento-<id>, #recibo-<id>, #pedido-<id> (abre el detalle),
+    // #nuevo-pedido, #nuevo-comprobante, #nueva-cobranza (abre el formulario de alta).
+    const h = location.hash.slice(1), [clase, id] = h.split('-');
+    const detalle = { documento: ['documentos', verDoc], recibo: ['cobranzas', verRecibo], pedido: ['pedidos', verPedido] }[clase];
+    ir(TITULOS[h] ? h : detalle ? detalle[0] : 'tablero');
+    if (detalle && Number(id)) detalle[1](Number(id));
+    if (puedeCargar()) ({ 'nuevo-pedido': () => { ir('pedidos'); nuevoPedido(); }, 'nuevo-comprobante': () => abrirDoc({}), 'nueva-cobranza': () => abrirCobro({}) }[h] || (() => {}))();
+  } catch (e) { toast('No se pudo cargar el módulo: ' + e.message, true); }
+})();
+</script>
+</body>
+</html>

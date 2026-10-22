@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta Certificados SMG</title>
+<style>
+  /* ======================================================================
+     Tema claro de la maqueta aprobada: contenido claro y barra lateral azul marino.
+     Mantiene la estructura y los nombres de clase de operaciones.html
+     (app-shell, sidebar, seguimiento-panel, panel-section, seg-btn...).
+     ====================================================================== */
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --line: #dbe3ee; --line-strong: #c3d0e0;
+    --text: #0f2440; --muted: #5b6b80; --text-muted: #5b6b80; --navy: #0f2847; --navy-2: #12305a;
+    --blue: #1565c0; --blue-hover: #0f4f9c; --blue-soft: #e3edf9; --blue-head: #dce8f7; --blue-tot: #e8f1fb;
+    --amber: #b45309; --amber-soft: #fff7e6; --amber-line: #f5c46b;
+    --red: #b91c1c; --red-soft: #fdecec; --green: #15803d; --green-soft: #e7f6ec;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); font-size: 13px; overflow-x: hidden; }
+  button, input, select, textarea { font: inherit; }
+  .bg-photo, .bg-blur { display: none; }
+  a { color: var(--blue); }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 12px; color: var(--navy); }
+
+  /* ---------- Estructura (misma que operaciones.html) ---------- */
+  .app-shell { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; min-height: 100vh; padding: 0 14px 14px 0; transition: grid-template-columns 0.22s ease; }
+  .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 240px minmax(0, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+  .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 14px; }
+
+  /* Barra lateral: mismas entradas y comportamiento; fondo azul marino. */
+  .sidebar.card { background: linear-gradient(180deg, var(--navy), var(--navy-2)); color: #e6edf7; border: 0; border-radius: 0; position: sticky; top: 0; height: 100vh; }
+  .sidebar { padding: 12px; display: flex; flex-direction: column; gap: 12px; width: 100%; overflow: hidden; }
+  .brand { display: flex; justify-content: center; align-items: center; min-height: 90px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; background: rgba(255, 255, 255, 0.95); }
+  .brand img { width: 78%; max-width: 160px; object-fit: contain; }
+  .sidebar:not(:hover):not(:focus-within) .brand img { width: 38px; }
+  .menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .menu-btn { border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: inherit; border-radius: 8px; padding: 11px 12px; font-weight: 600; font-size: 13px;
+              cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: background 0.18s ease; }
+  .menu-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+  .menu-btn.active { background: var(--blue); border-color: #8fb4e6; color: #fff; box-shadow: 0 4px 12px rgba(21, 101, 192, 0.35); }
+  .menu-icon { width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .menu-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sidebar:not(:hover):not(:focus-within) .menu-label { display: none; }
+  .sidebar:not(:hover):not(:focus-within) .menu-btn { justify-content: center; padding: 11px 0; }
+
+  /* Barra de la maqueta (no forma parte del diseño). */
+  .maqueta { padding: 6px 12px; background: #fff8e1; border: 1px solid #f1d58a; border-radius: 8px; color: #7a5300; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .maqueta a { color: var(--blue); cursor: pointer; text-decoration: underline; }
+  .maqueta select { padding: 3px 6px; font-size: 12px; }
+  .crumbs { color: var(--muted); } .crumbs b { color: var(--text); } .crumbs i { font-style: normal; margin: 0 6px; }
+
+  /* Pantallas de Seguimiento y Certificados. */
+  .seguimiento-panel { padding: 0; overflow: hidden; }
+  .seguimiento-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  .seguimiento-header h2 { margin: 0; font-size: 24px; line-height: 1.2; color: var(--navy); }
+  .seguimiento-header p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .seguimiento-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .seguimiento-main { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .seguimiento-grid { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 1fr; gap: 10px; align-items: end; }
+  .panel-section { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .panel-section-header { background: #f7faff; color: var(--navy); padding: 9px 12px; font-size: 14px; font-weight: 700; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 6px; }
+  .panel-section-body { padding: 10px 12px 12px; }
+  .details-client-grid, .execution-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+  .details-client-grid .field-wide, .execution-grid .field-wide { grid-column: span 2; }
+  .vista-extra { padding: 16px 18px; }
+  .sin-cambios { margin-left: auto; font-size: 11px; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 8px; }
+  .seg-hint { color: var(--muted); font-size: 12px; }
+  .seg-table-wrap, .wrap { overflow-x: auto; }
+  .seg-badge { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--blue-head); color: var(--navy); }
+  .seg-toolbar { margin-top: 10px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg-toolbar .seg-hint { margin-right: auto; }
+
+  /* Subtarjetas dentro de pantallas y modales. */
+  .card .card { margin-bottom: 12px; }
+  #con-panel > .card:last-child { margin-bottom: 0; }
+  .card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .card-h h2 { font-size: 15px; margin: 0; color: var(--navy); }
+  .card-b { padding: 12px 14px; }
+  details > summary { cursor: pointer; }
+
+  /* ---------- Botones y campos ---------- */
+  .btn, .seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 5px; border: 1px solid var(--blue);
+                   background: #fff; color: var(--blue); font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn:hover, .seg-btn:hover { background: var(--blue-soft); }
+  .btn.primary, .seg-btn.primary, .btn.sel { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn.primary:hover, .seg-btn.primary:hover { background: var(--blue-hover); }
+  .btn.danger, .seg-btn.danger { border-color: var(--red); color: var(--red); } .btn.danger:hover { background: var(--red-soft); }
+  .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
+  .btn.lg { height: 44px; padding: 0 22px; min-width: 190px; }
+  .btn:disabled, .seg-btn:disabled { opacity: 0.45; cursor: not-allowed; background: #fff; }
+  .btn.primary:disabled { background: var(--blue); }
+  .btn svg, .seg-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .icon-btn { border: 0; background: none; color: var(--blue); cursor: pointer; padding: 2px; }
+  input, select, textarea { border: 1px solid var(--line-strong); border-radius: 5px; padding: 6px 8px; background: #fff; color: var(--text); }
+  .field input, .field select, .field textarea { width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(21, 101, 192, 0.25); border-color: var(--blue); }
+  input[disabled], input[readonly] { background: #eef2f7; color: var(--muted); }
+  input[type="checkbox"] { padding: 0; }
+  input.num-in { width: 66px; text-align: right; padding: 3px 5px; }
+  .field { display: flex; flex-direction: column; gap: 3px; } .field > label, .lbl { color: var(--muted); font-size: 12.5px; }
+  .val { font-size: 15px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 5px; overflow: hidden; }
+  .seg-toggle button { border: 0; background: #fff; color: var(--text); padding: 7px 22px; cursor: pointer; }
+  .seg-toggle button.on { background: var(--blue); color: #fff; font-weight: 600; }
+  .seg-toggle button:disabled { cursor: not-allowed; }
+  .pill { display: inline-block; padding: 3px 14px; border-radius: 999px; background: var(--blue-head); color: var(--navy); font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .b-EMITIDO, .b-DEFINITIVO, .b-VALIDADA { background: var(--green-soft); color: var(--green); }
+  .b-ANULADO { background: var(--red-soft); color: var(--red); }
+  .b-BORRADOR, .b-PROVISORIO, .b-PENDIENTE { background: var(--amber-soft); color: var(--amber); }
+  .alert { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--amber-line); background: var(--amber-soft); color: #7a4a06; border-radius: 6px; padding: 9px 12px; margin: 4px 0; }
+  .alert b { display: block; color: var(--amber); }
+  .alert.info { border-color: #b7cff0; background: var(--blue-soft); color: #1d3c66; } .alert.info b { color: var(--blue); }
+  .alert.err { border-color: #f1b4b4; background: var(--red-soft); color: #7f1d1d; } .alert.err b { color: var(--red); }
+  .alert .ic { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; background: #e39a1d; font-size: 12px; }
+  .alert.info .ic { background: var(--blue); } .alert.err .ic { background: var(--red); }
+  .tag { font-size: 10.5px; color: #8a5a00; border: 1px dashed #d9a521; border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+
+  /* ---------- Tablas (las del seguimiento y las de certificados con el mismo aspecto) ---------- */
+  table.t, .metrics-table, .orders-table, .items-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .t th, .t td, .metrics-table th, .metrics-table td, .orders-table th, .orders-table td { border: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; text-align: left; }
+  #ed-tabla th, #ed-tabla td { padding: 5px 5px; font-size: 12px; }
+  .t thead th, .metrics-table th, .orders-table th { background: var(--blue-head); color: var(--navy); font-weight: 700; }
+  .t thead th { text-align: center; }
+  .t thead tr.g th { background: #cfdff3; }
+  .t td.r, .t th.r, .metrics-table .num, .orders-table .num { text-align: right; } .t td.c { text-align: center; }
+  .t tbody tr:hover td, .orders-table tbody tr:hover td { background: #f7faff; }
+  .orders-table tr.selected td { background: var(--blue-tot); }
+  .t tr.tot td { background: var(--blue-tot); font-weight: 700; }
+  .t tr.sub td { background: #f3f7fd; font-weight: 700; }
+  .t tr.exceso td { background: #fff3dc !important; }
+  .t tr.exceso td:first-child { box-shadow: inset 3px 0 0 #e39a1d; }
+  .t td.neg { color: var(--red); }
+  .t.ajustar td, .t.ajustar th { white-space: normal; padding: 6px 5px; }
+
+  /* ---------- Rejillas ---------- */
+  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .stat { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: #fbfdff; }
+  .stat .lbl { display: block; margin-bottom: 4px; } .stat b { font-size: 18px; color: var(--navy); }
+  .contrato { display: grid; grid-template-columns: 1.25fr 1fr 0.55fr 1fr 0.85fr; gap: 14px 18px; }
+  .contrato .col { display: flex; flex-direction: column; gap: 14px; }
+  .trio { display: grid; grid-template-columns: 1.3fr 0.9fr 0.9fr; gap: 14px; }
+  .trio .card { margin-bottom: 0 !important; }
+  .kv { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--line); }
+  .kv.final { background: var(--blue-tot); font-weight: 700; padding: 10px 8px; border: 0; margin-top: 4px; border-radius: 4px; }
+  .estado { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .estado .alert { flex: 1; min-width: 300px; margin: 0; }
+
+  /* ---------- Modales ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(15, 36, 64, 0.45); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 24px 14px; overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg); border-radius: 10px; width: min(1480px, 100%); box-shadow: 0 20px 50px rgba(15, 36, 64, 0.3); }
+  .modal.sm { width: min(580px, 100%); background: #fff; }
+  .modal.md { width: min(1220px, 100%); background: #fff; }
+  .modal-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); background: #fff; border-radius: 10px 10px 0 0; }
+  .modal-h h3 { margin: 0; font-size: 18px; color: var(--navy); }
+  .modal-b { padding: 16px 18px; }
+  .modal-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); background: #fff; border-radius: 0 0 10px 10px; }
+  .close { border: 0; background: none; font-size: 22px; color: var(--muted); cursor: pointer; }
+  .timeline { list-style: none; margin: 0; padding: 0; } .timeline li { border-left: 3px solid var(--blue); padding: 3px 0 9px 10px; }
+  .toast { position: fixed; right: 20px; bottom: 20px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 6px; z-index: 200; display: none; max-width: 420px; }
+
+  /* ---------- PDF SMG ---------- */
+  .pdf-wrap { background: #e2e8f0; padding: 12px; border-radius: 8px; }
+  .pdf-wrap iframe { display: block; width: 100%; height: 78vh; min-height: 560px; border: 0; background: #fff; box-shadow: 0 4px 18px rgba(15, 36, 64, 0.18); }
+  .pdf-nota { font-size: 12px; color: var(--muted); margin: 8px 2px 0; }
+
+  /* ---------- Reajustes ---------- */
+  .idx { border: 1px solid var(--line); background: #fff; border-radius: 4px; padding: 3px 6px; cursor: pointer; min-width: 112px; text-align: right; color: var(--text); }
+  .idx:hover, .idx.sel { border-color: var(--blue); background: var(--blue-soft); }
+  .idx small { color: var(--muted); margin-left: 4px; }
+  .seccion { font-weight: 700; color: var(--navy); margin: 16px 0 6px; font-size: 14px; }
+  .formula { font-family: Consolas, monospace; background: var(--blue-soft); border-radius: 5px; padding: 7px 10px; }
+
+  @media (max-width: 1100px) { .seguimiento-grid, .contrato { grid-template-columns: 1fr 1fr; } .trio { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; padding: 0 8px 8px; } .sidebar { display: none; }
+                              .details-client-grid, .execution-grid, .seguimiento-grid { grid-template-columns: 1fr; } .details-client-grid .field-wide, .execution-grid .field-wide { grid-column: auto; } }
+</style>
+</head>
+<body>
+<div class="bg-photo"></div>
+<div class="bg-blur"></div>
+
+<div class="app-shell">
+  <!-- ================= BARRA LATERAL: copia de operaciones.html (colapsable, mismas cinco entradas) ================= -->
+  <aside class="sidebar card" aria-label="Menú de Operaciones">
+    <div class="brand"><img src="../Imagenes/09-smg.png" alt="Logo SMG"></div>
+    <div class="menu">
+      <button class="menu-btn" type="button" data-inerte><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span class="menu-label">Dashboard</span></button>
+      <button class="menu-btn" type="button" data-inerte><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></span><span class="menu-label">Carga de Partes Diarios</span></button>
+      <button class="menu-btn" type="button" data-inerte><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M3 21h18"></path><path d="M5 21V5l7-3 7 3v16"></path><path d="M9 9h1"></path><path d="M14 9h1"></path><path d="M9 13h1"></path><path d="M14 13h1"></path><path d="M9 17h1"></path><path d="M14 17h1"></path></svg></span><span class="menu-label">Centro de Costos</span></button>
+      <button class="menu-btn active" type="button" data-vista="lista"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg></span><span class="menu-label">Seguimiento de Cliente</span></button>
+      <a class="menu-btn" data-inerte style="margin-top: auto;"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span><span class="menu-label">Menú Principal</span></a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Barra exclusiva de la maqueta: no forma parte del diseño. -->
+    <div class="maqueta">
+      <b>MAQUETA</b> <span>datos ficticios; los cálculos los hará el servidor.</span>
+      <span class="crumbs" id="crumbs">Operaciones<i>›</i>Seguimiento de Cliente<i>›</i><b>SEG-0007</b></span>
+      <span>Ver como: <select id="rol" title="Perfil simulado (solo maqueta)">
+          <option value="operador">Operador (sin permiso de exceso)</option>
+          <option value="autorizante">Autorizante (con permiso de exceso)</option>
+          <option value="consulta">Solo consulta</option>
+          <option value="contingencia">Cuenta de contingencia</option>
+          <option value="sinpanel">Usuario sin panel de certificados</option>
+          <option value="personalizado">Personalizado (Administración)</option>
+        </select></span>
+      <span>Ir a: <a onclick="verVista('lista')">Seguimiento</a> · <a onclick="verVista('certificados')">Certificados</a> · <a onclick="abrirEditor(true)">Editor</a> ·
+        <a onclick="demoEmitir()">Emisión con exceso</a> · <a onclick="abrirAnular(3)">Anulación</a> ·
+        <a onclick="verVista('admin')">Administración</a> · <a onclick="verVista('pdf')">PDF SMG</a> ·
+        Reajustes: <a onclick="$('rol').value = 'autorizante'; aplicarRol(); abrirFormula(); abrirValidacion(1)">Validación</a> · <a onclick="abrirFormula()">Fórmula</a> · <a onclick="abrirIndices()">Índices</a> · <a onclick="abrirContrato()">Contrato</a></span>
+    </div>
+
+    <!-- ================= SEGUIMIENTO DE CLIENTE: misma estructura que operaciones.html ================= -->
+    <section class="card seguimiento-panel" id="vista-lista">
+      <div class="seguimiento-header">
+        <div>
+          <h2>Seguimiento de Cliente</h2>
+          <p>Expediente comercial de la obra (Centro de Costos): órdenes de compra e ítems contratados</p>
+        </div>
+        <div class="seguimiento-actions">
+          <span class="seg-badge">SEG-0007 · guardado</span>
+          <button class="seg-btn primary" id="btn-certificados" type="button" onclick="verVista('certificados')" title="Certificados y reajustes del seguimiento"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>Certificados</button>
+          <button class="seg-btn" type="button" onclick="toast('Sin cambios respecto de la pantalla actual.')">+ Nuevo seguimiento</button>
+          <button class="seg-btn" type="button" onclick="toast('Sin cambios respecto de la pantalla actual.')">Cancelar cambios</button>
+          <button class="seg-btn primary" type="button" onclick="toast('Sin cambios respecto de la pantalla actual.')">Guardar seguimiento</button>
+        </div>
+      </div>
+
+      <div class="seguimiento-main">
+        <div class="seguimiento-grid">
+          <div class="field"><label>Buscar seguimiento</label><input type="search" placeholder="SEG, Centro de Costos, cliente o cotización..."></div>
+          <div class="field"><label>N° Registro</label><select><option>SEG-0007 · Planta Industrial SMG</option></select></div>
+          <div class="field"><label>Fecha Alta Servicio</label><input type="date" value="2024-07-15"></div>
+          <div class="field"><label>Última actualización</label><input type="text" value="16/10/2024 09:12" readonly></div>
+        </div>
+
+        <div class="panel-section" id="sec-obra">
+          <div class="panel-section-header">Obra (Centro de Costos) y Cliente</div>
+          <div class="panel-section-body details-client-grid">
+            <div class="field"><label>Centro de Costo *</label><input type="text" value="CC-001 – Planta Industrial SMG"></div>
+            <div class="field"><label>Empresa</label><input type="text" value="ACME S.A."></div>
+            <div class="field"><label>CUIT</label><input type="text" value="30-00000000-0"></div>
+            <div class="field"><label>Provincia</label><input type="text" value="Buenos Aires"></div>
+            <div class="field field-wide"><label>Dirección</label><input type="text" value="Parque Industrial Pilar"></div>
+          </div>
+        </div>
+
+        <div class="panel-section" id="sec-cotizacion">
+          <div class="panel-section-header">Cotización y Ejecución</div>
+          <div class="panel-section-body execution-grid">
+            <div class="field field-wide"><label>Cotización</label><input type="text" value="COT-2024-001"></div>
+            <div class="field"><label>Fecha de Inicio</label><input type="date" value="2024-08-01"></div>
+            <div class="field"><label>Fecha Final</label><input type="date" value="2025-01-31"></div>
+            <div class="field"><label>Cantidad de Certificados (previstos)</label><input type="number" value="6"></div>
+            <div class="field"><label>Estado</label><select><option>En curso</option></select></div>
+          </div>
+        </div>
+
+        <div class="panel-section" id="sec-resumen">
+          <div class="panel-section-header">Resumen económico (registros guardados)</div>
+          <div class="panel-section-body">
+            <div class="seg-table-wrap">
+              <table class="metrics-table">
+                <thead><tr><th>Moneda</th><th class="num">OC</th><th class="num">Total contratado (OC)</th><th class="num">Ítems</th><th class="num">Total ítems</th><th class="num">Diferencia OC − ítems</th></tr></thead>
+                <tbody><tr><td><strong>ARS</strong></td><td class="num">2</td><td class="num">ARS 560.000,00</td><td class="num">6</td><td class="num">ARS 560.000,00</td><td class="num">ARS 0,00</td></tr></tbody>
+              </table>
+            </div>
+            <div class="seg-hint" style="margin-top:6px;">2 orden(es) de compra · 6 ítem(s). Los importes en distintas monedas no se suman entre sí.</div>
+            <p class="seg-hint" style="margin:8px 0 0;">El avance de ejecución y la facturación se calcularán cuando se incorpore la gestión de certificados.</p>
+          </div>
+        </div>
+
+        <div class="panel-section" id="sec-ordenes">
+          <div class="panel-section-header">Órdenes de Compra</div>
+          <div class="panel-section-body">
+            <div class="seg-table-wrap">
+              <table class="orders-table seg-select-table">
+                <thead><tr><th>N°</th><th>Orden de Compra</th><th>Revisión</th><th>Otorgada</th><th>Vencimiento</th><th>Moneda</th><th class="num">Monto OC</th><th class="num">Ítems</th><th class="num">Total ítems</th><th class="num">Diferencia</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+                <tbody>
+                  <tr class="selected"><td>1</td><td>OC-4501</td><td>1</td><td>2024-07-20</td><td>2025-01-31</td><td>ARS</td><td class="num">500.000,00</td><td class="num">5</td><td class="num">500.000,00</td><td class="num">0,00</td><td></td><td>—</td></tr>
+                  <tr><td>2</td><td>OC-4502</td><td>0</td><td>2024-09-02</td><td>2025-01-31</td><td>ARS</td><td class="num">60.000,00</td><td class="num">1</td><td class="num">60.000,00</td><td class="num">0,00</td><td></td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="seg-toolbar"><span class="seg-hint">Alta, edición y borrado de OC igual que hoy.</span>
+              <button class="seg-btn primary" type="button" onclick="toast('Sin cambios respecto de la pantalla actual.')">+ Agregar Orden de Compra</button></div>
+          </div>
+        </div>
+
+        <div class="panel-section" id="sec-items">
+          <div class="panel-section-header">Ítems contratados</div>
+          <div class="panel-section-body">
+            <div class="seg-hint">Igual que hoy: alta, edición y borrado de ítems por OC. Única regla nueva, del lado del servidor: un ítem con avance certificado no puede borrarse ni bajar su cantidad por debajo de lo certificado.</div>
+          </div>
+        </div>
+
+        <div class="panel-section" id="sec-anexos">
+          <div class="panel-section-header">Anexos y Certificados</div>
+          <div class="panel-section-body">
+            <p class="seg-hint" style="margin:0;">Pendiente de implementación: los anexos de OC/cotización y los certificados de avance se vincularán a este seguimiento (Centro de Costos) y a sus órdenes de compra o ítems.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CERTIFICADOS Y REAJUSTES: pantalla propia, se abre con el botón "Certificados" del seguimiento ================= -->
+    <section class="card seguimiento-panel hidden" id="vista-certificados">
+      <div class="seguimiento-header">
+        <div>
+          <h2>Certificados y reajustes</h2>
+          <p>SEG-0007 · CC-001 – Planta Industrial SMG · ACME S.A. · Cotización COT-2024-001</p>
+        </div>
+        <div class="seguimiento-actions">
+          <span class="seg-badge">SEG-0007</span>
+          <button class="seg-btn" id="btn-volver-seguimiento" type="button" onclick="verVista('lista')">← Volver al seguimiento</button>
+        </div>
+      </div>
+      <div class="seguimiento-main">
+        <div id="sin-panel" class="alert err hidden"><span class="ic">!</span><div><b>Sin acceso a certificados</b>
+          Su usuario no tiene el panel "Seguimiento de Cliente – Certificados". El seguimiento (cabecera, OC e ítems) sigue disponible.</div></div>
+        <div id="con-panel">
+          <div class="card">
+            <div class="card-h"><h2>Resumen de certificación</h2><span class="seg-hint">solo certificados emitidos</span></div>
+            <div class="card-b seg-table-wrap">
+              <table class="metrics-table">
+                <thead><tr><th>Moneda</th><th class="num">Certificado (ejecución)</th><th class="num">Saldo de ejecución</th><th class="num">Avance</th><th class="num">Reajustes reconocidos</th><th class="num">Emitidos</th></tr></thead>
+                <tbody><tr><td><strong>ARS</strong></td><td class="num">$ 170.000,00</td><td class="num">$ 390.000,00</td><td class="num">30,36 %</td><td class="num">$ 5.342,50</td><td class="num">2 de 6 previstos</td></tr></tbody>
+              </table>
+              <div class="seg-hint" style="margin-top:6px;">Los reajustes no consumen saldo de ejecución; se controlan contra la previsión.</div>
+            </div>
+          </div>
+              <div class="card" id="rj-card"></div>
+              <div class="card">
+                <div class="card-h"><h2>Saldos por orden de compra</h2>
+                  <span class="actions" style="align-items:center"><span class="pill">Modalidad: Por ítems</span>
+                    <span class="seg-hint">fija desde SEG-0007-CERT-001</span>
+                    <button class="btn sm" data-req="cambiar_modalidad" onclick="abrir('m-modalidad')">Cambiar modalidad</button></span></div>
+                <div class="card-b wrap">
+                  <table class="t">
+                    <thead><tr><th>OC</th><th>Rev.</th><th>Moneda</th><th class="r">Base</th><th class="r">Certificado</th><th class="r">Saldo</th><th class="r">Avance</th><th>Estado</th></tr></thead>
+                    <tbody>
+                      <tr><td>OC-4501</td><td>1</td><td>ARS ($)</td><td class="r">500.000,00</td><td class="r">170.000,00</td><td class="r">330.000,00</td><td class="r">34,00 %</td><td>Abierta</td></tr>
+                      <tr><td>OC-4502</td><td>0</td><td>ARS ($)</td><td class="r">60.000,00</td><td class="r">0,00</td><td class="r">60.000,00</td><td class="r">0,00 %</td><td>Abierta</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-h"><h2>Certificados</h2><button class="btn primary" data-req="certificar" onclick="abrirEditor(false)">+ Nuevo certificado</button></div>
+                <div class="card-b wrap">
+                  <table class="t">
+                    <thead><tr><th>N°</th><th>Fecha</th><th>Período</th><th>Alcance</th><th>Tipo</th><th class="r">Neto actual</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <tbody id="lista"></tbody>
+                  </table>
+                </div>
+              </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ADMINISTRACIÓN ================= -->
+    <section id="vista-admin" class="card vista-extra hidden">
+      <h1>Administración de usuarios</h1>
+      <p class="muted" style="margin-top:-6px">Pantalla del módulo Administración (administracion.html). Se muestra aquí solo para revisar los permisos nuevos.</p>
+      <div class="alert info"><span class="ic">i</span><div><b>Se configura en el módulo Administración</b>
+        Los permisos de certificados se asignan en la edición de usuario existente (módulo Administración), en sus tres pasos actuales:
+        módulo → panel → acciones. No hay pantallas de permisos en Operaciones. Solo se agregan el panel nuevo y sus nueve acciones.</div></div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-h"><h2>Editar usuario</h2><span class="muted">maria.gomez@smg.com</span></div>
+        <div class="card-b">
+          <div class="contrato" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+            <div class="field"><label>Nombre y apellido</label><input value="María Gómez"></div>
+            <div class="field"><label>Correo</label><input value="maria.gomez@smg.com"></div>
+            <div class="field"><label>Estado</label><select><option>ACTIVO</option><option>INACTIVO</option></select></div>
+            <div class="field"><label>Tipo de usuario</label><select><option>OPERADOR</option><option>SUPERVISOR</option><option>ADMINISTRADOR</option></select></div>
+          </div>
+          <details open class="card" style="margin:14px 0 8px"><summary class="card-h" style="cursor:pointer"><h2>1. Permisos por módulo</h2></summary>
+            <div class="card-b actions" style="gap:18px">
+              <label><input type="checkbox"> Logística</label><label><input type="checkbox"> Almacén</label>
+              <label><input type="checkbox" id="adm-mod-oper" checked onchange="renderPermisos()"> <b>Operaciones</b></label>
+              <label><input type="checkbox"> Compras</label><label><input type="checkbox"> Administración</label></div></details>
+          <details open class="card" style="margin-bottom:8px"><summary class="card-h" style="cursor:pointer"><h2>2. Paneles habilitados</h2></summary>
+            <div class="card-b" id="adm-paneles"></div></details>
+          <details open class="card" style="margin-bottom:0"><summary class="card-h" style="cursor:pointer"><h2>3. Acciones permitidas</h2></summary>
+            <div class="card-b" id="adm-acciones"></div></details>
+          <div class="actions" style="margin-top:12px;justify-content:flex-end">
+            <button class="btn" onclick="toast('Maqueta: se descartarían los cambios.')">Cancelar edición</button>
+            <button class="btn primary" onclick="toast('Maqueta: se guardaría el usuario (paneles_json y acciones_json).')">Guardar usuario</button></div>
+          <p class="muted" style="margin:10px 0 0">Asignar o quitar este panel no cambia el acceso actual a SEG, OC e ítems (dependen solo del módulo Operaciones).
+            Las acciones de usuario nominal no pueden ejecutarse con la cuenta de contingencia. En la maqueta, estas casillas definen el perfil "Personalizado".</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PDF ================= -->
+    <section id="vista-pdf" class="card vista-extra hidden">
+      <div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px"><h1 style="margin:0">Muestra del PDF – Certificado de Servicio SMG</h1><button class="seg-btn" type="button" onclick="verVista('certificados')">← Volver a certificados</button></div>
+      <div class="card"><div class="card-b actions">
+        <span class="lbl" style="align-self:center">Pesos ($):</span>
+        <button class="btn sm" data-pdf="items" onclick="pdf('items')">5 ítems</button>
+        <button class="btn sm" data-pdf="items20" onclick="pdf('items20')">20 ítems</button>
+        <button class="btn sm" data-pdf="items30" onclick="pdf('items30')">30 ítems (2 págs.)</button>
+        <button class="btn sm" data-pdf="global" onclick="pdf('global')">Global por SEG</button>
+        <button class="btn sm" data-pdf="borrador" onclick="pdf('borrador')">Borrador</button>
+        <button class="btn sm" data-pdf="anulado" onclick="pdf('anulado')">Anulado</button>
+        <button class="btn sm" data-pdf="reajuste" onclick="pdf('reajuste')">Con reajuste y retroactivo</button>
+        <button class="btn sm" data-pdf="reajuste30" onclick="pdf('reajuste30')">Reajuste, 30 ítems</button>
+        <button class="btn sm" data-pdf="negativo" onclick="pdf('negativo')">Reajuste negativo</button>
+      </div><div class="card-b actions" style="border-top:1px solid var(--line)">
+        <span class="lbl" style="align-self:center">Otras monedas:</span>
+        <button class="btn sm" data-pdf="usd" onclick="pdf('usd')">US$ · 5 ítems</button>
+        <button class="btn sm" data-pdf="usdreajuste" onclick="pdf('usdreajuste')">US$ · reajuste, 20 ítems</button>
+        <button class="btn sm" data-pdf="exceso" onclick="pdf('exceso')">US$ · exceso autorizado</button>
+        <button class="btn sm" data-pdf="eurglobal" onclick="pdf('eurglobal')">€ · global con reajuste</button>
+        <button class="btn sm" data-pdf="eurborrador" onclick="pdf('eurborrador')">€ · borrador 30 ítems</button>
+      </div></div>
+      <div class="pdf-wrap"><iframe id="pdf-hoja" title="Muestra del PDF"></iframe></div>
+      <p class="pdf-nota">Se muestran los PDF reales generados con el formato aprobado (maquetas/pdf_muestras). Datos ficticios.
+        Los importes llevan el símbolo de la moneda de la OC: $ para pesos (ARS), US$ para dólares (USD) y € para euros (EUR).
+        <a id="pdf-abrir" target="_blank" rel="noopener">Abrir en otra pestaña</a></p>
+    </section>
+  </main>
+</div>
+
+<!-- ================= EDITOR (modal grande) ================= -->
+<div class="modal-bg" id="m-editor"><div class="modal">
+  <div class="modal-h"><h3 id="ed-titulo">Certificado de Servicio – borrador</h3><button class="close" onclick="cerrar('m-editor')">×</button></div>
+  <div class="modal-b">
+    <div class="card">
+      <div class="card-h"><h2>Datos del contrato</h2></div>
+      <div class="card-b contrato">
+        <div class="col">
+          <div><div class="lbl">Obra</div><div class="val">Planta Industrial SMG</div></div>
+          <div><div class="lbl">Cliente</div><div class="val">ACME S.A.</div></div>
+          <div><div class="lbl">Centro de Costos</div><div class="val">CC-001 - Planta Industrial</div></div>
+          <div><div class="lbl">N° Cotización</div><div class="val">COT-2024-001</div></div>
+        </div>
+        <div class="col">
+          <div class="field"><label>N° Orden de Compra</label>
+            <select id="ed-oc"><option value="0">OC-4501 Rev. 1</option><option value="1">OC-4502 Rev. 0</option></select></div>
+          <div><div class="lbl">Project manager</div><div class="val">Juan Pérez</div></div>
+          <div><div class="lbl">Localización</div><div class="val">Parque Industrial Pilar</div></div>
+          <div><div class="lbl">Provincia</div><div class="val">Buenos Aires</div></div>
+        </div>
+        <div class="col">
+          <div><div class="lbl">Monto de OC</div><div class="val" id="ed-monto">$ 500.000,00</div></div>
+        </div>
+        <div class="col">
+          <div class="field"><label>Alcance</label>
+            <div class="actions"><span class="pill" id="ed-alc-pill">OC</span>
+              <select id="ed-alc"><option value="OC">Una OC</option><option value="SEG">SEG completo</option></select></div></div>
+          <div><div class="lbl">Período a certificar</div><div class="val">Octubre 2024</div></div>
+          <div class="actions" style="gap:14px">
+            <div class="field"><label>Desde</label><input type="date" value="2024-10-01"></div>
+            <div class="field"><label>Hasta</label><input type="date" value="2024-10-31"></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="field"><label>Certificado N° <span class="muted">(estimado)</span></label><input value="0004" disabled title="Se asigna al emitir"></div>
+          <div class="field"><label>Fecha</label><input type="date" value="2024-10-16"></div>
+          <div class="field"><label>Tipo</label><select id="ed-tipo"><option value="PARCIAL">Parcial</option><option value="FINAL">Final</option></select></div>
+          <div class="field"><label>Reemplaza a</label><select id="ed-reemp"><option value="">—</option><option>SEG-0007-CERT-002 (anulado)</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Detalle del certificado</h2>
+        <span class="actions" style="align-items:center">
+          <span class="muted">Moneda:</span><span class="pill" title="La define la OC; un certificado no mezcla monedas">ARS – Peso argentino ($)</span>
+          <button class="btn" onclick="cargarDesdeOC()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z M14 3v5h5"/></svg>Cargar desde OC</button>
+        </span></div>
+      <div class="card-b">
+        <div class="actions" style="justify-content:space-between;margin-bottom:10px">
+          <div class="seg-toggle" id="ed-mod"><button data-mod="ITEMS" class="on">Por ítems</button><button data-mod="GLOBAL">Global</button></div>
+          <span class="muted" id="ed-mod-nota">La modalidad del SEG queda fija al emitir el primer certificado <span class="tag">en la maqueta se puede alternar</span></span>
+        </div>
+        <div class="wrap"><table class="t" id="ed-tabla"></table></div>
+        <div id="ed-reparto" class="alert info hidden" style="margin-top:10px"><span class="ic">i</span><div>
+          <b>Repartir total entre las OC (proporcional al saldo)</b>
+          <span class="actions" style="margin-top:6px"><input class="num-in" style="width:130px" id="ed-total" type="number" step="0.01" placeholder="Importe total">
+          <button class="btn sm" onclick="repartir()">Repartir</button><span class="muted">Luego cada importe puede editarse.</span></span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Reajustes del certificado</h2>
+        <span class="actions"><button class="btn sm" onclick="abrirIndices()">Índices mensuales</button><button class="btn sm" onclick="abrirFormula()">Fórmula polinómica</button></span></div>
+      <div class="card-b" id="ed-reaj"></div>
+    </div>
+
+    <div class="trio">
+      <div class="card">
+        <div class="card-h"><h2>Descuentos</h2><button class="btn sm" onclick="agregarDescuento()">+ Agregar descuento</button></div>
+        <div class="card-b"><table class="t" id="ed-desc"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Totales del período</h2></div>
+        <div class="card-b" id="ed-totales"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Información adicional</h2></div>
+        <div class="card-b field"><label>Observaciones</label><textarea rows="5" placeholder="Ingrese observaciones del certificado..."></textarea></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;margin-bottom:0">
+      <div class="card-h"><h2>Estado y acciones</h2></div>
+      <div class="card-b estado">
+        <div id="ed-avisos" style="flex:1;min-width:300px"></div>
+        <button class="btn lg" data-req="certificar" onclick="guardarBorrador()">💾 Guardar borrador</button>
+        <button class="btn lg" onclick="recalcular()">🧮 Calcular</button>
+        <button class="btn lg" onclick="cerrar('m-editor'); pdf('borrador'); verVista('pdf')">Vista previa PDF</button>
+        <button class="btn lg primary" data-req="emitir_certificado" onclick="abrirEmitir(4)">Emitir certificado</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ================= EMITIR ================= -->
+<div class="modal-bg" id="m-emitir"><div class="modal sm">
+  <div class="modal-h"><h3>Emitir certificado</h3><button class="close" onclick="cerrar('m-emitir')">×</button></div>
+  <div class="modal-b" id="em-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-emitir')">Cancelar</button><button class="btn primary" id="em-ok" onclick="emitir()">Emitir certificado</button></div>
+</div></div>
+
+<!-- ================= ANULAR ================= -->
+<div class="modal-bg" id="m-anular"><div class="modal sm">
+  <div class="modal-h"><h3 id="an-titulo">Anular certificado</h3><button class="close" onclick="cerrar('m-anular')">×</button></div>
+  <div class="modal-b" id="an-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-anular')">Cancelar</button><button class="btn danger" id="an-ok" onclick="anular()">Anular certificado</button></div>
+</div></div>
+
+<!-- ================= DETALLE ================= -->
+<div class="modal-bg" id="m-ver"><div class="modal sm" style="width:min(820px,100%)">
+  <div class="modal-h"><h3 id="ver-titulo">Certificado</h3><button class="close" onclick="cerrar('m-ver')">×</button></div>
+  <div class="modal-b" id="ver-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-ver')">Cerrar</button></div>
+</div></div>
+
+<!-- ================= MODALIDAD ================= -->
+<div class="modal-bg" id="m-modalidad"><div class="modal sm">
+  <div class="modal-h"><h3>Cambiar modalidad de certificación</h3><button class="close" onclick="cerrar('m-modalidad')">×</button></div>
+  <div class="modal-b">
+    <div class="alert info"><span class="ic">i</span><div>No puede haber borradores abiertos. No se puede pasar de Global a Por ítems si hay certificados válidos.
+      Pasar de Por ítems a Global conserva lo certificado como acumulado de cada OC.</div></div>
+    <div class="field" style="margin-top:10px"><label>Modalidad actual</label><input value="Por ítems" disabled></div>
+    <div class="field" style="margin-top:8px"><label>Nueva modalidad</label><select><option>Global</option></select></div>
+    <div class="field" style="margin-top:8px"><label>Justificación (mín. 20 caracteres)</label><textarea rows="3"></textarea></div>
+    <div class="alert err" style="margin-top:10px"><span class="ic">!</span><div><b>Hay 1 borrador abierto (Octubre 2024)</b>Emítalo o elimínelo antes de cambiar la modalidad.</div></div>
+  </div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-modalidad')">Cancelar</button><button class="btn primary" disabled>Cambiar modalidad</button></div>
+</div></div>
+
+<!-- ================= FÓRMULA POLINÓMICA ================= -->
+<div class="modal-bg" id="m-formula"><div class="modal md">
+  <div class="modal-h"><h3>Fórmula polinómica de reajuste – SEG-0007</h3><button class="close" onclick="cerrar('m-formula')">×</button></div>
+  <div class="modal-b" id="fo-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-formula')">Cerrar</button></div>
+</div></div>
+
+<!-- ================= VALIDACIÓN CONTRACTUAL ================= -->
+<div class="modal-bg" id="m-validar" style="z-index:110"><div class="modal sm">
+  <div class="modal-h"><h3>Validar fórmula contra el contrato</h3><button class="close" onclick="cerrar('m-validar')">×</button></div>
+  <div class="modal-b" id="va-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-validar')">Cancelar</button><button class="btn primary" id="va-btn" onclick="confirmarValidacion()">Registrar validación</button></div>
+</div></div>
+
+<!-- ================= ÍNDICES MENSUALES ================= -->
+<div class="modal-bg" id="m-indices"><div class="modal md">
+  <div class="modal-h"><h3>Índices mensuales – SEG-0007</h3><button class="close" onclick="cerrar('m-indices')">×</button></div>
+  <div class="modal-b" id="ix-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-indices')">Cerrar</button></div>
+</div></div>
+
+<!-- ================= CONFIGURACIÓN DEL CONTRATO ================= -->
+<div class="modal-bg" id="m-contrato"><div class="modal md">
+  <div class="modal-h"><h3>Configuración económica del contrato – SEG-0007</h3><button class="close" onclick="cerrar('m-contrato')">×</button></div>
+  <div class="modal-b" id="co-cuerpo"></div>
+  <div class="modal-f"><button class="btn" onclick="cerrar('m-contrato')">Cerrar</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const fmt = (n) => (n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pc = (n) => `${fmt(n)} %`;
+// Se guarda el código ISO de la OC (ARS, USD, EUR); en pantalla y en el PDF se muestra el símbolo.
+const SIMBOLOS = { ARS: '$', USD: 'US$', EUR: '€' };
+const MONEDA = 'ARS', SIM = SIMBOLOS[MONEDA] || MONEDA;
+const mon = (n) => `${SIM} ${fmt(n)}`;
+const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const $ = (id) => document.getElementById(id);
+function toast(texto) { const t = $('toast'); t.textContent = texto; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => { t.style.display = 'none'; }, 3200); }
+
+/* ---------------- Permisos ---------------- */
+const ACCIONES = [
+  ['consultar', 'Consultar certificados'], ['certificar', 'Crear y editar borradores'],
+  ['emitir_certificado', 'Emitir certificados'], ['anular_certificado', 'Anular certificados'],
+  ['autorizar_exceso', 'Autorizar exceso de saldo en certificados'], ['cambiar_modalidad', 'Cambiar modalidad de certificación'],
+  ['configurar_reajuste', 'Configurar fórmula de reajuste y previsión'], ['cargar_indices', 'Cargar y corregir índices de reajuste'],
+  ['incorporar_historico', 'Incorporar acumulado inicial y certificados anteriores'],
+];
+const NOMINALES = new Set(['emitir_certificado', 'anular_certificado', 'autorizar_exceso', 'cambiar_modalidad', 'configurar_reajuste', 'cargar_indices', 'incorporar_historico']);
+const ROLES = {
+  operador: ['consultar', 'certificar', 'emitir_certificado', 'anular_certificado', 'cambiar_modalidad', 'cargar_indices'],
+  autorizante: ACCIONES.map((a) => a[0]), consulta: ['consultar'], contingencia: ACCIONES.map((a) => a[0]),
+  sinpanel: [], personalizado: ['consultar', 'certificar'],
+};
+const rol = () => $('rol').value;
+const puede = (a) => ROLES[rol()].includes(a) && !(rol() === 'contingencia' && NOMINALES.has(a));
+const motivoNo = (a) => rol() === 'contingencia' && NOMINALES.has(a)
+  ? 'Requiere un usuario nominal: la cuenta de contingencia no puede hacerlo'
+  : `Su usuario no tiene el permiso "${(ACCIONES.find((x) => x[0] === a) || [, a])[1]}"`;
+function boton(texto, accion, onclick, clase = '') {
+  const ok = !accion || puede(accion);
+  return `<button class="btn sm ${clase}" ${ok ? '' : `disabled title="${motivoNo(accion)}"`} onclick="${onclick}">${texto}</button>`;
+}
+
+/* ---------------- Datos ficticios ---------------- */
+const OCS = [
+  { oc: 'OC-4501', rev: 'Rev. 1', monto: 500000, items: [
+    { n: 1, d: 'Movimientos de suelo', u: 'm3', c: 1000, p: 50, qa: 400 },
+    { n: 2, d: 'Hormigón armado', u: 'm3', c: 800, p: 150, qa: 320 },
+    { n: 3, d: 'Estructura metálica', u: 'tn', c: 50, p: 2000, qa: 20 },
+    { n: 4, d: 'Instalaciones eléctricas', u: 'gl', c: 1, p: 80000, qa: 0.4 },
+    { n: 5, d: 'Terminaciones', u: 'm2', c: 2000, p: 75, qa: 400 } ] },
+  { oc: 'OC-4502', rev: 'Rev. 0', monto: 60000, items: [
+    { n: 1, d: 'Obras complementarias', u: 'gl', c: 1, p: 60000, qa: 0 } ] },
+];
+OCS.forEach((o) => { o.cert = r2(o.items.reduce((s, i) => s + i.qa * i.p, 0)); });
+let CERTS = [
+  { id: 4, num: null, fecha: '—', per: 'Octubre 2024', alc: 'OC-4501', tipo: 'Parcial', neto: 55000, est: 'BORRADOR' },
+  { id: 3, num: 3, fecha: '30/09/2024', per: 'Septiembre 2024', alc: 'OC-4501', tipo: 'Parcial', neto: 90000, est: 'EMITIDO', reemplaza: 2 },
+  { id: 2, num: 2, fecha: '28/09/2024', per: 'Septiembre 2024', alc: 'OC-4501', tipo: 'Parcial', neto: 95000, est: 'ANULADO', motivo: 'Importe de hormigón mal cargado' },
+  { id: 1, num: 1, fecha: '31/08/2024', per: 'Agosto 2024', alc: 'OC-4501', tipo: 'Parcial', neto: 80000, est: 'EMITIDO' },
+];
+const numTxt = (n) => (n ? `SEG-0007-CERT-${String(n).padStart(3, '0')}` : 'Borrador');
+const ultimoEmitido = () => Math.max(...CERTS.filter((c) => c.est === 'EMITIDO').map((c) => c.num));
+
+/* ---------------- Listado ---------------- */
+function renderLista() {
+  $('lista').innerHTML = CERTS.map((c) => {
+    let acc = boton('Ver', 'consultar', `ver(${c.id})`);
+    if (c.est === 'BORRADOR') {
+      acc += boton('Editar', 'certificar', 'abrirEditor(true)') + boton('Vista previa', 'consultar', "pdf('borrador');verVista('pdf')")
+        + boton('Emitir', 'emitir_certificado', `abrirEmitir(${c.id})`, 'primary') + boton('Eliminar', 'certificar', `eliminar(${c.id})`, 'danger');
+    } else {
+      acc += boton('PDF', 'consultar', "pdf('items');verVista('pdf')");
+      if (c.est === 'EMITIDO') {
+        acc += c.num !== ultimoEmitido() && puede('anular_certificado')
+          ? `<button class="btn sm danger" disabled title="Primero anule ${numTxt(ultimoEmitido())}: solo se anula el último emitido de cada OC">Anular</button>`
+          : boton('Anular', 'anular_certificado', `abrirAnular(${c.id})`, 'danger');
+      } else {
+        acc += boton('Copia sellada', 'consultar', "pdf('anulado');verVista('pdf')") + boton('Crear reemplazo', 'certificar', 'abrirEditor(false, true)');
+      }
+    }
+    const extra = c.reemplaza ? ` <span class="muted">(reemplaza a ${numTxt(c.reemplaza)})</span>` : '';
+    return `<tr><td>${numTxt(c.num)}${extra}</td><td>${c.fecha}</td><td>${c.per}</td><td>${c.alc}</td><td>${c.tipo}</td>
+      <td class="r">${fmt(c.neto)}</td><td><span class="badge b-${c.est}">${c.est}</span></td><td><div class="actions">${acc}</div></td></tr>`;
+  }).join('');
+}
+function aplicarRol() {
+  const sin = rol() === 'sinpanel';
+  $('con-panel').classList.toggle('hidden', sin);
+  $('sin-panel').classList.toggle('hidden', !sin);
+  $('btn-certificados').classList.toggle('hidden', sin);   // sin el panel, el botón no se muestra
+  document.querySelectorAll('[data-req]').forEach((b) => { const ok = puede(b.dataset.req); b.disabled = !ok; b.title = ok ? '' : motivoNo(b.dataset.req); });
+  renderLista(); renderPermisos(); renderRJResumen();
+}
+let panelCertificados = true;
+function renderPermisos() {
+  const modulo = $('adm-mod-oper').checked;
+  $('adm-paneles').innerHTML = modulo ? `<div class="lbl" style="margin-bottom:6px">OPERACIONES</div><div class="actions" style="gap:18px">
+      <label><input type="checkbox" checked> Dashboard</label><label><input type="checkbox"> Carga de Partes Diarios</label>
+      <label><input type="checkbox" ${panelCertificados ? 'checked' : ''} onchange="panelCertificados=this.checked; renderPermisos()"> <b>Seguimiento de Cliente – Certificados</b> <span class="badge b-BORRADOR">nuevo</span></label></div>`
+    : '<span class="muted">Seleccione módulo(s) para configurar paneles.</span>';
+  $('adm-acciones').innerHTML = modulo && panelCertificados ? `<div class="lbl" style="margin-bottom:6px">operaciones / seguimiento_cliente</div>
+      <div class="actions" style="gap:10px 22px">${ACCIONES.map(([k, t]) => `<label title="${k}"><input type="checkbox" ${ROLES.personalizado.includes(k) ? 'checked' : ''}
+        onchange="togglePermiso('${k}', this.checked)"> ${['autorizar_exceso', 'configurar_reajuste', 'cargar_indices', 'incorporar_historico'].includes(k) ? `<b>${t}</b>` : t}${NOMINALES.has(k) ? ' <span class="muted">(usuario nominal)</span>' : ''}</label>`).join('')}</div>`
+    : '<span class="muted">Seleccione paneles para configurar acciones.</span>';
+  ROLES.personalizado = modulo && panelCertificados ? ROLES.personalizado : [];
+}
+function togglePermiso(k, on) {
+  ROLES.personalizado = on ? [...new Set([...ROLES.personalizado, k])] : ROLES.personalizado.filter((x) => x !== k);
+  if (rol() === 'personalizado') aplicarRol();
+  toast('Maqueta: permiso actualizado para el perfil "Personalizado".');
+}
+function verVista(v) {
+  ['lista', 'certificados', 'admin', 'pdf'].forEach((x) => $('vista-' + x).classList.toggle('hidden', x !== v));
+  document.querySelectorAll('.menu-btn[data-vista]').forEach((b) => b.classList.toggle('active', v !== 'admin'));
+  $('crumbs').innerHTML = v === 'admin' ? 'Administración<i>›</i>Usuarios<i>›</i><b>Editar usuario</b>'
+    : `Operaciones<i>›</i>Seguimiento de Cliente<i>›</i>SEG-0007${v === 'certificados' ? '<i>›</i><b>Certificados</b>' : v === 'pdf' ? '<i>›</i>Certificados<i>›</i><b>PDF</b>' : ''}`;
+  window.scrollTo(0, 0);
+}
+function irA(id) { verVista($('vista-certificados').contains($(id)) ? 'certificados' : 'lista'); const el = $(id); if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+const abrir = (id) => $(id).classList.add('open');
+const cerrar = (id) => $(id).classList.remove('open');
+
+/* ---------------- Editor (cálculo simulado) ---------------- */
+let modalidad = 'ITEMS', carga = {}, descuentos = [];
+const DESC_EJEMPLO = [{ concepto: 'RECUPERO_ANTICIPO', descripcion: 'Anticipo OC-4501', base: 'MANUAL', pct: null, importe: 5000 },
+  { concepto: 'FONDO_REPARO', descripcion: '5 % sobre ejecución reajustada', base: 'EJECUCION_REAJUSTADA', pct: 5, importe: null }];
+const CARGA_EJEMPLO = { '0-1': { q: 200 }, '0-2': { q: 80 }, '0-3': { q: 5 }, '0-4': { q: 0.1 }, '0-5': { q: 200 } };
+function abrirEditor(editar, reemplazo = false) {
+  $('ed-titulo').textContent = editar ? 'Certificado de Servicio – borrador Octubre 2024' : 'Nuevo certificado de servicio';
+  $('ed-reemp').selectedIndex = reemplazo ? 1 : 0;
+  $('ed-oc').value = '0'; $('ed-alc').value = 'OC'; $('ed-tipo').value = 'PARCIAL';
+  setModalidad('ITEMS', false);
+  carga = editar ? JSON.parse(JSON.stringify(CARGA_EJEMPLO)) : {};
+  descuentos = editar ? DESC_EJEMPLO.map((d) => ({ ...d })) : [];
+  renderEditor(); abrir('m-editor');
+}
+function setModalidad(m, render = true) {
+  modalidad = m; carga = {};
+  document.querySelectorAll('#ed-mod button').forEach((b) => b.classList.toggle('on', b.dataset.mod === m));
+  if (render) renderEditor();
+}
+function lineasAlcance() {
+  const ocs = $('ed-alc').value === 'OC' ? [Number($('ed-oc').value)] : [0, 1];
+  if (modalidad === 'GLOBAL') return ocs.map((i) => ({ key: `${i}`, oc: i, n: i + 1, d: `Monto global ${OCS[i].oc} ${OCS[i].rev}`, u: 'gl', c: null, p: null, base: OCS[i].monto, ia: OCS[i].cert }));
+  return ocs.flatMap((i) => OCS[i].items.map((it) => ({ key: `${i}-${it.n}`, oc: i, ...it, base: r2(it.c * it.p), ia: r2(it.qa * it.p) })));
+}
+function calcular() {
+  const final = $('ed-tipo').value === 'FINAL';
+  return lineasAlcance().map((l) => {
+    const e = carga[l.key] || {};
+    let qp = null, qacc = null, periodo;
+    if (modalidad === 'ITEMS') {
+      if (final) { qacc = e.f ?? l.qa; qp = r2(qacc - l.qa); } else { qp = e.q ?? (e.pct != null ? r2(l.c * e.pct / 100) : 0); qacc = r2(l.qa + qp); }
+      periodo = r2((qacc === l.c ? l.base : r2(qacc * l.p)) - l.ia);
+    } else {
+      periodo = final ? r2((e.f ?? l.ia) - l.ia) : (e.i ?? (e.pct != null ? r2(l.base * e.pct / 100) : 0));
+    }
+    const acum = r2(l.ia + periodo);
+    return { ...l, qp, qacc, periodo, acum, exceso: Math.max(0, r2(acum - Math.max(l.base, l.ia))) };
+  });
+}
+function setCarga(key, campo, valor) {
+  carga[key] = { ...(carga[key] || {}) };
+  if (valor === '') delete carga[key][campo]; else carga[key][campo] = Number(valor);
+  if (campo === 'q' || campo === 'i') delete carga[key].pct;
+  if (campo === 'pct') { delete carga[key].q; delete carga[key].i; }
+  renderEditor();
+}
+function renderEditor() {
+  const final = $('ed-tipo').value === 'FINAL', alc = $('ed-alc').value, items = modalidad === 'ITEMS';
+  $('ed-alc-pill').textContent = alc;
+  $('ed-oc').disabled = alc === 'SEG';
+  $('ed-monto').textContent = mon(alc === 'OC' ? OCS[Number($('ed-oc').value)].monto : OCS[0].monto + OCS[1].monto);
+  $('ed-reparto').classList.toggle('hidden', !(modalidad === 'GLOBAL' && alc === 'SEG' && !final));
+  const lineas = calcular();
+  const base = r2(lineas.reduce((s, l) => s + l.base, 0));
+  const sum = (k) => r2(lineas.reduce((s, l) => s + l[k], 0));
+  const pct = (v, b) => (b ? pc(r2(v / b * 100)) : '-');
+  const cant = (v) => (v == null ? '—' : fmt(v));
+  const inQ = (l, campo, valor, paso = 'any') => `<input class="num-in" type="number" step="${paso}" value="${valor ?? ''}" onchange="setCarga('${l.key}','${campo}',this.value)">`;
+  let ocActual = null;
+  const filas = lineas.map((l) => {
+    const e = carga[l.key] || {};
+    const sub = alc === 'SEG' && items && l.oc !== ocActual ? `<tr class="sub"><td colspan="18">${OCS[l.oc].oc} ${OCS[l.oc].rev}</td></tr>` : '';
+    ocActual = l.oc;
+    // En un certificado FINAL se carga el acumulado; en uno PARCIAL, lo actual (cantidad/importe o %).
+    const acumCant = final && items ? inQ(l, 'f', e.f ?? l.qa) : cant(l.qacc);
+    const acumImp = final && !items ? inQ(l, 'f', e.f ?? l.ia, '0.01') : fmt(l.acum);
+    const actCant = !final && items ? inQ(l, 'q', e.q ?? (e.pct != null ? null : '')) : cant(l.qp);
+    const actImp = !final && !items ? inQ(l, 'i', e.i ?? '', '0.01') : fmt(l.periodo);
+    const actAv = !final ? `<input class="num-in" style="width:76px" type="number" step="any" title="Carga por porcentaje" placeholder="${fmt(r2(l.periodo / l.base * 100))} %" value="${e.pct ?? ''}" onchange="setCarga('${l.key}','pct',this.value)">` : pct(l.periodo, l.base);
+    return `${sub}<tr class="${l.exceso > 0 ? 'exceso' : ''}" title="${l.exceso > 0 ? 'Excede el saldo en ' + mon(l.exceso) : ''}">
+      <td class="c">${l.n}</td><td>${l.d}</td><td class="c">${l.u}</td><td class="r">${cant(l.c)}</td><td class="r">${l.p == null ? '—' : fmt(l.p)}</td>
+      <td class="r">${fmt(l.base)}</td><td class="r">${pct(l.base, base)}</td>
+      <td class="r">${acumCant}</td><td class="r">${acumImp}</td><td class="r">${pct(l.acum, l.base)}</td>
+      <td class="r">${cant(items ? l.qa : null)}</td><td class="r">${fmt(l.ia)}</td><td class="r">${pct(l.ia, l.base)}</td>
+      <td class="r">${actCant}</td><td class="r">${actImp}</td><td class="r">${actAv}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis">${e.obs ? `<span class="muted" title="${e.obs}">${e.obs}</span>` : ''}</td>
+      <td class="c"><button class="icon-btn" title="Observación de la línea" onclick="obsLinea('${l.key}')">💬</button></td></tr>`;
+  }).join('');
+  $('ed-tabla').innerHTML = `<thead>
+      <tr class="g"><th rowspan="2">Item</th><th rowspan="2">Descripción</th><th colspan="5">Valores según OC</th><th colspan="3">${final ? 'Acumulado final (carga)' : 'Acumulado'}</th>
+        <th colspan="3">Anterior</th><th colspan="3">${final ? 'Actual' : 'Actual (carga)'}</th><th rowspan="2" colspan="2">Obs.</th></tr>
+      <tr><th>Unidad</th><th>Cantidad</th><th>Precio unitario</th><th>Precio total</th><th>%</th><th>Cantidad</th><th>Importe</th><th>Avance</th>
+        <th>Cantidad</th><th>Importe</th><th>Avance</th><th>Cantidad</th><th>Importe</th><th>Avance</th></tr></thead>
+    <tbody>${filas}
+      <tr class="tot"><td></td><td>Totales</td><td class="c">-</td><td class="c">-</td><td class="c">-</td><td class="r">${fmt(base)}</td><td class="r">100,00 %</td>
+        <td class="c">-</td><td class="r">${fmt(sum('acum'))}</td><td class="r">${pct(sum('acum'), base)}</td>
+        <td class="c">-</td><td class="r">${fmt(sum('ia'))}</td><td class="r">${pct(sum('ia'), base)}</td>
+        <td class="c">-</td><td class="r">${fmt(sum('periodo'))}</td><td class="r">${pct(sum('periodo'), base)}</td><td colspan="2"></td></tr></tbody>`;
+  const neto = sum('periodo'), exceso = sum('exceso'), rj = calcRJ(neto, descuentos), desc = rj.descTot;
+  renderDescuentos(rj); renderReajusteEditor(rj);
+  $('ed-totales').innerHTML = `<div class="kv"><span>Neto actual <span class="muted">(ejecución a precio OC)</span></span><b>${fmt(neto)}</b></div>
+    <div class="kv"><span>Reajuste del período <span class="muted">${rj.coef ? '(coef. ' + fmtC(rj.coef, 4) + ')' : ''}</span></span><b>${fmt(rj.reajPer)}</b></div>
+    <div class="kv"><span>Diferencias retroactivas</span><b>${fmt(rj.retroTot)}</b></div>
+    <div class="kv"><span>Descuentos netos</span><b>${fmt(desc)}</b></div>
+    <div class="kv final"><span>Total a facturar (neto, sin IVA)</span><span>${fmt(rj.total)}</span></div>
+    <div class="muted" style="margin-top:8px">El IVA se determina al facturar. El reajuste no consume el saldo de ejecución de la OC.</div>`;
+  const lineasExc = lineas.filter((l) => l.exceso > 0).length;
+  const avisos = [];
+  if (lineasExc) avisos.push(['', 'Borrador con exceso de saldo', `Hay ${lineasExc} línea(s) con importe superior al saldo disponible (${mon(exceso)}). Para emitirlo se requiere el permiso "Autorizar exceso de saldo en certificados" y una justificación.`]);
+  if (!final && neto <= 0) avisos.push(['err', 'Sin avance en el período', 'Un certificado parcial debe tener importe del período mayor que cero.']);
+  if (desc > r2(neto + rj.reajPer + rj.retroTot)) avisos.push(['err', 'Descuentos superiores al subtotal', 'Los descuentos no pueden superar la ejecución más los reajustes.']);
+  if (rj.falta) avisos.push(['err', 'Faltan índices del período', `No hay valor para ${rj.falta} en ${MESES[PER_BORRADOR]}. Cargue un índice provisorio o definitivo.`]);
+  if (rj.provisorios.length) avisos.push(['', 'Índices provisorios', `${rj.provisorios.join(', ')}: puede emitirse; cuando se cargue el valor definitivo, la diferencia quedará como retroactivo pendiente.`]);
+  if (rj.prevision.excede) avisos.push(['', 'Supera la previsión de reajustes', `Los reajustes acumulados llegarían a ${mon(rj.prevision.nuevo)} (previsión ${mon(rj.prevision.monto)}). Emitirlo requiere "Autorizar exceso" y una justificación.`]);
+  if (final && sum('acum') < base) avisos.push(['', 'Saldo no ejecutado', `El certificado final cierra la OC dejando ${mon(r2(base - sum('acum')))} sin ejecutar.`]);
+  if (!avisos.length) avisos.push(['info', 'Borrador sin observaciones', 'Hay 1 borrador más en este seguimiento: los borradores no reservan saldo y se revalidan al emitir.']);
+  $('ed-avisos').innerHTML = avisos.map(([c, t, d]) => `<div class="alert ${c}"><span class="ic">${c === 'info' ? 'i' : '!'}</span><div><b>${t}</b>${d}</div></div>`).join('');
+  window.calculoActual = { neto, desc, exceso, lineas, rj };
+}
+function renderDescuentos(rj) {
+  const opc = (lista, sel) => lista.map(([k, t]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${t}</option>`).join('');
+  $('ed-desc').innerHTML = `<thead><tr><th style="text-align:left">Concepto</th><th style="text-align:left">Descripción</th><th style="text-align:left">Base</th><th class="r">%</th><th class="r">Importe</th><th></th></tr></thead><tbody>`
+    + (descuentos.length ? descuentos.map((d, i) => `<tr>
+        <td><select onchange="setDesc(${i},'concepto',this.value)">${opc(Object.entries(CONCEPTOS_DESC), d.concepto)}</select></td>
+        <td><input style="width:100%;min-width:90px" value="${d.descripcion || ''}" placeholder="${d.concepto === 'OTRO' ? 'Obligatoria' : ''}" onchange="descuentos[${i}].descripcion=this.value"></td>
+        <td><select title="Base de cálculo" onchange="setDesc(${i},'base',this.value)">${opc(Object.entries(BASES_DESC), d.base)}</select></td>
+        <td class="r">${d.base === 'MANUAL' ? '—' : `<input class="num-in" style="width:52px" type="number" step="0.01" value="${d.pct ?? ''}" onchange="setDesc(${i},'pct',this.value)">`}</td>
+        <td class="r">${d.base === 'MANUAL' ? `<input class="num-in" type="number" step="0.01" value="${d.importe ?? ''}" onchange="setDesc(${i},'importe',this.value)">`
+          : `<span title="${fmtC(d.pct || 0, 2)} % de ${mon(rj.bases[d.base])}">${fmt(rj.desc[i])}</span>`}</td>
+        <td class="c"><button class="icon-btn" title="Quitar" onclick="descuentos.splice(${i},1); renderEditor()">🗑</button></td></tr>`).join('')
+      : '<tr><td colspan="6" class="muted">Sin descuentos.</td></tr>')
+    + `<tr class="tot"><td colspan="4">Total descuentos</td><td class="r">${fmt(rj.descTot)}</td><td></td></tr></tbody>`;
+}
+function setDesc(i, campo, valor) {
+  const d = descuentos[i];
+  if (campo === 'concepto') { d.concepto = valor; d.base = RJ.reglasDesc[valor].base; d.pct = RJ.reglasDesc[valor].pct; }
+  else d[campo] = campo === 'base' ? valor : (valor === '' ? null : Number(valor));
+  renderEditor();
+}
+function agregarDescuento() { const r = RJ.reglasDesc.RECUPERO_ANTICIPO; descuentos.push({ concepto: 'RECUPERO_ANTICIPO', descripcion: '', base: r.base, pct: r.pct, importe: null }); renderEditor(); }
+function obsLinea(key) { const t = prompt('Observación de la línea (se imprime en el PDF):', (carga[key] || {}).obs || ''); if (t !== null) { carga[key] = { ...(carga[key] || {}), obs: t }; renderEditor(); } }
+function cargarDesdeOC() { carga = {}; renderEditor(); toast('Maqueta: se recargaron las líneas con los ítems y saldos vigentes de la OC.'); }
+function recalcular() { renderEditor(); toast('Maqueta: en la versión real "Calcular" consulta al servidor (POST /calcular) y muestra sus importes y validaciones.'); }
+function guardarBorrador() { cerrar('m-editor'); toast('Maqueta: el borrador se guardaría y quedaría en la lista con estado BORRADOR.'); }
+function repartir() {
+  const total = Number($('ed-total').value) || 0, ls = lineasAlcance();
+  const saldos = ls.map((l) => Math.max(0, l.base - l.ia)), suma = saldos.reduce((a, b) => a + b, 0);
+  if (total > suma) { toast(`Supera el saldo disponible (${mon(suma)}). Para registrar un exceso, cargue cada OC manualmente.`); return; }
+  const cent = Math.round(total * 100), asign = saldos.map((s) => Math.floor(cent * s / suma));
+  for (let i = 0, resto = cent - asign.reduce((a, b) => a + b, 0); resto > 0; i++, resto--) asign[i % asign.length]++;
+  ls.forEach((l, i) => { carga[l.key] = { i: asign[i] / 100 }; });
+  renderEditor();
+}
+$('ed-mod').addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b) setModalidad(b.dataset.mod); });
+['ed-alc', 'ed-oc', 'ed-tipo'].forEach((id) => $(id).addEventListener('change', () => { carga = {}; renderEditor(); }));
+
+/* ---------------- Emisión ---------------- */
+let emitiendo = null;
+function abrirEmitir(id, excesoForzado) {
+  emitiendo = id;
+  const editorAbierto = $('m-editor').classList.contains('open') && window.calculoActual;
+  const exceso = excesoForzado ?? (editorAbierto ? window.calculoActual.exceso : 0);
+  // Con exceso forzado (demo), el neto supera el saldo de la OC (330.000) en el importe del exceso.
+  const neto = excesoForzado ? 330000 + excesoForzado : (editorAbierto ? window.calculoActual.neto : 55000);
+  const proximo = Math.max(RJ.proximo || 1, ...CERTS.filter((c) => c.num).map((c) => c.num + 1));
+  const rj = editorAbierto ? window.calculoActual.rj : calcRJ(neto, DESC_EJEMPLO.map((d) => ({ ...d })));
+  let html = `<p>Se emitirá como <b>${numTxt(proximo)}</b> <span class="muted">(número estimado; se asigna al confirmar)</span>.</p>
+    <table class="t"><tr><td>Neto actual (ejecución)</td><td class="r"><b>${mon(neto)}</b></td></tr>
+      <tr><td>Reajuste del período ${rj.coef ? '(coef. ' + fmtC(rj.coef, 4) + ')' : ''}</td><td class="r">${mon(rj.reajPer)}</td></tr>
+      <tr><td>Diferencias retroactivas</td><td class="r">${mon(rj.retroTot)}</td></tr>
+      <tr><td>Descuentos netos</td><td class="r">${mon(rj.descTot)}</td></tr>
+      <tr class="tot"><td>Total a facturar (neto, sin IVA)</td><td class="r">${mon(r2(neto + rj.reajPer + rj.retroTot - rj.descTot))}</td></tr>
+      <tr><td>Saldo de ejecución resultante OC-4501</td><td class="r"><b>${mon(r2(330000 - neto))}</b></td></tr>
+      <tr><td>Reajustes acumulados / previsión</td><td class="r">${mon(rj.prevision.nuevo)} / ${mon(rj.prevision.monto)}</td></tr></table>
+    ${rj.provisorios.length ? `<div class="alert" style="margin-top:8px"><span class="ic">!</span><div><b>Se emite con índices provisorios</b>${rj.provisorios.join(', ')}. Quedará registrado; la diferencia con el definitivo se reconocerá como retroactivo.</div></div>` : ''}
+    ${rj.retro.length ? `<div class="alert info" style="margin-top:8px"><span class="ic">i</span><div><b>Incluye diferencias retroactivas</b>Al confirmar, el servidor recalcula: si otro certificado ya las reconoció o cambió algún índice, se pedirá recalcular (no se duplican).</div></div>` : ''}
+    <div class="alert info" style="margin-top:10px"><span class="ic">i</span><div>Un certificado emitido no se modifica: solo puede anularse. Se generará el PDF y quedará registrado en el historial.</div></div>`;
+  let habilitado = !rj.falta;
+  if (rj.falta) html += `<div class="alert err" style="margin-top:8px"><span class="ic">!</span><div><b>Faltan índices</b>No hay valor para ${rj.falta}.</div></div>`;
+  if (exceso > 0 || rj.prevision.excede) {
+    html += exceso > 0 ? `<div class="alert" style="margin-top:8px"><span class="ic">!</span><div><b>Excede el saldo en ${mon(exceso)}</b>Líneas resaltadas en el detalle del certificado.</div></div>`
+      : `<div class="alert" style="margin-top:8px"><span class="ic">!</span><div><b>Supera la previsión de reajustes en ${mon(r2(rj.prevision.nuevo - rj.prevision.monto))}</b>La previsión vigente es ${mon(rj.prevision.monto)}.</div></div>`;
+    if (puede('autorizar_exceso')) {
+      html += `<div class="field" style="margin-top:8px"><label>Justificación del exceso (obligatoria, mín. 20 caracteres)</label>
+        <textarea id="em-just" rows="3" oninput="$('em-ok').disabled = this.value.trim().length < 20"></textarea>
+        <span class="muted">Se registrarán su usuario, la fecha y hora, el importe excedido y la justificación.</span></div>`;
+      habilitado = false;
+    } else {
+      html += `<div class="alert err" style="margin-top:8px"><span class="ic">!</span><div><b>No puede emitirse con exceso</b>${motivoNo('autorizar_exceso')}.</div></div>`;
+      habilitado = false;
+    }
+  }
+  $('em-cuerpo').innerHTML = html; $('em-ok').disabled = !habilitado; abrir('m-emitir');
+}
+function demoEmitir() { abrirEmitir(4, 1250); }
+function emitir() {
+  const c = CERTS.find((x) => x.id === emitiendo);
+  c.num = Math.max(RJ.proximo || 1, ...CERTS.filter((x) => x.num).map((x) => x.num + 1)); c.est = 'EMITIDO'; c.fecha = '16/10/2024';
+  const neto = $('m-editor').classList.contains('open') && window.calculoActual ? window.calculoActual.neto : c.neto;
+  c.neto = neto; emitirRJ(c.id, c.num, PER_BORRADOR, neto);
+  cerrar('m-emitir'); cerrar('m-editor'); renderLista(); renderRJResumen(); toast(`Maqueta: ${numTxt(c.num)} emitido y PDF generado. Sus reajustes quedan congelados.`);
+}
+function eliminar(id) { if (confirm('¿Eliminar el borrador? Esta acción no puede deshacerse.')) { CERTS = CERTS.filter((c) => c.id !== id); renderLista(); } }
+
+/* ---------------- Anulación ---------------- */
+let anulando = null;
+function abrirAnular(id) {
+  anulando = id;
+  $('an-titulo').textContent = `Anular ${numTxt(CERTS.find((x) => x.id === id).num)}`;
+  $('an-cuerpo').innerHTML = `<div class="alert"><span class="ic">!</span><div><b>La anulación no borra el certificado</b>
+      Conserva su número, el PDF original y el historial, y devuelve el saldo a la OC. Para corregirlo, luego use "Crear reemplazo".</div></div>
+    <div class="field" style="margin-top:10px"><label>Motivo de anulación (obligatorio, mín. 10 caracteres)</label>
+      <textarea id="an-motivo" rows="3" oninput="$('an-ok').disabled = this.value.trim().length < 10"></textarea></div>`;
+  $('an-ok').disabled = true; abrir('m-anular');
+}
+function anular() {
+  const c = CERTS.find((x) => x.id === anulando);
+  const quien = RJ.emitidos.find((k) => k.id !== c.id && k.lineas.some((l) => l.origen === c.id));
+  if (quien) { toast(`No se puede anular: ${numTxt(quien.num)} reconoció diferencias retroactivas de este certificado. Anule primero ese.`); return; }
+  c.est = 'ANULADO'; c.motivo = $('an-motivo').value.trim();
+  RJ.emitidos = RJ.emitidos.filter((k) => k.id !== c.id);
+  cerrar('m-anular'); renderLista(); renderRJResumen(); toast(`Maqueta: ${numTxt(c.num)} anulado. Sus reajustes dejan de contar; si llevaba retroactivos, vuelven a quedar pendientes.`);
+}
+
+/* ---------------- Detalle ---------------- */
+function ver(id) {
+  const c = CERTS.find((x) => x.id === id);
+  $('ver-titulo').innerHTML = `${numTxt(c.num)} <span class="badge b-${c.est}">${c.est}</span>`;
+  const hist = c.est === 'BORRADOR' ? ['15/10/2024 09:12 · Borrador creado · maria.gomez@smg.com']
+    : ['29/09/2024 17:40 · Borrador creado · maria.gomez@smg.com', `${c.fecha} 10:05 · Emitido · maria.gomez@smg.com · verificación 7F3A9C21B0DE`]
+      .concat(c.est === 'ANULADO' ? [`29/09/2024 08:30 · Anulado · maria.gomez@smg.com · "${c.motivo}"`] : []);
+  $('ver-cuerpo').innerHTML = `<div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat"><span class="lbl">Alcance</span><b>${c.alc}</b></div><div class="stat"><span class="lbl">Tipo</span><b>${c.tipo}</b></div>
+      <div class="stat"><span class="lbl">Período</span><b style="font-size:15px">${c.per}</b></div><div class="stat"><span class="lbl">Neto actual</span><b>${fmt(c.neto)}</b></div></div>
+    ${c.est === 'ANULADO' ? `<div class="alert err" style="margin-top:10px"><span class="ic">!</span><div><b>Anulado</b>${c.motivo}</div></div>` : ''}
+    ${detalleRJ(c)}
+    <h4 style="margin:14px 0 6px">Historial</h4><ul class="timeline">${hist.map((h) => `<li>${h}</li>`).join('')}</ul>`;
+  abrir('m-ver');
+}
+
+/* ---------------- PDF SMG ---------------- */
+const PDF_MUESTRAS = {
+  items: 'certificado_smg_05_items.pdf', items20: 'certificado_smg_20_items.pdf', items30: 'certificado_smg_30_items.pdf',
+  global: 'certificado_smg_global_seg.pdf', borrador: 'certificado_smg_20_items_borrador.pdf', anulado: 'certificado_smg_anulado.pdf',
+  reajuste: 'certificado_smg_reajuste.pdf', usd: 'certificado_smg_05_items_usd.pdf',
+  reajuste30: 'certificado_smg_30_items_reajuste.pdf', negativo: 'certificado_smg_reajuste_negativo.pdf',
+  usdreajuste: 'certificado_smg_reajuste_usd.pdf', exceso: 'certificado_smg_exceso_usd.pdf',
+  eurglobal: 'certificado_smg_global_reajuste_eur.pdf', eurborrador: 'certificado_smg_30_items_eur_borrador.pdf',
+};
+function pdf(tipo) {
+  const url = `pdf_muestras/${PDF_MUESTRAS[tipo]}#view=FitH`;
+  $('pdf-hoja').src = url;
+  $('pdf-abrir').href = url;
+  document.querySelectorAll('[data-pdf]').forEach((b) => b.classList.toggle('sel', b.dataset.pdf === tipo));
+}
+
+/* ---------------- Reajustes por polinómica ----------------
+   Misma lógica que el motor de referencia validado (reajuste_motor.py):
+   Esperado(k) con fórmula e índices vigentes hoy; Reconocido(k) = líneas con origen k en emitidos;
+   Pendiente = Esperado − Reconocido → retroactivo en el próximo certificado (nunca se modifican emitidos). */
+const MESES = { '2024-07': 'Julio 2024', '2024-08': 'Agosto 2024', '2024-09': 'Septiembre 2024', '2024-10': 'Octubre 2024', '2024-11': 'Noviembre 2024' };
+const PERIODOS = ['2024-08', '2024-09', '2024-10', '2024-11'];
+const PER_BORRADOR = '2024-10';
+const CONCEPTOS_DESC = { RECUPERO_ANTICIPO: 'Recupero de anticipo', FONDO_REPARO: 'Fondo de reparo', MULTA: 'Multa', OTRO: 'Otro' };
+const BASES_DESC = { EJECUCION: 'Ejecución', EJECUCION_REAJUSTADA: 'Ejecución + reajuste', TOTAL_CON_RETROACTIVOS: 'Ejecución + reajuste + retroactivos', MANUAL: 'Importe manual' };
+const fmtC = (n, d = 6) => Number(n).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const RJ = {
+  formulas: [{ v: 1, desde: '2024-08', base: '2024-07', factor: 1, neg: true, dec: null, validada: false, motivo: 'Versión inicial cargada desde el contrato',
+    por: 'maria.gomez@smg.com', en: '01/08/2024 09:00', comps: [
+      { c: 'MO', n: 'Mano de obra', w: 0.40, b: 1000, f: 'Jornal CCT, categoría 1, del mes de ejecución' },
+      { c: 'GASOIL', n: 'Gasoil', w: 0.35, b: 500, f: 'Precio del litro de gasoil del cliente, mes de ejecución' },
+      { c: 'ACERO', n: 'Acero', w: 0.25, b: 2000, f: 'Índice de acero publicado, mes de ejecución' }] }],
+  indices: [], emitidos: [],
+  prevision: [{ monto: 15000, motivo: 'Previsión inicial del contrato', por: 'maria.gomez@smg.com', en: '01/08/2024 09:05' }],
+  reglasDesc: { RECUPERO_ANTICIPO: { base: 'MANUAL', pct: null }, FONDO_REPARO: { base: 'EJECUCION_REAJUSTADA', pct: 5 }, MULTA: { base: 'MANUAL', pct: null }, OTRO: { base: 'MANUAL', pct: null } },
+  proximo: null, inicial: null, historicos: [],
+  auditoria: [{ en: '01/08/2024 09:00', por: 'maria.gomez@smg.com', accion: 'Fórmula v1 creada', detalle: 'Versión inicial cargada desde el contrato' },
+    { en: '01/08/2024 09:05', por: 'maria.gomez@smg.com', accion: 'Previsión registrada', detalle: '$ 15.000,00 · Previsión inicial del contrato' },
+    { en: '10/10/2024 11:20', por: 'ana.ruiz@smg.com', accion: 'Índice corregido', detalle: 'Mano de obra · Septiembre 2024 · v2 = 1.080,00 · Paritaria septiembre (acuerdo CCT)' }],
+};
+const auditar = (accion, detalle) => RJ.auditoria.push({ en: '16/10/2024 12:00', por: 'usuario@smg.com', accion, detalle });
+function tablaAuditoria(filtro = () => true) {
+  const filas = RJ.auditoria.filter(filtro).slice().reverse();
+  return `<div class="wrap"><table class="t"><thead><tr><th>Fecha</th><th>Usuario</th><th style="text-align:left">Acción</th><th style="text-align:left">Detalle</th></tr></thead><tbody>
+    ${filas.map((a) => `<tr><td>${a.en}</td><td>${a.por}</td><td>${a.accion}</td><td style="white-space:normal">${a.detalle}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="muted">Sin registros.</td></tr>'}</tbody></table></div>
+    <p class="muted" style="margin:6px 0 0">Registro de solo inserción: no se edita ni se borra.</p>`;
+}
+const formulaPara = (p) => RJ.formulas.filter((f) => f.desde <= p).sort((a, b) => b.v - a.v)[0];
+const formulaUltima = () => RJ.formulas[RJ.formulas.length - 1];
+const versionesIdx = (c, p) => RJ.indices.filter((i) => i.c === c && i.p === p).sort((a, b) => a.v - b.v);
+const indiceVig = (c, p) => versionesIdx(c, p).pop();
+function coefRJ(p) {
+  const f = formulaPara(p);
+  if (!f) return { falta: 'fórmula vigente' };
+  let k = 0; const det = [];
+  for (const x of f.comps) {
+    const i = indiceVig(x.c, p);
+    if (!i) return { falta: x.n, f };
+    k += x.w * i.val / x.b; det.push({ ...x, i });
+  }
+  if (f.dec != null) k = Number(k.toFixed(f.dec));
+  return { k, f, det };
+}
+function esperadoRJ(base, p) {
+  const r = coefRJ(p);
+  if (r.falta) return { falta: r.falta };
+  let poli = r2(base * r.f.factor * (r.k - 1));
+  if (!r.f.neg && poli < 0) poli = 0;
+  return { REBASE: r2(base * (r.f.factor - 1)), POLINOMICA: poli, r };
+}
+const reconocidoRJ = (id, comp) => r2(RJ.emitidos.reduce((s, c) => s + c.lineas.filter((l) => l.origen === id && l.comp === comp).reduce((a, l) => a + l.imp, 0), 0));
+const coefAplicado = (id) => { const ls = RJ.emitidos.flatMap((c) => c.lineas.filter((l) => l.origen === id && l.comp === 'POLINOMICA')); return ls.length ? ls[ls.length - 1].coef : null; };
+function pendientesRJ() {
+  return RJ.emitidos.flatMap((k) => {
+    const e = esperadoRJ(k.base, k.per);
+    if (e.falta) return [];
+    return ['REBASE', 'POLINOMICA'].map((comp) => {
+      const rec = reconocidoRJ(k.id, comp);
+      return { tipo: 'RETROACTIVO', comp, origen: k.id, num: k.num, per: k.per, base: k.base, coef: e.r.k, coefAnt: coefAplicado(k.id), esperado: e[comp], rec, imp: r2(e[comp] - rec), r: e.r };
+    }).filter((l) => Math.abs(l.imp) >= 0.005);
+  });
+}
+function lineasRJ(base, p) {
+  const e = esperadoRJ(base, p);
+  const per = e.falta ? [] : ['REBASE', 'POLINOMICA'].filter((c) => e[c] !== 0)
+    .map((comp) => ({ tipo: 'PERIODO', comp, origen: null, per: p, base, coef: e.r.k, coefAnt: null, esperado: e[comp], rec: 0, imp: e[comp], r: e.r }));
+  return { per, retro: pendientesRJ(), falta: e.falta, r: e.r };
+}
+function emitirRJ(id, num, per, base) {
+  const l = lineasRJ(base, per);
+  RJ.emitidos.push({ id, num, per, base, lineas: [...l.per, ...l.retro].map((x) => ({ ...x, origen: x.origen ?? id, f: x.r.f.v,
+    idx: x.r.det.map((d) => ({ c: d.c, n: d.n, w: d.w, b: d.b, v: d.i.v, val: d.i.val, est: d.i.est })) })) });
+}
+const reajustesAcum = () => r2(RJ.emitidos.reduce((s, c) => s + c.lineas.reduce((a, l) => a + l.imp, 0), 0) + (RJ.inicial ? RJ.inicial.reaj : 0));
+const previsionVig = () => RJ.prevision[RJ.prevision.length - 1].monto;
+function calcRJ(neto, descs) {
+  const l = lineasRJ(neto, PER_BORRADOR);
+  const reajPer = r2(l.per.reduce((s, x) => s + x.imp, 0)), retroTot = r2(l.retro.reduce((s, x) => s + x.imp, 0));
+  const bases = { EJECUCION: neto, EJECUCION_REAJUSTADA: r2(neto + reajPer), TOTAL_CON_RETROACTIVOS: r2(neto + reajPer + retroTot) };
+  const desc = descs.map((d) => (d.base === 'MANUAL' ? Number(d.importe) || 0 : r2(bases[d.base] * (Number(d.pct) || 0) / 100)));
+  const descTot = r2(desc.reduce((a, b) => a + b, 0));
+  const acum = reajustesAcum(), nuevo = r2(acum + reajPer + retroTot), monto = previsionVig();
+  return { per: l.per, retro: l.retro, falta: l.falta, coef: l.r ? l.r.k : null, f: l.r ? l.r.f : formulaPara(PER_BORRADOR), det: l.r ? l.r.det : [],
+    reajPer, retroTot, bases, desc, descTot, total: r2(neto + reajPer + retroTot - descTot),
+    provisorios: l.r ? l.r.det.filter((d) => d.i.est === 'PROVISORIO').map((d) => `${d.n} ${MESES[PER_BORRADOR]}`) : [],
+    prevision: { monto, acum, nuevo, excede: nuevo > monto } };
+}
+const textoFormula = (f) => `C = ${f.comps.map((x) => `${fmtC(x.w, 2)}·${x.c}/${fmt(x.b)}`).join(' + ')}`;
+const badgeVal = (f) => `<span class="badge b-${f.validada ? 'VALIDADA' : 'PENDIENTE'}" title="${f.validada ? `Validada por ${f.validadaPor} el ${f.validadaEn}` : ''}">${f.validada ? 'Validada contractualmente' : 'Pendiente de validación contractual'}</span>`;
+const lineaTxt = (l) => (l.tipo === 'PERIODO' ? 'Período' : 'Retroactivo');
+function tablaLineasRJ(lineas, mostrarOrigen = true) {
+  return `<div class="wrap"><table class="t"><thead><tr><th>Tipo</th>${mostrarOrigen ? '<th>Certificado de origen</th>' : ''}<th>Período</th><th>Componente</th>
+    <th class="r">Base</th><th class="r">Coef. aplicado antes</th><th class="r">Coef. vigente</th><th class="r">Reconocido antes</th><th class="r">Corresponde</th><th class="r">Importe</th></tr></thead><tbody>
+    ${lineas.map((l) => `<tr><td>${lineaTxt(l)}</td>${mostrarOrigen ? `<td>${l.tipo === 'PERIODO' && !l.num ? 'Este certificado' : numTxt(l.num)}</td>` : ''}<td>${MESES[l.per]}</td>
+      <td>${l.comp === 'POLINOMICA' ? 'Polinómica' : 'Rebase'}</td><td class="r">${fmt(l.base)}</td><td class="r">${l.coefAnt ? fmtC(l.coefAnt) : '—'}</td>
+      <td class="r">${fmtC(l.coef)}</td><td class="r">${fmt(l.rec)}</td><td class="r">${fmt(l.esperado)}</td><td class="r ${l.imp < 0 ? 'neg' : ''}"><b>${fmt(l.imp)}</b></td></tr>`).join('')
+      || `<tr><td colspan="10" class="muted">Sin líneas de reajuste.</td></tr>`}</tbody></table></div>`;
+}
+function tablaIndicesRJ(periodos) {
+  return `<div class="wrap"><table class="t"><thead><tr><th>Período</th><th>Componente</th><th class="r">Ponderación</th><th class="r">Valor base</th><th class="r">Índice</th>
+    <th>Versión</th><th>Estado</th><th class="r">Relación</th><th style="text-align:left">Motivo de la versión</th></tr></thead><tbody>
+    ${periodos.flatMap((p) => { const r = coefRJ(p); return r.falta ? [] : r.det.map((d) => `<tr><td>${MESES[p]}</td><td>${d.n}</td><td class="r">${fmtC(d.w, 2)}</td>
+      <td class="r">${fmt(d.b)}</td><td class="r">${fmt(d.i.val)}</td><td class="c">v${d.i.v}</td><td><span class="badge b-${d.i.est}">${d.i.est}</span></td>
+      <td class="r">${fmtC(d.i.val / d.b)}</td><td>${d.i.motivo || '—'}</td></tr>`); }).join('')}</tbody></table></div>`;
+}
+function renderReajusteEditor(rj) {
+  const f = rj.f;
+  const lineas = [...rj.per, ...rj.retro];
+  $('ed-reaj').innerHTML = `<div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span>${f ? `<b>Fórmula v${f.v}</b> · vigente desde ${MESES[f.desde]} · mes base ${MESES[f.base]} · factor de rebase ${fmtC(f.factor)} · ${f.neg ? 'admite negativos' : 'sin negativos'}` : 'Sin fórmula'}</span>
+      ${f ? badgeVal(f) : ''}</div>
+    ${f ? `<div class="formula" style="margin-bottom:10px">${textoFormula(f)} &nbsp;→&nbsp; ${MESES[PER_BORRADOR]}: <b>${rj.coef ? fmtC(rj.coef) : 'sin calcular'}</b></div>` : ''}
+    ${rj.falta ? `<div class="alert err"><span class="ic">!</span><div><b>Faltan índices de ${MESES[PER_BORRADOR]}</b>No hay valor para ${rj.falta}. Cárguelo en "Índices mensuales" (puede ser provisorio).</div></div>` : ''}
+    ${tablaLineasRJ(lineas)}
+    ${rj.retro.length ? `<div class="alert info" style="margin-top:8px"><span class="ic">i</span><div><b>Diferencias retroactivas incluidas</b>Surgen de índices o fórmulas corregidos después de emitir los certificados de origen.
+      Cada línea muestra lo ya reconocido y lo que corresponde hoy; se cobra solo la diferencia. Los certificados emitidos no se modifican.</div></div>` : ''}
+    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Índices utilizados y trazabilidad</summary>${tablaIndicesRJ([...new Set(lineas.map((l) => l.per))])}</details>`;
+}
+function renderRJResumen() {
+  if (!$('rj-card')) return;
+  const f = formulaUltima(), pend = pendientesRJ(), totPend = r2(pend.reduce((s, l) => s + l.imp, 0));
+  const r = coefRJ(PER_BORRADOR), acum = reajustesAcum(), prev = previsionVig();
+  const prov = r.falta ? [] : r.det.filter((d) => d.i.est === 'PROVISORIO');
+  $('rj-card').innerHTML = `<div class="card-h"><h2>Reajustes por polinómica</h2>
+      <span class="actions">${boton('Fórmula polinómica', 'consultar', 'abrirFormula()')}${boton('Índices mensuales', 'consultar', 'abrirIndices()')}${boton('Configuración del contrato', 'consultar', 'abrirContrato()')}</span></div>
+    <div class="card-b">
+      <div class="stats">
+        <div class="stat"><span class="lbl">Fórmula vigente</span><b>v${f.v}</b> <span class="muted">desde ${MESES[f.desde]}</span><div style="margin-top:4px">${badgeVal(f)}</div></div>
+        <div class="stat"><span class="lbl">Coeficiente ${MESES[PER_BORRADOR]}</span><b>${r.falta ? '—' : fmtC(r.k, 4)}</b>${prov.length ? ' <span class="badge b-PROVISORIO">índice provisorio</span>' : ''}</div>
+        <div class="stat"><span class="lbl">Reajustes acumulados (emitidos)</span><b>${fmt(acum)}</b></div>
+        <div class="stat"><span class="lbl">Previsión · saldo</span><b>${fmt(prev)}</b> <span class="muted">saldo ${fmt(r2(prev - acum))}</span></div>
+        <div class="stat"><span class="lbl">Retroactivo pendiente</span><b style="color:${totPend ? 'var(--amber)' : 'inherit'}">${fmt(totPend)}</b></div>
+      </div>
+      ${pend.length ? `<div class="alert" style="margin-top:10px"><span class="ic">!</span><div><b>Diferencias retroactivas pendientes por ${mon(totPend)}</b>
+        ${pend.map((l) => `${numTxt(l.num)} (${MESES[l.per]}): coeficiente ${fmtC(l.coefAnt)} → ${fmtC(l.coef)}, diferencia ${mon(l.imp)}`).join(' · ')}.
+        Se incluirán en el próximo certificado que se emita.</div></div>` : ''}
+      <p class="muted" style="margin:8px 0 0">El saldo de ejecución de cada OC no incluye reajustes: estos se controlan contra la previsión.</p>
+    </div>`;
+}
+function detalleRJ(c) {
+  const k = RJ.emitidos.find((x) => x.id === c.id);
+  if (c.est === 'BORRADOR') return '<p class="muted" style="margin-top:10px">Los reajustes del borrador se calculan en el editor y se congelan al emitir.</p>';
+  if (!k) return c.est === 'ANULADO' ? '<p class="muted" style="margin-top:10px">Anulado: sus líneas de reajuste no cuentan en acumulados ni en retroactivos.</p>' : '';
+  const despues = RJ.emitidos.filter((x) => x.id !== k.id).flatMap((x) => x.lineas.filter((l) => l.origen === k.id).map((l) => ({ ...l, num: x.num })));
+  const pend = pendientesRJ().filter((l) => l.origen === k.id);
+  return `<h4 style="margin:14px 0 6px">Reajustes (congelados al emitir)</h4>${tablaLineasRJ(k.lineas.map((l) => ({ ...l, num: l.tipo === 'PERIODO' ? k.num : RJ.emitidos.find((x) => x.id === l.origen)?.num })))}
+    <p class="muted" style="margin:6px 0">Índices aplicados: ${k.lineas.filter((l) => l.tipo === 'PERIODO').flatMap((l) => l.idx.map((i) => `${i.n} ${fmt(i.val)} (v${i.v}, ${i.est.toLowerCase()})`)).join(' · ')} · fórmula v${k.lineas[0]?.f}.</p>
+    ${despues.length ? `<div class="alert info"><span class="ic">i</span><div><b>Diferencias reconocidas después</b>${despues.map((l) => `${numTxt(l.num)}: ${mon(l.imp)}`).join(' · ')}</div></div>` : ''}
+    ${pend.length ? `<div class="alert"><span class="ic">!</span><div><b>Diferencia pendiente</b>${mon(r2(pend.reduce((s, l) => s + l.imp, 0)))}: se reconocerá en el próximo certificado.</div></div>` : ''}`;
+}
+
+/* ---- Fórmula polinómica ---- */
+let fb = null;
+function abrirFormula() { fb = JSON.parse(JSON.stringify(formulaUltima())); fb.motivo = ''; renderFormula(); abrir('m-formula'); }
+function renderFormula() {
+  const ok = puede('configurar_reajuste'), suma = r2(fb.comps.reduce((s, x) => s + (Number(x.w) || 0), 0) * 1e6) / 1e6;
+  const opcPer = (sel, lista) => lista.map((p) => `<option value="${p}" ${p === sel ? 'selected' : ''}>${MESES[p]}</option>`).join('');
+  $('fo-cuerpo').innerHTML = `<div class="alert info"><span class="ic">i</span><div><b>Las ponderaciones y bases no se asumen</b>Se cargan desde el contrato y quedan
+      "pendientes de validación contractual" hasta que un usuario con permiso las valide. Una versión vigente nunca se edita: cada cambio crea una versión nueva con motivo.</div></div>
+    <div class="seccion">Versiones</div>
+    <div class="wrap"><table class="t ajustar"><thead><tr><th>Versión</th><th>Vigente desde</th><th>Mes base</th><th>Fórmula</th><th class="r">Factor rebase</th><th>Negativos</th><th>Validación</th><th style="text-align:left">Motivo</th><th>Usuario / fecha</th><th></th></tr></thead><tbody>
+      ${RJ.formulas.map((f) => `<tr><td class="c"><b>v${f.v}</b></td><td>${MESES[f.desde]}</td><td>${MESES[f.base]}</td><td style="min-width:210px">${textoFormula(f)}</td>
+        <td class="r">${fmtC(f.factor)}</td><td class="c">${f.neg ? 'Sí' : 'No'}</td><td>${badgeVal(f)}</td><td style="min-width:150px">${f.motivo}</td><td>${f.por}<br><span class="muted">${f.en}</span></td>
+        <td>${f.validada ? `<span class="muted">${f.validadaPor}<br>${f.validadaEn}</span>` : boton('Validar', 'configurar_reajuste', `abrirValidacion(${f.v})`)}</td></tr>`).join('')}</tbody></table></div>
+    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Auditoría de la fórmula (creación y validación de versiones)</summary>
+      ${tablaAuditoria((a) => a.accion.startsWith('Fórmula'))}</details>
+    <div class="seccion">Nueva versión <span class="muted" style="font-weight:400">(se precarga con la última)</span></div>
+    <div class="contrato" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+      <div class="field"><label>Vigente desde</label><select onchange="fb.desde=this.value; renderFormula()">${opcPer(fb.desde, PERIODOS)}</select></div>
+      <div class="field"><label>Mes base</label><select onchange="fb.base=this.value; renderFormula()">${opcPer(fb.base, ['2024-07', ...PERIODOS])}</select></div>
+      <div class="field"><label>Factor de rebase</label><input type="number" step="0.000001" value="${fb.factor}" onchange="fb.factor=Number(this.value); renderFormula()"></div>
+      <div class="field"><label>Redondeo del coeficiente</label><select onchange="fb.dec=this.value===''?null:Number(this.value); renderFormula()">
+        ${[['', 'Sin redondeo'], ['4', '4 decimales'], ['6', '6 decimales']].map(([v, t]) => `<option value="${v}" ${String(fb.dec ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Reajustes negativos</label><label><input type="checkbox" ${fb.neg ? 'checked' : ''} onchange="fb.neg=this.checked"> Se aplican si la fórmula los produce</label></div>
+    </div>
+    <div class="wrap" style="margin-top:10px"><table class="t"><thead><tr><th>Código</th><th>Componente</th><th class="r">Ponderación</th><th class="r">Valor base</th><th style="text-align:left">Fuente (texto contractual)</th><th></th></tr></thead><tbody>
+      ${fb.comps.map((x, i) => `<tr><td><input style="width:80px" value="${x.c}" onchange="fb.comps[${i}].c=this.value.toUpperCase(); renderFormula()"></td>
+        <td><input value="${x.n}" onchange="fb.comps[${i}].n=this.value"></td>
+        <td class="r"><input class="num-in" type="number" step="0.0001" value="${x.w}" onchange="fb.comps[${i}].w=Number(this.value); renderFormula()"></td>
+        <td class="r"><input class="num-in" style="width:96px" type="number" step="0.01" value="${x.b}" onchange="fb.comps[${i}].b=Number(this.value); renderFormula()"></td>
+        <td><input style="width:100%;min-width:260px" value="${x.f}" onchange="fb.comps[${i}].f=this.value"></td>
+        <td class="c"><button class="icon-btn" title="Quitar" onclick="fb.comps.splice(${i},1); renderFormula()">🗑</button></td></tr>`).join('')}
+      <tr class="tot"><td colspan="2">Suma de ponderaciones <button class="btn sm" style="margin-left:8px" onclick="fb.comps.push({ c: 'NUEVO', n: '', w: 0, b: 1, f: '' }); renderFormula()">+ Componente</button></td>
+        <td class="r" style="color:${Math.abs(suma - 1) < 1e-9 ? 'var(--green)' : 'var(--red)'}">${fmtC(suma, 4)}</td><td colspan="3">${Math.abs(suma - 1) < 1e-9 ? 'Correcta' : 'Debe sumar exactamente 1'}</td></tr></tbody></table></div>
+    <div class="field" style="margin-top:10px"><label>Motivo de la nueva versión (obligatorio, mín. 10 caracteres)</label><textarea rows="2" oninput="fb.motivo=this.value">${fb.motivo}</textarea></div>
+    <div class="actions" style="justify-content:space-between;margin-top:10px"><span class="muted">${fb.desde <= RJ.emitidos.map((k) => k.per).sort().pop()
+      ? `Vigente desde un período ya certificado: los certificados emitidos no cambian; la diferencia se reconocerá como retroactivo.` : 'Aplica a períodos todavía no certificados.'}</span>
+      ${ok ? `<button class="btn primary" onclick="guardarFormula()">Guardar como versión v${RJ.formulas.length + 1}</button>` : `<button class="btn primary" disabled title="${motivoNo('configurar_reajuste')}">Guardar nueva versión</button>`}</div>`;
+}
+function guardarFormula() {
+  const suma = fb.comps.reduce((s, x) => s + (Number(x.w) || 0), 0), codigos = fb.comps.map((x) => x.c);
+  const error = Math.abs(suma - 1) > 1e-9 ? 'Las ponderaciones deben sumar exactamente 1.'
+    : fb.comps.some((x) => !(x.b > 0)) ? 'Todos los valores base deben ser mayores que cero.'
+    : !(fb.factor > 0) ? 'El factor de rebase debe ser mayor que cero.'
+    : new Set(codigos).size !== codigos.length ? 'Hay códigos de componente repetidos.'
+    : (fb.motivo || '').trim().length < 10 ? 'Indique el motivo (mín. 10 caracteres).' : '';
+  if (error) { toast(error); return; }
+  const antes = r2(pendientesRJ().reduce((s, l) => s + l.imp, 0));
+  RJ.formulas.push({ ...JSON.parse(JSON.stringify(fb)), v: RJ.formulas.length + 1, validada: false, por: 'usuario@smg.com', en: '16/10/2024 12:00' });
+  auditar(`Fórmula v${RJ.formulas.length} creada`, `${textoFormula(fb)} · vigente desde ${MESES[fb.desde]} · ${fb.motivo}`);
+  const despues = r2(pendientesRJ().reduce((s, l) => s + l.imp, 0));
+  abrirFormula(); renderRJResumen(); if ($('m-editor').classList.contains('open')) renderEditor();
+  toast(`Versión v${RJ.formulas.length} guardada (pendiente de validación contractual). Retroactivo pendiente: ${mon(antes)} → ${mon(despues)}.`);
+}
+let validando = null;
+function abrirValidacion(v) {
+  validando = RJ.formulas.find((x) => x.v === v);
+  $('va-cuerpo').innerHTML = `<p>Versión <b>v${v}</b> · vigente desde ${MESES[validando.desde]} · mes base ${MESES[validando.base]}</p>
+    <div class="formula">${textoFormula(validando)} · factor de rebase ${fmtC(validando.factor)} · ${validando.neg ? 'admite' : 'no admite'} negativos</div>
+    <div class="alert info" style="margin-top:10px"><span class="ic">i</span><div><b>Qué se valida</b>Que ponderaciones, valores base, fuentes, mes base, factor de rebase y
+      tratamiento de negativos coinciden con el contrato. La validación no modifica la versión: queda registrada con su usuario y fecha en la auditoría.</div></div>
+    <label style="display:block;margin-top:10px"><input type="checkbox" id="va-ok" onchange="$('va-btn').disabled = !this.checked || $('va-ref').value.trim().length < 5">
+      Confirmo que los datos de esta versión coinciden con el contrato</label>
+    <div class="field" style="margin-top:8px"><label>Referencia del documento contractual (obligatoria; ej. contrato N°, adenda, cláusula)</label>
+      <input id="va-ref" oninput="$('va-btn').disabled = !$('va-ok').checked || this.value.trim().length < 5"></div>
+    <div class="field" style="margin-top:8px"><label>Observación (opcional)</label><textarea id="va-obs" rows="2"></textarea></div>`;
+  $('va-btn').disabled = true; abrir('m-validar');
+}
+function confirmarValidacion() {
+  const f = validando, ref = $('va-ref').value.trim(), obs = $('va-obs').value.trim();
+  f.validada = true; f.validadaPor = 'usuario@smg.com'; f.validadaEn = '16/10/2024 12:00'; f.referencia = ref;
+  auditar(`Fórmula v${f.v} validada contractualmente`, `Referencia: ${ref}${obs ? ' · ' + obs : ''}`);
+  cerrar('m-validar'); renderFormula(); renderRJResumen(); if ($('m-editor').classList.contains('open')) renderEditor();
+  toast(`Versión v${f.v} validada. Quedaron registrados usuario, fecha y referencia.`);
+}
+
+/* ---- Índices mensuales ---- */
+let idxSel = null;
+function abrirIndices() { idxSel = idxSel || { c: 'MO', p: '2024-09' }; renderIndices(); abrir('m-indices'); }
+function renderIndices() {
+  const f = formulaUltima(), usados = (p) => RJ.emitidos.filter((k) => k.per === p).map((k) => numTxt(k.num));
+  const celda = (c, p) => { const i = indiceVig(c, p), sel = idxSel && idxSel.c === c && idxSel.p === p;
+    return `<button class="idx ${sel ? 'sel' : ''}" onclick="idxSel={c:'${c}',p:'${p}'}; renderIndices()">${i ? `${fmt(i.val)}<small>v${i.v}</small>${i.est === 'PROVISORIO' ? ' <span class="badge b-PROVISORIO">P</span>' : ''}` : '<span class="muted">— cargar</span>'}</button>`; };
+  const vers = versionesIdx(idxSel.c, idxSel.p), comp = f.comps.find((x) => x.c === idxSel.c) || { n: idxSel.c };
+  const ok = puede('cargar_indices');
+  $('ix-cuerpo').innerHTML = `<div class="alert info"><span class="ic">i</span><div><b>Registro con historial</b>Corregir un índice crea una versión nueva con motivo; las anteriores se conservan.
+      Si el período ya fue certificado, la diferencia se reconoce como retroactivo en el próximo certificado. Los emitidos no cambian.</div></div>
+    <div class="formula" style="margin:10px 0">Fórmula v${f.v}: ${textoFormula(f)} · mes base ${MESES[f.base]}</div>
+    <div class="wrap"><table class="t"><thead><tr><th>Período</th>${f.comps.map((x) => `<th>${x.n}<br><span class="muted" style="font-weight:400">pond. ${fmtC(x.w, 2)}</span></th>`).join('')}
+      <th class="r">Coeficiente</th><th>Usado en</th></tr></thead><tbody>
+      <tr><td><b>Base · ${MESES[f.base]}</b></td>${f.comps.map((x) => `<td class="r">${fmt(x.b)}</td>`).join('')}<td class="r">1,000000</td><td></td></tr>
+      ${PERIODOS.map((p) => { const r = coefRJ(p); return `<tr><td>${MESES[p]}</td>${f.comps.map((x) => `<td class="c">${celda(x.c, p)}</td>`).join('')}
+        <td class="r">${r.falta ? '<span class="muted">incompleto</span>' : `<b>${fmtC(r.k)}</b>`}</td><td>${usados(p).join(', ') || (p === PER_BORRADOR ? '<span class="muted">borrador</span>' : '')}</td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="seccion">${comp.n} · ${MESES[idxSel.p]}</div>
+    <div class="wrap"><table class="t"><thead><tr><th>Versión</th><th class="r">Valor</th><th>Estado</th><th style="text-align:left">Motivo</th><th>Usuario</th><th>Fecha</th></tr></thead><tbody>
+      ${vers.map((i) => `<tr><td class="c">v${i.v}${i === vers[vers.length - 1] ? ' <span class="badge b-EMITIDO">vigente</span>' : ''}</td><td class="r">${fmt(i.val)}</td>
+        <td><span class="badge b-${i.est}">${i.est}</span></td><td style="white-space:normal">${i.motivo || 'Carga inicial'}</td><td>${i.por}</td><td>${i.en}</td></tr>`).join('')
+        || '<tr><td colspan="6" class="muted">Sin valores cargados.</td></tr>'}</tbody></table></div>
+    <div class="contrato" style="grid-template-columns:0.8fr 0.8fr 2fr auto;margin-top:10px;align-items:end">
+      <div class="field"><label>Valor</label><input id="ix-val" type="number" step="0.0001"></div>
+      <div class="field"><label>Estado</label><select id="ix-est"><option>DEFINITIVO</option><option>PROVISORIO</option></select></div>
+      <div class="field"><label>Motivo ${vers.length ? '(obligatorio: es una corrección)' : '(opcional en la primera carga)'}</label><input id="ix-mot" placeholder="Ej.: Paritaria AOMA, valor publicado definitivo..."></div>
+      ${ok ? `<button class="btn primary" onclick="registrarIndice()">${vers.length ? 'Registrar corrección' : 'Cargar índice'}</button>` : `<button class="btn primary" disabled title="${motivoNo('cargar_indices')}">Registrar</button>`}
+    </div><div id="ix-impacto"></div>`;
+}
+function registrarIndice() {
+  const val = Number($('ix-val').value), est = $('ix-est').value, mot = $('ix-mot').value.trim(), vers = versionesIdx(idxSel.c, idxSel.p);
+  if (!(val > 0)) { toast('El índice debe ser mayor que cero.'); return; }
+  if (vers.length && mot.length < 10) { toast('Una corrección requiere motivo (mín. 10 caracteres).'); return; }
+  const antes = pendientesRJ();
+  RJ.indices.push({ c: idxSel.c, p: idxSel.p, v: vers.length + 1, val, est, motivo: mot, por: 'usuario@smg.com', en: '16/10/2024 12:00' });
+  auditar(vers.length ? 'Índice corregido' : 'Índice cargado', `${(formulaUltima().comps.find((x) => x.c === idxSel.c) || { n: idxSel.c }).n} · ${MESES[idxSel.p]} · v${vers.length + 1} = ${fmt(val)} (${est.toLowerCase()})${mot ? ' · ' + mot : ''}`);
+  const despues = pendientesRJ(), dif = r2(despues.reduce((s, l) => s + l.imp, 0) - antes.reduce((s, l) => s + l.imp, 0));
+  renderIndices(); renderRJResumen(); if ($('m-editor').classList.contains('open')) renderEditor();
+  $('ix-impacto').innerHTML = `<div class="alert ${dif ? '' : 'info'}" style="margin-top:10px"><span class="ic">${dif ? '!' : 'i'}</span><div><b>${dif ? `Genera una diferencia retroactiva de ${mon(dif)}` : 'Sin diferencias retroactivas'}</b>
+    ${dif ? despues.map((l) => `${numTxt(l.num)} (${MESES[l.per]}): pendiente ${mon(l.imp)}`).join(' · ') + '. Se incluirá en el próximo certificado.'
+      : 'El período no tiene certificados emitidos o el coeficiente no cambió.'}</div></div>`;
+}
+
+/* ---- Configuración del contrato: previsión, bases de descuento, histórico y numeración ---- */
+function abrirContrato() { renderContrato(); abrir('m-contrato'); }
+function renderContrato() {
+  const acum = reajustesAcum(), prev = previsionVig(), cfg = puede('configurar_reajuste'), his = puede('incorporar_historico');
+  const btn = (t, acc, fn) => (puede(acc) ? `<button class="btn primary" onclick="${fn}">${t}</button>` : `<button class="btn primary" disabled title="${motivoNo(acc)}">${t}</button>`);
+  const proximo = Math.max(RJ.proximo || 1, ...CERTS.filter((c) => c.num).map((c) => c.num + 1));
+  $('co-cuerpo').innerHTML = `<div class="seccion" style="margin-top:0">Previsión de reajustes</div>
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><span class="lbl">Previsión vigente</span><b>${fmt(prev)}</b></div>
+      <div class="stat"><span class="lbl">Reajustes acumulados</span><b>${fmt(acum)}</b></div><div class="stat"><span class="lbl">Saldo de previsión</span><b>${fmt(r2(prev - acum))}</b></div></div>
+    <div class="wrap" style="margin-top:8px"><table class="t"><thead><tr><th class="r">Monto</th><th style="text-align:left">Motivo</th><th>Usuario</th><th>Fecha</th></tr></thead><tbody>
+      ${RJ.prevision.map((x) => `<tr><td class="r">${fmt(x.monto)}</td><td>${x.motivo}</td><td>${x.por}</td><td>${x.en}</td></tr>`).join('')}</tbody></table></div>
+    <div class="contrato" style="grid-template-columns:1fr 3fr auto;margin-top:8px;align-items:end">
+      <div class="field"><label>Nueva previsión (${SIM})</label><input id="co-prev" type="number" step="0.01"></div>
+      <div class="field"><label>Motivo (obligatorio)</label><input id="co-prev-mot" placeholder="Ej.: adenda N° 2"></div>${btn('Registrar', 'configurar_reajuste', 'registrarPrevision()')}</div>
+    <p class="muted" style="margin:6px 0 0">Superar la previsión al emitir requiere "Autorizar exceso" y una justificación. Los reajustes no consumen el saldo de ejecución.</p>
+
+    <div class="seccion">Base de cálculo de descuentos por concepto</div>
+    <div class="wrap"><table class="t"><thead><tr><th style="text-align:left">Concepto</th><th style="text-align:left">Base</th><th class="r">% por defecto</th></tr></thead><tbody>
+      ${Object.entries(CONCEPTOS_DESC).map(([k, t]) => `<tr><td>${t}</td><td><select ${cfg ? '' : 'disabled'} onchange="RJ.reglasDesc.${k}.base=this.value; renderContrato()">
+        ${Object.entries(BASES_DESC).map(([b, bt]) => `<option value="${b}" ${b === RJ.reglasDesc[k].base ? 'selected' : ''}>${bt}</option>`).join('')}</select></td>
+        <td class="r">${RJ.reglasDesc[k].base === 'MANUAL' ? '—' : `<input class="num-in" type="number" step="0.01" ${cfg ? '' : 'disabled'} value="${RJ.reglasDesc[k].pct ?? ''}" onchange="RJ.reglasDesc.${k}.pct=Number(this.value)">`}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="muted" style="margin:6px 0 0">Se aplican como valor inicial al agregar un descuento; el certificado guarda la base, el % y el importe usados. Los cambios quedan en historial.</p>
+
+    <div class="seccion">Numeración e histórico (certificados anteriores al sistema)</div>
+    <div class="contrato" style="grid-template-columns:repeat(5,minmax(0,1fr));align-items:end">
+      <div class="field"><label>Próximo número de certificado</label><input id="co-prox" type="number" min="1" value="${proximo}" ${his ? '' : 'disabled'}></div>
+      <div class="field"><label>Acumulado inicial: hasta el certificado N°</label><input id="co-hasta" type="number" min="1" ${his ? '' : 'disabled'} value="${RJ.inicial ? RJ.inicial.hasta : ''}"></div>
+      <div class="field"><label>Base ejecutada acumulada (OC-4501)</label><input id="co-base" type="number" step="0.01" ${his ? '' : 'disabled'} value="${RJ.inicial ? RJ.inicial.base : ''}"></div>
+      <div class="field"><label>Reajustes acumulados</label><input id="co-reaj" type="number" step="0.01" ${his ? '' : 'disabled'} value="${RJ.inicial ? RJ.inicial.reaj : ''}"></div>
+      ${btn('Registrar', 'incorporar_historico', 'registrarInicial()')}</div>
+    <div class="field" style="margin-top:8px"><label>Justificación (obligatoria; ej. certificados 1 a 19 emitidos fuera del sistema, planilla de referencia)</label><input id="co-just" ${his ? '' : 'disabled'} value="${RJ.inicial ? RJ.inicial.just : ''}"></div>
+    <div class="alert info" style="margin-top:8px"><span class="ic">i</span><div><b>Acumulado inicial o certificados individuales</b>El acumulado inicial cuenta en saldos pero no genera retroactivos (no tiene detalle por período).
+      Si necesita trazabilidad o retroactivos sobre esos meses, incorpore cada certificado anterior con sus cantidades y los reajustes efectivamente pagados.</div></div>
+    <div class="wrap" style="margin-top:8px"><table class="t"><thead><tr><th>N°</th><th>Período</th><th class="r">Base</th><th class="r">Reajustes pagados</th><th>Origen</th></tr></thead><tbody>
+      ${RJ.historicos.map((h) => `<tr><td>${numTxt(h.num)}</td><td>${MESES[h.per] || h.per}</td><td class="r">${fmt(h.base)}</td><td class="r">${fmt(h.reaj)}</td><td>HISTÓRICO</td></tr>`).join('')
+        || '<tr><td colspan="5" class="muted">No hay certificados anteriores incorporados individualmente.</td></tr>'}</tbody></table></div>
+    <div class="seccion">Registro de auditoría de reajustes</div>${tablaAuditoria()}
+    <div class="actions" style="justify-content:flex-end;margin-top:8px">${puede('incorporar_historico')
+      ? `<button class="btn" onclick="toast('Maqueta: abriría un formulario con número, período, cantidades por ítem (precio OC), reajustes pagados por componente e índices usados, PDF original (opcional) y justificación. Se registra como EMITIDO con origen HISTÓRICO.')">+ Incorporar certificado anterior</button>`
+      : `<button class="btn" disabled title="${motivoNo('incorporar_historico')}">+ Incorporar certificado anterior</button>`}</div>`;
+}
+function registrarPrevision() {
+  const m = Number($('co-prev').value), mot = $('co-prev-mot').value.trim();
+  if (!(m >= 0) || $('co-prev').value === '' || mot.length < 5) { toast('Indique el monto y el motivo.'); return; }
+  RJ.prevision.push({ monto: m, motivo: mot, por: 'usuario@smg.com', en: '16/10/2024 12:00' });
+  auditar('Previsión registrada', `${mon(m)} · ${mot}`); renderContrato(); renderRJResumen();
+  if ($('m-editor').classList.contains('open')) renderEditor();
+}
+function registrarInicial() {
+  const prox = Number($('co-prox').value), hasta = Number($('co-hasta').value), just = $('co-just').value.trim();
+  const maxNum = Math.max(...CERTS.filter((c) => c.num).map((c) => c.num));
+  if (prox <= maxNum) { toast(`El próximo número debe ser mayor que ${maxNum} (último usado).`); return; }
+  if (hasta && hasta >= prox) { toast('El acumulado inicial debe cubrir números anteriores al próximo certificado.'); return; }
+  if (hasta && just.length < 20) { toast('La justificación es obligatoria (mín. 20 caracteres).'); return; }
+  RJ.proximo = prox;
+  if (hasta) RJ.inicial = { hasta, base: Number($('co-base').value) || 0, reaj: Number($('co-reaj').value) || 0, just };
+  auditar('Numeración / acumulado inicial', `Próximo número ${prox}${hasta ? ` · acumulado hasta el N° ${hasta} · ${just}` : ''}`);
+  renderContrato(); renderRJResumen(); toast('Maqueta: registrado con usuario, fecha y justificación. Corregirlo requiere un nuevo registro con motivo.');
+}
+
+// Estado inicial: CERT-001 y CERT-003 emitidos con los índices de ese momento; luego se corrige MO de septiembre (paritaria).
+[['2024-08', [1030, 510, 2020]], ['2024-09', [1050, 520, 2050]], ['2024-10', [1100, 530, 2060]]].forEach(([p, vals]) => ['MO', 'GASOIL', 'ACERO'].forEach((c, i) =>
+  RJ.indices.push({ c, p, v: 1, val: vals[i], est: p === '2024-10' && c === 'MO' ? 'PROVISORIO' : 'DEFINITIVO', motivo: '', por: 'maria.gomez@smg.com', en: `05/${p.slice(5)}/2024 09:00` })));
+emitirRJ(1, 1, '2024-08', 80000);
+emitirRJ(3, 3, '2024-09', 90000);
+RJ.indices.push({ c: 'MO', p: '2024-09', v: 2, val: 1080, est: 'DEFINITIVO', motivo: 'Paritaria septiembre (acuerdo CCT)', por: 'ana.ruiz@smg.com', en: '10/10/2024 11:20' });
+
+/* ---------------- Inicio ---------------- */
+document.querySelectorAll('.menu [data-vista]').forEach((a) => a.addEventListener('click', () => verVista(a.dataset.vista)));
+document.querySelectorAll('.menu [data-inerte]').forEach((a) => a.addEventListener('click', () => toast('Maqueta: esta entrada del menú no cambia; no forma parte de la revisión.')));
+$('rol').addEventListener('change', aplicarRol);
+aplicarRol(); pdf('items');
+// Acceso directo a una pantalla: #certificados, #pdf, #admin, #editor, #emitir, #anular, #formula, #indices, #contrato, #reajuste, #validar.
+({ certificados: () => verVista('certificados'), pdf: () => verVista('pdf'), admin: () => verVista('admin'), editor: () => abrirEditor(true),
+   formula: () => abrirFormula(), indices: () => abrirIndices(), contrato: () => abrirContrato(),
+   validar: () => { $('rol').value = 'autorizante'; aplicarRol(); abrirFormula(); abrirValidacion(1); },
+   reajuste: () => { abrirEditor(true); setTimeout(() => $('ed-reaj').scrollIntoView(), 50); },
+   emitir: () => { $('rol').value = 'autorizante'; aplicarRol(); demoEmitir(); }, anular: () => abrirAnular(3),
+}[location.hash.slice(1)] || (() => {}))();
+</script>
+</body>
+</html>

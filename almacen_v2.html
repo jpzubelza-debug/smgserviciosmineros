@@ -72,6 +72,22 @@
     .chart-mini .mini-label { width: 78px; flex: 0 0 78px; }
     .chart-mini .mini-track { flex: 1; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow:hidden; }
     .chart-mini .mini-fill { height: 100%; border-radius: 999px; }
+    /* Barras horizontales con columna reservada para el nombre (se adapta al ancho de la tarjeta). */
+    .chart-box:has(.chart-hbar) { container-type: inline-size; }
+    .chart-hbar { display:flex; flex-direction: column; gap: 10px; }
+    .chart-hbar-row { display:grid; grid-template-columns: minmax(120px, min(40%, 340px)) minmax(0,1fr) minmax(48px, auto); column-gap: 14px; align-items:center; }
+    .chart-hbar-label { min-width: 0; font-size:12px; line-height: 1.3; color:#dbeafe; }
+    .chart-hbar-label .hbar-name { display:-webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow:hidden; overflow-wrap:anywhere; }
+    .chart-hbar-label .hbar-sub { display:block; font-size:11px; color:#94a3b8; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-hbar-value { font-size:12px; color:#e2e8f0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .chart-hbar-row.is-otros .hbar-name { color:#94a3b8; font-style: italic; }
+    .chart-hbar-foot { margin-top: 2px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size:12px; color:#94a3b8; display:flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .chart-hbar-foot strong { color:#e2e8f0; font-variant-numeric: tabular-nums; }
+    @container (max-width: 420px) {
+      .chart-hbar-row { grid-template-columns: minmax(0,1fr) auto; row-gap: 4px; }
+      .chart-hbar-row .chart-bar-track { grid-column: 1 / -1; grid-row: 2; }
+      .chart-hbar-row .chart-hbar-value { grid-row: 1; grid-column: 2; }
+    }
     .chart-mini .mini-value { width: 44px; text-align: right; color:#e2e8f0; }
     .dash-span-6 { grid-column: span 6; }
     .dash-span-12 { grid-column: span 12; }
@@ -101,6 +117,12 @@
     button:hover { box-shadow: 0 0 12px rgba(59,130,246,0.6); }
     .inline { display:flex; gap:8px; flex-wrap: wrap; }
     .inline > * { width:auto; }
+    .stock-seg { display:inline-flex; align-self:flex-start; gap:0; border:1px solid rgba(255,255,255,0.25); border-radius:8px; overflow:hidden; }
+    .stock-seg button { width:auto; border-radius:0; background: rgba(255,255,255,0.06); color:#dbeafe; font-weight:600; padding:9px 12px; white-space:nowrap; }
+    .stock-seg button + button { border-left:1px solid rgba(255,255,255,0.2); }
+    .stock-seg button.active { background: linear-gradient(135deg, #3b82f6, #2563eb); color:#fff; }
+    .stock-seg button:hover { box-shadow:none; background: rgba(59,130,246,0.35); }
+    .stock-seg button.active:hover { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .table-wrap { overflow:auto; max-height: 56vh; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; }
     .productos-list-wrap { height: 42vh; min-height: 260px; max-height: 460px; overflow: auto; }
     .productos-list-wrap table.productos-table { min-width: 1400px; }
@@ -124,7 +146,8 @@
       text-overflow: ellipsis;
     }
     .ios-items-table th:last-child, .ios-items-table td:last-child { width: 90px; text-align: center; }
-    .movimientos-list-wrap { height: 320px; min-height: 320px; max-height: 320px; overflow-y: scroll; overflow-x: auto; }
+    .movimientos-list-wrap { height: 320px; min-height: 320px; max-height: none; overflow-y: scroll; overflow-x: auto; }
+    .inventario-list-wrap { height: 320px; min-height: 320px; max-height: none; }
     .movimientos-list-wrap table { min-width: 1100px; }
     table { width:100%; border-collapse: collapse; font-size:13px; }
     th { position: sticky; top:0; z-index: 2; background: rgba(10,24,38,0.82); padding: 8px; text-align:left; border-bottom: 1px solid rgba(255,255,255,0.2); }
@@ -251,8 +274,8 @@
             <div id="dash-categoria-chart" class="chart-box"></div>
           </div>
           <div class="card chart-card dash-span-6">
-            <h3>Consumo por Proyecto</h3>
-            <div id="dash-proyecto-chart" class="chart-box"></div>
+            <h3>Consumo por Centro de Costos</h3>
+            <div id="dash-centro-costos-chart" class="chart-box"></div>
           </div>
           <div class="card chart-card dash-span-12">
             <h3>Top Materiales Más Utilizados</h3>
@@ -538,6 +561,14 @@
           <input id="inv-filtro-ubicacion" name="inv_filtro_ubicacion" autocomplete="off" list="inv-filtro-ubicacion-lista" placeholder="Ubicacion" oninput="renderInventariosFiltrados()" onchange="renderInventariosFiltrados()">
           <datalist id="inv-filtro-ubicacion-lista"></datalist>
         </div>
+        <div class="field">
+          <span class="field-label" id="inv-filtro-stock-label">Stock</span>
+          <div class="stock-seg" id="inv-filtro-stock" role="group" aria-labelledby="inv-filtro-stock-label">
+            <button type="button" data-stock="todos" class="active" aria-pressed="true" onclick="setFiltroStockInventario('todos')">Todos</button>
+            <button type="button" data-stock="con" aria-pressed="false" onclick="setFiltroStockInventario('con')">Con stock</button>
+            <button type="button" data-stock="sin" aria-pressed="false" onclick="setFiltroStockInventario('sin')">Sin stock</button>
+          </div>
+        </div>
       </div>
       <div class="inline">
         <button type="button" onclick="buscarInventarios()">Buscar</button>
@@ -547,7 +578,7 @@
         <button type="button" onclick="descargarInventariosExcel()">Exportar Excel</button>
       </div>
       <p class="msg" id="inv-msg"></p>
-      <div class="table-wrap"><table><thead><tr><th>N°</th><th>Codigo</th><th>Descripcion</th><th>Familia</th><th>Marca</th><th>Modelo</th><th>Unidad</th><th>Categoria</th><th>Ubicacion</th><th>Stock actual</th><th>Reservado</th><th>Disponible</th></tr></thead><tbody id="inv-stock-body"></tbody></table></div>
+      <div class="table-wrap inventario-list-wrap"><table><thead><tr><th>N°</th><th>Codigo</th><th>Descripcion</th><th>Familia</th><th>Marca</th><th>Modelo</th><th>Unidad</th><th>Categoria</th><th>Ubicacion</th><th>Stock actual</th><th>Reservado</th><th>Disponible</th></tr></thead><tbody id="inv-stock-body"></tbody></table></div>
         </div>
       </section>
 
@@ -653,11 +684,11 @@ function renderAlertItems(containerId, items, emptyText, mode){
 
 function renderDashboardCharts(d){
   const categorias = (d.stock_por_categoria || []).slice(0, 10);
-  const proyectos = (d.consumo_por_proyecto || []).slice(0, 10);
+  const centrosCostos = d.consumo_por_centro_costos || [];
   const topMateriales = (d.top_materiales || []).slice(0, 10);
   const movCanvas = document.getElementById('dash-movimientos-chart');
   const catCanvas = document.getElementById('dash-categoria-chart');
-  const proyCanvas = document.getElementById('dash-proyecto-chart');
+  const ccCanvas = document.getElementById('dash-centro-costos-chart');
   const topCanvas = document.getElementById('dash-top-chart');
   const movimientosMensuales = (d.movimientos_mensuales || []).slice(-12);
   const totalMesMax = Math.max(1, ...movimientosMensuales.map(r => Math.max(Number(r.ingresos || 0), Number(r.entregas || 0))));
@@ -686,33 +717,68 @@ function renderDashboardCharts(d){
     `;
   }
 
-  const renderBars = (items, keyLabel, keyValue, colors) => {
-    const max = Math.max(1, ...items.map(x => Number(x[keyValue] || 0)));
+  // items: [{ label, sub?, title?, value, otros? }]; el nombre ocupa su propia columna y nunca se monta sobre la barra.
+  const renderBars = (items, colors, { emptyText = 'Sin datos para mostrar.', foot = '' } = {}) => {
+    if (!items.length) return `<div class="subtitle">${esc(emptyText)}</div>`;
+    const max = Math.max(1, ...items.map(x => Number(x.value || 0)));
     return `
-      <div class="chart-stacked">
+      <div class="chart-hbar">
         ${items.map((item, idx) => {
-          const value = Number(item[keyValue] || 0);
-          const color = colors[idx % colors.length];
+          const value = Number(item.value || 0);
+          const color = item.otros ? '#64748b' : colors[idx % colors.length];
+          const tooltip = item.title || [item.label, item.sub].filter(Boolean).join(' · ');
           return `
-            <div class="chart-row">
-              <div class="chart-row-label">${esc(item[keyLabel] || '')}</div>
+            <div class="chart-hbar-row${item.otros ? ' is-otros' : ''}" title="${esc(`${tooltip}: ${formatNumberDashboard(value)}`)}">
+              <div class="chart-hbar-label">
+                <span class="hbar-name">${esc(item.label || '')}</span>
+                ${item.sub ? `<span class="hbar-sub">${esc(item.sub)}</span>` : ''}
+              </div>
               <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${(value / max) * 100}%; background:${color}"></div></div>
-              <div class="chart-row-value">${esc(formatNumberDashboard(value))}</div>
+              <div class="chart-hbar-value">${esc(formatNumberDashboard(value))}</div>
             </div>
           `;
         }).join('')}
+        ${foot ? `<div class="chart-hbar-foot">${foot}</div>` : ''}
       </div>
     `;
   };
 
   if (catCanvas) {
-    catCanvas.innerHTML = renderBars(categorias, 'categoria', 'total', ['#60a5fa', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee', '#fb7185', '#c084fc', '#38bdf8', '#fbbf24']);
+    catCanvas.innerHTML = renderBars(
+      categorias.map(x => ({ label: x.categoria, value: x.total })),
+      ['#60a5fa', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee', '#fb7185', '#c084fc', '#38bdf8', '#fbbf24']
+    );
   }
-  if (proyCanvas) {
-    proyCanvas.innerHTML = renderBars(proyectos.map(x => ({ proyecto: x.proyecto, total: x.total })), 'proyecto', 'total', ['#f59e0b', '#f97316', '#fb7185', '#ec4899', '#8b5cf6']);
+  if (ccCanvas) {
+    // Se muestran los 9 centros con mas salidas; el resto se agrupa en "Otros" para que el total no cambie.
+    const visibles = centrosCostos.length > 10 ? centrosCostos.slice(0, 9) : centrosCostos;
+    const resto = centrosCostos.slice(visibles.length);
+    const filas = visibles.map(x => ({
+      label: x.centro_costos,
+      sub: `${formatNumberDashboard(x.remitos)} ${Number(x.remitos) === 1 ? 'remito' : 'remitos'}`,
+      value: x.total,
+    }));
+    if (resto.length) {
+      filas.push({
+        label: `Otros (${resto.length} centros de costos)`,
+        title: resto.map(x => `${x.centro_costos}: ${formatNumberDashboard(x.total)}`).join('\n'),
+        value: resto.reduce((acc, x) => acc + Number(x.total || 0), 0),
+        otros: true,
+      });
+    }
+    const totalSalidas = centrosCostos.reduce((acc, x) => acc + Number(x.total || 0), 0);
+    ccCanvas.innerHTML = renderBars(filas, ['#f59e0b', '#f97316', '#fb7185', '#ec4899', '#8b5cf6'], {
+      emptyText: 'Sin salidas registradas.',
+      foot: centrosCostos.length
+        ? `<span>Unidades entregadas en remitos de salida autorizados</span><span>Total <strong>${esc(formatNumberDashboard(totalSalidas))}</strong></span>`
+        : '',
+    });
   }
   if (topCanvas) {
-    topCanvas.innerHTML = renderBars(topMateriales.map(x => ({ label: `${x.codigo || ''} ${x.descripcion || ''}`.trim(), total: x.total })), 'label', 'total', ['#ec4899', '#fb7185', '#f472b6', '#c084fc', '#8b5cf6']);
+    topCanvas.innerHTML = renderBars(
+      topMateriales.map(x => ({ label: x.descripcion || x.codigo || '', sub: x.descripcion ? x.codigo : '', value: x.total })),
+      ['#ec4899', '#fb7185', '#f472b6', '#c084fc', '#8b5cf6']
+    );
   }
 }
 
@@ -722,8 +788,27 @@ function setTabs(){
     document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
+    if (btn.dataset.tab === 'mov') ajustarAlturaMovimientos();
+    if (btn.dataset.tab === 'inv') ajustarAlturaInventario();
   });
 }
+
+// Ajusta la altura de un listado al espacio libre de la ventana,
+// dejando visible lo que hay debajo (paginador) y un margen inferior.
+function ajustarAlturaListado(panelId, selector){
+  const panel = document.getElementById(panelId);
+  const wrap = panel ? panel.querySelector(selector) : null;
+  if (!wrap || !panel.classList.contains('active')) return;
+  const card = wrap.closest('.card');
+  const wrapRect = wrap.getBoundingClientRect();
+  const espacioDebajo = (card.getBoundingClientRect().bottom - wrapRect.bottom) + 12 + 17 + 20;
+  const topDoc = wrapRect.top + window.scrollY;
+  const disponible = Math.floor(window.innerHeight - topDoc - espacioDebajo - 4);
+  wrap.style.height = `${Math.max(320, disponible)}px`;
+}
+function ajustarAlturaMovimientos(){ ajustarAlturaListado('panel-mov', '.movimientos-list-wrap'); }
+function ajustarAlturaInventario(){ ajustarAlturaListado('panel-inv', '.inventario-list-wrap'); }
+window.addEventListener('resize', () => { ajustarAlturaMovimientos(); ajustarAlturaInventario(); });
 
 function aplicarPermisosPanelAlmacenUI(){
   const permitidos = state.panelesAlmacenPermitidos;
@@ -1676,6 +1761,7 @@ function renderMovimientosFiltrados(reiniciar = true){
   document.getElementById('btn-mov-mas').style.display = data.length > visibles.length ? '' : 'none';
   document.getElementById('mov-body').innerHTML = visibles.map(m=>`<tr><td>${esc(m.fecha)}</td><td>${esc(m.tipo)}</td><td>${esc(m.documento||'')}</td><td>${esc(m.producto||'')}</td><td>${esc(m.empleado||'')}</td><td>${esc(formatearCantidadMovimiento(m))}</td><td>${m.stock_anterior||0}</td><td>${m.stock_nuevo||0}</td></tr>`).join('');
   document.getElementById('mov-msg').textContent = `${data.length} movimiento(s) encontrado(s).`;
+  ajustarAlturaMovimientos();
 }
 
 function buscarMovimientos(){
@@ -1778,8 +1864,13 @@ function renderInventariosFiltrados(){
   const filtroDescripcion = normalizarFiltroInventario(document.getElementById('inv-filtro-descripcion')?.value || '');
   const filtroCategoria = normalizarFiltroInventario(document.getElementById('inv-filtro-categoria')?.value || '');
   const filtroUbicacion = normalizarFiltroInventario(document.getElementById('inv-filtro-ubicacion')?.value || '');
+  const filtroStock = state.inventarioFiltroStock || 'todos';
 
   const data = (state.inventariosListado || []).filter(x => {
+    // Usa stock_actual (fisico), no reservado ni disponible.
+    const stockActual = Number(x.stock_actual || 0);
+    if (filtroStock === 'con' && !(stockActual > 0)) return false;
+    if (filtroStock === 'sin' && stockActual !== 0) return false;
     const codigo = normalizarFiltroInventario(x.codigo);
     const descripcion = normalizarFiltroInventario(x.descripcion);
     const categoria = normalizarFiltroInventario(x.categoria);
@@ -1796,9 +1887,20 @@ function renderInventariosFiltrados(){
   tbody.innerHTML = data.map((x, idx) => `<tr><td>${idx+1}</td><td>${esc(x.codigo||'')}</td><td>${esc(x.descripcion||'')}</td><td>${esc(x.familia_nombre||'')}</td><td>${esc(x.marca_nombre||'')}</td><td>${esc(x.modelo_nombre||'')}</td><td>${esc(x.unidad_nombre||'')}</td><td>${esc(x.categoria||'')}</td><td>${esc(x.ubicacion||'')}</td><td>${Number(x.stock_actual||0)}</td><td>${Number(x.stock_reservado||0)}</td><td>${Number(x.stock_disponible||0)}</td></tr>`).join('');
   const msg = document.getElementById('inv-msg');
   if (msg) msg.textContent = `${data.length} producto(s) encontrado(s).`;
+  ajustarAlturaInventario();
 }
 
 function buscarInventarios(){
+  renderInventariosFiltrados();
+}
+
+function setFiltroStockInventario(valor){
+  state.inventarioFiltroStock = ['con', 'sin'].includes(valor) ? valor : 'todos';
+  document.querySelectorAll('#inv-filtro-stock button').forEach(btn => {
+    const activo = btn.dataset.stock === state.inventarioFiltroStock;
+    btn.classList.toggle('active', activo);
+    btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
+  });
   renderInventariosFiltrados();
 }
 
@@ -1839,7 +1941,7 @@ function limpiarFiltrosInventarios(){
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  renderInventariosFiltrados();
+  setFiltroStockInventario('todos');
 }
 
 async function cargarInventarios(){

@@ -3,7 +3,8 @@ from fastapi import FastAPI, UploadFile, File, Form, Query, Request, HTTPExcepti
 from fastapi.responses import HTMLResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -123,8 +124,15 @@ app.add_middleware(
 )
 
 AUTH_USER = os.getenv("APP_LOGIN_USER", "admin")
-AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "admin123")
-AUTH_COOKIE_NAME = "dash_auth_user"
+AUTH_PASS = os.getenv("APP_LOGIN_PASSWORD", "Juanpa93")
+# La cookie solo transporta un token aleatorio; la sesión (usuario, vencimiento,
+# revocación) vive en la tabla `sesiones` y en la base se guarda solo el hash
+# SHA-256 del token. La cookie anterior guardaba el usuario en texto plano y
+# permitía suplantarlo: se ignora y se elimina del navegador.
+AUTH_COOKIE_NAME = "dash_session"
+LEGACY_AUTH_COOKIE_NAME = "dash_auth_user"
+SESSION_MAX_SECONDS = 12 * 60 * 60
+SESSION_TOUCH_SECONDS = 60
 
 # Cifrado reversible de contraseñas para que un ADMINISTRADOR pueda consultar
 # la contraseña original de un usuario desde el módulo Administración. Esto es
@@ -157,12 +165,13 @@ SESSION_IDLE_SECONDS = 60 * 60
 ALL_MODULES = [
     "logistica", "almacen", "operaciones", "compras", "rrhh",
     "mantenimiento", "dashboard_ejecutivo", "administracion", "base_datos",
+    "facturacion",
 ]
 CONTINGENCY_PANELS = {
     "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
     "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
-    "operaciones": ["dashboard", "carga_partes_diarios"],
+    "operaciones": ["dashboard", "carga_partes_diarios", "seguimiento_cliente"],
     "rrhh": ["dashboard"],
     "mantenimiento": ["dashboard"],
     "dashboard_ejecutivo": ["dashboard"],
@@ -228,35 +237,159 @@ EMAIL_TEMPLATE_DEFINITIONS = {
 EMAIL_VARIABLE_RE = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 
 
-def _usuario_autenticado(request: Request):
-    """Devuelve el perfil de la sesión vigente o None si no es válida."""
-    usuario = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
-    if not usuario:
+_SESION_SIN_RESOLVER = object()
+
+
+def _sesion_ahora():
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+def _sesion_texto(momento):
+    return momento.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _sesion_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _sesion_es_https(request: Request) -> bool:
+    reenviado = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return request.url.scheme == "https" or reenviado == "https"
+
+
+def _sesion_set_cookie(response, request: Request, token: str):
+    response.set_cookie(
+        AUTH_COOKIE_NAME,
+        token,
+        max_age=SESSION_IDLE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=_sesion_es_https(request),
+        path="/",
+    )
+    response.delete_cookie(LEGACY_AUTH_COOKIE_NAME, path="/")
+
+
+def _sesion_crear(conn, request: Request, origen: str, usuario: str, usuario_id=None) -> str:
+    """Registra una sesión nueva y devuelve el token (solo se guarda su hash)."""
+    token = secrets.token_urlsafe(32)
+    ahora = _sesion_ahora()
+    conn.execute(
+        "DELETE FROM sesiones WHERE expira_en < ? OR expira_absoluta_en < ? OR revocada_en < ?",
+        (_sesion_texto(ahora - timedelta(days=7)),) * 3,
+    )
+    conn.execute(
+        """
+        INSERT INTO sesiones (token_hash, origen, usuario_id, usuario, creada_en, ultima_actividad,
+                              expira_en, expira_absoluta_en, ip, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _sesion_token_hash(token), origen, usuario_id, usuario,
+            _sesion_texto(ahora), _sesion_texto(ahora),
+            _sesion_texto(ahora + timedelta(seconds=SESSION_IDLE_SECONDS)),
+            _sesion_texto(ahora + timedelta(seconds=SESSION_MAX_SECONDS)),
+            request.client.host if request.client else "",
+            request.headers.get("user-agent", "")[:300],
+        ),
+    )
+    return token
+
+
+def _sesion_revocar_token(conn, token: str, motivo: str):
+    conn.execute(
+        "UPDATE sesiones SET revocada_en = ?, motivo_revocacion = ? WHERE token_hash = ? AND revocada_en IS NULL",
+        (_sesion_texto(_sesion_ahora()), motivo, _sesion_token_hash(token)),
+    )
+
+
+def _sesion_revocar_usuario(conn, usuario_id: int, motivo: str):
+    conn.execute(
+        "UPDATE sesiones SET revocada_en = ?, motivo_revocacion = ? WHERE usuario_id = ? AND revocada_en IS NULL",
+        (_sesion_texto(_sesion_ahora()), motivo, usuario_id),
+    )
+
+
+def _sesion_vigente(conn, token: str):
+    if not token:
         return None
+    ahora = _sesion_texto(_sesion_ahora())
+    return conn.execute(
+        """
+        SELECT * FROM sesiones
+        WHERE token_hash = ? AND revocada_en IS NULL AND expira_en > ? AND expira_absoluta_en > ?
+        """,
+        (_sesion_token_hash(token), ahora, ahora),
+    ).fetchone()
 
-    # Cuenta de contingencia configurada por variables de entorno.
-    if usuario == AUTH_USER:
-        return {
-            "usuario": AUTH_USER,
-            "nombre_apellido": "Administrador",
-            "tipo_usuario": "ADMINISTRADOR",
-            "modulos": ALL_MODULES,
-            "paneles": CONTINGENCY_PANELS,
-            "acciones": {},
-            "es_desarrollador": True,
-        }
 
+def _sesion_renovar(token: str) -> bool:
+    """Extiende el vencimiento por inactividad (sin superar el máximo absoluto)."""
     try:
         with get_sqlite_connection() as conn:
+            sesion = _sesion_vigente(conn, token)
+            if sesion is None:
+                return False
+            ahora = _sesion_ahora()
+            ultima = datetime.strptime(sesion["ultima_actividad"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            if (ahora - ultima).total_seconds() >= SESSION_TOUCH_SECONDS:
+                expira = min(_sesion_texto(ahora + timedelta(seconds=SESSION_IDLE_SECONDS)), sesion["expira_absoluta_en"])
+                conn.execute(
+                    "UPDATE sesiones SET ultima_actividad = ?, expira_en = ? WHERE id = ?",
+                    (_sesion_texto(ahora), expira, sesion["id"]),
+                )
+                conn.commit()
+            return True
+    except sqlite3.Error:
+        return False
+
+
+def _usuario_autenticado(request: Request):
+    """Devuelve el perfil de la sesión vigente o None si no es válida."""
+    # Se resuelve una sola vez por request (los endpoints lo consultan varias veces).
+    estado = getattr(request, "state", None)
+    perfil = getattr(estado, "perfil_sesion", _SESION_SIN_RESOLVER) if estado is not None else _SESION_SIN_RESOLVER
+    if perfil is _SESION_SIN_RESOLVER:
+        perfil = _perfil_desde_sesion(request)
+        if estado is not None:
+            estado.perfil_sesion = perfil
+    return perfil
+
+
+def _perfil_desde_sesion(request: Request):
+    token = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
+    if not token:
+        return None
+    try:
+        with get_sqlite_connection() as conn:
+            sesion = _sesion_vigente(conn, token)
+            if sesion is None:
+                return None
+
+            # Cuenta de contingencia configurada por variables de entorno.
+            if sesion["origen"] == "contingencia":
+                if sesion["usuario"] != AUTH_USER:
+                    return None
+                return {
+                    "usuario": AUTH_USER,
+                    "nombre_apellido": "Administrador",
+                    "tipo_usuario": "ADMINISTRADOR",
+                    "modulos": ALL_MODULES,
+                    "paneles": CONTINGENCY_PANELS,
+                    "acciones": {},
+                    "es_desarrollador": True,
+                    "origen": "contingencia",
+                }
+
             fila = conn.execute(
                 """
-                SELECT correo, nombre_apellido, tipo_usuario, modulos_json, paneles_json, acciones_json
+                SELECT id, correo, nombre_apellido, tipo_usuario, modulos_json, paneles_json, acciones_json
                 FROM usuarios
-                WHERE lower(correo) = lower(?)
+                WHERE id = ?
                   AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO'
                   AND COALESCE(bloqueado, 0) = 0
                 """,
-                (usuario,),
+                (sesion["usuario_id"],),
             ).fetchone()
     except sqlite3.Error:
         return None
@@ -265,11 +398,13 @@ def _usuario_autenticado(request: Request):
         return None
     return {
         "usuario": fila["correo"],
+        "usuario_id": fila["id"],
         "nombre_apellido": fila["nombre_apellido"],
         "tipo_usuario": fila["tipo_usuario"],
         "modulos": parse_json_list(fila["modulos_json"]),
-        "paneles": parse_json_dict(fila["paneles_json"], default={}) if "paneles_json" in fila.keys() else {},
-        "acciones": parse_json_dict(fila["acciones_json"], default={}) if "acciones_json" in fila.keys() else {},
+        "paneles": parse_json_dict(fila["paneles_json"], default={}),
+        "acciones": parse_json_dict(fila["acciones_json"], default={}),
+        "origen": "usuarios",
     }
 
 
@@ -327,14 +462,15 @@ def _leer_html(path: str):
 @app.middleware("http")
 async def renovar_sesion_por_actividad(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path != "/logout" and _usuario_autenticado(request) is not None:
-        response.set_cookie(
-            AUTH_COOKIE_NAME,
-            request.cookies.get(AUTH_COOKIE_NAME, ""),
-            max_age=SESSION_IDLE_SECONDS,
-            httponly=True,
-            samesite="lax",
-        )
+    # No pisar la cookie si el endpoint ya la definió (login) o la eliminó (logout).
+    cookie_definida = any(
+        valor.startswith(f"{AUTH_COOKIE_NAME}=") for valor in response.headers.getlist("set-cookie")
+    )
+    token = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
+    if token and not cookie_definida and request.url.path != "/logout" and _sesion_renovar(token):
+        _sesion_set_cookie(response, request, token)
+    elif request.cookies.get(LEGACY_AUTH_COOKIE_NAME):
+        response.delete_cookie(LEGACY_AUTH_COOKIE_NAME, path="/")
     return response
 
 def normalizar_texto(texto):
@@ -1045,6 +1181,32 @@ def migrar_responsables_modulo(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_responsables_modulo_modulo ON responsables_modulo (modulo)")
 
 
+def migrar_sesiones(conn):
+    """Sesiones del lado del servidor; la cookie solo lleva un token aleatorio."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sesiones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT NOT NULL UNIQUE,
+            origen TEXT NOT NULL CHECK (origen IN ('usuarios', 'contingencia')),
+            usuario_id INTEGER,
+            usuario TEXT NOT NULL,
+            creada_en TEXT NOT NULL,
+            ultima_actividad TEXT NOT NULL,
+            expira_en TEXT NOT NULL,
+            expira_absoluta_en TEXT NOT NULL,
+            revocada_en TEXT,
+            motivo_revocacion TEXT,
+            ip TEXT,
+            user_agent TEXT,
+            CHECK ((origen = 'usuarios') = (usuario_id IS NOT NULL)),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones (usuario_id)")
+
+
 def migrar_email_templates(conn):
     conn.execute(
         """
@@ -1274,6 +1436,7 @@ def migrar_centros_costos(conn):
         "presupuesto": "REAL DEFAULT 0",
         "observaciones": "TEXT",
         "updated_at": "TEXT",
+        "provincia": "TEXT",
     }
     for nombre, definicion in nuevas.items():
         if nombre not in columnas:
@@ -1289,11 +1452,639 @@ def migrar_seguimiento_cc(conn):
             conn.execute(f"ALTER TABLE seguimiento_cc ADD COLUMN {nombre} TEXT")
 
 
+CERT_DDL = (
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cliente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        orden_compra_cliente_id INTEGER,
+        alcance TEXT NOT NULL CHECK (alcance IN ('OC', 'SEG')),
+        modalidad TEXT NOT NULL CHECK (modalidad IN ('ITEMS', 'GLOBAL')),
+        tipo TEXT NOT NULL CHECK (tipo IN ('PARCIAL', 'FINAL')),
+        estado TEXT NOT NULL DEFAULT 'BORRADOR' CHECK (estado IN ('BORRADOR', 'EMITIDO', 'ANULADO')),
+        numero INTEGER,
+        moneda TEXT NOT NULL CHECK (length(moneda) = 3 AND moneda = upper(moneda)),
+        fecha_certificado TEXT NOT NULL,
+        periodo_desde TEXT NOT NULL,
+        periodo_hasta TEXT NOT NULL,
+        base_contractual NUMERIC NOT NULL DEFAULT 0,
+        acumulado_anterior NUMERIC NOT NULL DEFAULT 0,
+        importe_periodo NUMERIC NOT NULL DEFAULT 0 CHECK (importe_periodo >= 0),
+        acumulado NUMERIC NOT NULL DEFAULT 0,
+        saldo_resultante NUMERIC NOT NULL DEFAULT 0,
+        descuentos_netos NUMERIC NOT NULL DEFAULT 0 CHECK (descuentos_netos >= 0),
+        total_a_facturar NUMERIC NOT NULL DEFAULT 0 CHECK (total_a_facturar >= 0),
+        exceso_importe NUMERIC NOT NULL DEFAULT 0 CHECK (exceso_importe >= 0),
+        exceso_justificacion TEXT,
+        exceso_autorizado_por TEXT,
+        exceso_autorizado_en TEXT,
+        observaciones TEXT,
+        reemplaza_a_id INTEGER,
+        snapshot_json TEXT,
+        pdf_ruta TEXT,
+        pdf_sha256 TEXT,
+        creado_por TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        actualizado_por TEXT,
+        actualizado_en TEXT,
+        emitido_por TEXT,
+        emitido_en TEXT,
+        anulado_por TEXT,
+        anulado_en TEXT,
+        motivo_anulacion TEXT,
+        CHECK ((alcance = 'OC') = (orden_compra_cliente_id IS NOT NULL)),
+        CHECK ((estado = 'BORRADOR') = (numero IS NULL)),
+        CHECK (periodo_desde <= periodo_hasta),
+        CHECK (estado = 'BORRADOR' OR (emitido_por IS NOT NULL AND emitido_en IS NOT NULL
+                                       AND pdf_ruta IS NOT NULL AND pdf_sha256 IS NOT NULL AND snapshot_json IS NOT NULL)),
+        CHECK (estado <> 'ANULADO' OR (anulado_por IS NOT NULL AND anulado_en IS NOT NULL
+                                       AND length(trim(COALESCE(motivo_anulacion, ''))) > 0)),
+        CHECK (estado = 'BORRADOR' OR exceso_importe = 0 OR (
+            length(trim(COALESCE(exceso_justificacion, ''))) >= 20
+            AND exceso_autorizado_por IS NOT NULL AND exceso_autorizado_en IS NOT NULL)),
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT,
+        FOREIGN KEY (orden_compra_cliente_id) REFERENCES Orden_de_compra_cliente (id) ON DELETE RESTRICT,
+        FOREIGN KEY (reemplaza_a_id) REFERENCES certificados_cliente (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_cert_cliente_numero
+        ON certificados_cliente (seguimiento_cc_id, numero) WHERE numero IS NOT NULL
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_cert_cliente_seguimiento ON certificados_cliente (seguimiento_cc_id, estado)",
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cliente_lineas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        certificado_id INTEGER NOT NULL,
+        orden_compra_cliente_id INTEGER NOT NULL,
+        item_oc_cliente_id INTEGER,
+        orden_compra TEXT,
+        item_numero INTEGER,
+        descripcion TEXT,
+        unidad TEXT,
+        precio_unitario NUMERIC,
+        cantidad_contratada NUMERIC,
+        base_linea NUMERIC NOT NULL,
+        cantidad_anterior NUMERIC,
+        cantidad_periodo NUMERIC CHECK (cantidad_periodo IS NULL OR cantidad_periodo >= 0),
+        cantidad_acumulada NUMERIC,
+        importe_anterior NUMERIC NOT NULL,
+        importe_periodo NUMERIC NOT NULL CHECK (importe_periodo >= 0),
+        importe_acumulado NUMERIC NOT NULL,
+        valor_final_ingresado NUMERIC,
+        exceso_importe NUMERIC NOT NULL DEFAULT 0 CHECK (exceso_importe >= 0),
+        observacion TEXT,
+        FOREIGN KEY (certificado_id) REFERENCES certificados_cliente (id) ON DELETE CASCADE,
+        FOREIGN KEY (orden_compra_cliente_id) REFERENCES Orden_de_compra_cliente (id) ON DELETE RESTRICT,
+        FOREIGN KEY (item_oc_cliente_id) REFERENCES items_oc_cliente (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_cert_cliente_lineas
+        ON certificados_cliente_lineas (certificado_id, orden_compra_cliente_id, COALESCE(item_oc_cliente_id, 0))
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_cert_lineas_orden ON certificados_cliente_lineas (orden_compra_cliente_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cert_lineas_item ON certificados_cliente_lineas (item_oc_cliente_id)",
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cliente_descuentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        certificado_id INTEGER NOT NULL,
+        concepto TEXT NOT NULL CHECK (concepto IN ('RECUPERO_ANTICIPO', 'FONDO_REPARO', 'MULTA', 'OTRO')),
+        descripcion TEXT,
+        importe NUMERIC NOT NULL CHECK (importe > 0),
+        CHECK (concepto <> 'OTRO' OR length(trim(COALESCE(descripcion, ''))) > 0),
+        FOREIGN KEY (certificado_id) REFERENCES certificados_cliente (id) ON DELETE CASCADE
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_cert_descuentos_cert ON certificados_cliente_descuentos (certificado_id)",
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cliente_eventos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        certificado_id INTEGER,
+        evento TEXT NOT NULL,
+        usuario TEXT NOT NULL,
+        fecha TEXT NOT NULL,
+        detalle_json TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_cert_eventos_cert ON certificados_cliente_eventos (certificado_id)",
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cambios_modalidad (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        modalidad_anterior TEXT,
+        modalidad_nueva TEXT NOT NULL CHECK (modalidad_nueva IN ('ITEMS', 'GLOBAL')),
+        justificacion TEXT NOT NULL CHECK (length(trim(justificacion)) >= 20),
+        usuario TEXT NOT NULL,
+        fecha TEXT NOT NULL,
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    # --- Inmutabilidad de certificados emitidos y anulados ---
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_anulado_inmutable
+    BEFORE UPDATE ON certificados_cliente WHEN OLD.estado = 'ANULADO'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: un certificado anulado no puede modificarse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_emitido_inmutable
+    BEFORE UPDATE ON certificados_cliente WHEN OLD.estado = 'EMITIDO' AND (
+        NEW.estado IS NOT 'ANULADO'
+        OR NEW.seguimiento_cc_id IS NOT OLD.seguimiento_cc_id OR NEW.orden_compra_cliente_id IS NOT OLD.orden_compra_cliente_id
+        OR NEW.alcance IS NOT OLD.alcance OR NEW.modalidad IS NOT OLD.modalidad OR NEW.tipo IS NOT OLD.tipo
+        OR NEW.numero IS NOT OLD.numero OR NEW.moneda IS NOT OLD.moneda
+        OR NEW.fecha_certificado IS NOT OLD.fecha_certificado OR NEW.periodo_desde IS NOT OLD.periodo_desde
+        OR NEW.periodo_hasta IS NOT OLD.periodo_hasta OR NEW.base_contractual IS NOT OLD.base_contractual
+        OR NEW.acumulado_anterior IS NOT OLD.acumulado_anterior OR NEW.importe_periodo IS NOT OLD.importe_periodo
+        OR NEW.acumulado IS NOT OLD.acumulado OR NEW.saldo_resultante IS NOT OLD.saldo_resultante
+        OR NEW.descuentos_netos IS NOT OLD.descuentos_netos OR NEW.total_a_facturar IS NOT OLD.total_a_facturar
+        OR NEW.exceso_importe IS NOT OLD.exceso_importe OR NEW.exceso_justificacion IS NOT OLD.exceso_justificacion
+        OR NEW.exceso_autorizado_por IS NOT OLD.exceso_autorizado_por OR NEW.exceso_autorizado_en IS NOT OLD.exceso_autorizado_en
+        OR NEW.observaciones IS NOT OLD.observaciones OR NEW.reemplaza_a_id IS NOT OLD.reemplaza_a_id
+        OR NEW.snapshot_json IS NOT OLD.snapshot_json OR NEW.pdf_ruta IS NOT OLD.pdf_ruta OR NEW.pdf_sha256 IS NOT OLD.pdf_sha256
+        OR NEW.creado_por IS NOT OLD.creado_por OR NEW.creado_en IS NOT OLD.creado_en
+        OR NEW.emitido_por IS NOT OLD.emitido_por OR NEW.emitido_en IS NOT OLD.emitido_en)
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: un certificado emitido solo puede anularse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_borrador_no_anulable
+    BEFORE UPDATE ON certificados_cliente WHEN OLD.estado = 'BORRADOR' AND NEW.estado = 'ANULADO'
+    BEGIN SELECT RAISE(ABORT, 'CERT_ESTADO: un borrador se elimina, no se anula'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_solo_borra_borradores
+    BEFORE DELETE ON certificados_cliente WHEN OLD.estado <> 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: solo pueden eliminarse borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_lineas_insert
+    BEFORE INSERT ON certificados_cliente_lineas
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = NEW.certificado_id) IS NOT 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: las líneas solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_lineas_update
+    BEFORE UPDATE ON certificados_cliente_lineas
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = OLD.certificado_id) IS NOT 'BORRADOR'
+      OR (SELECT estado FROM certificados_cliente WHERE id = NEW.certificado_id) IS NOT 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: las líneas solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_lineas_delete
+    BEFORE DELETE ON certificados_cliente_lineas
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = OLD.certificado_id) IN ('EMITIDO', 'ANULADO')
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: las líneas solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_lineas_coherencia
+    BEFORE INSERT ON certificados_cliente_lineas
+    WHEN NOT EXISTS (
+        SELECT 1 FROM certificados_cliente c
+        JOIN Orden_de_compra_cliente o ON o.id = NEW.orden_compra_cliente_id
+        WHERE c.id = NEW.certificado_id
+          AND o.seguimiento_cc_id = c.seguimiento_cc_id
+          AND upper(trim(o.moneda)) = c.moneda
+          AND (c.orden_compra_cliente_id IS NULL OR c.orden_compra_cliente_id = o.id)
+          AND ((c.modalidad = 'ITEMS') = (NEW.item_oc_cliente_id IS NOT NULL)))
+      OR (NEW.item_oc_cliente_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM items_oc_cliente i
+        JOIN Orden_de_compra_cliente o ON o.id = i.orden_compra_cliente_id
+        WHERE i.id = NEW.item_oc_cliente_id
+          AND i.orden_compra_cliente_id = NEW.orden_compra_cliente_id
+          AND upper(COALESCE(NULLIF(trim(i.moneda), ''), o.moneda))
+              = (SELECT moneda FROM certificados_cliente WHERE id = NEW.certificado_id)))
+    BEGIN SELECT RAISE(ABORT, 'CERT_COHERENCIA: la línea no corresponde al SEG, la OC, la moneda o la modalidad del certificado'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_lineas_coherencia_update
+    BEFORE UPDATE OF certificado_id, orden_compra_cliente_id, item_oc_cliente_id ON certificados_cliente_lineas
+    BEGIN SELECT RAISE(ABORT, 'CERT_COHERENCIA: no se puede reasignar una línea; elimínela y vuelva a cargarla'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_descuentos_insert
+    BEFORE INSERT ON certificados_cliente_descuentos
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = NEW.certificado_id) IS NOT 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: los descuentos solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_descuentos_update
+    BEFORE UPDATE ON certificados_cliente_descuentos
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = OLD.certificado_id) IS NOT 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: los descuentos solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_descuentos_delete
+    BEFORE DELETE ON certificados_cliente_descuentos
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = OLD.certificado_id) IN ('EMITIDO', 'ANULADO')
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: los descuentos solo se modifican en borradores'); END
+    """,
+    # --- Historial y cambios de modalidad: solo se agregan filas ---
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_eventos_sin_update
+    BEFORE UPDATE ON certificados_cliente_eventos
+    BEGIN SELECT RAISE(ABORT, 'CERT_HISTORIAL: el historial no puede modificarse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_eventos_sin_delete
+    BEFORE DELETE ON certificados_cliente_eventos
+    BEGIN SELECT RAISE(ABORT, 'CERT_HISTORIAL: el historial no puede eliminarse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_modalidad_hist_sin_update
+    BEFORE UPDATE ON certificados_cambios_modalidad
+    BEGIN SELECT RAISE(ABORT, 'CERT_HISTORIAL: el historial no puede modificarse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_modalidad_hist_sin_delete
+    BEFORE DELETE ON certificados_cambios_modalidad
+    BEGIN SELECT RAISE(ABORT, 'CERT_HISTORIAL: el historial no puede eliminarse'); END
+    """,
+    # --- Protección de SEG, OC e ítems ya certificados ---
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_seg_modalidad
+    BEFORE UPDATE OF modalidad_certificacion ON seguimiento_cc
+    WHEN NEW.modalidad_certificacion IS NOT OLD.modalidad_certificacion
+      AND EXISTS (SELECT 1 FROM certificados_cliente c WHERE c.seguimiento_cc_id = OLD.id AND c.estado <> 'BORRADOR')
+      AND NOT EXISTS (
+        SELECT 1 FROM certificados_cambios_modalidad m
+        WHERE m.id = (SELECT MAX(id) FROM certificados_cambios_modalidad WHERE seguimiento_cc_id = OLD.id)
+          AND m.modalidad_anterior IS OLD.modalidad_certificacion
+          AND m.modalidad_nueva IS NEW.modalidad_certificacion)
+    BEGIN SELECT RAISE(ABORT, 'CERT_MODALIDAD: la modalidad solo cambia mediante el procedimiento autorizado'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_item_certificado
+    BEFORE UPDATE OF orden_compra_cliente_id, precio, moneda ON items_oc_cliente
+    WHEN (NEW.orden_compra_cliente_id IS NOT OLD.orden_compra_cliente_id
+          OR NEW.precio IS NOT OLD.precio
+          OR upper(COALESCE(NEW.moneda, '')) IS NOT upper(COALESCE(OLD.moneda, '')))
+      AND EXISTS (
+        SELECT 1 FROM certificados_cliente_lineas l
+        JOIN certificados_cliente c ON c.id = l.certificado_id
+        WHERE l.item_oc_cliente_id = OLD.id AND c.estado = 'EMITIDO'
+          AND (l.importe_periodo > 0 OR COALESCE(l.cantidad_periodo, 0) > 0))
+    BEGIN SELECT RAISE(ABORT, 'CERT_PROTEGIDO: el ítem tiene avance certificado'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_cert_orden_certificada
+    BEFORE UPDATE OF moneda, seguimiento_cc_id ON Orden_de_compra_cliente
+    WHEN (upper(COALESCE(NEW.moneda, '')) IS NOT upper(COALESCE(OLD.moneda, ''))
+          OR NEW.seguimiento_cc_id IS NOT OLD.seguimiento_cc_id)
+      AND EXISTS (
+        SELECT 1 FROM certificados_cliente_lineas l
+        JOIN certificados_cliente c ON c.id = l.certificado_id
+        WHERE l.orden_compra_cliente_id = OLD.id AND c.estado = 'EMITIDO')
+    BEGIN SELECT RAISE(ABORT, 'CERT_PROTEGIDO: la OC tiene certificados emitidos'); END
+    """,
+)
+
+
+def migrar_certificados_cliente(conn):
+    """Certificados de cliente (por ítems o global). Solo agrega estructuras; no modifica filas existentes."""
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(seguimiento_cc)").fetchall()}
+    if not columnas:
+        return
+    if "modalidad_certificacion" not in columnas:
+        conn.execute(
+            "ALTER TABLE seguimiento_cc ADD COLUMN modalidad_certificacion TEXT "
+            "CHECK (modalidad_certificacion IN ('ITEMS', 'GLOBAL'))"
+        )
+    # Los triggers se recrean siempre: con IF NOT EXISTS una base ya migrada conservaría
+    # definiciones anteriores. Recrearlos no toca datos.
+    definidos = set()
+    for sentencia in CERT_DDL:
+        trigger = re.search(r"CREATE TRIGGER IF NOT EXISTS (\w+)", sentencia)
+        if trigger:
+            definidos.add(trigger.group(1))
+            conn.execute(f"DROP TRIGGER IF EXISTS {trigger.group(1)}")
+        conn.execute(sentencia)
+    for (obsoleto,) in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg\\_cert\\_%' ESCAPE '\\'"
+    ).fetchall():
+        if obsoleto not in definidos:
+            conn.execute(f"DROP TRIGGER IF EXISTS {obsoleto}")
+
+
+REAJ_DDL = (
+    # --- Fórmula polinómica por SEG: versiones inmutables; solo se admite la validación contractual ---
+    """
+    CREATE TABLE IF NOT EXISTS reajuste_formulas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        version INTEGER NOT NULL CHECK (version >= 1),
+        vigente_desde TEXT NOT NULL CHECK (vigente_desde GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'),
+        mes_base TEXT NOT NULL CHECK (mes_base GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'),
+        factor_rebase TEXT NOT NULL CHECK (CAST(factor_rebase AS REAL) > 0),
+        permite_negativo INTEGER NOT NULL DEFAULT 1 CHECK (permite_negativo IN (0, 1)),
+        decimales_coeficiente INTEGER CHECK (decimales_coeficiente IS NULL OR decimales_coeficiente BETWEEN 2 AND 10),
+        validacion_contractual TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (validacion_contractual IN ('PENDIENTE', 'VALIDADA')),
+        validada_por TEXT,
+        validada_en TEXT,
+        referencia_contractual TEXT,
+        observacion_validacion TEXT,
+        motivo TEXT NOT NULL CHECK (length(trim(motivo)) >= 10),
+        creado_por TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        UNIQUE (seguimiento_cc_id, version),
+        CHECK (validacion_contractual = 'PENDIENTE' OR (validada_por IS NOT NULL AND validada_en IS NOT NULL
+                                                        AND length(trim(COALESCE(referencia_contractual, ''))) >= 5)),
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS reajuste_componentes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        formula_id INTEGER NOT NULL,
+        codigo TEXT NOT NULL CHECK (length(trim(codigo)) > 0 AND codigo = upper(codigo)),
+        nombre TEXT NOT NULL,
+        ponderacion TEXT NOT NULL CHECK (CAST(ponderacion AS REAL) > 0 AND CAST(ponderacion AS REAL) <= 1),
+        valor_base TEXT NOT NULL CHECK (CAST(valor_base AS REAL) > 0),
+        fuente TEXT,
+        UNIQUE (formula_id, codigo),
+        FOREIGN KEY (formula_id) REFERENCES reajuste_formulas (id) ON DELETE RESTRICT
+    )
+    """,
+    # --- Índices mensuales: cada corrección es una versión nueva con motivo ---
+    """
+    CREATE TABLE IF NOT EXISTS reajuste_indices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        codigo TEXT NOT NULL CHECK (codigo = upper(codigo)),
+        periodo TEXT NOT NULL CHECK (periodo GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'),
+        version INTEGER NOT NULL CHECK (version >= 1),
+        valor TEXT NOT NULL CHECK (CAST(valor AS REAL) > 0),
+        estado TEXT NOT NULL CHECK (estado IN ('PROVISORIO', 'DEFINITIVO')),
+        fuente_ref TEXT,
+        motivo TEXT,
+        cargado_por TEXT NOT NULL,
+        cargado_en TEXT NOT NULL,
+        UNIQUE (seguimiento_cc_id, codigo, periodo, version),
+        CHECK (version = 1 OR length(trim(COALESCE(motivo, ''))) >= 10),
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    # --- Líneas de reajuste de cada certificado (período y retroactivas) ---
+    """
+    CREATE TABLE IF NOT EXISTS certificados_cliente_reajustes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        certificado_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL CHECK (tipo IN ('PERIODO', 'RETROACTIVO')),
+        componente TEXT NOT NULL CHECK (componente IN ('REBASE', 'POLINOMICA')),
+        orden_compra_cliente_id INTEGER NOT NULL,
+        origen_certificado_id INTEGER NOT NULL,
+        periodo_origen TEXT NOT NULL,
+        base NUMERIC NOT NULL,
+        coeficiente TEXT,
+        esperado NUMERIC NOT NULL,
+        reconocido_previo NUMERIC NOT NULL DEFAULT 0,
+        importe NUMERIC NOT NULL,
+        detalle_json TEXT,
+        CHECK (tipo = 'RETROACTIVO' OR origen_certificado_id = certificado_id),
+        FOREIGN KEY (certificado_id) REFERENCES certificados_cliente (id) ON DELETE CASCADE,
+        FOREIGN KEY (orden_compra_cliente_id) REFERENCES Orden_de_compra_cliente (id) ON DELETE RESTRICT,
+        FOREIGN KEY (origen_certificado_id) REFERENCES certificados_cliente (id) ON DELETE RESTRICT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_cert_reajustes_cert ON certificados_cliente_reajustes (certificado_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cert_reajustes_origen ON certificados_cliente_reajustes (origen_certificado_id)",
+    # --- Configuración económica del contrato (historiales) ---
+    """
+    CREATE TABLE IF NOT EXISTS reajuste_previsiones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        moneda TEXT NOT NULL CHECK (length(moneda) = 3 AND moneda = upper(moneda)),
+        monto NUMERIC NOT NULL CHECK (monto >= 0),
+        motivo TEXT NOT NULL CHECK (length(trim(motivo)) >= 5),
+        creado_por TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS certificados_reglas_descuento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        concepto TEXT NOT NULL CHECK (concepto IN ('RECUPERO_ANTICIPO', 'FONDO_REPARO', 'MULTA', 'OTRO')),
+        base TEXT NOT NULL CHECK (base IN ('EJECUCION', 'EJECUCION_REAJUSTADA', 'TOTAL_CON_RETROACTIVOS', 'MANUAL')),
+        porcentaje NUMERIC CHECK (porcentaje IS NULL OR (porcentaje > 0 AND porcentaje <= 100)),
+        creado_por TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        CHECK ((base = 'MANUAL') = (porcentaje IS NULL)),
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    # Acumulado inicial de certificados emitidos fuera del sistema: cada registro reemplaza al anterior (historial).
+    """
+    CREATE TABLE IF NOT EXISTS certificados_saldo_inicial (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        hasta_numero INTEGER NOT NULL CHECK (hasta_numero >= 1),
+        justificacion TEXT NOT NULL CHECK (length(trim(justificacion)) >= 20),
+        creado_por TEXT NOT NULL,
+        creado_en TEXT NOT NULL,
+        FOREIGN KEY (seguimiento_cc_id) REFERENCES seguimiento_cc (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS certificados_saldo_inicial_lineas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        saldo_inicial_id INTEGER NOT NULL,
+        orden_compra_cliente_id INTEGER NOT NULL,
+        item_oc_cliente_id INTEGER,
+        cantidad NUMERIC CHECK (cantidad IS NULL OR cantidad >= 0),
+        base_acumulada NUMERIC NOT NULL CHECK (base_acumulada >= 0),
+        reajustes_acumulados NUMERIC NOT NULL DEFAULT 0,
+        FOREIGN KEY (saldo_inicial_id) REFERENCES certificados_saldo_inicial (id) ON DELETE RESTRICT,
+        FOREIGN KEY (orden_compra_cliente_id) REFERENCES Orden_de_compra_cliente (id) ON DELETE RESTRICT,
+        FOREIGN KEY (item_oc_cliente_id) REFERENCES items_oc_cliente (id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS reajuste_auditoria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seguimiento_cc_id INTEGER NOT NULL,
+        accion TEXT NOT NULL,
+        entidad TEXT NOT NULL,
+        entidad_id INTEGER,
+        detalle_json TEXT,
+        usuario TEXT NOT NULL,
+        fecha TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_reajuste_auditoria_seg ON reajuste_auditoria (seguimiento_cc_id, id)",
+    # --- Inmutabilidad ---
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_formula_solo_validacion
+    BEFORE UPDATE ON reajuste_formulas
+    WHEN NOT (OLD.validacion_contractual = 'PENDIENTE' AND NEW.validacion_contractual = 'VALIDADA'
+        AND NEW.id IS OLD.id AND NEW.seguimiento_cc_id IS OLD.seguimiento_cc_id AND NEW.version IS OLD.version
+        AND NEW.vigente_desde IS OLD.vigente_desde AND NEW.mes_base IS OLD.mes_base AND NEW.factor_rebase IS OLD.factor_rebase
+        AND NEW.permite_negativo IS OLD.permite_negativo AND NEW.decimales_coeficiente IS OLD.decimales_coeficiente
+        AND NEW.motivo IS OLD.motivo AND NEW.creado_por IS OLD.creado_por AND NEW.creado_en IS OLD.creado_en)
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: una versión de fórmula no se modifica; cree una versión nueva'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_formula_sin_delete
+    BEFORE DELETE ON reajuste_formulas
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: las versiones de fórmula no se eliminan'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_componentes_insert
+    BEFORE INSERT ON reajuste_componentes
+    WHEN (SELECT validacion_contractual FROM reajuste_formulas WHERE id = NEW.formula_id) IS NOT 'PENDIENTE'
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: la fórmula ya fue validada; cree una versión nueva'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_componentes_sin_update
+    BEFORE UPDATE ON reajuste_componentes
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: los componentes de una fórmula no se modifican'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_componentes_sin_delete
+    BEFORE DELETE ON reajuste_componentes
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: los componentes de una fórmula no se eliminan'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_indices_sin_update
+    BEFORE UPDATE ON reajuste_indices
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: un índice se corrige cargando una versión nueva'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_indices_sin_delete
+    BEFORE DELETE ON reajuste_indices
+    BEGIN SELECT RAISE(ABORT, 'RJ_INMUTABLE: los índices no se eliminan'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_lineas_insert
+    BEFORE INSERT ON certificados_cliente_reajustes
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = NEW.certificado_id) IS NOT 'BORRADOR'
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: los reajustes solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_lineas_update
+    BEFORE UPDATE ON certificados_cliente_reajustes
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: las líneas de reajuste no se modifican; se recalculan'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_lineas_delete
+    BEFORE DELETE ON certificados_cliente_reajustes
+    WHEN (SELECT estado FROM certificados_cliente WHERE id = OLD.certificado_id) IN ('EMITIDO', 'ANULADO')
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: los reajustes solo se modifican en borradores'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_lineas_coherencia
+    BEFORE INSERT ON certificados_cliente_reajustes
+    WHEN NOT EXISTS (
+        SELECT 1 FROM certificados_cliente c
+        JOIN Orden_de_compra_cliente o ON o.id = NEW.orden_compra_cliente_id
+        JOIN certificados_cliente k ON k.id = NEW.origen_certificado_id
+        WHERE c.id = NEW.certificado_id AND o.seguimiento_cc_id = c.seguimiento_cc_id
+          AND upper(trim(o.moneda)) = c.moneda AND k.seguimiento_cc_id = c.seguimiento_cc_id
+          AND (NEW.tipo = 'PERIODO' OR k.estado = 'EMITIDO'))
+    BEGIN SELECT RAISE(ABORT, 'CERT_COHERENCIA: el reajuste no corresponde al SEG, la OC, la moneda o el certificado de origen'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_cert_emitido_inmutable
+    BEFORE UPDATE ON certificados_cliente WHEN OLD.estado <> 'BORRADOR' AND (
+        NEW.origen IS NOT OLD.origen OR NEW.periodo_ejecucion IS NOT OLD.periodo_ejecucion
+        OR NEW.reajuste_periodo IS NOT OLD.reajuste_periodo OR NEW.reajuste_retroactivo IS NOT OLD.reajuste_retroactivo
+        OR NEW.exceso_prevision IS NOT OLD.exceso_prevision)
+    BEGIN SELECT RAISE(ABORT, 'CERT_INMUTABLE: un certificado emitido solo puede anularse'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_rj_anular_con_retroactivos
+    BEFORE UPDATE OF estado ON certificados_cliente
+    WHEN OLD.estado = 'EMITIDO' AND NEW.estado = 'ANULADO' AND EXISTS (
+        SELECT 1 FROM certificados_cliente_reajustes r
+        JOIN certificados_cliente c ON c.id = r.certificado_id
+        WHERE r.origen_certificado_id = OLD.id AND r.certificado_id <> OLD.id AND c.estado = 'EMITIDO')
+    BEGIN SELECT RAISE(ABORT, 'CERT_RETROACTIVO: otro certificado emitido reconoció retroactivos de este; anúlelo primero'); END
+    """,
+)
+# Tablas de historial: solo se agregan filas.
+REAJ_TABLAS_SOLO_INSERCION = (
+    "reajuste_previsiones", "certificados_reglas_descuento", "certificados_saldo_inicial",
+    "certificados_saldo_inicial_lineas", "reajuste_auditoria",
+)
+
+
+def migrar_reajustes(conn):
+    """Reajustes por polinómica y configuración económica del contrato. Solo agrega estructuras; no modifica filas."""
+    if not conn.execute("PRAGMA table_info(certificados_cliente)").fetchall():
+        return
+    nuevas = {
+        "seguimiento_cc": {"numero_proximo_certificado": "INTEGER CHECK (numero_proximo_certificado IS NULL OR numero_proximo_certificado >= 1)"},
+        "certificados_cliente": {
+            "origen": "TEXT NOT NULL DEFAULT 'SISTEMA' CHECK (origen IN ('SISTEMA', 'HISTORICO'))",
+            "periodo_ejecucion": "TEXT",
+            "reajuste_periodo": "NUMERIC NOT NULL DEFAULT 0",
+            "reajuste_retroactivo": "NUMERIC NOT NULL DEFAULT 0",
+            "exceso_prevision": "NUMERIC NOT NULL DEFAULT 0 CHECK (exceso_prevision >= 0)",
+        },
+        "certificados_cliente_descuentos": {
+            "base": "TEXT NOT NULL DEFAULT 'MANUAL' CHECK (base IN ('EJECUCION', 'EJECUCION_REAJUSTADA', 'TOTAL_CON_RETROACTIVOS', 'MANUAL'))",
+            "porcentaje": "NUMERIC",
+            "base_importe": "NUMERIC",
+        },
+    }
+    for tabla, columnas in nuevas.items():
+        existentes = {fila[1] for fila in conn.execute(f"PRAGMA table_info({tabla})").fetchall()}
+        for nombre, definicion in columnas.items():
+            if nombre not in existentes:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {definicion}")
+    sentencias = list(REAJ_DDL)
+    for tabla in REAJ_TABLAS_SOLO_INSERCION:
+        for operacion in ("UPDATE", "DELETE"):
+            sentencias.append(
+                f"CREATE TRIGGER IF NOT EXISTS trg_rj_{tabla}_sin_{operacion.lower()} BEFORE {operacion} ON {tabla} "
+                f"BEGIN SELECT RAISE(ABORT, 'RJ_HISTORIAL: {tabla} solo admite agregar registros'); END"
+            )
+    # Igual que en certificados: los triggers se recrean siempre para que una base ya migrada tome la definición vigente.
+    definidos = set()
+    for sentencia in sentencias:
+        trigger = re.search(r"CREATE TRIGGER IF NOT EXISTS (\w+)", sentencia)
+        if trigger:
+            definidos.add(trigger.group(1))
+            conn.execute(f"DROP TRIGGER IF EXISTS {trigger.group(1)}")
+        conn.execute(sentencia)
+    for (obsoleto,) in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg\\_rj\\_%' ESCAPE '\\'"
+    ).fetchall():
+        if obsoleto not in definidos:
+            conn.execute(f"DROP TRIGGER IF EXISTS {obsoleto}")
+
+
+CLIENTES_EXCEL_PATH = os.path.join(BASE_DIR, "Clientes.xlsx")
+
+
+def migrar_verificacion_certificados(conn):
+    """Código de verificación consultable por índice. Es una columna GENERADA a partir de snapshot_json (que es inmutable):
+    no se escribe ninguna fila, no se tocan los triggers de inmutabilidad y el valor siempre coincide con el snapshot."""
+    if not conn.execute("PRAGMA table_info(certificados_cliente)").fetchall():
+        return
+    # table_xinfo (y no table_info) porque las columnas generadas no aparecen en table_info.
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_xinfo(certificados_cliente)")}
+    if "codigo_verificacion" not in columnas:
+        conn.execute(
+            "ALTER TABLE certificados_cliente ADD COLUMN codigo_verificacion TEXT "
+            "GENERATED ALWAYS AS (json_extract(snapshot_json, '$.codigo_verificacion')) VIRTUAL"
+        )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cert_codigo_verificacion ON certificados_cliente (codigo_verificacion) "
+        "WHERE codigo_verificacion IS NOT NULL"
+    )
+
+
 def migrar_clientes_excel(conn):
-    ruta_excel = os.path.join(BASE_DIR, "Clientes.xlsx")
+    """Importación deliberada de Clientes.xlsx: inserta o actualiza todos los clientes del Excel.
+
+    Devuelve la cantidad importada, o None si falta el archivo o la lectura falla. No confirma la transacción.
+    """
+    ruta_excel = CLIENTES_EXCEL_PATH
     if not os.path.exists(ruta_excel):
         print(f"No se encontro el archivo de clientes para migrar: {ruta_excel}")
-        return
+        return None
 
     try:
         from openpyxl import load_workbook
@@ -1353,8 +2144,49 @@ def migrar_clientes_excel(conn):
 
         libro.close()
         print(f"Clientes migrados desde Excel: {migrados}")
+        return migrados
     except Exception as exc:
         print(f"Error migrando Clientes.xlsx: {exc}")
+        return None
+
+
+def importar_clientes_inicial(conn):
+    """Carga inicial de Clientes.xlsx al arrancar: solo si la tabla clientes está vacía.
+
+    Los reinicios (uvicorn --reload) no reimportan ni modifican updated_at; para actualizar desde el Excel
+    se llama deliberadamente a migrar_clientes_excel. El recuento y la carga ocurren bajo BEGIN IMMEDIATE:
+    dos arranques simultáneos no pueden importar a la vez, y el segundo ya encuentra la tabla cargada.
+    """
+    if conn.in_transaction:
+        print("Clientes.xlsx: importacion automatica omitida: dashboard.db tiene una transaccion pendiente.")
+        return
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+    except sqlite3.OperationalError as exc:
+        if "database is locked" not in str(exc).lower():
+            raise
+        print("Clientes.xlsx: importacion automatica omitida: dashboard.db esta bloqueada por otro proceso.")
+        return
+    try:
+        existentes = conn.execute("SELECT COUNT(*) FROM clientes").fetchone()[0]
+        if existentes:
+            conn.rollback()
+            print(f"Clientes.xlsx: importacion automatica omitida: la tabla clientes ya tiene {existentes} registros (no se modifican).")
+            return
+        if not os.path.exists(CLIENTES_EXCEL_PATH):
+            conn.rollback()
+            print(f"Clientes.xlsx: importacion inicial omitida: la tabla clientes esta vacia y no se encontro {CLIENTES_EXCEL_PATH}.")
+            return
+        migrados = migrar_clientes_excel(conn)
+        if migrados is None:
+            conn.rollback()
+            print("Clientes.xlsx: importacion inicial fallida: se revirtio y la tabla clientes sigue vacia.")
+            return
+        conn.commit()
+        print(f"Clientes.xlsx: importacion inicial ejecutada: {migrados} clientes (la tabla clientes estaba vacia).")
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 def migrar_catalogos_v2(conn):
@@ -1427,13 +2259,17 @@ def init_sqlite():
                     print("No se pudo migrar gestion_operativa porque dashboard.db esta bloqueada por otro proceso.")
                 migrar_usuarios_administracion(conn)
                 migrar_responsables_modulo(conn)
+                migrar_sesiones(conn)
                 migrar_email_templates(conn)
                 migrar_personal_dotacion(conn)
                 migrar_habilitaciones_personal(conn)
                 migrar_horas_maquinas(conn)
                 migrar_centros_costos(conn)
                 migrar_seguimiento_cc(conn)
-                migrar_clientes_excel(conn)
+                migrar_certificados_cliente(conn)
+                migrar_reajustes(conn)
+                migrar_verificacion_certificados(conn)
+                migrar_facturacion(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -1441,6 +2277,7 @@ def init_sqlite():
                     if "database is locked" not in str(exc).lower():
                         raise
                     print("Init SQLite: commit omitido temporalmente por bloqueo de dashboard.db; reintentara en el siguiente reload.")
+                importar_clientes_inicial(conn)
             return
         except sqlite3.OperationalError as exc:
             if "database is locked" not in str(exc).lower():
@@ -2075,6 +2912,8 @@ def reconciliar_gestion_operativa_cerradas(conn):
             )
 
 
+from facturacion import migrar_facturacion  # noqa: E402  (tablas fac_*; ver facturacion.py)
+
 init_sqlite()
 
 
@@ -2556,9 +3395,31 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
     user = str(username or "").strip()
     pwd = str(password or "")
 
-    if user == AUTH_USER and pwd == AUTH_PASS:
+    token_anterior = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
+    ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")
+
+    if secrets.compare_digest(user.encode("utf-8"), AUTH_USER.encode("utf-8")) and secrets.compare_digest(
+        pwd.encode("utf-8"), AUTH_PASS.encode("utf-8")
+    ):
+        try:
+            with get_sqlite_connection() as conn:
+                if token_anterior:
+                    _sesion_revocar_token(conn, token_anterior, "NUEVO_LOGIN")
+                token = _sesion_crear(conn, request, "contingencia", AUTH_USER)
+                conn.execute(
+                    """
+                    INSERT INTO historial_accesos (username_input, evento, detalle, ip, user_agent)
+                    VALUES (?, 'LOGIN_CONTINGENCIA', '', ?, ?)
+                    """,
+                    (user, ip, user_agent),
+                )
+                conn.commit()
+        except sqlite3.Error:
+            logger.exception("No se pudo registrar la sesión de contingencia")
+            return RedirectResponse("/login?error=1", status_code=302)
         response = RedirectResponse("/", status_code=302)
-        response.set_cookie(AUTH_COOKIE_NAME, user, max_age=SESSION_IDLE_SECONDS, httponly=True, samesite="lax")
+        _sesion_set_cookie(response, request, token)
         return response
 
     # Usuarios administrados desde el módulo Administración. El nombre de
@@ -2568,7 +3429,7 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
         with get_sqlite_connection() as conn:
             fila = conn.execute(
                 """
-                SELECT id, password_hash FROM usuarios
+                SELECT id, correo, password_hash FROM usuarios
                 WHERE lower(correo) = lower(?)
                   AND upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO'
                   AND COALESCE(bloqueado, 0) = 0
@@ -2592,11 +3453,14 @@ def login_submit(request: Request, username: str = Form(""), password: str = For
                     (usuario_id, username_input, evento, detalle, ip, user_agent)
                     VALUES (?, ?, 'LOGIN_EXITOSO', '', ?, ?)
                     """,
-                    (fila["id"], user, request.client.host if request.client else "", request.headers.get("user-agent", "")),
+                    (fila["id"], user, ip, user_agent),
                 )
+                if token_anterior:
+                    _sesion_revocar_token(conn, token_anterior, "NUEVO_LOGIN")
+                token = _sesion_crear(conn, request, "usuarios", fila["correo"], fila["id"])
                 conn.commit()
                 response = RedirectResponse("/", status_code=302)
-                response.set_cookie(AUTH_COOKIE_NAME, user, max_age=SESSION_IDLE_SECONDS, httponly=True, samesite="lax")
+                _sesion_set_cookie(response, request, token)
                 return response
             if fila:
                 conn.execute(
@@ -3395,6 +4259,10 @@ def admin_actualizar_usuario(usuario_id: int, request: Request, payload: dict):
                 valores.append(_cifrar_password(nueva_password))
             valores.append(usuario_id)
             conn.execute(f"UPDATE usuarios SET {', '.join(campos)} WHERE id = ?", valores)
+            if str(datos.get("password", "")):
+                _sesion_revocar_usuario(conn, usuario_id, "PASSWORD_CAMBIADA")
+            if (str(datos.get("estado", "ACTIVO")).strip().upper() or "ACTIVO") != "ACTIVO":
+                _sesion_revocar_usuario(conn, usuario_id, "USUARIO_INACTIVO")
             conn.execute("DELETE FROM usuario_roles_funcionales WHERE usuario_id = ?", (usuario_id,))
             for rol_id in roles:
                 try:
@@ -3418,6 +4286,8 @@ def admin_cambiar_estado_usuario(usuario_id: int, request: Request, payload: dic
         cur = conn.execute("UPDATE usuarios SET estado = ?, updated_at = datetime('now') WHERE id = ?", (estado, usuario_id))
         if not cur.rowcount:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        if estado != "ACTIVO":
+            _sesion_revocar_usuario(conn, usuario_id, "USUARIO_INACTIVO")
         _registrar_acceso_admin(conn, request, "USUARIO_ESTADO", f"usuario_id={usuario_id}; estado={estado}")
         conn.commit()
     return {"ok": True}
@@ -3431,6 +4301,8 @@ def admin_cambiar_bloqueo_usuario(usuario_id: int, request: Request, payload: di
         cur = conn.execute("UPDATE usuarios SET bloqueado = ?, updated_at = datetime('now') WHERE id = ?", (bloqueado, usuario_id))
         if not cur.rowcount:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        if bloqueado:
+            _sesion_revocar_usuario(conn, usuario_id, "USUARIO_BLOQUEADO")
         _registrar_acceso_admin(conn, request, "USUARIO_BLOQUEO", f"usuario_id={usuario_id}; bloqueado={bloqueado}")
         conn.commit()
     return {"ok": True}
@@ -3448,6 +4320,7 @@ def admin_resetear_password(usuario_id: int, request: Request, payload: dict):
         )
         if not cur.rowcount:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        _sesion_revocar_usuario(conn, usuario_id, "PASSWORD_RESTABLECIDA")
         _registrar_acceso_admin(conn, request, "PASSWORD_RESTABLECIDA", f"usuario_id={usuario_id}")
         conn.commit()
     return {"ok": True, "password": password}
@@ -3489,8 +4362,17 @@ def admin_listar_accesos(request: Request, limit: int = Query(100, ge=1, le=500)
 
 @app.get("/logout")
 def logout(request: Request):
+    token = str(request.cookies.get(AUTH_COOKIE_NAME, "")).strip()
+    if token:
+        try:
+            with get_sqlite_connection() as conn:
+                _sesion_revocar_token(conn, token, "LOGOUT")
+                conn.commit()
+        except sqlite3.Error:
+            logger.exception("No se pudo revocar la sesión al cerrar sesión")
     response = RedirectResponse("/login", status_code=302)
-    response.delete_cookie(AUTH_COOKIE_NAME)
+    response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    response.delete_cookie(LEGACY_AUTH_COOKIE_NAME, path="/")
     return response
 
 
@@ -3705,222 +4587,3142 @@ def _numero_seguimiento_cliente(seguimiento_id):
     return f"SEG-{int(seguimiento_id):04d}"
 
 
-@app.get("/operaciones/seguimientos-cliente")
-def listar_seguimientos_cliente(request: Request):
-    _requiere_modulo(request, "operaciones")
-    with get_sqlite_connection() as conn:
-        filas = conn.execute(
+# --- Seguimiento de Cliente --------------------------------------------------
+# Modelo: seguimiento_cc (1) -> Orden_de_compra_cliente (N) -> items_oc_cliente (N).
+# El Centro de Costos es la referencia de la obra; no existe una entidad Obra aparte.
+# La cabecera, cada OC y cada ítem se guardan por separado para conservar sus IDs.
+
+SEG_ESTADOS = ("En preparación", "En curso", "Finalizado")
+SEG_CAMPOS_TEXTO = {
+    "cotizacion": ("cotizacion", "Cotización", 500),
+    "condiciones_comerciales": ("condiciones_comerciales", "Condiciones comerciales", 500),
+    "telefono": ("telefono", "Teléfono", 80),
+    "solicitado_por": ("solicitado_por", "Solicitado por", 200),
+    "direccion": ("direccion", "Dirección", 300),
+    "contacto": ("contacto", "Contacto", 300),
+    "disponibilidad": ("disponibilidad", "Disponibilidad", 300),
+    "observaciones": ("observaciones", "Observaciones", 2000),
+}
+SEG_CAMPOS_FECHA = {
+    "fecha_alta_servicio": "Fecha alta servicio",
+    "fecha_inicio": "Fecha de inicio",
+    "fecha_final": "Fecha final",
+}
+SEG_CENTAVOS = Decimal("0.01")
+
+
+def _seg_error(detalle, status_code=400):
+    return HTTPException(status_code=status_code, detail=detalle)
+
+
+def _seg_texto(valor, campo, maximo):
+    texto = str(valor if valor is not None else "").strip()
+    if len(texto) > maximo:
+        raise _seg_error(f"{campo}: supera el máximo de {maximo} caracteres.")
+    return texto or None
+
+
+def _seg_fecha(valor, campo):
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    try:
+        datetime.strptime(texto, "%Y-%m-%d")
+    except ValueError:
+        raise _seg_error(f"{campo}: fecha inválida, use el formato AAAA-MM-DD.")
+    return texto
+
+
+def _seg_decimal(valor, campo, requerido=False, positivo=False):
+    if valor is None or str(valor).strip() == "":
+        if requerido:
+            raise _seg_error(f"{campo}: es obligatorio.")
+        return None
+    numero = _parse_op_num(valor, None)
+    if numero is None or not math.isfinite(numero):
+        raise _seg_error(f"{campo}: debe ser un número válido.")
+    decimal = Decimal(str(numero))
+    if decimal < 0 or (positivo and decimal == 0):
+        raise _seg_error(f"{campo}: debe ser {'mayor que cero' if positivo else 'mayor o igual a cero'}.")
+    return decimal
+
+
+def _seg_moneda(valor, requerido=True):
+    texto = str(valor or "").strip().upper()
+    if not texto:
+        if requerido:
+            raise _seg_error("Moneda: es obligatoria.")
+        return None
+    if not re.fullmatch(r"[A-Z]{3}", texto):
+        raise _seg_error("Moneda: use un código de 3 letras (por ejemplo ARS, USD, EUR).")
+    return texto
+
+
+def _seg_redondear(valor):
+    return float(Decimal(str(valor or 0)).quantize(SEG_CENTAVOS, rounding=ROUND_HALF_UP))
+
+
+def _seg_total_item(cantidad, precio):
+    return (Decimal(str(cantidad)) * Decimal(str(precio))).quantize(SEG_CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+async def _seg_leer_json(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise _seg_error("El cuerpo de la solicitud no es un JSON válido.")
+    if not isinstance(payload, dict):
+        raise _seg_error("El cuerpo de la solicitud debe ser un objeto JSON.")
+    return payload
+
+
+def _seg_ejecutar(operacion):
+    """Ejecuta una operación de escritura en una única transacción."""
+    conn = get_sqlite_connection()
+    try:
+        resultado = operacion(conn)
+        conn.commit()
+        return resultado
+    except HTTPException:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        raise _seg_error(f"La operación viola la integridad de los datos: {exc}", 409)
+    except sqlite3.Error as exc:
+        conn.rollback()
+        raise _seg_error(f"Error de base de datos: {exc}", 500)
+    finally:
+        conn.close()
+
+
+def _seg_obtener(conn, seguimiento_id):
+    fila = conn.execute("SELECT * FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)).fetchone()
+    if fila is None:
+        raise _seg_error("Seguimiento de cliente no encontrado.", 404)
+    return fila
+
+
+def _seg_obtener_orden(conn, seguimiento_id, orden_id):
+    fila = conn.execute(
+        "SELECT * FROM Orden_de_compra_cliente WHERE id = ? AND seguimiento_cc_id = ?",
+        (orden_id, seguimiento_id),
+    ).fetchone()
+    if fila is None:
+        raise _seg_error("La orden de compra no existe o no pertenece a este seguimiento.", 404)
+    return fila
+
+
+def _seg_obtener_item(conn, orden_id, item_id):
+    fila = conn.execute(
+        "SELECT * FROM items_oc_cliente WHERE id = ? AND orden_compra_cliente_id = ?",
+        (item_id, orden_id),
+    ).fetchone()
+    if fila is None:
+        raise _seg_error("El ítem no existe o no pertenece a esta orden de compra.", 404)
+    return fila
+
+
+def _seg_tocar(conn, seguimiento_id):
+    conn.execute(
+        "UPDATE seguimiento_cc SET fecha_ultima_actualizacion = CURRENT_TIMESTAMP WHERE id = ?",
+        (seguimiento_id,),
+    )
+
+
+def _seg_items_orden(conn, orden_id):
+    return [
+        dict(fila)
+        for fila in conn.execute(
             """
-            SELECT id, fecha_alta_servicio, cotizacion, estado_seguimiento,
-                   fecha_ultima_actualizacion
-            FROM seguimiento_cc
-            ORDER BY id DESC
-            """
+            SELECT id, orden_compra_cliente_id, numero, descripcion, unidad, cantidad,
+                   moneda, precio, total, observacion
+            FROM items_oc_cliente
+            WHERE orden_compra_cliente_id = ?
+            ORDER BY numero, id
+            """,
+            (orden_id,),
         ).fetchall()
+    ]
+
+
+def _seg_orden_payload(conn, orden):
+    items = _seg_items_orden(conn, orden["id"])
+    moneda_oc = (orden["moneda"] or "").upper()
+    total_misma_moneda = sum(
+        (Decimal(str(item["total"] or 0)) for item in items if (item["moneda"] or moneda_oc).upper() == moneda_oc),
+        Decimal("0"),
+    )
+    otras_monedas = sorted({(item["moneda"] or "").upper() for item in items} - {moneda_oc, ""})
+    return {
+        **dict(orden),
+        "items": items,
+        "cantidad_items": len(items),
+        "total_items": _seg_redondear(total_misma_moneda),
+        "items_otras_monedas": otras_monedas,
+    }
+
+
+def _seg_ordenes_payload(conn, seguimiento_id):
+    ordenes = conn.execute(
+        "SELECT * FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ? ORDER BY numero, id",
+        (seguimiento_id,),
+    ).fetchall()
+    return [_seg_orden_payload(conn, orden) for orden in ordenes]
+
+
+def _seg_resumen(ordenes):
+    """Totales calculados a partir de lo guardado, agrupados por moneda (nunca se mezclan)."""
+    por_moneda = {}
+    cantidad_items = 0
+    for orden in ordenes:
+        moneda = (orden["moneda"] or "SIN MONEDA").upper()
+        grupo = por_moneda.setdefault(moneda, {"monto_oc": Decimal("0"), "total_items": Decimal("0"), "cantidad_ordenes": 0, "cantidad_items": 0})
+        grupo["monto_oc"] += Decimal(str(orden["monto_oc"] or 0))
+        grupo["cantidad_ordenes"] += 1
+        for item in orden["items"]:
+            cantidad_items += 1
+            moneda_item = (item["moneda"] or moneda).upper()
+            grupo_item = por_moneda.setdefault(moneda_item, {"monto_oc": Decimal("0"), "total_items": Decimal("0"), "cantidad_ordenes": 0, "cantidad_items": 0})
+            grupo_item["total_items"] += Decimal(str(item["total"] or 0))
+            grupo_item["cantidad_items"] += 1
+    return {
+        "cantidad_ordenes": len(ordenes),
+        "cantidad_items": cantidad_items,
+        "por_moneda": [
+            {
+                "moneda": moneda,
+                "monto_oc": _seg_redondear(grupo["monto_oc"]),
+                "total_items": _seg_redondear(grupo["total_items"]),
+                "diferencia": _seg_redondear(grupo["monto_oc"] - grupo["total_items"]),
+                "cantidad_ordenes": grupo["cantidad_ordenes"],
+                "cantidad_items": grupo["cantidad_items"],
+            }
+            for moneda, grupo in sorted(por_moneda.items())
+        ],
+    }
+
+
+def _seg_centro_costo_info(conn, centro_costo_id):
+    if centro_costo_id is None:
+        return None
+    fila = conn.execute(
+        """
+        SELECT id, nombre, activo, cliente_id, proyecto_id, ubicacion, provincia, responsable_id, contrato,
+               orden_compra, fecha_inicio, fecha_fin_prevista, estado, moneda, importe_contratado
+        FROM centros_costos WHERE id = ?
+        """,
+        (centro_costo_id,),
+    ).fetchone()
+    return dict(fila) if fila else None
+
+
+def _seg_detalle(conn, seguimiento_id):
+    seguimiento = _seg_obtener(conn, seguimiento_id)
+    ordenes = _seg_ordenes_payload(conn, seguimiento_id)
+    centro = _seg_centro_costo_info(conn, seguimiento["centro_costo_id"])
+    centro_costo_texto = f"{centro['id']} - {(centro['nombre'] or '').strip()}" if centro else ""
+    empresa_texto = ""
+    cuit = ""
+    codigo_cliente = (seguimiento["cliente_codigo"] or "").strip()
+    if codigo_cliente:
+        cli = conn.execute(
+            "SELECT codigo, razon_social, cuit FROM clientes WHERE codigo = ?", (codigo_cliente,)
+        ).fetchone()
+        if cli:
+            empresa_texto = f"{cli['codigo']} - {cli['razon_social']}"
+            cuit = cli["cuit"] or ""
+        else:
+            empresa_texto = codigo_cliente
+    return {
+        "seguimiento": {
+            **dict(seguimiento),
+            "numero_seg": _numero_seguimiento_cliente(seguimiento["id"]),
+            "centro_costo_texto": centro_costo_texto,
+            "empresa_texto": empresa_texto,
+            "cuit": cuit,
+        },
+        "centro_costo": centro,
+        "ordenes": ordenes,
+        "resumen": _seg_resumen(ordenes),
+    }
+
+
+def _seg_cabecera_desde_payload(conn, payload):
+    """Convierte solo las claves presentes en el payload; las ausentes no se tocan."""
+    datos = {}
+    if "centro_costo" in payload or "centro_costo_id" in payload:
+        valor = payload.get("centro_costo_id", payload.get("centro_costo"))
+        texto = str(valor if valor is not None else "").strip()
+        if not texto:
+            datos["centro_costo_id"] = None
+        else:
+            centro_id = _operaciones_centro_costo_id(texto)
+            if centro_id is None:
+                raise _seg_error("Centro de Costos: seleccione un valor de la lista.")
+            if conn.execute("SELECT 1 FROM centros_costos WHERE id = ?", (centro_id,)).fetchone() is None:
+                raise _seg_error(f"Centro de Costos: no existe el centro {centro_id}.")
+            datos["centro_costo_id"] = centro_id
+    if "empresa" in payload or "cliente_codigo" in payload:
+        valor = payload.get("cliente_codigo", payload.get("empresa"))
+        codigo = str(valor or "").split(" - ", 1)[0].strip()
+        if codigo and conn.execute("SELECT 1 FROM clientes WHERE codigo = ?", (codigo,)).fetchone() is None:
+            raise _seg_error("Empresa: seleccione un cliente existente de la lista.")
+        datos["cliente_codigo"] = codigo or None
+    for clave, (columna, campo, maximo) in SEG_CAMPOS_TEXTO.items():
+        if clave in payload:
+            datos[columna] = _seg_texto(payload.get(clave), campo, maximo)
+    for clave, campo in SEG_CAMPOS_FECHA.items():
+        if clave in payload:
+            datos[clave] = _seg_fecha(payload.get(clave), campo)
+    if "cantidad_certificados" in payload:
+        valor = payload.get("cantidad_certificados")
+        try:
+            cantidad = int(str(valor).strip() or 0) if valor is not None else 0
+        except ValueError:
+            raise _seg_error("Cantidad de certificados: debe ser un número entero.")
+        if cantidad < 0:
+            raise _seg_error("Cantidad de certificados: no puede ser negativa.")
+        datos["cantidad_certificados"] = cantidad
+    if "estado_seguimiento" in payload:
+        estado = str(payload.get("estado_seguimiento") or "").strip() or SEG_ESTADOS[0]
+        if estado not in SEG_ESTADOS:
+            raise _seg_error(f"Estado: valor no permitido. Opciones: {', '.join(SEG_ESTADOS)}.")
+        datos["estado_seguimiento"] = estado
+    return datos
+
+
+def _seg_validar_cabecera(registro):
+    # Un Centro de Costos puede tener varios SEG (contratos, ampliaciones o expedientes independientes).
+    if registro.get("centro_costo_id") is None:
+        raise _seg_error("Centro de Costos: es obligatorio. El seguimiento se vincula a la obra por su Centro de Costos.")
+    inicio, final = registro.get("fecha_inicio"), registro.get("fecha_final")
+    if inicio and final and final < inicio:
+        raise _seg_error(f"La fecha final ({final}) no puede ser anterior a la fecha de inicio ({inicio}).")
+
+
+def _seg_guardar_cabecera(conn, payload, seguimiento_id=None):
+    if "ordenes" in payload:
+        raise _seg_error(
+            "Las órdenes de compra y sus ítems se guardan individualmente; "
+            "recargue la página para usar la versión actual del formulario."
+        )
+    datos = _seg_cabecera_desde_payload(conn, payload)
+    if seguimiento_id is not None:
+        actual = dict(_seg_obtener(conn, seguimiento_id))
+        _seg_validar_cabecera({**actual, **datos})
+        if datos:
+            asignaciones = ", ".join(f"{columna} = ?" for columna in datos)
+            conn.execute(
+                f"UPDATE seguimiento_cc SET {asignaciones}, fecha_ultima_actualizacion = CURRENT_TIMESTAMP WHERE id = ?",
+                (*datos.values(), seguimiento_id),
+            )
+        return seguimiento_id, False
+    datos.setdefault("estado_seguimiento", SEG_ESTADOS[0])
+    datos.setdefault("cantidad_certificados", 0)
+    _seg_validar_cabecera(datos)
+    columnas = ", ".join(datos)
+    marcadores = ", ".join("?" for _ in datos)
+    cursor = conn.execute(
+        f"INSERT INTO seguimiento_cc ({columnas}, fecha_ultima_actualizacion) VALUES ({marcadores}, CURRENT_TIMESTAMP)",
+        tuple(datos.values()),
+    )
+    return cursor.lastrowid, True
+
+
+def _seg_resumen_seguimiento(conn, seguimiento_id):
+    return _seg_resumen(_seg_ordenes_payload(conn, seguimiento_id))
+
+
+def _seg_consolidar_por_moneda(resumenes):
+    """Suma los resúmenes de varios SEG agrupando por moneda; nunca mezcla monedas."""
+    por_moneda = {}
+    for resumen in resumenes:
+        for grupo in resumen["por_moneda"]:
+            total = por_moneda.setdefault(grupo["moneda"], {"monto_oc": Decimal("0"), "total_items": Decimal("0"), "cantidad_ordenes": 0, "cantidad_items": 0})
+            total["monto_oc"] += Decimal(str(grupo["monto_oc"]))
+            total["total_items"] += Decimal(str(grupo["total_items"]))
+            total["cantidad_ordenes"] += grupo["cantidad_ordenes"]
+            total["cantidad_items"] += grupo["cantidad_items"]
     return [
         {
+            "moneda": moneda,
+            "monto_oc": _seg_redondear(total["monto_oc"]),
+            "total_items": _seg_redondear(total["total_items"]),
+            "diferencia": _seg_redondear(total["monto_oc"] - total["total_items"]),
+            "cantidad_ordenes": total["cantidad_ordenes"],
+            "cantidad_items": total["cantidad_items"],
+        }
+        for moneda, total in sorted(por_moneda.items())
+    ]
+
+
+def _seg_listar(conn, centro_costo_id=None):
+    filtro, parametros = ("WHERE s.centro_costo_id = ?", (centro_costo_id,)) if centro_costo_id is not None else ("", ())
+    filas = conn.execute(
+        f"""
+        SELECT s.id, s.fecha_alta_servicio, s.cotizacion, s.estado_seguimiento,
+               s.fecha_ultima_actualizacion, s.centro_costo_id, s.cliente_codigo,
+               cc.nombre AS centro_costo_nombre, cli.razon_social AS cliente_nombre
+        FROM seguimiento_cc s
+        LEFT JOIN centros_costos cc ON cc.id = s.centro_costo_id
+        LEFT JOIN clientes cli ON cli.codigo = s.cliente_codigo
+        {filtro}
+        ORDER BY s.id DESC
+        """,
+        parametros,
+    ).fetchall()
+    resultado = []
+    for fila in filas:
+        resumen = _seg_resumen_seguimiento(conn, fila["id"])
+        resultado.append({
             **dict(fila),
             "numero_seg": _numero_seguimiento_cliente(fila["id"]),
-        }
-        for fila in filas
-    ]
+            "cantidad_ordenes": resumen["cantidad_ordenes"],
+            "cantidad_items": resumen["cantidad_items"],
+            "importes_por_moneda": resumen["por_moneda"],
+        })
+    return resultado
+
+
+@app.get("/operaciones/seguimientos-cliente")
+def listar_seguimientos_cliente(request: Request, centro_costo_id: int | None = Query(None)):
+    _requiere_modulo(request, "operaciones")
+    conn = get_sqlite_connection()
+    try:
+        return _seg_listar(conn, centro_costo_id)
+    finally:
+        conn.close()
 
 
 @app.get("/operaciones/seguimiento-cliente/{seguimiento_id}")
 def obtener_seguimiento_cliente(request: Request, seguimiento_id: int):
     _requiere_modulo(request, "operaciones")
-    with get_sqlite_connection() as conn:
-        seguimiento = conn.execute(
-            "SELECT * FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)
-        ).fetchone()
-        if seguimiento is None:
-            raise HTTPException(status_code=404, detail="Seguimiento de cliente no encontrado.")
-        ordenes = conn.execute(
-            """
-            SELECT id, numero, orden_compra, revision, otorgada, vencimiento,
-                   moneda, monto_oc, observaciones
-            FROM Orden_de_compra_cliente
-            WHERE seguimiento_cc_id = ?
-            ORDER BY numero, id
-            """,
-            (seguimiento_id,),
-        ).fetchall()
-        ordenes_payload = []
-        for orden in ordenes:
-            items = conn.execute(
-                """
-                SELECT id, numero, descripcion, unidad, cantidad, moneda,
-                       precio, total, observacion
-                FROM items_oc_cliente
-                WHERE orden_compra_cliente_id = ?
-                ORDER BY numero, id
-                """,
-                (orden["id"],),
-            ).fetchall()
-            ordenes_payload.append({**dict(orden), "items": [dict(item) for item in items]})
-        centro_costo_texto = ""
-        if seguimiento["centro_costo_id"] is not None:
-            cc = conn.execute(
-                "SELECT id, nombre FROM centros_costos WHERE id = ?", (seguimiento["centro_costo_id"],)
-            ).fetchone()
-            if cc:
-                centro_costo_texto = f"{cc['id']} - {(cc['nombre'] or '').strip()}"
-        empresa_texto = ""
-        cuit = ""
-        codigo_cliente = (seguimiento["cliente_codigo"] or "").strip() if "cliente_codigo" in seguimiento.keys() else ""
-        if codigo_cliente:
-            cli = conn.execute(
-                "SELECT codigo, razon_social, cuit FROM clientes WHERE codigo = ?", (codigo_cliente,)
-            ).fetchone()
-            if cli:
-                empresa_texto = f"{cli['codigo']} - {cli['razon_social']}"
-                cuit = cli["cuit"] or ""
-            else:
-                empresa_texto = codigo_cliente
-    seguimiento_payload = {
-        **dict(seguimiento),
-        "numero_seg": _numero_seguimiento_cliente(seguimiento["id"]),
-        "centro_costo_texto": centro_costo_texto,
-        "empresa_texto": empresa_texto,
-        "cuit": cuit,
-    }
-    return {"seguimiento": seguimiento_payload, "ordenes": ordenes_payload}
+    conn = get_sqlite_connection()
+    try:
+        return _seg_detalle(conn, seguimiento_id)
+    finally:
+        conn.close()
 
 
 @app.post("/operaciones/seguimiento-cliente")
 async def guardar_seguimiento_cliente(request: Request):
+    """Crea un seguimiento o, si se envía seguimiento_id, actualiza solo su cabecera."""
     _requiere_modulo(request, "operaciones")
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = {}
-
-    ordenes = payload.get("ordenes", [])
-    if not isinstance(ordenes, list):
-        raise HTTPException(status_code=400, detail="Las órdenes de compra deben ser una lista.")
-    for orden in ordenes:
-        if not isinstance(orden, dict) or not isinstance(orden.get("items", []), list):
-            raise HTTPException(status_code=400, detail="El formato de una orden de compra no es válido.")
-
+    payload = await _seg_leer_json(request)
     seguimiento_id = payload.get("seguimiento_id")
-    centro_costo_id = _operaciones_centro_costo_id(payload.get("centro_costo"))
-    fecha_alta = str(payload.get("fecha_alta_servicio") or "").strip() or None
-    cotizacion = str(payload.get("cotizacion") or "").strip() or None
-    fecha_inicio = str(payload.get("fecha_inicio") or "").strip() or None
-    fecha_final = str(payload.get("fecha_final") or "").strip() or None
-    condiciones = str(payload.get("condiciones_comerciales") or "").strip() or None
-    estado = str(payload.get("estado_seguimiento") or "En preparación").strip() or "En preparación"
-    cliente_codigo = str(payload.get("empresa") or "").split(" - ", 1)[0].strip() or None
-    telefono = str(payload.get("telefono") or "").strip() or None
-    solicitado_por = str(payload.get("solicitado_por") or "").strip() or None
-    direccion = str(payload.get("direccion") or "").strip() or None
-    contacto = str(payload.get("contacto") or "").strip() or None
-    disponibilidad = str(payload.get("disponibilidad") or "").strip() or None
-    try:
-        cantidad_certificados = int(payload.get("cantidad_certificados") or 0)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="La cantidad de certificados debe ser un entero.")
-
-    with get_sqlite_connection() as conn:
+    if seguimiento_id not in (None, ""):
         try:
-            if seguimiento_id:
-                seguimiento_id = int(seguimiento_id)
-                existe = conn.execute(
-                    "SELECT 1 FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)
-                ).fetchone()
-                if existe is None:
-                    raise HTTPException(status_code=404, detail="Seguimiento de cliente no encontrado.")
-                conn.execute(
-                    """
-                    UPDATE seguimiento_cc SET centro_costo_id = ?, fecha_alta_servicio = ?,
-                        cotizacion = ?, fecha_inicio = ?, fecha_final = ?,
-                        cantidad_certificados = ?, condiciones_comerciales = ?,
-                        estado_seguimiento = ?, cliente_codigo = ?, telefono = ?,
-                        solicitado_por = ?, direccion = ?, contacto = ?, disponibilidad = ?,
-                        fecha_ultima_actualizacion = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (centro_costo_id, fecha_alta, cotizacion, fecha_inicio, fecha_final,
-                     cantidad_certificados, condiciones, estado, cliente_codigo, telefono,
-                     solicitado_por, direccion, contacto, disponibilidad, seguimiento_id),
-                )
-            else:
-                seguimiento_id = conn.execute(
-                    "SELECT COALESCE(MAX(id), 0) + 1 FROM seguimiento_cc"
-                ).fetchone()[0]
-                conn.execute(
-                    """
-                    INSERT INTO seguimiento_cc (
-                        id, centro_costo_id, fecha_alta_servicio, cotizacion, fecha_inicio,
-                        fecha_final, cantidad_certificados, condiciones_comerciales,
-                        estado_seguimiento, cliente_codigo, telefono, solicitado_por,
-                        direccion, contacto, disponibilidad, fecha_ultima_actualizacion
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    """,
-                    (seguimiento_id, centro_costo_id, fecha_alta, cotizacion, fecha_inicio,
-                     fecha_final, cantidad_certificados, condiciones, estado, cliente_codigo,
-                     telefono, solicitado_por, direccion, contacto, disponibilidad),
-                )
+            seguimiento_id = int(seguimiento_id)
+        except (TypeError, ValueError):
+            raise _seg_error("El identificador del seguimiento no es válido.")
+    else:
+        seguimiento_id = None
 
-            conn.execute(
-                "DELETE FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ?",
-                (seguimiento_id,),
-            )
-            for orden_index, orden in enumerate(ordenes, start=1):
-                cur_orden = conn.execute(
-                    """
-                    INSERT INTO Orden_de_compra_cliente (
-                        seguimiento_cc_id, numero, orden_compra, revision, otorgada,
-                        vencimiento, moneda, monto_oc, observaciones
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        seguimiento_id, orden_index,
-                        str(orden.get("orden_compra") or "").strip() or None,
-                        str(orden.get("revision") or "").strip() or None,
-                        str(orden.get("otorgada") or "").strip() or None,
-                        str(orden.get("vencimiento") or "").strip() or None,
-                        str(orden.get("moneda") or "").strip() or None,
-                        _parse_op_num(orden.get("monto_oc"), 0),
-                        str(orden.get("observaciones") or "").strip() or None,
-                    ),
-                )
-                orden_id = cur_orden.lastrowid
-                for item_index, item in enumerate(orden.get("items", []), start=1):
-                    cantidad = _parse_op_num(item.get("cantidad"), 0)
-                    precio = _parse_op_num(item.get("precio"), 0)
-                    total = _parse_op_num(item.get("total"), cantidad * precio)
-                    conn.execute(
-                        """
-                        INSERT INTO items_oc_cliente (
-                            orden_compra_cliente_id, numero, descripcion, unidad,
-                            cantidad, moneda, precio, total, observacion
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            orden_id, item_index,
-                            str(item.get("descripcion") or "").strip() or None,
-                            str(item.get("unidad") or "").strip() or None,
-                            cantidad, str(item.get("moneda") or "").strip() or None,
-                            precio, total,
-                            str(item.get("observacion") or "").strip() or None,
-                        ),
-                    )
-            conn.commit()
-        except HTTPException:
-            conn.rollback()
-            raise
-        except sqlite3.Error as exc:
-            conn.rollback()
-            raise HTTPException(status_code=400, detail=f"No se pudo guardar el seguimiento: {exc}")
+    def operacion(conn):
+        sid, creado = _seg_guardar_cabecera(conn, payload, seguimiento_id)
+        return sid, creado, _seg_detalle(conn, sid)
 
+    sid, creado, detalle = _seg_ejecutar(operacion)
     return {
         "ok": True,
-        "seguimiento_id": seguimiento_id,
-        "numero_seg": _numero_seguimiento_cliente(seguimiento_id),
-        "mensaje": "Seguimiento de cliente guardado correctamente.",
+        "creado": creado,
+        "seguimiento_id": sid,
+        "numero_seg": _numero_seguimiento_cliente(sid),
+        "mensaje": f"Seguimiento {_numero_seguimiento_cliente(sid)} {'creado' if creado else 'actualizado'} correctamente.",
+        **detalle,
     }
 
+
+@app.put("/operaciones/seguimiento-cliente/{seguimiento_id}")
+async def actualizar_seguimiento_cliente(request: Request, seguimiento_id: int):
+    _requiere_modulo(request, "operaciones")
+    payload = await _seg_leer_json(request)
+    payload.pop("seguimiento_id", None)
+
+    def operacion(conn):
+        _seg_guardar_cabecera(conn, payload, seguimiento_id)
+        return _seg_detalle(conn, seguimiento_id)
+
+    detalle = _seg_ejecutar(operacion)
+    return {
+        "ok": True,
+        "creado": False,
+        "seguimiento_id": seguimiento_id,
+        "numero_seg": _numero_seguimiento_cliente(seguimiento_id),
+        "mensaje": f"Seguimiento {_numero_seguimiento_cliente(seguimiento_id)} actualizado correctamente.",
+        **detalle,
+    }
+
+
+def _seg_orden_desde_payload(payload, actual=None):
+    datos = {}
+    if actual is None or "orden_compra" in payload:
+        numero_oc = _seg_texto(payload.get("orden_compra"), "Orden de compra", 100)
+        if not numero_oc:
+            raise _seg_error("Orden de compra: el número de OC es obligatorio.")
+        datos["orden_compra"] = numero_oc
+    if actual is None or "revision" in payload:
+        datos["revision"] = _seg_texto(payload.get("revision"), "Revisión", 50)
+    for clave, campo in (("otorgada", "Fecha de otorgamiento"), ("vencimiento", "Fecha de vencimiento")):
+        if actual is None or clave in payload:
+            datos[clave] = _seg_fecha(payload.get(clave), campo)
+    if actual is None or "moneda" in payload:
+        datos["moneda"] = _seg_moneda(payload.get("moneda"))
+    if actual is None or "monto_oc" in payload:
+        monto = _seg_decimal(payload.get("monto_oc"), "Monto de OC")
+        datos["monto_oc"] = float((monto or Decimal("0")).quantize(SEG_CENTAVOS, rounding=ROUND_HALF_UP))
+    if actual is None or "observaciones" in payload:
+        datos["observaciones"] = _seg_texto(payload.get("observaciones"), "Observaciones", 2000)
+    registro = {**(dict(actual) if actual else {}), **datos}
+    if registro.get("otorgada") and registro.get("vencimiento") and registro["vencimiento"] < registro["otorgada"]:
+        raise _seg_error(
+            f"La fecha de vencimiento ({registro['vencimiento']}) no puede ser anterior "
+            f"a la de otorgamiento ({registro['otorgada']})."
+        )
+    return datos, registro
+
+
+def _seg_validar_oc_unica(conn, seguimiento_id, registro, orden_id=None):
+    duplicada = conn.execute(
+        """
+        SELECT id FROM Orden_de_compra_cliente
+        WHERE seguimiento_cc_id = ? AND id != ?
+          AND UPPER(TRIM(orden_compra)) = UPPER(TRIM(?))
+          AND UPPER(TRIM(COALESCE(revision, ''))) = UPPER(TRIM(COALESCE(?, '')))
+        """,
+        (seguimiento_id, orden_id or 0, registro["orden_compra"], registro.get("revision")),
+    ).fetchone()
+    if duplicada is not None:
+        raise _seg_error("Ya existe una OC con ese número y revisión en este seguimiento.", 409)
+
+
+@app.get("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes")
+def listar_ordenes_seguimiento_cliente(request: Request, seguimiento_id: int):
+    _requiere_modulo(request, "operaciones")
+    conn = get_sqlite_connection()
+    try:
+        _seg_obtener(conn, seguimiento_id)
+        ordenes = _seg_ordenes_payload(conn, seguimiento_id)
+        return {"ordenes": ordenes, "resumen": _seg_resumen(ordenes)}
+    finally:
+        conn.close()
+
+
+@app.post("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes")
+async def crear_orden_seguimiento_cliente(request: Request, seguimiento_id: int):
+    _requiere_modulo(request, "operaciones")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        _seg_obtener(conn, seguimiento_id)
+        datos, registro = _seg_orden_desde_payload(payload)
+        _seg_validar_oc_unica(conn, seguimiento_id, registro)
+        numero = conn.execute(
+            "SELECT COALESCE(MAX(numero), 0) + 1 FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ?",
+            (seguimiento_id,),
+        ).fetchone()[0]
+        columnas = ["seguimiento_cc_id", "numero", *datos]
+        cursor = conn.execute(
+            f"INSERT INTO Orden_de_compra_cliente ({', '.join(columnas)}) VALUES ({', '.join('?' for _ in columnas)})",
+            (seguimiento_id, numero, *datos.values()),
+        )
+        _seg_tocar(conn, seguimiento_id)
+        return cursor.lastrowid, _seg_detalle(conn, seguimiento_id)
+
+    orden_id, detalle = _seg_ejecutar(operacion)
+    return {"ok": True, "orden_id": orden_id, "mensaje": "Orden de compra agregada.", **detalle}
+
+
+@app.put("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}")
+async def actualizar_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
+    _requiere_modulo(request, "operaciones")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        actual = _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        datos, registro = _seg_orden_desde_payload(payload, actual)
+        _seg_validar_oc_unica(conn, seguimiento_id, registro, orden_id)
+        _cert_validar_cambio_orden(conn, actual, datos)
+        if datos:
+            conn.execute(
+                f"UPDATE Orden_de_compra_cliente SET {', '.join(f'{c} = ?' for c in datos)} WHERE id = ? AND seguimiento_cc_id = ?",
+                (*datos.values(), orden_id, seguimiento_id),
+            )
+            _seg_tocar(conn, seguimiento_id)
+        return _seg_detalle(conn, seguimiento_id)
+
+    detalle = _seg_ejecutar(operacion)
+    return {"ok": True, "orden_id": orden_id, "mensaje": "Orden de compra actualizada.", **detalle}
+
+
+@app.delete("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}")
+def eliminar_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
+    _requiere_modulo(request, "operaciones")
+
+    def operacion(conn):
+        orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        cantidad_items = conn.execute(
+            "SELECT COUNT(*) FROM items_oc_cliente WHERE orden_compra_cliente_id = ?", (orden_id,)
+        ).fetchone()[0]
+        if cantidad_items:
+            raise _seg_error(
+                f"La OC {orden['orden_compra'] or orden['numero']} tiene {cantidad_items} ítem(s). "
+                "Elimínelos o muévalos a otra OC antes de eliminarla.",
+                409,
+            )
+        _cert_liberar_borradores(conn, "orden_compra_cliente_id", orden_id, f"La OC {orden['orden_compra'] or orden['numero']}")
+        conn.execute(
+            "DELETE FROM Orden_de_compra_cliente WHERE id = ? AND seguimiento_cc_id = ?",
+            (orden_id, seguimiento_id),
+        )
+        _seg_tocar(conn, seguimiento_id)
+        return _seg_detalle(conn, seguimiento_id)
+
+    detalle = _seg_ejecutar(operacion)
+    return {"ok": True, "mensaje": "Orden de compra eliminada.", **detalle}
+
+
+def _seg_item_desde_payload(payload, orden, actual=None):
+    datos = {}
+    if actual is None or "descripcion" in payload:
+        descripcion = _seg_texto(payload.get("descripcion"), "Descripción", 500)
+        if not descripcion:
+            raise _seg_error("Descripción: es obligatoria.")
+        datos["descripcion"] = descripcion
+    if actual is None or "unidad" in payload:
+        datos["unidad"] = _seg_texto(payload.get("unidad"), "Unidad", 30)
+    if actual is None or "moneda" in payload:
+        datos["moneda"] = _seg_moneda(payload.get("moneda"), requerido=False) or _seg_moneda(orden["moneda"], requerido=False)
+    if actual is None or "observacion" in payload:
+        datos["observacion"] = _seg_texto(payload.get("observacion"), "Observación", 1000)
+    cantidad = _seg_decimal(payload.get("cantidad"), "Cantidad", requerido=True, positivo=True) \
+        if actual is None or "cantidad" in payload else Decimal(str(actual["cantidad"] or 0))
+    precio = _seg_decimal(payload.get("precio"), "Precio unitario", requerido=True) \
+        if actual is None or "precio" in payload else Decimal(str(actual["precio"] or 0))
+    datos["cantidad"] = float(cantidad)
+    datos["precio"] = float(precio)
+    # El total siempre lo calcula el servidor; se ignora cualquier total enviado por el cliente.
+    datos["total"] = float(_seg_total_item(cantidad, precio))
+    return datos
+
+
+@app.get("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items")
+def listar_items_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
+    _requiere_modulo(request, "operaciones")
+    conn = get_sqlite_connection()
+    try:
+        orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        return _seg_orden_payload(conn, orden)
+    finally:
+        conn.close()
+
+
+@app.post("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items")
+async def crear_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
+    _requiere_modulo(request, "operaciones")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        datos = _seg_item_desde_payload(payload, orden)
+        numero = conn.execute(
+            "SELECT COALESCE(MAX(numero), 0) + 1 FROM items_oc_cliente WHERE orden_compra_cliente_id = ?",
+            (orden_id,),
+        ).fetchone()[0]
+        columnas = ["orden_compra_cliente_id", "numero", *datos]
+        cursor = conn.execute(
+            f"INSERT INTO items_oc_cliente ({', '.join(columnas)}) VALUES ({', '.join('?' for _ in columnas)})",
+            (orden_id, numero, *datos.values()),
+        )
+        _seg_tocar(conn, seguimiento_id)
+        return cursor.lastrowid, _seg_detalle(conn, seguimiento_id)
+
+    item_id, detalle = _seg_ejecutar(operacion)
+    return {"ok": True, "item_id": item_id, "orden_id": orden_id, "mensaje": "Ítem agregado.", **detalle}
+
+
+@app.put("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items/{item_id}")
+async def actualizar_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int, item_id: int):
+    """Actualiza un ítem. Con orden_compra_cliente_id lo mueve a otra OC del mismo seguimiento."""
+    _requiere_modulo(request, "operaciones")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        actual = _seg_obtener_item(conn, orden_id, item_id)
+        destino_id = orden_id
+        if payload.get("orden_compra_cliente_id") not in (None, ""):
+            try:
+                destino_id = int(payload["orden_compra_cliente_id"])
+            except (TypeError, ValueError):
+                raise _seg_error("La OC de destino no es válida.")
+        destino = orden if destino_id == orden_id else _seg_obtener_orden(conn, seguimiento_id, destino_id)
+        datos = _seg_item_desde_payload(payload, destino, actual)
+        if destino_id != orden_id:
+            datos["orden_compra_cliente_id"] = destino_id
+        _cert_validar_cambio_item(conn, actual, datos)
+        if destino_id != orden_id:
+            datos["numero"] = conn.execute(
+                "SELECT COALESCE(MAX(numero), 0) + 1 FROM items_oc_cliente WHERE orden_compra_cliente_id = ?",
+                (destino_id,),
+            ).fetchone()[0]
+        conn.execute(
+            f"UPDATE items_oc_cliente SET {', '.join(f'{c} = ?' for c in datos)} WHERE id = ? AND orden_compra_cliente_id = ?",
+            (*datos.values(), item_id, orden_id),
+        )
+        _seg_tocar(conn, seguimiento_id)
+        return destino_id, _seg_detalle(conn, seguimiento_id)
+
+    destino_id, detalle = _seg_ejecutar(operacion)
+    mensaje = "Ítem actualizado." if destino_id == orden_id else "Ítem actualizado y movido a la OC seleccionada."
+    return {"ok": True, "item_id": item_id, "orden_id": destino_id, "mensaje": mensaje, **detalle}
+
+
+@app.delete("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items/{item_id}")
+def eliminar_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int, item_id: int):
+    _requiere_modulo(request, "operaciones")
+
+    def operacion(conn):
+        _seg_obtener_orden(conn, seguimiento_id, orden_id)
+        item = _seg_obtener_item(conn, orden_id, item_id)
+        _cert_liberar_borradores(conn, "item_oc_cliente_id", item_id, f"El ítem {item['numero']}")
+        conn.execute(
+            "DELETE FROM items_oc_cliente WHERE id = ? AND orden_compra_cliente_id = ?",
+            (item_id, orden_id),
+        )
+        _seg_tocar(conn, seguimiento_id)
+        return _seg_detalle(conn, seguimiento_id)
+
+    detalle = _seg_ejecutar(operacion)
+    return {"ok": True, "orden_id": orden_id, "mensaje": "Ítem eliminado.", **detalle}
+
+
+@app.get("/operaciones/centros-costos/{id_centro}/seguimientos")
+@app.get("/api/operaciones/centros-costos/{id_centro}/seguimientos")
+def consolidado_seguimientos_centro_costo(request: Request, id_centro: int):
+    """Vista consolidada (solo lectura) de los SEG de un Centro de Costos, con totales por moneda."""
+    _requiere_modulo(request, "operaciones")
+    conn = get_sqlite_connection()
+    try:
+        centro = _seg_centro_costo_info(conn, id_centro)
+        if centro is None:
+            raise _seg_error("Centro de Costos no encontrado.", 404)
+        seguimientos = _seg_listar(conn, id_centro)
+    finally:
+        conn.close()
+    resumenes = [{"por_moneda": seg["importes_por_moneda"]} for seg in seguimientos]
+    return {
+        "centro_costo": centro,
+        "seguimientos": seguimientos,
+        "consolidado": {
+            "cantidad_seguimientos": len(seguimientos),
+            "cantidad_ordenes": sum(seg["cantidad_ordenes"] for seg in seguimientos),
+            "cantidad_items": sum(seg["cantidad_items"] for seg in seguimientos),
+            "por_moneda": _seg_consolidar_por_moneda(resumenes),
+        },
+    }
+
+
+# ============================================================================
+# Certificados de cliente
+# ----------------------------------------------------------------------------
+# Un certificado pertenece a un SEG y, si su alcance es "OC", a una OC concreta.
+# Cada importe se registra en líneas contra su OC (y su ítem en modalidad ITEMS),
+# de modo que certificados por OC y por SEG consumen el mismo saldo y nunca se
+# cuenta dos veces el mismo avance. Solo los certificados EMITIDOS computan.
+# Todos los importes se calculan aquí con Decimal; el cliente solo envía datos de carga.
+# ============================================================================
+
+CERT_MODULO = "operaciones"
+CERT_PANEL = "seguimiento_cliente"
+# Acciones que exigen un usuario nominal con el permiso asignado explícitamente
+# (no alcanza con la cuenta de contingencia ni con el perfil de desarrollador).
+CERT_ACCIONES_NOMINALES = {
+    "emitir_certificado", "anular_certificado", "autorizar_exceso", "cambiar_modalidad",
+    "configurar_reajuste", "cargar_indices", "incorporar_historico",
+}
+CERT_MODALIDADES = ("ITEMS", "GLOBAL")
+CERT_TIPOS = ("PARCIAL", "FINAL")
+CERT_ALCANCES = ("OC", "SEG")
+CERT_CONCEPTOS_DESCUENTO = ("RECUPERO_ANTICIPO", "FONDO_REPARO", "MULTA", "OTRO")
+CERT_CANTIDAD = Decimal("0.0001")
+CERT_MIN_JUSTIFICACION = 20
+CERT_MIN_MOTIVO_ANULACION = 10
+CERT_DOC_DIR = os.path.join(DATA_DIR, "Doc_Certificados")
+# Verificación pública: sin URL configurada los PDF se emiten sin QR (el código impreso sigue sirviendo para consultar).
+CERT_URL_VERIFICACION = os.getenv("CERT_URL_VERIFICACION", "").strip().rstrip("/")
+# Con un proxy de confianza delante (Render) la IP del cliente se toma de X-Forwarded-For; si no, de la conexión.
+CERT_VERIFICACION_PROXY = os.getenv("CERT_VERIFICACION_PROXY", "").strip().lower() in ("1", "true", "si", "sí")
+CERT_MESES = ("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto",
+              "Septiembre", "Octubre", "Noviembre", "Diciembre")
+CERT_CERO = Decimal("0")
+
+
+def _cert_tiene_accion_nominal(perfil, accion):
+    if (perfil or {}).get("origen") != "usuarios":
+        return False
+    if CERT_MODULO not in (perfil.get("modulos") or []):
+        return False
+    if CERT_PANEL not in ((perfil.get("paneles") or {}).get(CERT_MODULO) or []):
+        return False
+    return accion in (((perfil.get("acciones") or {}).get(CERT_MODULO) or {}).get(CERT_PANEL) or [])
+
+
+def _cert_requiere(request: Request, accion: str):
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+    if accion not in CERT_ACCIONES_NOMINALES:
+        return _requiere_accion(request, CERT_MODULO, CERT_PANEL, accion)
+    if not _cert_tiene_accion_nominal(perfil, accion):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Esta operación requiere un usuario nominal con el permiso '{accion}' en Seguimiento de Cliente.",
+        )
+    return perfil
+
+
+def _cert_dec(valor):
+    return Decimal(str(valor if valor is not None else 0))
+
+
+def _cert_cent(valor):
+    return Decimal(valor).quantize(SEG_CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+def _cert_cant(valor):
+    return Decimal(valor).quantize(CERT_CANTIDAD, rounding=ROUND_HALF_UP)
+
+
+def _cert_hay(datos, clave):
+    return isinstance(datos, dict) and datos.get(clave) not in (None, "")
+
+
+def _cert_json(valor):
+    """Convierte Decimal a float (recursivo) para respuestas y JSON persistidos."""
+    if isinstance(valor, Decimal):
+        return float(valor)
+    if isinstance(valor, dict):
+        return {k: _cert_json(v) for k, v in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [_cert_json(v) for v in valor]
+    return valor
+
+
+def _cert_opcion(valor, opciones, campo):
+    texto = str(valor or "").strip().upper()
+    if texto not in opciones:
+        raise _seg_error(f"{campo}: valor no permitido. Opciones: {', '.join(opciones)}.")
+    return texto
+
+
+def _cert_id(valor, campo):
+    if valor in (None, ""):
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        raise _seg_error(f"{campo}: identificador inválido.")
+
+
+def _cert_numero_texto(seguimiento_id, numero):
+    if numero is None:
+        return None
+    return f"{_numero_seguimiento_cliente(seguimiento_id)}-CERT-{int(numero):03d}"
+
+
+def _cert_evento(conn, seguimiento_id, certificado_id, evento, usuario, detalle=None):
+    conn.execute(
+        """
+        INSERT INTO certificados_cliente_eventos (seguimiento_cc_id, certificado_id, evento, usuario, fecha, detalle_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            seguimiento_id, certificado_id, evento, usuario or "desconocido", fecha_actual_iso(),
+            json.dumps(_cert_json(detalle), ensure_ascii=False, default=str) if detalle else None,
+        ),
+    )
+
+
+def _cert_ejecutar(operacion):
+    """Escritura en una transacción BEGIN IMMEDIATE: serializa cálculo de saldos y numeración."""
+    conn = get_sqlite_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        resultado = operacion(conn)
+        conn.commit()
+        return resultado
+    except HTTPException:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        raise _seg_error(f"La operación viola la integridad de los certificados: {exc}", 409)
+    except sqlite3.Error as exc:
+        conn.rollback()
+        raise _seg_error(f"Error de base de datos: {exc}", 500)
+    finally:
+        conn.close()
+
+
+async def _cert_leer_json_opcional(request: Request):
+    cuerpo = await request.body()
+    if not cuerpo.strip():
+        return {}
+    return await _seg_leer_json(request)
+
+
+# ---------------------------------------------------------------------------
+# Lectura de OC, ítems y acumulados
+# ---------------------------------------------------------------------------
+
+def _cert_ordenes(conn, seguimiento_id):
+    ordenes = {}
+    for orden in conn.execute(
+        "SELECT * FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ? ORDER BY numero, id", (seguimiento_id,)
+    ).fetchall():
+        items = conn.execute(
+            "SELECT * FROM items_oc_cliente WHERE orden_compra_cliente_id = ? ORDER BY numero, id", (orden["id"],)
+        ).fetchall()
+        ordenes[orden["id"]] = {"orden": orden, "moneda": (orden["moneda"] or "").strip().upper(), "items": items}
+    return ordenes
+
+
+def _cert_moneda_item(item, moneda_orden):
+    return (item["moneda"] or "").strip().upper() or moneda_orden
+
+
+def _cert_etiqueta_oc(orden):
+    texto = f"OC {orden['orden_compra'] or orden['numero']}"
+    return f"{texto} {orden['revision']}" if orden["revision"] else texto
+
+
+def _cert_acumulados(conn, seguimiento_id):
+    """Acumulados válidos (solo EMITIDO) por OC y por ítem. Las sumas se hacen con Decimal, no con SUM de SQL."""
+    filas = conn.execute(
+        """
+        SELECT l.orden_compra_cliente_id, l.item_oc_cliente_id, l.cantidad_periodo, l.importe_periodo, c.tipo, c.numero
+        FROM certificados_cliente_lineas l
+        JOIN certificados_cliente c ON c.id = l.certificado_id
+        WHERE c.seguimiento_cc_id = ? AND c.estado = 'EMITIDO'
+        """,
+        (seguimiento_id,),
+    ).fetchall()
+    por_oc, por_item, cerradas = {}, {}, {}
+    for fila in filas:
+        orden_id = fila["orden_compra_cliente_id"]
+        por_oc[orden_id] = por_oc.get(orden_id, CERT_CERO) + _cert_dec(fila["importe_periodo"])
+        if fila["item_oc_cliente_id"] is not None:
+            cantidad, importe = por_item.get(fila["item_oc_cliente_id"], (CERT_CERO, CERT_CERO))
+            por_item[fila["item_oc_cliente_id"]] = (
+                cantidad + _cert_dec(fila["cantidad_periodo"]),
+                importe + _cert_dec(fila["importe_periodo"]),
+            )
+        if fila["tipo"] == "FINAL":
+            cerradas[orden_id] = fila["numero"]
+    inicial = _rj_saldo_inicial(conn, seguimiento_id)
+    for orden_id, base in inicial["oc"].items():
+        por_oc[orden_id] = por_oc.get(orden_id, CERT_CERO) + base
+    for item_id, (cantidad_inicial, importe_inicial) in inicial["item"].items():
+        cantidad, importe = por_item.get(item_id, (CERT_CERO, CERT_CERO))
+        por_item[item_id] = (cantidad + cantidad_inicial, importe + importe_inicial)
+    return {"oc": por_oc, "item": por_item, "cerradas": cerradas}
+
+
+# ---------------------------------------------------------------------------
+# Cálculo de líneas
+# ---------------------------------------------------------------------------
+
+def _cert_lineas_items(ordenes, alcance_ocs, acumulados, tipo, entradas):
+    items = {}
+    for orden_id in alcance_ocs:
+        datos = ordenes[orden_id]
+        etiqueta_oc = _cert_etiqueta_oc(datos["orden"])
+        if not datos["items"]:
+            raise _seg_error(f"La {etiqueta_oc} no tiene ítems; no puede certificarse por ítems.")
+        total_items = CERT_CERO
+        for item in datos["items"]:
+            if _cert_moneda_item(item, datos["moneda"]) != datos["moneda"]:
+                raise _seg_error(f"La {etiqueta_oc} tiene ítems en otra moneda; corríjala antes de certificar por ítems.")
+            total_items += _cert_dec(item["total"])
+            items[item["id"]] = (orden_id, item)
+        monto_oc = _cert_cent(_cert_dec(datos["orden"]["monto_oc"]))
+        if _cert_cent(total_items) != monto_oc:
+            raise _seg_error(
+                f"La suma de los ítems de la {etiqueta_oc} ({_cert_cent(total_items)}) no coincide con el monto de la OC "
+                f"({monto_oc}). Concílielos antes de certificar por ítems."
+            )
+
+    pedidos = {}
+    for entrada in entradas:
+        if not isinstance(entrada, dict):
+            raise _seg_error("Cada línea debe ser un objeto.")
+        item_id = _cert_id(entrada.get("item_oc_cliente_id"), "Ítem")
+        if item_id not in items:
+            raise _seg_error(f"El ítem {item_id} no pertenece al alcance del certificado o su OC está cerrada.")
+        if item_id in pedidos:
+            raise _seg_error(f"El ítem {item_id} está repetido en el certificado.")
+        pedidos[item_id] = entrada
+
+    lineas = []
+    for item_id, (orden_id, item) in items.items():
+        entrada = pedidos.get(item_id, {})
+        etiqueta = f"Ítem {item['numero']} ({item['descripcion'] or ''})"
+        contratada = _cert_dec(item["cantidad"])
+        precio = _cert_dec(item["precio"])
+        base = _cert_cent(_cert_dec(item["total"]))
+        cantidad_anterior, importe_anterior = acumulados["item"].get(item_id, (CERT_CERO, CERT_CERO))
+        final_ingresado = None
+        if tipo == "PARCIAL":
+            if _cert_hay(entrada, "cantidad_periodo"):
+                periodo = _seg_decimal(entrada["cantidad_periodo"], f"{etiqueta}: cantidad del período")
+            elif _cert_hay(entrada, "porcentaje_periodo"):
+                periodo = contratada * _seg_decimal(entrada["porcentaje_periodo"], f"{etiqueta}: porcentaje del período") / 100
+            else:
+                periodo = CERT_CERO
+            periodo = _cert_cant(periodo)
+        else:
+            if _cert_hay(entrada, "cantidad_final"):
+                final = _seg_decimal(entrada["cantidad_final"], f"{etiqueta}: cantidad final")
+            elif _cert_hay(entrada, "porcentaje_final"):
+                final = contratada * _seg_decimal(entrada["porcentaje_final"], f"{etiqueta}: porcentaje final") / 100
+            elif _cert_hay(entrada, "cantidad_periodo"):
+                final = cantidad_anterior + _seg_decimal(entrada["cantidad_periodo"], f"{etiqueta}: cantidad del período")
+            else:
+                final = None
+            if final is not None:
+                final = _cert_cant(final)
+                final_ingresado = final
+            else:
+                final = cantidad_anterior
+            if final < cantidad_anterior:
+                raise _seg_error(
+                    f"{etiqueta}: la cantidad final ({final}) es menor que la ya certificada ({cantidad_anterior})."
+                )
+            periodo = final - cantidad_anterior
+        acumulada = cantidad_anterior + periodo
+        # El importe acumulado se recalcula desde la cantidad acumulada; al completar el ítem se usa su total exacto.
+        importe_acumulado = base if acumulada == contratada else _cert_cent(acumulada * precio)
+        importe_periodo = importe_acumulado - importe_anterior
+        if importe_periodo < 0:
+            raise _seg_error(f"{etiqueta}: el importe del período resulta negativo; revise los certificados anteriores.")
+        lineas.append({
+            "orden_compra_cliente_id": orden_id,
+            "item_oc_cliente_id": item_id,
+            "orden_compra": ordenes[orden_id]["orden"]["orden_compra"],
+            "item_numero": item["numero"],
+            "descripcion": item["descripcion"],
+            "unidad": item["unidad"],
+            "precio_unitario": precio,
+            "cantidad_contratada": contratada,
+            "base_linea": base,
+            "cantidad_anterior": cantidad_anterior,
+            "cantidad_periodo": periodo,
+            "cantidad_acumulada": acumulada,
+            "importe_anterior": importe_anterior,
+            "importe_periodo": importe_periodo,
+            "importe_acumulado": importe_acumulado,
+            "valor_final_ingresado": final_ingresado,
+            "exceso_importe": max(CERT_CERO, importe_acumulado - max(base, importe_anterior)),
+            "observacion": _seg_texto(entrada.get("observacion"), f"{etiqueta}: observación", 500),
+        })
+    return lineas
+
+
+def _cert_distribuir(ordenes, alcance_ocs, acumulados, tipo, entrada):
+    """Reparte un importe total entre las OC del alcance en proporción a su saldo (método del mayor resto)."""
+    clave = "importe_total_periodo" if tipo == "PARCIAL" else "importe_final_total"
+    if not _cert_hay(entrada, clave):
+        return {}
+    total = _cert_cent(_seg_decimal(entrada.get(clave), "Importe total"))
+    anteriores = {oid: acumulados["oc"].get(oid, CERT_CERO) for oid in alcance_ocs}
+    if tipo == "FINAL":
+        anterior_total = sum(anteriores.values(), CERT_CERO)
+        if total < anterior_total:
+            raise _seg_error(f"El importe final ({total}) es menor que lo ya certificado ({anterior_total}).")
+        total -= anterior_total
+    saldos = {
+        oid: max(CERT_CERO, _cert_cent(_cert_dec(ordenes[oid]["orden"]["monto_oc"])) - anteriores[oid])
+        for oid in alcance_ocs
+    }
+    saldo_total = sum(saldos.values(), CERT_CERO)
+    if total > saldo_total:
+        raise _seg_error(
+            f"El importe ({total}) supera el saldo disponible ({saldo_total}). "
+            "Para registrar un exceso, distribúyalo manualmente por OC."
+        )
+    centavos = int(total * 100)
+    pesos = {oid: int(saldos[oid] * 100) for oid in alcance_ocs}
+    peso_total = sum(pesos.values())
+    asignado = {oid: (centavos * pesos[oid] // peso_total) if peso_total else 0 for oid in alcance_ocs}
+    resto = centavos - sum(asignado.values())
+    orden_resto = sorted(
+        alcance_ocs,
+        key=lambda oid: (-((centavos * pesos[oid]) % peso_total) if peso_total else 0, alcance_ocs.index(oid)),
+    )
+    for oid in orden_resto[:resto]:
+        asignado[oid] += 1
+    if tipo == "PARCIAL":
+        return {oid: {"importe_periodo": Decimal(asignado[oid]) / 100} for oid in alcance_ocs}
+    return {oid: {"importe_final": anteriores[oid] + Decimal(asignado[oid]) / 100} for oid in alcance_ocs}
+
+
+def _cert_lineas_global(ordenes, alcance_ocs, acumulados, tipo, entradas, entrada_general):
+    pedidos = {}
+    for entrada in entradas:
+        if not isinstance(entrada, dict):
+            raise _seg_error("Cada línea debe ser un objeto.")
+        orden_id = _cert_id(entrada.get("orden_compra_cliente_id"), "OC")
+        if orden_id is None and len(alcance_ocs) == 1:
+            orden_id = alcance_ocs[0]
+        if orden_id not in alcance_ocs:
+            raise _seg_error(f"La OC {orden_id} no pertenece al alcance del certificado o está cerrada.")
+        if orden_id in pedidos:
+            raise _seg_error(f"La OC {orden_id} está repetida en el certificado.")
+        pedidos[orden_id] = entrada
+    if not pedidos:
+        pedidos = _cert_distribuir(ordenes, alcance_ocs, acumulados, tipo, entrada_general)
+
+    lineas = []
+    for orden_id in alcance_ocs:
+        orden = ordenes[orden_id]["orden"]
+        entrada = pedidos.get(orden_id, {})
+        etiqueta = _cert_etiqueta_oc(orden)
+        base = _cert_cent(_cert_dec(orden["monto_oc"]))
+        anterior = acumulados["oc"].get(orden_id, CERT_CERO)
+        final_ingresado = None
+        if tipo == "PARCIAL":
+            if _cert_hay(entrada, "importe_periodo"):
+                periodo = _seg_decimal(entrada["importe_periodo"], f"{etiqueta}: importe del período")
+            elif _cert_hay(entrada, "porcentaje_periodo"):
+                periodo = base * _seg_decimal(entrada["porcentaje_periodo"], f"{etiqueta}: porcentaje del período") / 100
+            else:
+                periodo = CERT_CERO
+            periodo = _cert_cent(periodo)
+        else:
+            if _cert_hay(entrada, "importe_final"):
+                final = _seg_decimal(entrada["importe_final"], f"{etiqueta}: importe final")
+            elif _cert_hay(entrada, "porcentaje_final"):
+                final = base * _seg_decimal(entrada["porcentaje_final"], f"{etiqueta}: porcentaje final") / 100
+            elif _cert_hay(entrada, "importe_periodo"):
+                final = anterior + _seg_decimal(entrada["importe_periodo"], f"{etiqueta}: importe del período")
+            else:
+                final = None
+            if final is not None:
+                final = _cert_cent(final)
+                final_ingresado = final
+            else:
+                final = anterior
+            if final < anterior:
+                raise _seg_error(f"{etiqueta}: el importe final ({final}) es menor que lo ya certificado ({anterior}).")
+            periodo = final - anterior
+        acumulado = anterior + periodo
+        lineas.append({
+            "orden_compra_cliente_id": orden_id,
+            "item_oc_cliente_id": None,
+            "orden_compra": orden["orden_compra"],
+            "item_numero": orden["numero"],
+            "descripcion": f"Monto global {etiqueta}",
+            "unidad": "Gl",
+            "precio_unitario": None,
+            "cantidad_contratada": None,
+            "base_linea": base,
+            "cantidad_anterior": None,
+            "cantidad_periodo": None,
+            "cantidad_acumulada": None,
+            "importe_anterior": anterior,
+            "importe_periodo": periodo,
+            "importe_acumulado": acumulado,
+            "valor_final_ingresado": final_ingresado,
+            "exceso_importe": max(CERT_CERO, acumulado - max(base, anterior)),
+            "observacion": _seg_texto(entrada.get("observacion"), f"{etiqueta}: observación", 500),
+        })
+    return lineas
+
+
+def _cert_descuentos(valor, bases=None):
+    if valor in (None, ""):
+        return []
+    if not isinstance(valor, list):
+        raise _seg_error("Descuentos: debe enviarse una lista.")
+    descuentos = []
+    for descuento in valor:
+        if not isinstance(descuento, dict):
+            raise _seg_error("Cada descuento debe ser un objeto.")
+        concepto = _cert_opcion(descuento.get("concepto"), CERT_CONCEPTOS_DESCUENTO, "Concepto de descuento")
+        descripcion = _seg_texto(descuento.get("descripcion"), "Descripción del descuento", 300)
+        if concepto == "OTRO" and not descripcion:
+            raise _seg_error("Descuento OTRO: la descripción es obligatoria.")
+        base = str(descuento.get("base") or "MANUAL").strip().upper()
+        if base not in REAJ_BASES_DESCUENTO:
+            raise _seg_error(f"Base del descuento: valor no permitido. Opciones: {', '.join(REAJ_BASES_DESCUENTO)}.")
+        porcentaje = base_importe = None
+        if base == "MANUAL":
+            importe = _cert_cent(_seg_decimal(descuento.get("importe"), "Importe del descuento", requerido=True, positivo=True))
+        else:
+            porcentaje = _rj_decimal(descuento.get("porcentaje"), "Porcentaje del descuento", positivo=True)
+            if porcentaje > 100:
+                raise _seg_error("Porcentaje del descuento: no puede superar 100.")
+            base_importe = (bases or {}).get(base, CERT_CERO)
+            importe = _cert_cent(base_importe * porcentaje / 100)
+        if importe <= 0:
+            raise _seg_error("Importe del descuento: debe ser mayor que cero.")
+        descuentos.append({"concepto": concepto, "descripcion": descripcion, "importe": importe,
+                           "base": base, "porcentaje": porcentaje, "base_importe": base_importe})
+    return descuentos
+
+
+# ---------------------------------------------------------------------------
+# Reajustes por polinómica y diferencias retroactivas
+#
+#   C(p)       = Σ wᵢ · Iᵢ(p) / Iᵢ(base)        versión de fórmula e índices vigentes para p
+#   REBASE     = cent( B × (f − 1) )
+#   POLINOMICA = cent( B × f × (C − 1) )         0 si la versión no permite negativos y resulta < 0
+#   Pendiente(k) = Esperado(k) − Reconocido(k)  → línea RETROACTIVO en el próximo certificado
+#
+# Esperado(k) se calcula con la fórmula y los índices vigentes HOY; Reconocido(k) suma las líneas
+# (de período y retroactivas) con origen k en certificados EMITIDOS. Así una diferencia ya reconocida
+# no se vuelve a cobrar y los certificados emitidos nunca se modifican.
+# ---------------------------------------------------------------------------
+
+REAJ_COMPONENTES = ("REBASE", "POLINOMICA")
+REAJ_BASES_DESCUENTO = ("EJECUCION", "EJECUCION_REAJUSTADA", "TOTAL_CON_RETROACTIVOS", "MANUAL")
+REAJ_ESTADOS_INDICE = ("PROVISORIO", "DEFINITIVO")
+REAJ_MIN_MOTIVO = 10
+REAJ_MIN_REFERENCIA = 5
+REAJ_MIN_MOTIVO_PREVISION = 5
+REAJ_UNO = Decimal("1")
+
+
+def _rj_periodo(valor, campo):
+    texto = str(valor or "").strip()
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", texto):
+        raise _seg_error(f"{campo}: use el formato AAAA-MM.")
+    return texto
+
+
+def _rj_periodo_texto(periodo):
+    if not periodo:
+        return ""
+    anio, mes = periodo.split("-")
+    return f"{CERT_MESES[int(mes) - 1]} {anio}"
+
+
+def _rj_decimal(valor, campo, requerido=True, positivo=False, admite_negativo=False):
+    """Decimal exacto desde texto o número (acepta coma decimal). Los índices y ponderaciones no pasan por float."""
+    if valor is None or str(valor).strip() == "":
+        if requerido:
+            raise _seg_error(f"{campo}: es obligatorio.")
+        return None
+    texto = str(valor).strip()
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+    try:
+        numero = Decimal(texto)
+    except Exception:
+        raise _seg_error(f"{campo}: debe ser un número válido.")
+    if not numero.is_finite():
+        raise _seg_error(f"{campo}: debe ser un número válido.")
+    if positivo and numero <= 0:
+        raise _seg_error(f"{campo}: debe ser mayor que cero.")
+    if not admite_negativo and numero < 0:
+        raise _seg_error(f"{campo}: no puede ser negativo.")
+    return numero
+
+
+def _rj_auditar(conn, seguimiento_id, accion, entidad, entidad_id, usuario, detalle=None):
+    conn.execute(
+        """
+        INSERT INTO reajuste_auditoria (seguimiento_cc_id, accion, entidad, entidad_id, detalle_json, usuario, fecha)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            seguimiento_id, accion, entidad, entidad_id,
+            json.dumps(_cert_json(detalle), ensure_ascii=False, default=str) if detalle else None,
+            usuario or "desconocido", fecha_actual_iso(),
+        ),
+    )
+
+
+def _rj_formulas(conn, seguimiento_id):
+    formulas = []
+    for fila in conn.execute(
+        "SELECT * FROM reajuste_formulas WHERE seguimiento_cc_id = ? ORDER BY version", (seguimiento_id,)
+    ).fetchall():
+        formula = dict(fila)
+        formula["factor"] = Decimal(fila["factor_rebase"])
+        formula["componentes"] = [
+            {**dict(c), "w": Decimal(c["ponderacion"]), "base": Decimal(c["valor_base"])}
+            for c in conn.execute("SELECT * FROM reajuste_componentes WHERE formula_id = ? ORDER BY id", (fila["id"],)).fetchall()
+        ]
+        formulas.append(formula)
+    return formulas
+
+
+def _rj_formula_para(formulas, periodo):
+    """Versión de número más alto con vigente_desde ≤ período."""
+    candidatas = [f for f in formulas if f["vigente_desde"] <= periodo]
+    return max(candidatas, key=lambda f: f["version"]) if candidatas else None
+
+
+def _rj_formula_texto(formula):
+    partes = [f"{c['w']}·{c['codigo']}/{c['base']}" for c in formula["componentes"]]
+    texto = "C = " + " + ".join(partes)
+    if formula["factor"] != REAJ_UNO:
+        texto += f" · factor de rebase {formula['factor']}"
+    return f"v{formula['version']}: {texto}"
+
+
+def _rj_indices(conn, seguimiento_id):
+    """{(codigo, periodo): [versiones ascendentes]}; la vigente es la última."""
+    indices = {}
+    for fila in conn.execute(
+        "SELECT * FROM reajuste_indices WHERE seguimiento_cc_id = ? ORDER BY codigo, periodo, version", (seguimiento_id,)
+    ).fetchall():
+        indices.setdefault((fila["codigo"], fila["periodo"]), []).append(dict(fila))
+    return indices
+
+
+def _rj_coeficiente(formula, periodo, indices):
+    """Devuelve (C, detalle, faltantes). C es None si falta algún índice del período."""
+    detalle, faltantes, coeficiente = [], [], Decimal(0)
+    for comp in formula["componentes"]:
+        versiones = indices.get((comp["codigo"], periodo))
+        if not versiones:
+            faltantes.append(comp["codigo"])
+            continue
+        vigente = versiones[-1]
+        relacion = Decimal(vigente["valor"]) / comp["base"]
+        coeficiente += comp["w"] * relacion
+        detalle.append({
+            "codigo": comp["codigo"], "nombre": comp["nombre"], "ponderacion": comp["ponderacion"],
+            "valor_base": comp["valor_base"], "indice_id": vigente["id"], "indice_version": vigente["version"],
+            "valor": vigente["valor"], "estado": vigente["estado"], "motivo": vigente["motivo"],
+            "relacion": str(relacion.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)),
+        })
+    if faltantes:
+        return None, detalle, faltantes
+    if formula["decimales_coeficiente"] is not None:
+        coeficiente = coeficiente.quantize(Decimal(1).scaleb(-int(formula["decimales_coeficiente"])), rounding=ROUND_HALF_UP)
+    return coeficiente, detalle, []
+
+
+def _rj_esperado(base, formula, coeficiente):
+    poli = _cert_cent(base * formula["factor"] * (coeficiente - REAJ_UNO))
+    if poli < 0 and not formula["permite_negativo"]:
+        poli = CERT_CERO
+    return {"REBASE": _cert_cent(base * (formula["factor"] - REAJ_UNO)), "POLINOMICA": poli}
+
+
+def _rj_detalle(formula, periodo, coeficiente, componentes):
+    return {
+        "formula_id": formula["id"], "formula_version": formula["version"], "factor_rebase": formula["factor_rebase"],
+        "permite_negativo": bool(formula["permite_negativo"]), "decimales_coeficiente": formula["decimales_coeficiente"],
+        "validacion_contractual": formula["validacion_contractual"], "mes_base": formula["mes_base"],
+        "periodo": periodo, "coeficiente": str(coeficiente), "componentes": componentes,
+    }
+
+
+def _rj_emitidos(conn, seguimiento_id, excluir_id=None):
+    """Certificados EMITIDOS con su base por OC y lo ya reconocido por (origen, OC, componente)."""
+    certificados = {
+        f["id"]: dict(f) for f in conn.execute(
+            """
+            SELECT id, numero, moneda, periodo_hasta, periodo_ejecucion, origen FROM certificados_cliente
+            WHERE seguimiento_cc_id = ? AND estado = 'EMITIDO' AND id != ? ORDER BY numero
+            """,
+            (seguimiento_id, excluir_id or 0),
+        ).fetchall()
+    }
+    bases = {}
+    for fila in conn.execute(
+        """
+        SELECT l.certificado_id, l.orden_compra_cliente_id, l.importe_periodo FROM certificados_cliente_lineas l
+        JOIN certificados_cliente c ON c.id = l.certificado_id WHERE c.seguimiento_cc_id = ? AND c.estado = 'EMITIDO'
+        """,
+        (seguimiento_id,),
+    ).fetchall():
+        por_oc = bases.setdefault(fila["certificado_id"], {})
+        por_oc[fila["orden_compra_cliente_id"]] = por_oc.get(fila["orden_compra_cliente_id"], CERT_CERO) + _cert_dec(fila["importe_periodo"])
+    reconocido, coef_aplicado, acumulado_moneda = {}, {}, {}
+    for fila in conn.execute(
+        """
+        SELECT r.*, c.moneda FROM certificados_cliente_reajustes r JOIN certificados_cliente c ON c.id = r.certificado_id
+        WHERE c.seguimiento_cc_id = ? AND c.estado = 'EMITIDO' ORDER BY c.numero, r.id
+        """,
+        (seguimiento_id,),
+    ).fetchall():
+        clave = (fila["origen_certificado_id"], fila["orden_compra_cliente_id"], fila["componente"])
+        reconocido[clave] = reconocido.get(clave, CERT_CERO) + _cert_dec(fila["importe"])
+        if fila["componente"] == "POLINOMICA" and fila["coeficiente"]:
+            coef_aplicado[clave[:2]] = fila["coeficiente"]
+        acumulado_moneda[fila["moneda"]] = acumulado_moneda.get(fila["moneda"], CERT_CERO) + _cert_dec(fila["importe"])
+    return {"certificados": certificados, "bases": bases, "reconocido": reconocido,
+            "coef_aplicado": coef_aplicado, "acumulado_moneda": acumulado_moneda}
+
+
+def _rj_pendientes(conn, seguimiento_id, ordenes_alcance, formulas, indices, emitidos):
+    """Líneas RETROACTIVO pendientes para las OC indicadas, y avisos de lo que no puede calcularse."""
+    lineas, avisos = [], []
+    for k in emitidos["certificados"].values():
+        periodo = k["periodo_ejecucion"] or (k["periodo_hasta"] or "")[:7]
+        formula = _rj_formula_para(formulas, periodo) if periodo else None
+        for orden_id, base in sorted(emitidos["bases"].get(k["id"], {}).items()):
+            if orden_id not in ordenes_alcance:
+                continue
+            reconocidos = {c: emitidos["reconocido"].get((k["id"], orden_id, c), CERT_CERO) for c in REAJ_COMPONENTES}
+            if formula is None:
+                # Sin fórmula para ese período no hay reajuste esperado; un reajuste histórico pagado se respeta.
+                continue
+            coeficiente, componentes, faltantes = _rj_coeficiente(formula, periodo, indices)
+            numero = _cert_numero_texto(seguimiento_id, k["numero"])
+            if coeficiente is None:
+                avisos.append(f"No se puede calcular el retroactivo de {numero} ({_rj_periodo_texto(periodo)}): faltan índices de {', '.join(faltantes)}.")
+                continue
+            esperado = _rj_esperado(base, formula, coeficiente)
+            for componente in REAJ_COMPONENTES:
+                diferencia = esperado[componente] - reconocidos[componente]
+                if diferencia == 0:
+                    continue
+                lineas.append({
+                    "tipo": "RETROACTIVO", "componente": componente, "orden_compra_cliente_id": orden_id,
+                    "origen_certificado_id": k["id"], "origen_numero_texto": numero, "periodo_origen": periodo,
+                    "base": base, "coeficiente": str(coeficiente) if componente == "POLINOMICA" else formula["factor_rebase"],
+                    "coeficiente_anterior": emitidos["coef_aplicado"].get((k["id"], orden_id)) if componente == "POLINOMICA" else None,
+                    "esperado": esperado[componente], "reconocido_previo": reconocidos[componente], "importe": diferencia,
+                    "detalle": _rj_detalle(formula, periodo, coeficiente, componentes),
+                })
+    return lineas, avisos
+
+
+def _rj_previsiones(conn, seguimiento_id):
+    vigentes = {}
+    for fila in conn.execute(
+        "SELECT * FROM reajuste_previsiones WHERE seguimiento_cc_id = ? ORDER BY id", (seguimiento_id,)
+    ).fetchall():
+        vigentes[fila["moneda"]] = dict(fila)
+    return vigentes
+
+
+def _rj_reglas_descuento(conn, seguimiento_id):
+    reglas = {}
+    for fila in conn.execute(
+        "SELECT * FROM certificados_reglas_descuento WHERE seguimiento_cc_id = ? ORDER BY id", (seguimiento_id,)
+    ).fetchall():
+        reglas[fila["concepto"]] = dict(fila)
+    return reglas
+
+
+def _rj_saldo_inicial(conn, seguimiento_id):
+    """Acumulado inicial vigente (último registro): por OC, por ítem y reajustes por OC."""
+    registro = conn.execute(
+        "SELECT * FROM certificados_saldo_inicial WHERE seguimiento_cc_id = ? ORDER BY id DESC LIMIT 1", (seguimiento_id,)
+    ).fetchone()
+    resultado = {"registro": dict(registro) if registro else None, "oc": {}, "item": {}, "reajustes": {}, "lineas": []}
+    if registro is None:
+        return resultado
+    for fila in conn.execute(
+        "SELECT * FROM certificados_saldo_inicial_lineas WHERE saldo_inicial_id = ? ORDER BY id", (registro["id"],)
+    ).fetchall():
+        orden_id, base = fila["orden_compra_cliente_id"], _cert_dec(fila["base_acumulada"])
+        resultado["lineas"].append(dict(fila))
+        resultado["oc"][orden_id] = resultado["oc"].get(orden_id, CERT_CERO) + base
+        resultado["reajustes"][orden_id] = resultado["reajustes"].get(orden_id, CERT_CERO) + _cert_dec(fila["reajustes_acumulados"])
+        if fila["item_oc_cliente_id"] is not None:
+            cantidad, importe = resultado["item"].get(fila["item_oc_cliente_id"], (CERT_CERO, CERT_CERO))
+            resultado["item"][fila["item_oc_cliente_id"]] = (cantidad + _cert_dec(fila["cantidad"]), importe + base)
+    return resultado
+
+
+def _rj_reajustes_acumulados(conn, seguimiento_id, moneda, emitidos=None, inicial=None):
+    emitidos = emitidos or _rj_emitidos(conn, seguimiento_id)
+    inicial = inicial or _rj_saldo_inicial(conn, seguimiento_id)
+    monedas_oc = {
+        f["id"]: (f["moneda"] or "").strip().upper()
+        for f in conn.execute("SELECT id, moneda FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ?", (seguimiento_id,)).fetchall()
+    }
+    desde_inicial = sum((v for oid, v in inicial["reajustes"].items() if monedas_oc.get(oid) == moneda), CERT_CERO)
+    return desde_inicial + emitidos["acumulado_moneda"].get(moneda, CERT_CERO)
+
+
+def _rj_huella(lineas):
+    clave = [
+        (l["tipo"], l["componente"], l["orden_compra_cliente_id"], l["origen_certificado_id"], str(l["importe"]), str(l["coeficiente"]))
+        for l in lineas
+    ]
+    return hashlib.sha256(json.dumps(clave).encode("utf-8")).hexdigest()[:16]
+
+
+def _rj_calcular(conn, seguimiento_id, moneda, alcance_ocs, lineas_cert, periodo, certificado_id=None, pagados=None):
+    """Reajuste del período y retroactivos de un certificado. `pagados` (certificados históricos) reemplaza el cálculo
+    del período por los importes efectivamente pagados y no genera retroactivos."""
+    formulas = _rj_formulas(conn, seguimiento_id)
+    indices = _rj_indices(conn, seguimiento_id)
+    bases = {}
+    for linea in lineas_cert:
+        bases[linea["orden_compra_cliente_id"]] = bases.get(linea["orden_compra_cliente_id"], CERT_CERO) + linea["importe_periodo"]
+    formula = _rj_formula_para(formulas, periodo)
+    resultado = {
+        "aplica": formula is not None or bool(pagados), "periodo": periodo, "periodo_texto": _rj_periodo_texto(periodo),
+        "formula": None, "formula_texto": None, "coeficiente": None, "lineas": [], "indices": [],
+        "provisorios": [], "faltantes": [], "avisos": [], "sin_validar": [],
+    }
+    if pagados is not None:
+        for pago in pagados:
+            resultado["lineas"].append({
+                "tipo": "PERIODO", "componente": pago["componente"], "orden_compra_cliente_id": pago["orden_compra_cliente_id"],
+                "origen_certificado_id": None, "origen_numero_texto": None, "periodo_origen": periodo,
+                "base": bases.get(pago["orden_compra_cliente_id"], CERT_CERO), "coeficiente": pago.get("coeficiente"),
+                "coeficiente_anterior": None, "esperado": pago["importe"], "reconocido_previo": CERT_CERO,
+                "importe": pago["importe"], "detalle": {"historico": True, "periodo": periodo, "coeficiente": pago.get("coeficiente")},
+            })
+    elif formula is not None:
+        coeficiente, componentes, faltantes = _rj_coeficiente(formula, periodo, indices)
+        resultado.update({
+            "formula": {k: formula[k] for k in ("id", "version", "vigente_desde", "mes_base", "factor_rebase", "permite_negativo",
+                                                "decimales_coeficiente", "validacion_contractual", "validada_por", "validada_en",
+                                                "referencia_contractual")},
+            "formula_texto": _rj_formula_texto(formula), "indices": componentes,
+        })
+        if coeficiente is None:
+            resultado["faltantes"] = [f"{c} {_rj_periodo_texto(periodo)}" for c in faltantes]
+        else:
+            resultado["coeficiente"] = str(coeficiente)
+            for orden_id, base in sorted(bases.items()):
+                if base == 0:
+                    continue
+                esperado = _rj_esperado(base, formula, coeficiente)
+                for componente in REAJ_COMPONENTES:
+                    if componente == "REBASE" and formula["factor"] == REAJ_UNO:
+                        continue
+                    resultado["lineas"].append({
+                        "tipo": "PERIODO", "componente": componente, "orden_compra_cliente_id": orden_id,
+                        "origen_certificado_id": None, "origen_numero_texto": None, "periodo_origen": periodo, "base": base,
+                        "coeficiente": str(coeficiente) if componente == "POLINOMICA" else formula["factor_rebase"],
+                        "coeficiente_anterior": None, "esperado": esperado[componente], "reconocido_previo": CERT_CERO,
+                        "importe": esperado[componente], "detalle": _rj_detalle(formula, periodo, coeficiente, componentes),
+                    })
+        if formula["validacion_contractual"] != "VALIDADA":
+            resultado["sin_validar"].append(f"v{formula['version']}")
+        resultado["provisorios"] = [f"{c['codigo']} {_rj_periodo_texto(periodo)}" for c in componentes if c["estado"] == "PROVISORIO"]
+
+    emitidos = _rj_emitidos(conn, seguimiento_id, certificado_id)
+    if pagados is None and formulas:
+        retro, avisos = _rj_pendientes(conn, seguimiento_id, set(alcance_ocs), formulas, indices, emitidos)
+        resultado["lineas"].extend(retro)
+        resultado["avisos"].extend(avisos)
+        resultado["aplica"] = resultado["aplica"] or bool(retro)
+        for linea in retro:
+            for comp in linea["detalle"]["componentes"]:
+                texto = f"{comp['codigo']} {_rj_periodo_texto(linea['periodo_origen'])}"
+                if comp["estado"] == "PROVISORIO" and texto not in resultado["provisorios"]:
+                    resultado["provisorios"].append(texto)
+
+    # Una fórmula pendiente de validación contractual sirve para configurar, calcular y guardar borradores, no para emitir.
+    for linea in resultado["lineas"]:
+        detalle = linea["detalle"]
+        if detalle.get("validacion_contractual", "VALIDADA") != "VALIDADA" and f"v{detalle['formula_version']}" not in resultado["sin_validar"]:
+            resultado["sin_validar"].append(f"v{detalle['formula_version']}")
+    resultado["reajuste_periodo"] = sum((l["importe"] for l in resultado["lineas"] if l["tipo"] == "PERIODO"), CERT_CERO)
+    resultado["retroactivo"] = sum((l["importe"] for l in resultado["lineas"] if l["tipo"] == "RETROACTIVO"), CERT_CERO)
+    total = resultado["reajuste_periodo"] + resultado["retroactivo"]
+    previsiones = _rj_previsiones(conn, seguimiento_id)
+    acumulado = _rj_reajustes_acumulados(conn, seguimiento_id, moneda, emitidos)
+    prevision = previsiones.get(moneda)
+    monto = _cert_dec(prevision["monto"]) if prevision else None
+    excede = CERT_CERO
+    if monto is not None and total > 0:
+        excede = max(CERT_CERO, min(total, acumulado + total - monto))
+    resultado["prevision"] = {
+        "monto": monto, "acumulado": acumulado, "nuevo": acumulado + total, "exceso": excede,
+        "saldo": (monto - acumulado - total) if monto is not None else None,
+    }
+    if resultado["aplica"] and monto is None and total != 0:
+        resultado["avisos"].append(f"No hay previsión de reajustes configurada en {moneda}.")
+    resultado["huella"] = _rj_huella(resultado["lineas"])
+    return resultado
+
+
+def _rj_texto_descuento_base(base):
+    return {"EJECUCION": "ejecución", "EJECUCION_REAJUSTADA": "ejecución + reajuste",
+            "TOTAL_CON_RETROACTIVOS": "ejecución + reajuste + retroactivos", "MANUAL": "importe manual"}[base]
+
+
+def _cert_proximo_numero(conn, seguimiento_id):
+    """max(próximo número configurado, último número + 1). Se llama dentro de BEGIN IMMEDIATE."""
+    ultimo = conn.execute("SELECT COALESCE(MAX(numero), 0) FROM certificados_cliente WHERE seguimiento_cc_id = ?", (seguimiento_id,)).fetchone()[0]
+    configurado = conn.execute("SELECT numero_proximo_certificado FROM seguimiento_cc WHERE id = ?", (seguimiento_id,)).fetchone()[0]
+    return max(int(configurado or 1), int(ultimo) + 1)
+
+
+def _cert_calcular(conn, seguimiento_id, entrada, certificado_id=None, pagados=None):
+    """Valida la carga y calcula líneas, totales, descuentos y exceso. No escribe en la base."""
+    seguimiento = _seg_obtener(conn, seguimiento_id)
+    if seguimiento["centro_costo_id"] is None:
+        raise _seg_error("El seguimiento no tiene Centro de Costos asignado; no puede certificarse.")
+
+    otros = conn.execute(
+        "SELECT id, estado, modalidad FROM certificados_cliente WHERE seguimiento_cc_id = ? AND id != ?",
+        (seguimiento_id, certificado_id or 0),
+    ).fetchall()
+    modalidad_fija = any(fila["estado"] != "BORRADOR" for fila in otros)
+    modalidad_seg = seguimiento["modalidad_certificacion"]
+    pedida = str(entrada.get("modalidad") or "").strip().upper() or None
+    if modalidad_fija or (modalidad_seg and any(fila["estado"] == "BORRADOR" for fila in otros)):
+        if pedida and pedida != modalidad_seg:
+            raise _seg_error(
+                f"La modalidad del seguimiento es {modalidad_seg}"
+                + ("" if modalidad_fija else " (hay otros borradores con esa modalidad)")
+                + "; para cambiarla use el procedimiento de cambio de modalidad.",
+                409,
+            )
+        modalidad = modalidad_seg
+    else:
+        modalidad = _cert_opcion(pedida or modalidad_seg, CERT_MODALIDADES, "Modalidad")
+
+    tipo = _cert_opcion(entrada.get("tipo"), CERT_TIPOS, "Tipo")
+    alcance = _cert_opcion(entrada.get("alcance"), CERT_ALCANCES, "Alcance")
+    moneda = _seg_moneda(entrada.get("moneda"))
+    fecha = _seg_fecha(entrada.get("fecha_certificado"), "Fecha del certificado")
+    desde = _seg_fecha(entrada.get("periodo_desde"), "Período desde")
+    hasta = _seg_fecha(entrada.get("periodo_hasta"), "Período hasta")
+    if not (fecha and desde and hasta):
+        raise _seg_error("La fecha del certificado y el período (desde y hasta) son obligatorios.")
+    if hasta < desde:
+        raise _seg_error(f"El período hasta ({hasta}) no puede ser anterior al período desde ({desde}).")
+    observaciones = _seg_texto(entrada.get("observaciones"), "Observaciones", 2000)
+
+    ordenes = _cert_ordenes(conn, seguimiento_id)
+    acumulados = _cert_acumulados(conn, seguimiento_id)
+    orden_id = _cert_id(entrada.get("orden_compra_cliente_id"), "OC")
+    if alcance == "OC":
+        if orden_id is None or orden_id not in ordenes:
+            raise _seg_error("Seleccione una OC de este seguimiento.")
+        if ordenes[orden_id]["moneda"] != moneda:
+            raise _seg_error(f"La OC está en {ordenes[orden_id]['moneda'] or 'otra moneda'}; no se mezclan monedas.")
+        if orden_id in acumulados["cerradas"]:
+            raise _seg_error(
+                f"La {_cert_etiqueta_oc(ordenes[orden_id]['orden'])} está cerrada por el certificado final "
+                f"{_cert_numero_texto(seguimiento_id, acumulados['cerradas'][orden_id])}.",
+                409,
+            )
+        alcance_ocs = [orden_id]
+    else:
+        orden_id = None
+        alcance_ocs = [oid for oid, datos in ordenes.items() if datos["moneda"] == moneda and oid not in acumulados["cerradas"]]
+        if not alcance_ocs:
+            raise _seg_error(f"No hay OC abiertas en {moneda} en este seguimiento.")
+
+    reemplaza_a_id = _cert_id(entrada.get("reemplaza_a_id"), "Certificado reemplazado")
+    if reemplaza_a_id is not None:
+        original = conn.execute(
+            "SELECT estado, seguimiento_cc_id FROM certificados_cliente WHERE id = ?", (reemplaza_a_id,)
+        ).fetchone()
+        if original is None or original["seguimiento_cc_id"] != seguimiento_id:
+            raise _seg_error("El certificado a reemplazar no pertenece a este seguimiento.")
+        if original["estado"] != "ANULADO":
+            raise _seg_error("Solo puede reemplazarse un certificado anulado. Anúlelo primero.", 409)
+        ya_reemplazado = conn.execute(
+            "SELECT numero FROM certificados_cliente WHERE reemplaza_a_id = ? AND estado = 'EMITIDO' AND id != ?",
+            (reemplaza_a_id, certificado_id or 0),
+        ).fetchone()
+        if ya_reemplazado:
+            raise _seg_error(
+                f"Ese certificado ya fue reemplazado por {_cert_numero_texto(seguimiento_id, ya_reemplazado['numero'])}.", 409
+            )
+
+    entradas = entrada.get("lineas") or []
+    if not isinstance(entradas, list):
+        raise _seg_error("Líneas: debe enviarse una lista.")
+    if modalidad == "ITEMS":
+        lineas = _cert_lineas_items(ordenes, alcance_ocs, acumulados, tipo, entradas)
+    else:
+        lineas = _cert_lineas_global(ordenes, alcance_ocs, acumulados, tipo, entradas, entrada)
+
+    base = sum((l["base_linea"] for l in lineas), CERT_CERO)
+    anterior = sum((l["importe_anterior"] for l in lineas), CERT_CERO)
+    periodo = sum((l["importe_periodo"] for l in lineas), CERT_CERO)
+    acumulado = anterior + periodo
+    exceso = sum((l["exceso_importe"] for l in lineas), CERT_CERO)
+    periodo_ejecucion = hasta[:7]
+    reajuste = _rj_calcular(conn, seguimiento_id, moneda, alcance_ocs, lineas, periodo_ejecucion, certificado_id, pagados)
+    reajuste_periodo, retroactivo = reajuste["reajuste_periodo"], reajuste["retroactivo"]
+    if tipo == "PARCIAL" and periodo <= 0 and not any(l["importe"] for l in reajuste["lineas"]):
+        raise _seg_error("El certificado parcial no tiene avance en el período.")
+    bruto = periodo + reajuste_periodo + retroactivo
+    if bruto < 0:
+        raise _seg_error(
+            f"El certificado resulta negativo ({bruto}): los reajustes negativos superan la ejecución del período. "
+            "Incluya más avance o difiera el certificado.", 409,
+        )
+    descuentos = _cert_descuentos(entrada.get("descuentos"), {
+        "EJECUCION": periodo, "EJECUCION_REAJUSTADA": periodo + reajuste_periodo, "TOTAL_CON_RETROACTIVOS": bruto,
+    })
+    descuentos_netos = sum((d["importe"] for d in descuentos), CERT_CERO)
+    if descuentos_netos > bruto:
+        raise _seg_error(
+            f"Los descuentos ({descuentos_netos}) superan el certificado neto actual ({periodo})."
+            if not reajuste["lineas"] else
+            f"Los descuentos ({descuentos_netos}) superan el importe del certificado antes de descuentos ({bruto})."
+        )
+
+    advertencias = []
+    borradores = [fila for fila in otros if fila["estado"] == "BORRADOR"]
+    if borradores:
+        advertencias.append(
+            f"Hay {len(borradores)} borrador(es) más en este seguimiento. Los borradores no reservan saldo: "
+            "los saldos se vuelven a validar al emitir."
+        )
+    if not modalidad_fija:
+        advertencias.append(f"La modalidad {modalidad} quedará fija al emitir el primer certificado del seguimiento.")
+    if tipo == "FINAL" and acumulado < base:
+        advertencias.append(f"El certificado final deja un saldo no ejecutado de {base - acumulado} {moneda}.")
+    if exceso > 0:
+        advertencias.append(
+            f"El certificado excede el saldo en {exceso} {moneda}: para emitirlo se requiere el permiso "
+            "'Autorizar exceso de saldo en certificados' y una justificación."
+        )
+    advertencias.extend(reajuste["avisos"])
+    if reajuste["faltantes"]:
+        advertencias.append(f"Faltan índices para calcular el reajuste: {', '.join(reajuste['faltantes'])}. No puede emitirse hasta cargarlos.")
+    if reajuste["sin_validar"]:
+        advertencias.append(
+            f"Fórmula {', '.join(reajuste['sin_validar'])} pendiente de validación contractual: el cálculo y el borrador son "
+            "válidos, pero no puede emitirse hasta validarla."
+        )
+    if reajuste["provisorios"]:
+        advertencias.append(
+            f"Se usan índices provisorios ({', '.join(reajuste['provisorios'])}): la diferencia con el definitivo "
+            "se reconocerá como retroactivo."
+        )
+    if reajuste["prevision"]["exceso"] > 0:
+        advertencias.append(
+            f"Los reajustes superan la previsión en {reajuste['prevision']['exceso']} {moneda}: para emitirlo se requiere "
+            "el permiso 'Autorizar exceso de saldo en certificados' y una justificación."
+        )
+
+    return {
+        "cabecera": {
+            "alcance": alcance,
+            "orden_compra_cliente_id": orden_id,
+            "modalidad": modalidad,
+            "tipo": tipo,
+            "moneda": moneda,
+            "fecha_certificado": fecha,
+            "periodo_desde": desde,
+            "periodo_hasta": hasta,
+            "base_contractual": base,
+            "acumulado_anterior": anterior,
+            "importe_periodo": periodo,
+            "acumulado": acumulado,
+            "saldo_resultante": base - acumulado,
+            "descuentos_netos": descuentos_netos,
+            "total_a_facturar": bruto - descuentos_netos,
+            "exceso_importe": exceso,
+            "observaciones": observaciones,
+            "reemplaza_a_id": reemplaza_a_id,
+            "origen": "HISTORICO" if pagados is not None else "SISTEMA",
+            "periodo_ejecucion": periodo_ejecucion,
+            "reajuste_periodo": reajuste_periodo,
+            "reajuste_retroactivo": retroactivo,
+            "exceso_prevision": reajuste["prevision"]["exceso"],
+        },
+        "lineas": lineas,
+        "descuentos": descuentos,
+        "reajuste": reajuste,
+        "advertencias": advertencias,
+        "modalidad_fija": modalidad_fija,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Persistencia
+# ---------------------------------------------------------------------------
+
+CERT_COLUMNAS_CALCULADAS = (
+    "alcance", "orden_compra_cliente_id", "modalidad", "tipo", "moneda", "fecha_certificado", "periodo_desde",
+    "periodo_hasta", "base_contractual", "acumulado_anterior", "importe_periodo", "acumulado", "saldo_resultante",
+    "descuentos_netos", "total_a_facturar", "exceso_importe", "observaciones", "reemplaza_a_id",
+    "origen", "periodo_ejecucion", "reajuste_periodo", "reajuste_retroactivo", "exceso_prevision",
+)
+CERT_COLUMNAS_REAJUSTE = (
+    "tipo", "componente", "orden_compra_cliente_id", "origen_certificado_id", "periodo_origen", "base", "coeficiente",
+    "esperado", "reconocido_previo", "importe",
+)
+CERT_COLUMNAS_LINEA = (
+    "orden_compra_cliente_id", "item_oc_cliente_id", "orden_compra", "item_numero", "descripcion", "unidad",
+    "precio_unitario", "cantidad_contratada", "base_linea", "cantidad_anterior", "cantidad_periodo",
+    "cantidad_acumulada", "importe_anterior", "importe_periodo", "importe_acumulado", "valor_final_ingresado",
+    "exceso_importe", "observacion",
+)
+
+
+def _cert_obtener(conn, seguimiento_id, certificado_id):
+    fila = conn.execute(
+        "SELECT * FROM certificados_cliente WHERE id = ? AND seguimiento_cc_id = ?", (certificado_id, seguimiento_id)
+    ).fetchone()
+    if fila is None:
+        raise _seg_error("Certificado no encontrado.", 404)
+    return fila
+
+
+def _cert_guardar(conn, seguimiento_id, calculo, usuario, certificado_id=None):
+    """Inserta o reescribe un BORRADOR con sus líneas y descuentos calculados."""
+    cabecera = _cert_json(calculo["cabecera"])
+    ahora = fecha_actual_iso()
+    if certificado_id is None:
+        columnas = [*CERT_COLUMNAS_CALCULADAS, "estado", "creado_por", "creado_en"]
+        valores = [*(cabecera[c] for c in CERT_COLUMNAS_CALCULADAS), "BORRADOR", usuario, ahora]
+        cursor = conn.execute(
+            f"INSERT INTO certificados_cliente (seguimiento_cc_id, {', '.join(columnas)}) "
+            f"VALUES (?, {', '.join('?' for _ in columnas)})",
+            (seguimiento_id, *valores),
+        )
+        certificado_id = cursor.lastrowid
+    else:
+        conn.execute(
+            f"UPDATE certificados_cliente SET {', '.join(f'{c} = ?' for c in CERT_COLUMNAS_CALCULADAS)}, "
+            "actualizado_por = ?, actualizado_en = ? WHERE id = ? AND estado = 'BORRADOR'",
+            (*(cabecera[c] for c in CERT_COLUMNAS_CALCULADAS), usuario, ahora, certificado_id),
+        )
+        conn.execute("DELETE FROM certificados_cliente_lineas WHERE certificado_id = ?", (certificado_id,))
+        conn.execute("DELETE FROM certificados_cliente_descuentos WHERE certificado_id = ?", (certificado_id,))
+        conn.execute("DELETE FROM certificados_cliente_reajustes WHERE certificado_id = ?", (certificado_id,))
+    for linea in _cert_json(calculo["lineas"]):
+        conn.execute(
+            f"INSERT INTO certificados_cliente_lineas (certificado_id, {', '.join(CERT_COLUMNAS_LINEA)}) "
+            f"VALUES (?, {', '.join('?' for _ in CERT_COLUMNAS_LINEA)})",
+            (certificado_id, *(linea[c] for c in CERT_COLUMNAS_LINEA)),
+        )
+    for descuento in _cert_json(calculo["descuentos"]):
+        conn.execute(
+            "INSERT INTO certificados_cliente_descuentos (certificado_id, concepto, descripcion, importe, base, porcentaje, base_importe) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (certificado_id, descuento["concepto"], descuento["descripcion"], descuento["importe"],
+             descuento["base"], descuento["porcentaje"], descuento["base_importe"]),
+        )
+    for linea in calculo["reajuste"]["lineas"]:
+        fila = _cert_json({**linea, "origen_certificado_id": linea["origen_certificado_id"] or certificado_id})
+        conn.execute(
+            f"INSERT INTO certificados_cliente_reajustes (certificado_id, {', '.join(CERT_COLUMNAS_REAJUSTE)}, detalle_json) "
+            f"VALUES (?, {', '.join('?' for _ in CERT_COLUMNAS_REAJUSTE)}, ?)",
+            (certificado_id, *(fila[c] for c in CERT_COLUMNAS_REAJUSTE),
+             json.dumps(fila["detalle"], ensure_ascii=False, default=str)),
+        )
+    conn.execute(
+        "UPDATE seguimiento_cc SET modalidad_certificacion = ? WHERE id = ? AND modalidad_certificacion IS NOT ?",
+        (cabecera["modalidad"], seguimiento_id, cabecera["modalidad"]),
+    )
+    return certificado_id
+
+
+def _cert_entrada_desde_borrador(conn, certificado):
+    """Reconstruye la carga original de un borrador para recalcularla con los acumulados vigentes."""
+    entradas = []
+    for linea in conn.execute(
+        "SELECT * FROM certificados_cliente_lineas WHERE certificado_id = ? ORDER BY id", (certificado["id"],)
+    ).fetchall():
+        if certificado["modalidad"] == "ITEMS":
+            entrada = {"item_oc_cliente_id": linea["item_oc_cliente_id"]}
+            clave_final, clave_periodo, periodo = "cantidad_final", "cantidad_periodo", linea["cantidad_periodo"]
+        else:
+            entrada = {"orden_compra_cliente_id": linea["orden_compra_cliente_id"]}
+            clave_final, clave_periodo, periodo = "importe_final", "importe_periodo", linea["importe_periodo"]
+        if certificado["tipo"] == "FINAL":
+            if linea["valor_final_ingresado"] is not None:
+                entrada[clave_final] = linea["valor_final_ingresado"]
+        else:
+            entrada[clave_periodo] = periodo
+        entrada["observacion"] = linea["observacion"]
+        entradas.append(entrada)
+    descuentos = [
+        dict(fila) for fila in conn.execute(
+            "SELECT concepto, descripcion, importe, base, porcentaje FROM certificados_cliente_descuentos WHERE certificado_id = ? ORDER BY id",
+            (certificado["id"],),
+        ).fetchall()
+    ]
+    return {
+        "alcance": certificado["alcance"],
+        "orden_compra_cliente_id": certificado["orden_compra_cliente_id"],
+        "modalidad": certificado["modalidad"],
+        "tipo": certificado["tipo"],
+        "moneda": certificado["moneda"],
+        "fecha_certificado": certificado["fecha_certificado"],
+        "periodo_desde": certificado["periodo_desde"],
+        "periodo_hasta": certificado["periodo_hasta"],
+        "observaciones": certificado["observaciones"],
+        "reemplaza_a_id": certificado["reemplaza_a_id"],
+        "lineas": entradas,
+        "descuentos": descuentos,
+    }
+
+
+def _cert_detalle(conn, seguimiento_id, certificado_id):
+    certificado = dict(_cert_obtener(conn, seguimiento_id, certificado_id))
+    certificado.pop("snapshot_json", None)
+    certificado["numero_texto"] = _cert_numero_texto(seguimiento_id, certificado["numero"])
+    certificado["lineas"] = [
+        dict(fila) for fila in conn.execute(
+            "SELECT * FROM certificados_cliente_lineas WHERE certificado_id = ? ORDER BY orden_compra_cliente_id, item_numero, id",
+            (certificado_id,),
+        ).fetchall()
+    ]
+    certificado["descuentos"] = [
+        dict(fila) for fila in conn.execute(
+            "SELECT * FROM certificados_cliente_descuentos WHERE certificado_id = ? ORDER BY id", (certificado_id,)
+        ).fetchall()
+    ]
+    certificado["reajustes"] = []
+    for fila in conn.execute(
+        "SELECT r.*, k.numero AS origen_numero FROM certificados_cliente_reajustes r "
+        "JOIN certificados_cliente k ON k.id = r.origen_certificado_id WHERE r.certificado_id = ? ORDER BY r.tipo, r.id",
+        (certificado_id,),
+    ).fetchall():
+        linea = dict(fila)
+        linea["detalle"] = json.loads(linea.pop("detalle_json") or "null")
+        linea["origen_numero_texto"] = _cert_numero_texto(seguimiento_id, fila["origen_numero"])
+        certificado["reajustes"].append(linea)
+    certificado["bloqueos_anulacion"] = (
+        _cert_posteriores(conn, seguimiento_id, certificado) + _cert_reconocido_por(conn, seguimiento_id, certificado["id"])
+        if certificado["estado"] == "EMITIDO" else []
+    )
+    return certificado
+
+
+def _cert_reconocido_por(conn, seguimiento_id, certificado_id):
+    """Certificados emitidos que reconocieron retroactivos de este (impiden anularlo)."""
+    filas = conn.execute(
+        """
+        SELECT DISTINCT c.numero FROM certificados_cliente_reajustes r JOIN certificados_cliente c ON c.id = r.certificado_id
+        WHERE r.origen_certificado_id = ? AND r.certificado_id <> ? AND c.estado = 'EMITIDO' ORDER BY c.numero
+        """,
+        (certificado_id, certificado_id),
+    ).fetchall()
+    return [_cert_numero_texto(seguimiento_id, f["numero"]) for f in filas]
+
+
+def _cert_posteriores(conn, seguimiento_id, certificado):
+    """Certificados emitidos con número mayor que afectan alguna OC del certificado (impiden anularlo)."""
+    filas = conn.execute(
+        """
+        SELECT DISTINCT c.numero FROM certificados_cliente c
+        JOIN certificados_cliente_lineas l ON l.certificado_id = c.id
+        WHERE c.seguimiento_cc_id = ? AND c.estado = 'EMITIDO' AND c.numero > ?
+          AND l.orden_compra_cliente_id IN (
+              SELECT orden_compra_cliente_id FROM certificados_cliente_lineas WHERE certificado_id = ?)
+        ORDER BY c.numero
+        """,
+        (seguimiento_id, certificado["numero"], certificado["id"]),
+    ).fetchall()
+    return [_cert_numero_texto(seguimiento_id, fila["numero"]) for fila in filas]
+
+
+def _cert_resumen(conn, seguimiento_id):
+    """Saldos por OC, por ítem y por moneda (solo certificados emitidos)."""
+    seguimiento = _seg_obtener(conn, seguimiento_id)
+    modalidad = seguimiento["modalidad_certificacion"]
+    ordenes = _cert_ordenes(conn, seguimiento_id)
+    acumulados = _cert_acumulados(conn, seguimiento_id)
+    por_oc, por_moneda = [], {}
+    for orden_id, datos in ordenes.items():
+        orden = datos["orden"]
+        total_items = _cert_cent(sum((_cert_dec(i["total"]) for i in datos["items"]), CERT_CERO))
+        monto_oc = _cert_cent(_cert_dec(orden["monto_oc"]))
+        base = total_items if modalidad == "ITEMS" else monto_oc
+        certificado = acumulados["oc"].get(orden_id, CERT_CERO)
+        items = []
+        for item in datos["items"]:
+            cantidad, importe = acumulados["item"].get(item["id"], (CERT_CERO, CERT_CERO))
+            items.append({
+                "item_oc_cliente_id": item["id"],
+                "numero": item["numero"],
+                "descripcion": item["descripcion"],
+                "unidad": item["unidad"],
+                "cantidad": _cert_dec(item["cantidad"]),
+                "precio": _cert_dec(item["precio"]),
+                "total": _cert_dec(item["total"]),
+                "cantidad_certificada": cantidad,
+                "importe_certificado": importe,
+                "saldo_cantidad": _cert_dec(item["cantidad"]) - cantidad,
+                "saldo_importe": _cert_cent(_cert_dec(item["total"])) - importe,
+            })
+        cerrada = acumulados["cerradas"].get(orden_id)
+        por_oc.append({
+            "orden_compra_cliente_id": orden_id,
+            "orden_compra": orden["orden_compra"],
+            "revision": orden["revision"],
+            "moneda": datos["moneda"],
+            "monto_oc": monto_oc,
+            "total_items": total_items,
+            "base": base,
+            "certificado": certificado,
+            "saldo": base - certificado,
+            "avance_pct": (certificado / base * 100).quantize(SEG_CENTAVOS) if base else CERT_CERO,
+            "cerrada": cerrada is not None,
+            "cerrada_por": _cert_numero_texto(seguimiento_id, cerrada),
+            "items": items,
+        })
+        grupo = por_moneda.setdefault(datos["moneda"], {"moneda": datos["moneda"], "base": CERT_CERO, "certificado": CERT_CERO})
+        grupo["base"] += base
+        grupo["certificado"] += certificado
+    for grupo in por_moneda.values():
+        grupo["saldo"] = grupo["base"] - grupo["certificado"]
+        grupo["avance_pct"] = (grupo["certificado"] / grupo["base"] * 100).quantize(SEG_CENTAVOS) if grupo["base"] else CERT_CERO
+    return {
+        "modalidad": modalidad,
+        "modalidad_fija": conn.execute(
+            "SELECT 1 FROM certificados_cliente WHERE seguimiento_cc_id = ? AND estado <> 'BORRADOR' LIMIT 1", (seguimiento_id,)
+        ).fetchone() is not None,
+        "por_moneda": sorted(por_moneda.values(), key=lambda g: g["moneda"]),
+        "ordenes": por_oc,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Snapshot y PDF
+# ---------------------------------------------------------------------------
+
+def _cert_snapshot(conn, seguimiento_id, calculo, numero, emision):
+    """Datos congelados del certificado: alcanzan para regenerar el PDF sin consultar otras tablas."""
+    seguimiento = _seg_obtener(conn, seguimiento_id)
+    cabecera = calculo["cabecera"]
+    centro = conn.execute(
+        "SELECT id, nombre, ubicacion, provincia, responsable_id FROM centros_costos WHERE id = ?",
+        (seguimiento["centro_costo_id"],),
+    ).fetchone()
+    project_manager = None
+    if centro and centro["responsable_id"]:
+        persona = conn.execute("SELECT nombre FROM personal WHERE legajo = ?", (centro["responsable_id"],)).fetchone()
+        project_manager = persona["nombre"] if persona else None
+    cliente = None
+    if seguimiento["cliente_codigo"]:
+        cliente = conn.execute(
+            "SELECT codigo, razon_social, cuit FROM clientes WHERE codigo = ?", (seguimiento["cliente_codigo"],)
+        ).fetchone()
+    ordenes = {}
+    for linea in calculo["lineas"]:
+        if linea["orden_compra_cliente_id"] not in ordenes:
+            orden = conn.execute(
+                "SELECT id, numero, orden_compra, revision, monto_oc FROM Orden_de_compra_cliente WHERE id = ?",
+                (linea["orden_compra_cliente_id"],),
+            ).fetchone()
+            ordenes[orden["id"]] = {
+                "id": orden["id"], "orden_compra": orden["orden_compra"], "revision": orden["revision"],
+                "monto_oc": _cert_cent(_cert_dec(orden["monto_oc"])),
+            }
+    hasta = datetime.strptime(cabecera["periodo_hasta"], "%Y-%m-%d")
+    reemplaza = None
+    if cabecera["reemplaza_a_id"]:
+        fila = conn.execute("SELECT numero FROM certificados_cliente WHERE id = ?", (cabecera["reemplaza_a_id"],)).fetchone()
+        reemplaza = _cert_numero_texto(seguimiento_id, fila["numero"]) if fila else None
+    etiquetas_oc = {o["id"]: f"{o['orden_compra'] or ''} {o['revision'] or ''}".strip() for o in ordenes.values()}
+    snapshot = _cert_json({
+        "version": 2,
+        "seguimiento": {
+            "id": seguimiento_id,
+            "numero_seg": _numero_seguimiento_cliente(seguimiento_id),
+            "cotizacion": seguimiento["cotizacion"],
+        },
+        "obra": {
+            "centro_costo_id": centro["id"] if centro else None,
+            "nombre": centro["nombre"] if centro else None,
+            "localizacion": centro["ubicacion"] if centro else None,
+            "provincia": centro["provincia"] if centro else None,
+            "project_manager": project_manager,
+        },
+        "cliente": {
+            "codigo": cliente["codigo"] if cliente else seguimiento["cliente_codigo"],
+            "razon_social": cliente["razon_social"] if cliente else None,
+            "cuit": cliente["cuit"] if cliente else None,
+        },
+        "ordenes": list(ordenes.values()),
+        "monto_oc_total": sum((o["monto_oc"] for o in ordenes.values()), CERT_CERO),
+        "certificado": {
+            **cabecera,
+            "numero": numero,
+            "numero_texto": _cert_numero_texto(seguimiento_id, numero),
+            "periodo_texto": f"{CERT_MESES[hasta.month - 1]} {hasta.year}",
+            "reemplaza_a": reemplaza,
+            "exceso_justificacion": emision.get("exceso_justificacion"),
+            "exceso_autorizado_por": emision.get("exceso_autorizado_por"),
+            "exceso_autorizado_en": emision.get("exceso_autorizado_en"),
+        },
+        "lineas": calculo["lineas"],
+        "descuentos": calculo["descuentos"],
+        "reajuste": _cert_snapshot_reajuste(calculo["reajuste"], etiquetas_oc),
+        "emision": {"usuario": emision.get("usuario"), "nombre": emision.get("nombre"), "fecha": emision.get("fecha")},
+    })
+    snapshot["codigo_verificacion"] = hashlib.sha256(
+        json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()[:12].upper()
+    if CERT_URL_VERIFICACION:
+        # Se congela con el certificado (fuera del código): las copias posteriores llevan el mismo QR.
+        snapshot["url_verificacion"] = f"{CERT_URL_VERIFICACION}/{snapshot['codigo_verificacion']}"
+    return snapshot
+
+
+def _cert_snapshot_reajuste(reajuste, etiquetas_oc):
+    """Bloque de reajustes del snapshot: fórmula, líneas e índices (con su versión y motivo) tal como se aplicaron."""
+    if not reajuste or not reajuste["lineas"]:
+        return None
+    import certificado_pdf
+
+    num = certificado_pdf.num
+    mes = lambda p: f"{p[5:7]}/{p[:4]}" if p else ""
+    formula = reajuste["formula"] or next((l["detalle"] for l in reajuste["lineas"] if l["detalle"].get("formula_version")), None)
+    componentes = reajuste["indices"] or next((l["detalle"].get("componentes") for l in reajuste["lineas"] if l["detalle"].get("componentes")), [])
+    if formula and componentes:
+        version = formula.get("version") or formula.get("formula_version")
+        factor = formula.get("factor_rebase")
+        pendiente = formula.get("validacion_contractual") != "VALIDADA"
+        texto = (f"Fórmula v{version} (vigente desde {mes(formula.get('vigente_desde'))}, mes base {mes(formula.get('mes_base'))})"
+                 + (" – pendiente de validación contractual" if pendiente else "") + ": C = "
+                 + " + ".join(f"{num(c['ponderacion'])}·{c['nombre']}/{num(c['valor_base'])}" for c in componentes)
+                 + f" · factor de rebase {num(factor, 6)}")
+    else:
+        texto = "Reajustes efectivamente pagados (registro histórico)"
+    lineas, indices, periodos = [], [], []
+    for linea in reajuste["lineas"]:
+        lineas.append({
+            "tipo": "Período" if linea["tipo"] == "PERIODO" else "Retroactivo",
+            "origen": "Este certificado" if linea["tipo"] == "PERIODO" else linea["origen_numero_texto"],
+            "oc": etiquetas_oc.get(linea["orden_compra_cliente_id"], str(linea["orden_compra_cliente_id"])),
+            "periodo": _rj_periodo_texto(linea["periodo_origen"]),
+            "componente": "Polinómica" if linea["componente"] == "POLINOMICA" else "Rebase",
+            "base": linea["base"], "coef": linea["coeficiente"], "coef_anterior": linea["coeficiente_anterior"],
+            "reconocido_previo": linea["reconocido_previo"], "esperado": linea["esperado"], "importe": linea["importe"],
+            "tipo_codigo": linea["tipo"], "componente_codigo": linea["componente"], "orden_compra_cliente_id": linea["orden_compra_cliente_id"],
+            "origen_certificado_id": linea["origen_certificado_id"], "periodo_origen": linea["periodo_origen"],
+            "detalle": linea["detalle"],
+        })
+        if linea["periodo_origen"] not in periodos and linea["detalle"].get("componentes"):
+            periodos.append(linea["periodo_origen"])
+            for c in linea["detalle"]["componentes"]:
+                indices.append({**c, "periodo": _rj_periodo_texto(linea["periodo_origen"]), "version": c["indice_version"]})
+    return {
+        "formula_texto": texto, "coeficiente": reajuste["coeficiente"], "periodo": reajuste["periodo"],
+        "reajuste_periodo": reajuste["reajuste_periodo"], "retroactivo": reajuste["retroactivo"],
+        "provisorios": reajuste["provisorios"], "lineas": lineas, "indices": indices,
+    }
+
+
+def _cert_formato_importe(valor, moneda=""):
+    if valor is None:
+        return ""
+    texto = f"{Decimal(str(valor)):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{moneda} {texto}".strip()
+
+
+def _cert_pdf_bytes(snapshot, marca=None):
+    """Certificado de Servicio SMG con el diseño aprobado (ver certificado_pdf.py)."""
+    import certificado_pdf
+
+    return certificado_pdf.generar_pdf(snapshot, marca)
+
+
+# ---------------------------------------------------------------------------
+# Protección de OC e ítems referenciados por certificados
+# ---------------------------------------------------------------------------
+
+def _cert_referencias(conn, columna, valor):
+    return conn.execute(
+        f"""
+        SELECT l.id AS linea_id, l.cantidad_periodo, l.importe_periodo, c.id, c.estado, c.numero, c.seguimiento_cc_id
+        FROM certificados_cliente_lineas l
+        JOIN certificados_cliente c ON c.id = l.certificado_id
+        WHERE l.{columna} = ?
+        """,
+        (valor,),
+    ).fetchall()
+
+
+def _cert_liberar_borradores(conn, columna, valor, descripcion):
+    """Antes de eliminar una OC o un ítem: bloquea si está certificado o con avance en borradores; quita líneas vacías."""
+    filas = _cert_referencias(conn, columna, valor)
+    certificados = sorted({_cert_numero_texto(f["seguimiento_cc_id"], f["numero"]) for f in filas if f["estado"] != "BORRADOR"})
+    if certificados:
+        raise _seg_error(f"{descripcion} figura en certificados emitidos o anulados ({', '.join(certificados)}); no puede eliminarse.", 409)
+    if any(_cert_dec(f["cantidad_periodo"]) > 0 or _cert_dec(f["importe_periodo"]) > 0 for f in filas):
+        raise _seg_error(f"{descripcion} tiene avance cargado en un borrador de certificado; quítelo del borrador antes de eliminarlo.", 409)
+    for fila in filas:
+        conn.execute("DELETE FROM certificados_cliente_lineas WHERE id = ?", (fila["linea_id"],))
+
+
+def _cert_validar_cambio_item(conn, actual, datos):
+    # Solo protege ítems con avance certificado; las líneas en cero no fijan precio ni OC.
+    emitidas = [
+        f for f in _cert_referencias(conn, "item_oc_cliente_id", actual["id"])
+        if f["estado"] == "EMITIDO" and (_cert_dec(f["importe_periodo"]) > 0 or _cert_dec(f["cantidad_periodo"]) > 0)
+    ]
+    if not emitidas:
+        return
+    numeros = ", ".join(sorted({_cert_numero_texto(f["seguimiento_cc_id"], f["numero"]) for f in emitidas}))
+    if "orden_compra_cliente_id" in datos and datos["orden_compra_cliente_id"] != actual["orden_compra_cliente_id"]:
+        raise _seg_error(f"El ítem tiene certificados emitidos ({numeros}); no puede moverse a otra OC.", 409)
+    if "precio" in datos and _cert_dec(datos["precio"]) != _cert_dec(actual["precio"]):
+        raise _seg_error(f"El ítem tiene certificados emitidos ({numeros}); su precio unitario no puede modificarse.", 409)
+    if "moneda" in datos and (datos["moneda"] or "").upper() != (actual["moneda"] or "").upper():
+        raise _seg_error(f"El ítem tiene certificados emitidos ({numeros}); su moneda no puede modificarse.", 409)
+    certificada = sum((_cert_dec(f["cantidad_periodo"]) for f in emitidas), CERT_CERO)
+    if "cantidad" in datos and _cert_dec(datos["cantidad"]) < certificada:
+        raise _seg_error(f"La cantidad no puede ser menor que la ya certificada ({certificada}).", 409)
+
+
+def _cert_validar_cambio_orden(conn, actual, datos):
+    emitidas = [f for f in _cert_referencias(conn, "orden_compra_cliente_id", actual["id"]) if f["estado"] == "EMITIDO"]
+    if not emitidas:
+        return
+    numeros = ", ".join(sorted({_cert_numero_texto(f["seguimiento_cc_id"], f["numero"]) for f in emitidas}))
+    if "moneda" in datos and (datos["moneda"] or "").upper() != (actual["moneda"] or "").upper():
+        raise _seg_error(f"La OC tiene certificados emitidos ({numeros}); su moneda no puede modificarse.", 409)
+    certificado = _cert_cent(sum((_cert_dec(f["importe_periodo"]) for f in emitidas), CERT_CERO))
+    if "monto_oc" in datos and _cert_dec(datos["monto_oc"]) < certificado:
+        raise _seg_error(f"El monto de la OC no puede ser menor que lo ya certificado ({certificado}).", 409)
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+CERT_RUTA = "/operaciones/seguimiento-cliente/{seguimiento_id}/certificados"
+
+
+def _cert_respuesta_calculo(calculo, perfil):
+    exceso = calculo["cabecera"]["exceso_importe"] + calculo["cabecera"]["exceso_prevision"]
+    return _cert_json({
+        **calculo,
+        "requiere_autorizacion_exceso": exceso > 0,
+        "puede_autorizar_exceso": _cert_tiene_accion_nominal(perfil, "autorizar_exceso"),
+    })
+
+
+@app.get(CERT_RUTA)
+def listar_certificados_cliente(request: Request, seguimiento_id: int):
+    _cert_requiere(request, "consultar")
+    conn = get_sqlite_connection()
+    try:
+        _seg_obtener(conn, seguimiento_id)
+        filas = conn.execute(
+            """
+            SELECT id, numero, estado, tipo, alcance, modalidad, moneda, orden_compra_cliente_id, fecha_certificado,
+                   periodo_desde, periodo_hasta, importe_periodo, acumulado, saldo_resultante, descuentos_netos,
+                   total_a_facturar, exceso_importe, reemplaza_a_id, creado_por, emitido_por, emitido_en,
+                   anulado_por, anulado_en, motivo_anulacion, origen, periodo_ejecucion, reajuste_periodo,
+                   reajuste_retroactivo, exceso_prevision
+            FROM certificados_cliente WHERE seguimiento_cc_id = ?
+            ORDER BY CASE WHEN numero IS NULL THEN 1 ELSE 0 END, numero DESC, id DESC
+            """,
+            (seguimiento_id,),
+        ).fetchall()
+        certificados = []
+        for fila in filas:
+            dato = dict(fila)
+            dato["numero_texto"] = _cert_numero_texto(seguimiento_id, fila["numero"])
+            dato["bloqueos_anulacion"] = (
+                _cert_posteriores(conn, seguimiento_id, fila) + _cert_reconocido_por(conn, seguimiento_id, fila["id"])
+                if fila["estado"] == "EMITIDO" else []
+            )
+            certificados.append(dato)
+        return _cert_json({"certificados": certificados, "resumen": _cert_resumen(conn, seguimiento_id)})
+    finally:
+        conn.close()
+
+
+@app.post(CERT_RUTA + "/calcular")
+async def calcular_certificado_cliente(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "certificar")
+    payload = await _seg_leer_json(request)
+    conn = get_sqlite_connection()
+    try:
+        calculo = _cert_calcular(conn, seguimiento_id, payload, _cert_id(payload.get("certificado_id"), "Certificado"))
+        return _cert_respuesta_calculo(calculo, perfil)
+    finally:
+        conn.close()
+
+
+@app.post(CERT_RUTA)
+async def crear_certificado_cliente(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "certificar")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        calculo = _cert_calcular(conn, seguimiento_id, payload)
+        certificado_id = _cert_guardar(conn, seguimiento_id, calculo, perfil["usuario"])
+        _cert_evento(conn, seguimiento_id, certificado_id, "BORRADOR_CREADO", perfil["usuario"], {
+            "importe_periodo": calculo["cabecera"]["importe_periodo"], "exceso_importe": calculo["cabecera"]["exceso_importe"],
+        })
+        return certificado_id, calculo, _cert_detalle(conn, seguimiento_id, certificado_id)
+
+    certificado_id, calculo, detalle = _cert_ejecutar(operacion)
+    return _cert_json({
+        "ok": True, "certificado_id": certificado_id, "mensaje": "Borrador de certificado guardado.",
+        "certificado": detalle, "calculo": _cert_respuesta_calculo(calculo, perfil),
+    })
+
+
+@app.get(CERT_RUTA + "/{certificado_id}")
+def obtener_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    _cert_requiere(request, "consultar")
+    conn = get_sqlite_connection()
+    try:
+        return _cert_json(_cert_detalle(conn, seguimiento_id, certificado_id))
+    finally:
+        conn.close()
+
+
+@app.put(CERT_RUTA + "/{certificado_id}")
+async def actualizar_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    perfil = _cert_requiere(request, "certificar")
+    payload = await _seg_leer_json(request)
+
+    def operacion(conn):
+        actual = _cert_obtener(conn, seguimiento_id, certificado_id)
+        if actual["estado"] != "BORRADOR":
+            raise _seg_error("Solo pueden modificarse borradores. Un certificado emitido solo puede anularse.", 409)
+        calculo = _cert_calcular(conn, seguimiento_id, payload, certificado_id)
+        _cert_guardar(conn, seguimiento_id, calculo, perfil["usuario"], certificado_id)
+        _cert_evento(conn, seguimiento_id, certificado_id, "BORRADOR_EDITADO", perfil["usuario"], {
+            "importe_periodo": calculo["cabecera"]["importe_periodo"], "exceso_importe": calculo["cabecera"]["exceso_importe"],
+        })
+        return calculo, _cert_detalle(conn, seguimiento_id, certificado_id)
+
+    calculo, detalle = _cert_ejecutar(operacion)
+    return _cert_json({
+        "ok": True, "certificado_id": certificado_id, "mensaje": "Borrador actualizado.",
+        "certificado": detalle, "calculo": _cert_respuesta_calculo(calculo, perfil),
+    })
+
+
+@app.delete(CERT_RUTA + "/{certificado_id}")
+def eliminar_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    perfil = _cert_requiere(request, "certificar")
+
+    def operacion(conn):
+        actual = _cert_obtener(conn, seguimiento_id, certificado_id)
+        if actual["estado"] != "BORRADOR":
+            raise _seg_error("Solo pueden eliminarse borradores. Un certificado emitido solo puede anularse.", 409)
+        conn.execute("DELETE FROM certificados_cliente WHERE id = ?", (certificado_id,))
+        _cert_evento(conn, seguimiento_id, certificado_id, "BORRADOR_ELIMINADO", perfil["usuario"], {
+            "importe_periodo": actual["importe_periodo"], "tipo": actual["tipo"], "alcance": actual["alcance"],
+        })
+        # Antes de la primera emisión la modalidad no está fija: si no quedan certificados, vuelve a quedar libre.
+        if conn.execute("SELECT 1 FROM certificados_cliente WHERE seguimiento_cc_id = ? LIMIT 1", (seguimiento_id,)).fetchone() is None:
+            conn.execute("UPDATE seguimiento_cc SET modalidad_certificacion = NULL WHERE id = ?", (seguimiento_id,))
+
+    _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": "Borrador eliminado."}
+
+
+@app.post(CERT_RUTA + "/{certificado_id}/emitir")
+async def emitir_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    perfil = _cert_requiere(request, "emitir_certificado")
+    payload = await _cert_leer_json_opcional(request)
+    justificacion = str(payload.get("justificacion_exceso") or "").strip()
+    huella_cliente = str(payload.get("huella_reajustes") or "").strip()
+    archivos_creados = []
+
+    def operacion(conn):
+        certificado = _cert_obtener(conn, seguimiento_id, certificado_id)
+        if certificado["estado"] != "BORRADOR":
+            raise _seg_error("El certificado ya fue emitido o anulado.", 409)
+        calculo = _cert_calcular(conn, seguimiento_id, _cert_entrada_desde_borrador(conn, certificado), certificado_id)
+        reajuste = calculo["reajuste"]
+        if reajuste["faltantes"]:
+            raise _seg_error(f"Faltan índices para calcular el reajuste: {', '.join(reajuste['faltantes'])}.", 409)
+        if reajuste["sin_validar"]:
+            raise _seg_error(
+                f"La fórmula {', '.join(reajuste['sin_validar'])} está pendiente de validación contractual; "
+                "valídela antes de emitir.", 409,
+            )
+        if reajuste["lineas"] and huella_cliente != reajuste["huella"]:
+            raise _seg_error(
+                "Los reajustes cambiaron desde el último cálculo (índices corregidos u otro certificado emitido). "
+                "Recalcule el certificado y revise los importes antes de emitir.", 409,
+            )
+        exceso = calculo["cabecera"]["exceso_importe"] + calculo["cabecera"]["exceso_prevision"]
+        ahora = fecha_actual_iso()
+        emision = {"usuario": perfil["usuario"], "nombre": perfil.get("nombre_apellido"), "fecha": ahora}
+        if exceso > 0:
+            if not _cert_tiene_accion_nominal(perfil, "autorizar_exceso"):
+                raise _seg_error(
+                    f"El certificado excede el saldo o la previsión de reajustes en {exceso} {calculo['cabecera']['moneda']}. "
+                    "Para emitirlo se requiere el permiso 'Autorizar exceso de saldo en certificados'.",
+                    403,
+                )
+            if len(justificacion) < CERT_MIN_JUSTIFICACION:
+                raise _seg_error(
+                    f"El certificado excede el saldo en {exceso} {calculo['cabecera']['moneda']}: ingrese una "
+                    f"justificación de al menos {CERT_MIN_JUSTIFICACION} caracteres."
+                )
+            emision.update({"exceso_justificacion": justificacion, "exceso_autorizado_por": perfil["usuario"], "exceso_autorizado_en": ahora})
+        numero = _cert_proximo_numero(conn, seguimiento_id)
+        _cert_guardar(conn, seguimiento_id, calculo, perfil["usuario"], certificado_id)
+        snapshot = _cert_snapshot(conn, seguimiento_id, calculo, numero, emision)
+        contenido = _cert_pdf_bytes(snapshot)
+        numero_seg = _numero_seguimiento_cliente(seguimiento_id)
+        ruta_relativa = os.path.join("Doc_Certificados", numero_seg, f"{_cert_numero_texto(seguimiento_id, numero)}.pdf")
+        ruta = os.path.join(DATA_DIR, ruta_relativa)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        try:
+            # Nunca se sobrescribe un PDF existente.
+            with open(ruta, "xb") as archivo:
+                archivo.write(contenido)
+        except FileExistsError:
+            raise _seg_error(f"Ya existe el archivo {ruta_relativa}; no se sobrescribe. Revise el directorio de certificados.", 409)
+        archivos_creados.append(ruta)
+        conn.execute(
+            """
+            UPDATE certificados_cliente
+            SET estado = 'EMITIDO', numero = ?, emitido_por = ?, emitido_en = ?, snapshot_json = ?, pdf_ruta = ?,
+                pdf_sha256 = ?, exceso_justificacion = ?, exceso_autorizado_por = ?, exceso_autorizado_en = ?
+            WHERE id = ? AND estado = 'BORRADOR'
+            """,
+            (
+                numero, perfil["usuario"], ahora, json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                ruta_relativa.replace(os.sep, "/"), hashlib.sha256(contenido).hexdigest(),
+                emision.get("exceso_justificacion"), emision.get("exceso_autorizado_por"), emision.get("exceso_autorizado_en"),
+                certificado_id,
+            ),
+        )
+        _cert_evento(conn, seguimiento_id, certificado_id, "EMITIDO", perfil["usuario"], {
+            "numero": _cert_numero_texto(seguimiento_id, numero), "importe_periodo": calculo["cabecera"]["importe_periodo"],
+            "reajuste_periodo": calculo["cabecera"]["reajuste_periodo"], "reajuste_retroactivo": calculo["cabecera"]["reajuste_retroactivo"],
+            "indices_provisorios": reajuste["provisorios"], "codigo_verificacion": snapshot["codigo_verificacion"],
+        })
+        if exceso > 0:
+            _cert_evento(conn, seguimiento_id, certificado_id, "EXCESO_AUTORIZADO", perfil["usuario"], {
+                "importe_excedido": calculo["cabecera"]["exceso_importe"], "exceso_prevision": calculo["cabecera"]["exceso_prevision"],
+                "moneda": calculo["cabecera"]["moneda"], "justificacion": justificacion, "fecha": ahora,
+            })
+        return numero, _cert_detalle(conn, seguimiento_id, certificado_id)
+
+    try:
+        numero, detalle = _cert_ejecutar(operacion)
+    except Exception:
+        for ruta in archivos_creados:
+            try:
+                os.remove(ruta)
+            except OSError:
+                logger.exception("No se pudo eliminar el PDF de una emisión revertida: %s", ruta)
+        raise
+    return _cert_json({
+        "ok": True, "certificado_id": certificado_id, "numero_texto": _cert_numero_texto(seguimiento_id, numero),
+        "mensaje": f"Certificado {_cert_numero_texto(seguimiento_id, numero)} emitido.", "certificado": detalle,
+    })
+
+
+@app.post(CERT_RUTA + "/{certificado_id}/anular")
+async def anular_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    perfil = _cert_requiere(request, "anular_certificado")
+    payload = await _cert_leer_json_opcional(request)
+    motivo = str(payload.get("motivo") or "").strip()
+    if len(motivo) < CERT_MIN_MOTIVO_ANULACION:
+        raise _seg_error(f"El motivo de anulación es obligatorio (al menos {CERT_MIN_MOTIVO_ANULACION} caracteres).")
+    if len(motivo) > 2000:
+        raise _seg_error("El motivo de anulación supera los 2000 caracteres.")
+
+    def operacion(conn):
+        certificado = _cert_obtener(conn, seguimiento_id, certificado_id)
+        if certificado["estado"] != "EMITIDO":
+            raise _seg_error("Solo pueden anularse certificados emitidos.", 409)
+        posteriores = _cert_posteriores(conn, seguimiento_id, certificado)
+        if posteriores:
+            raise _seg_error(
+                "Solo puede anularse el último certificado emitido de cada OC afectada. "
+                f"Primero anule: {', '.join(posteriores)}.",
+                409,
+            )
+        reconocido_por = _cert_reconocido_por(conn, seguimiento_id, certificado_id)
+        if reconocido_por:
+            raise _seg_error(
+                f"{', '.join(reconocido_por)} reconoció diferencias retroactivas de este certificado. Anule primero ese certificado.",
+                409,
+            )
+        ahora = fecha_actual_iso()
+        conn.execute(
+            """
+            UPDATE certificados_cliente
+            SET estado = 'ANULADO', anulado_por = ?, anulado_en = ?, motivo_anulacion = ?, actualizado_por = ?, actualizado_en = ?
+            WHERE id = ? AND estado = 'EMITIDO'
+            """,
+            (perfil["usuario"], ahora, motivo, perfil["usuario"], ahora, certificado_id),
+        )
+        _cert_evento(conn, seguimiento_id, certificado_id, "ANULADO", perfil["usuario"], {
+            "numero": _cert_numero_texto(seguimiento_id, certificado["numero"]), "motivo": motivo,
+        })
+        return _cert_detalle(conn, seguimiento_id, certificado_id)
+
+    detalle = _cert_ejecutar(operacion)
+    return _cert_json({"ok": True, "mensaje": f"Certificado {detalle['numero_texto']} anulado.", "certificado": detalle})
+
+
+@app.get(CERT_RUTA + "/{certificado_id}/pdf")
+def pdf_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int, copia: str = Query("original")):
+    perfil = _cert_requiere(request, "consultar")
+    conn = get_sqlite_connection()
+    try:
+        certificado = _cert_obtener(conn, seguimiento_id, certificado_id)
+        if certificado["estado"] == "BORRADOR":
+            calculo = _cert_calcular(conn, seguimiento_id, _cert_entrada_desde_borrador(conn, certificado), certificado_id)
+            snapshot = _cert_snapshot(conn, seguimiento_id, calculo, None, {
+                "usuario": perfil["usuario"], "nombre": perfil.get("nombre_apellido"), "fecha": fecha_actual_iso(),
+            })
+            contenido, nombre = _cert_pdf_bytes(snapshot, "BORRADOR – SIN VALIDEZ"), f"borrador-{certificado_id}.pdf"
+        elif copia == "sellada":
+            if certificado["estado"] != "ANULADO":
+                raise _seg_error("La copia con sello solo existe para certificados anulados.")
+            snapshot = json.loads(certificado["snapshot_json"])
+            snapshot["anulacion"] = {"fecha": certificado["anulado_en"], "usuario": certificado["anulado_por"],
+                                     "motivo": certificado["motivo_anulacion"]}
+            contenido = _cert_pdf_bytes(snapshot, "ANULADO")
+            nombre = f"{_cert_numero_texto(seguimiento_id, certificado['numero'])}-ANULADO.pdf"
+        else:
+            ruta = os.path.join(DATA_DIR, certificado["pdf_ruta"])
+            try:
+                with open(ruta, "rb") as archivo:
+                    contenido = archivo.read()
+            except OSError:
+                raise _seg_error("No se encontró el PDF original del certificado.", 500)
+            if hashlib.sha256(contenido).hexdigest() != certificado["pdf_sha256"]:
+                raise _seg_error("El PDF original no coincide con su código de integridad; no se entrega.", 500)
+            nombre = os.path.basename(ruta)
+    finally:
+        conn.close()
+    return Response(content=contenido, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{nombre}"'})
+
+
+import verificacion_certificados as verificacion  # noqa: E402
+
+_LIMITADOR_VERIFICACION = verificacion.LimitadorConsultas()
+
+
+def _verificacion_respuesta(estado=None, datos=None, codigo_http=200):
+    return HTMLResponse(verificacion.pagina(estado, datos), status_code=codigo_http, headers=verificacion.CABECERAS)
+
+
+def _verificacion_buscar(codigo):
+    """Estado público del certificado con ese código, o None si no existe (borradores incluidos: no tienen código)."""
+    conn = get_sqlite_connection()
+    try:
+        fila = conn.execute(
+            "SELECT id, estado, snapshot_json FROM certificados_cliente WHERE codigo_verificacion = ? AND estado IN ('EMITIDO', 'ANULADO')",
+            (codigo,),
+        ).fetchone()
+        if fila is None:
+            return None
+        snapshot = json.loads(fila["snapshot_json"])
+        if not verificacion.codigo_integro(snapshot):
+            logging.warning("Verificación pública: el certificado %s no supera el control de integridad del snapshot.", fila["id"])
+            return "NO_VERIFICABLE", None
+        reemplazo = None
+        if fila["estado"] == "ANULADO":
+            nuevo = conn.execute(
+                "SELECT snapshot_json FROM certificados_cliente WHERE reemplaza_a_id = ? AND estado = 'EMITIDO'", (fila["id"],)
+            ).fetchone()
+            if nuevo:
+                reemplazo = json.loads(nuevo["snapshot_json"])["certificado"]["numero_texto"]
+        datos = verificacion.datos_publicos(snapshot, fila, reemplazo)
+        return datos["estado"], datos
+    finally:
+        conn.close()
+
+
+@app.get("/verificar", response_class=HTMLResponse)
+def verificar_certificado_formulario(request: Request, codigo: str = Query(default="")):
+    """Formulario público; con ?codigo= (envío del formulario) redirige a la URL canónica que también lleva el QR."""
+    if not codigo:
+        return _verificacion_respuesta()
+    normalizado = verificacion.normalizar_codigo(codigo)
+    destino = f"/verificar/{normalizado}" if normalizado else "/verificar/invalido"
+    return RedirectResponse(destino, status_code=303, headers=verificacion.CABECERAS)
+
+
+@app.get("/verificar/{codigo}", response_class=HTMLResponse)
+def verificar_certificado(request: Request, codigo: str):
+    ip = verificacion.ip_cliente(request, CERT_VERIFICACION_PROXY)
+    if not _LIMITADOR_VERIFICACION.permitir(ip):
+        return _verificacion_respuesta("LIMITE", codigo_http=429)
+    normalizado = verificacion.normalizar_codigo(codigo)
+    resultado = _verificacion_buscar(normalizado) if normalizado else None
+    if resultado is None:
+        # Código mal escrito o inexistente: misma respuesta, y cuenta para el límite de intentos fallidos.
+        _LIMITADOR_VERIFICACION.registrar_fallida(ip)
+        return _verificacion_respuesta("NO_ENCONTRADO", codigo_http=404)
+    estado, datos = resultado
+    return _verificacion_respuesta(estado, datos)
+
+
+@app.get(CERT_RUTA + "/{certificado_id}/historial")
+def historial_certificado_cliente(request: Request, seguimiento_id: int, certificado_id: int):
+    _cert_requiere(request, "consultar")
+    conn = get_sqlite_connection()
+    try:
+        _cert_obtener(conn, seguimiento_id, certificado_id)
+        filas = conn.execute(
+            "SELECT * FROM certificados_cliente_eventos WHERE seguimiento_cc_id = ? AND certificado_id = ? ORDER BY id",
+            (seguimiento_id, certificado_id),
+        ).fetchall()
+        return {"eventos": [{**dict(f), "detalle": json.loads(f["detalle_json"]) if f["detalle_json"] else None} for f in filas]}
+    finally:
+        conn.close()
+
+
+@app.post("/operaciones/seguimiento-cliente/{seguimiento_id}/modalidad")
+async def cambiar_modalidad_certificacion(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "cambiar_modalidad")
+    payload = await _seg_leer_json(request)
+    nueva = _cert_opcion(payload.get("modalidad"), CERT_MODALIDADES, "Modalidad")
+    justificacion = str(payload.get("justificacion") or "").strip()
+    if len(justificacion) < CERT_MIN_JUSTIFICACION:
+        raise _seg_error(f"La justificación es obligatoria (al menos {CERT_MIN_JUSTIFICACION} caracteres).")
+
+    def operacion(conn):
+        seguimiento = _seg_obtener(conn, seguimiento_id)
+        actual = seguimiento["modalidad_certificacion"]
+        if actual == nueva:
+            raise _seg_error(f"La modalidad ya es {nueva}.")
+        borradores = conn.execute(
+            "SELECT COUNT(*) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND estado = 'BORRADOR'", (seguimiento_id,)
+        ).fetchone()[0]
+        if borradores:
+            raise _seg_error("Hay borradores de certificado abiertos: emítalos o elimínelos antes de cambiar la modalidad.", 409)
+        emitidos = conn.execute(
+            "SELECT COUNT(*) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND estado = 'EMITIDO'", (seguimiento_id,)
+        ).fetchone()[0]
+        if actual == "GLOBAL" and nueva == "ITEMS" and emitidos:
+            raise _seg_error(
+                "No puede pasarse de GLOBAL a ITEMS con certificados válidos: los importes globales no están asignados a ítems.",
+                409,
+            )
+        conn.execute(
+            """
+            INSERT INTO certificados_cambios_modalidad (seguimiento_cc_id, modalidad_anterior, modalidad_nueva, justificacion, usuario, fecha)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (seguimiento_id, actual, nueva, justificacion, perfil["usuario"], fecha_actual_iso()),
+        )
+        conn.execute("UPDATE seguimiento_cc SET modalidad_certificacion = ? WHERE id = ?", (nueva, seguimiento_id))
+        _cert_evento(conn, seguimiento_id, None, "MODALIDAD_CAMBIADA", perfil["usuario"], {
+            "anterior": actual, "nueva": nueva, "justificacion": justificacion,
+        })
+        return actual
+
+    anterior = _cert_ejecutar(operacion)
+    return {"ok": True, "modalidad_anterior": anterior, "modalidad": nueva, "mensaje": f"Modalidad cambiada a {nueva}."}
+
+
+# ---------------------------------------------------------------------------
+# Reajustes: configuración del contrato, fórmula, índices e histórico
+# ---------------------------------------------------------------------------
+
+REAJ_RUTA = "/operaciones/seguimiento-cliente/{seguimiento_id}/reajustes"
+
+
+def _rj_estado(conn, seguimiento_id):
+    """Todo lo que la pantalla de Certificados necesita para reajustes, previsión, descuentos, numeración e histórico."""
+    seguimiento = _seg_obtener(conn, seguimiento_id)
+    formulas = _rj_formulas(conn, seguimiento_id)
+    indices = _rj_indices(conn, seguimiento_id)
+    emitidos = _rj_emitidos(conn, seguimiento_id)
+    inicial = _rj_saldo_inicial(conn, seguimiento_id)
+    ordenes = _cert_ordenes(conn, seguimiento_id)
+    previsiones = _rj_previsiones(conn, seguimiento_id)
+    monedas = sorted({d["moneda"] for d in ordenes.values() if d["moneda"]})
+
+    pendientes, avisos = ([], [])
+    if formulas:
+        pendientes, avisos = _rj_pendientes(conn, seguimiento_id, set(ordenes), formulas, indices, emitidos)
+    por_moneda = []
+    for moneda in monedas:
+        acumulado = _rj_reajustes_acumulados(conn, seguimiento_id, moneda, emitidos, inicial)
+        prevision = previsiones.get(moneda)
+        monto = _cert_dec(prevision["monto"]) if prevision else None
+        pendiente = sum((l["importe"] for l in pendientes if ordenes[l["orden_compra_cliente_id"]]["moneda"] == moneda), CERT_CERO)
+        por_moneda.append({
+            "moneda": moneda, "reajustes_acumulados": acumulado, "prevision": monto,
+            "saldo_prevision": (monto - acumulado) if monto is not None else None, "retroactivo_pendiente": pendiente,
+        })
+
+    # Último período con todos los índices de la fórmula que le corresponde.
+    ultimo = None
+    for periodo in sorted({p for (_, p) in indices}, reverse=True):
+        formula = _rj_formula_para(formulas, periodo)
+        if formula is None:
+            continue
+        coeficiente, componentes, faltantes = _rj_coeficiente(formula, periodo, indices)
+        if coeficiente is not None:
+            ultimo = {"periodo": periodo, "periodo_texto": _rj_periodo_texto(periodo), "coeficiente": str(coeficiente),
+                      "formula_version": formula["version"], "provisorio": any(c["estado"] == "PROVISORIO" for c in componentes)}
+            break
+
+    ultimo_numero = conn.execute(
+        "SELECT COALESCE(MAX(numero), 0) FROM certificados_cliente WHERE seguimiento_cc_id = ?", (seguimiento_id,)
+    ).fetchone()[0]
+    return {
+        "formulas": [
+            {**{k: v for k, v in f.items() if k not in ("factor", "componentes")}, "texto": _rj_formula_texto(f),
+             "componentes": [{k: v for k, v in c.items() if k not in ("w", "base")} for c in f["componentes"]]}
+            for f in formulas
+        ],
+        "indices": [v for versiones in indices.values() for v in versiones],
+        "previsiones": [dict(f) for f in conn.execute(
+            "SELECT * FROM reajuste_previsiones WHERE seguimiento_cc_id = ? ORDER BY id", (seguimiento_id,)).fetchall()],
+        "reglas_descuento": _rj_reglas_descuento(conn, seguimiento_id),
+        "reglas_descuento_historial": [dict(f) for f in conn.execute(
+            "SELECT * FROM certificados_reglas_descuento WHERE seguimiento_cc_id = ? ORDER BY id", (seguimiento_id,)).fetchall()],
+        "saldo_inicial": {"registro": inicial["registro"], "lineas": inicial["lineas"]},
+        "saldo_inicial_historial": [dict(f) for f in conn.execute(
+            "SELECT * FROM certificados_saldo_inicial WHERE seguimiento_cc_id = ? ORDER BY id", (seguimiento_id,)).fetchall()],
+        "historicos": [dict(f) for f in conn.execute(
+            """SELECT id, numero, periodo_ejecucion, importe_periodo, reajuste_periodo, estado, moneda, emitido_por, emitido_en
+               FROM certificados_cliente WHERE seguimiento_cc_id = ? AND origen = 'HISTORICO' ORDER BY numero""",
+            (seguimiento_id,)).fetchall()],
+        "numeracion": {
+            "configurado": seguimiento["numero_proximo_certificado"], "ultimo": ultimo_numero,
+            "proximo": _cert_proximo_numero(conn, seguimiento_id),
+        },
+        "monedas": por_moneda,
+        "ultimo_coeficiente": ultimo,
+        "pendientes": pendientes,
+        "avisos": avisos,
+        "auditoria": [
+            {**dict(f), "detalle": json.loads(f["detalle_json"]) if f["detalle_json"] else None}
+            for f in conn.execute(
+                "SELECT * FROM reajuste_auditoria WHERE seguimiento_cc_id = ? ORDER BY id DESC", (seguimiento_id,)).fetchall()
+        ],
+    }
+
+
+@app.get(REAJ_RUTA)
+def obtener_reajustes(request: Request, seguimiento_id: int):
+    _cert_requiere(request, "consultar")
+    conn = get_sqlite_connection()
+    try:
+        return _cert_json(_rj_estado(conn, seguimiento_id))
+    finally:
+        conn.close()
+
+
+@app.post(REAJ_RUTA + "/formulas")
+async def crear_formula_reajuste(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "configurar_reajuste")
+    payload = await _seg_leer_json(request)
+    vigente_desde = _rj_periodo(payload.get("vigente_desde"), "Vigente desde")
+    mes_base = _rj_periodo(payload.get("mes_base"), "Mes base")
+    if mes_base > vigente_desde:
+        raise _seg_error("El mes base no puede ser posterior al período desde el que rige la fórmula.")
+    factor = _rj_decimal(payload.get("factor_rebase", "1"), "Factor de rebase", positivo=True)
+    decimales = payload.get("decimales_coeficiente")
+    decimales = None if decimales in (None, "") else _cert_id(decimales, "Decimales del coeficiente")
+    if decimales is not None and not 2 <= decimales <= 10:
+        raise _seg_error("Decimales del coeficiente: entre 2 y 10, o sin redondeo.")
+    motivo = str(payload.get("motivo") or "").strip()
+    if len(motivo) < REAJ_MIN_MOTIVO:
+        raise _seg_error(f"El motivo de la versión es obligatorio (al menos {REAJ_MIN_MOTIVO} caracteres).")
+    componentes = payload.get("componentes")
+    if not isinstance(componentes, list) or not componentes:
+        raise _seg_error("Cargue al menos un componente de la fórmula.")
+    vistos, suma, filas = set(), Decimal(0), []
+    for posicion, comp in enumerate(componentes, start=1):
+        if not isinstance(comp, dict):
+            raise _seg_error("Cada componente debe ser un objeto.")
+        codigo = str(comp.get("codigo") or "").strip().upper()
+        if not re.fullmatch(r"[A-Z0-9_]{1,20}", codigo):
+            raise _seg_error(f"Componente {posicion}: código inválido (letras, números o _, hasta 20).")
+        if codigo in vistos:
+            raise _seg_error(f"El componente {codigo} está repetido.")
+        vistos.add(codigo)
+        nombre = _seg_texto(comp.get("nombre"), f"{codigo}: nombre", 100) or codigo
+        ponderacion = _rj_decimal(comp.get("ponderacion"), f"{codigo}: ponderación", positivo=True)
+        if ponderacion > 1:
+            raise _seg_error(f"{codigo}: la ponderación no puede superar 1.")
+        valor_base = _rj_decimal(comp.get("valor_base"), f"{codigo}: valor base", positivo=True)
+        suma += ponderacion
+        filas.append((codigo, nombre, str(ponderacion), str(valor_base), _seg_texto(comp.get("fuente"), f"{codigo}: fuente", 300)))
+    if suma != 1:
+        raise _seg_error(f"Las ponderaciones deben sumar exactamente 1 (suman {suma}).")
+
+    def operacion(conn):
+        _seg_obtener(conn, seguimiento_id)
+        version = conn.execute(
+            "SELECT COALESCE(MAX(version), 0) + 1 FROM reajuste_formulas WHERE seguimiento_cc_id = ?", (seguimiento_id,)
+        ).fetchone()[0]
+        ahora = fecha_actual_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO reajuste_formulas (seguimiento_cc_id, version, vigente_desde, mes_base, factor_rebase, permite_negativo,
+                                           decimales_coeficiente, motivo, creado_por, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (seguimiento_id, version, vigente_desde, mes_base, str(factor), 0 if payload.get("permite_negativo") is False else 1,
+             decimales, motivo, perfil["usuario"], ahora),
+        )
+        formula_id = cursor.lastrowid
+        conn.executemany(
+            "INSERT INTO reajuste_componentes (formula_id, codigo, nombre, ponderacion, valor_base, fuente) VALUES (?, ?, ?, ?, ?, ?)",
+            [(formula_id, *fila) for fila in filas],
+        )
+        certificado = conn.execute(
+            "SELECT MIN(periodo_ejecucion) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND estado = 'EMITIDO'",
+            (seguimiento_id,),
+        ).fetchone()[0]
+        _rj_auditar(conn, seguimiento_id, f"Fórmula v{version} creada", "reajuste_formulas", formula_id, perfil["usuario"], {
+            "vigente_desde": vigente_desde, "mes_base": mes_base, "factor_rebase": str(factor), "motivo": motivo,
+            "componentes": [{"codigo": f[0], "ponderacion": f[2], "valor_base": f[3]} for f in filas],
+            "retroactiva": bool(certificado and vigente_desde <= certificado),
+        })
+        return version
+
+    version = _cert_ejecutar(operacion)
+    return {"ok": True, "version": version, "mensaje": f"Fórmula v{version} guardada; queda pendiente de validación contractual."}
+
+
+@app.post(REAJ_RUTA + "/formulas/{formula_id}/validar")
+async def validar_formula_reajuste(request: Request, seguimiento_id: int, formula_id: int):
+    perfil = _cert_requiere(request, "configurar_reajuste")
+    payload = await _seg_leer_json(request)
+    if payload.get("confirmo") is not True:
+        raise _seg_error("Confirme que los datos de la versión coinciden con el contrato.")
+    referencia = str(payload.get("referencia_contractual") or "").strip()
+    if len(referencia) < REAJ_MIN_REFERENCIA:
+        raise _seg_error(f"La referencia contractual es obligatoria (al menos {REAJ_MIN_REFERENCIA} caracteres).")
+    referencia = _seg_texto(referencia, "Referencia contractual", 300)
+    observacion = _seg_texto(payload.get("observacion"), "Observación", 1000)
+
+    def operacion(conn):
+        formula = conn.execute(
+            "SELECT * FROM reajuste_formulas WHERE id = ? AND seguimiento_cc_id = ?", (formula_id, seguimiento_id)
+        ).fetchone()
+        if formula is None:
+            raise _seg_error("Versión de fórmula no encontrada.", 404)
+        if formula["validacion_contractual"] == "VALIDADA":
+            raise _seg_error("La versión ya fue validada; si estaba mal, cree una versión nueva.", 409)
+        ahora = fecha_actual_iso()
+        conn.execute(
+            """
+            UPDATE reajuste_formulas SET validacion_contractual = 'VALIDADA', validada_por = ?, validada_en = ?,
+                   referencia_contractual = ?, observacion_validacion = ? WHERE id = ?
+            """,
+            (perfil["usuario"], ahora, referencia, observacion, formula_id),
+        )
+        _rj_auditar(conn, seguimiento_id, f"Fórmula v{formula['version']} validada contractualmente", "reajuste_formulas",
+                    formula_id, perfil["usuario"], {"referencia_contractual": referencia, "observacion": observacion})
+        return formula["version"]
+
+    version = _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": f"Fórmula v{version} validada."}
+
+
+@app.post(REAJ_RUTA + "/indices")
+async def cargar_indice_reajuste(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "cargar_indices")
+    payload = await _seg_leer_json(request)
+    codigo = str(payload.get("codigo") or "").strip().upper()
+    periodo = _rj_periodo(payload.get("periodo"), "Período")
+    valor = _rj_decimal(payload.get("valor"), "Valor del índice", positivo=True)
+    estado = _cert_opcion(payload.get("estado") or "DEFINITIVO", REAJ_ESTADOS_INDICE, "Estado del índice")
+    fuente = _seg_texto(payload.get("fuente_ref"), "Fuente", 300)
+    motivo = _seg_texto(payload.get("motivo"), "Motivo", 1000)
+
+    def operacion(conn):
+        _seg_obtener(conn, seguimiento_id)
+        codigos = {f["codigo"] for f in conn.execute(
+            "SELECT DISTINCT c.codigo FROM reajuste_componentes c JOIN reajuste_formulas f ON f.id = c.formula_id "
+            "WHERE f.seguimiento_cc_id = ?", (seguimiento_id,)).fetchall()}
+        if codigo not in codigos:
+            raise _seg_error(f"El índice {codigo or '(sin código)'} no es componente de ninguna versión de la fórmula.")
+        anterior = conn.execute(
+            "SELECT * FROM reajuste_indices WHERE seguimiento_cc_id = ? AND codigo = ? AND periodo = ? ORDER BY version DESC LIMIT 1",
+            (seguimiento_id, codigo, periodo),
+        ).fetchone()
+        version = (anterior["version"] + 1) if anterior else 1
+        if anterior and len(motivo or "") < REAJ_MIN_MOTIVO:
+            raise _seg_error(f"Es una corrección del índice: el motivo es obligatorio (al menos {REAJ_MIN_MOTIVO} caracteres).")
+        if anterior and Decimal(anterior["valor"]) == valor and anterior["estado"] == estado:
+            raise _seg_error("El valor y el estado no cambian respecto de la versión vigente.")
+        ahora = fecha_actual_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO reajuste_indices (seguimiento_cc_id, codigo, periodo, version, valor, estado, fuente_ref, motivo, cargado_por, cargado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (seguimiento_id, codigo, periodo, version, str(valor), estado, fuente, motivo, perfil["usuario"], ahora),
+        )
+        usado = conn.execute(
+            "SELECT COUNT(*) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND estado = 'EMITIDO' AND periodo_ejecucion = ?",
+            (seguimiento_id, periodo),
+        ).fetchone()[0]
+        _rj_auditar(conn, seguimiento_id, "Índice corregido" if anterior else "Índice cargado", "reajuste_indices", cursor.lastrowid,
+                    perfil["usuario"], {
+                        "codigo": codigo, "periodo": periodo, "version": version, "valor": str(valor), "estado": estado,
+                        "valor_anterior": anterior["valor"] if anterior else None, "motivo": motivo, "certificados_emitidos_del_periodo": usado,
+                    })
+        return version, usado
+
+    version, usado = _cert_ejecutar(operacion)
+    mensaje = f"Índice {codigo} {_rj_periodo_texto(periodo)} registrado (versión {version})."
+    if usado and version > 1:
+        mensaje += " El período ya fue certificado: la diferencia quedará como retroactivo pendiente."
+    return {"ok": True, "version": version, "mensaje": mensaje}
+
+
+@app.post(REAJ_RUTA + "/previsiones")
+async def registrar_prevision_reajuste(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "configurar_reajuste")
+    payload = await _seg_leer_json(request)
+    moneda = _seg_moneda(payload.get("moneda"))
+    monto = _cert_cent(_seg_decimal(payload.get("monto"), "Monto de la previsión", requerido=True))
+    motivo = str(payload.get("motivo") or "").strip()
+    if len(motivo) < REAJ_MIN_MOTIVO_PREVISION:
+        raise _seg_error(f"El motivo es obligatorio (al menos {REAJ_MIN_MOTIVO_PREVISION} caracteres).")
+
+    def operacion(conn):
+        _seg_obtener(conn, seguimiento_id)
+        if not conn.execute(
+            "SELECT 1 FROM Orden_de_compra_cliente WHERE seguimiento_cc_id = ? AND upper(trim(moneda)) = ? LIMIT 1", (seguimiento_id, moneda)
+        ).fetchone():
+            raise _seg_error(f"El seguimiento no tiene órdenes de compra en {moneda}.")
+        cursor = conn.execute(
+            "INSERT INTO reajuste_previsiones (seguimiento_cc_id, moneda, monto, motivo, creado_por, creado_en) VALUES (?, ?, ?, ?, ?, ?)",
+            (seguimiento_id, moneda, float(monto), _seg_texto(motivo, "Motivo", 500), perfil["usuario"], fecha_actual_iso()),
+        )
+        _rj_auditar(conn, seguimiento_id, "Previsión registrada", "reajuste_previsiones", cursor.lastrowid, perfil["usuario"],
+                    {"moneda": moneda, "monto": monto, "motivo": motivo})
+
+    _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": "Previsión de reajustes registrada."}
+
+
+@app.post(REAJ_RUTA + "/reglas-descuento")
+async def registrar_regla_descuento(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "configurar_reajuste")
+    payload = await _seg_leer_json(request)
+    concepto = _cert_opcion(payload.get("concepto"), CERT_CONCEPTOS_DESCUENTO, "Concepto")
+    base = _cert_opcion(payload.get("base"), REAJ_BASES_DESCUENTO, "Base")
+    porcentaje = None
+    if base != "MANUAL":
+        porcentaje = _rj_decimal(payload.get("porcentaje"), "Porcentaje", positivo=True)
+        if porcentaje > 100:
+            raise _seg_error("Porcentaje: no puede superar 100.")
+
+    def operacion(conn):
+        _seg_obtener(conn, seguimiento_id)
+        actual = _rj_reglas_descuento(conn, seguimiento_id).get(concepto)
+        if actual and actual["base"] == base and (actual["porcentaje"] is None if porcentaje is None else _cert_dec(actual["porcentaje"]) == porcentaje):
+            raise _seg_error("La regla no cambia respecto de la vigente.")
+        cursor = conn.execute(
+            "INSERT INTO certificados_reglas_descuento (seguimiento_cc_id, concepto, base, porcentaje, creado_por, creado_en) VALUES (?, ?, ?, ?, ?, ?)",
+            (seguimiento_id, concepto, base, float(porcentaje) if porcentaje is not None else None, perfil["usuario"], fecha_actual_iso()),
+        )
+        _rj_auditar(conn, seguimiento_id, "Base de descuento modificada", "certificados_reglas_descuento", cursor.lastrowid,
+                    perfil["usuario"], {"concepto": concepto, "base": base, "porcentaje": porcentaje,
+                                        "anterior": {"base": actual["base"], "porcentaje": actual["porcentaje"]} if actual else None})
+
+    _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": "Base de cálculo del descuento registrada."}
+
+
+@app.post(REAJ_RUTA + "/numeracion")
+async def registrar_numeracion_certificados(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "incorporar_historico")
+    payload = await _seg_leer_json(request)
+    proximo = _cert_id(payload.get("numero_proximo"), "Próximo número")
+    if proximo is None or proximo < 1:
+        raise _seg_error("Próximo número: debe ser un entero mayor o igual a 1.")
+    motivo = str(payload.get("motivo") or "").strip()
+    if len(motivo) < REAJ_MIN_MOTIVO:
+        raise _seg_error(f"El motivo es obligatorio (al menos {REAJ_MIN_MOTIVO} caracteres).")
+
+    def operacion(conn):
+        seguimiento = _seg_obtener(conn, seguimiento_id)
+        ultimo = conn.execute("SELECT COALESCE(MAX(numero), 0) FROM certificados_cliente WHERE seguimiento_cc_id = ?",
+                              (seguimiento_id,)).fetchone()[0]
+        if proximo <= ultimo:
+            raise _seg_error(f"El próximo número debe ser mayor que {ultimo} (último número usado).", 409)
+        inicial = _rj_saldo_inicial(conn, seguimiento_id)["registro"]
+        if inicial and proximo <= inicial["hasta_numero"]:
+            raise _seg_error(f"El acumulado inicial cubre hasta el N° {inicial['hasta_numero']}; el próximo debe ser mayor.", 409)
+        conn.execute("UPDATE seguimiento_cc SET numero_proximo_certificado = ? WHERE id = ?", (proximo, seguimiento_id))
+        _rj_auditar(conn, seguimiento_id, "Próximo número de certificado", "seguimiento_cc", seguimiento_id, perfil["usuario"],
+                    {"anterior": seguimiento["numero_proximo_certificado"], "nuevo": proximo, "motivo": motivo})
+
+    _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": f"El próximo certificado será el N° {proximo}."}
+
+
+@app.post(REAJ_RUTA + "/saldo-inicial")
+async def registrar_saldo_inicial(request: Request, seguimiento_id: int):
+    perfil = _cert_requiere(request, "incorporar_historico")
+    payload = await _seg_leer_json(request)
+    hasta = _cert_id(payload.get("hasta_numero"), "Hasta el certificado N°")
+    if hasta is None or hasta < 1:
+        raise _seg_error("Indique hasta qué número de certificado cubre el acumulado inicial.")
+    justificacion = str(payload.get("justificacion") or "").strip()
+    if len(justificacion) < CERT_MIN_JUSTIFICACION:
+        raise _seg_error(f"La justificación es obligatoria (al menos {CERT_MIN_JUSTIFICACION} caracteres).")
+    lineas = payload.get("lineas")
+    if not isinstance(lineas, list) or not lineas:
+        raise _seg_error("Cargue el acumulado de al menos una OC.")
+
+    def operacion(conn):
+        seguimiento = _seg_obtener(conn, seguimiento_id)
+        modalidad = seguimiento["modalidad_certificacion"]
+        if modalidad is None:
+            modalidad = _cert_opcion(payload.get("modalidad"), CERT_MODALIDADES, "Modalidad")
+            conn.execute("UPDATE seguimiento_cc SET modalidad_certificacion = ? WHERE id = ?", (modalidad, seguimiento_id))
+        primero = conn.execute(
+            "SELECT MIN(numero) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND numero IS NOT NULL", (seguimiento_id,)
+        ).fetchone()[0]
+        if primero is not None and hasta >= primero:
+            raise _seg_error(f"Ya existe el certificado N° {primero}: el acumulado inicial debe cubrir números anteriores.", 409)
+        ordenes = _cert_ordenes(conn, seguimiento_id)
+        filas, vistos = [], set()
+        for linea in lineas:
+            if not isinstance(linea, dict):
+                raise _seg_error("Cada línea del acumulado inicial debe ser un objeto.")
+            orden_id = _cert_id(linea.get("orden_compra_cliente_id"), "OC")
+            if orden_id not in ordenes:
+                raise _seg_error("La OC del acumulado inicial no pertenece a este seguimiento.")
+            datos = ordenes[orden_id]
+            item_id = _cert_id(linea.get("item_oc_cliente_id"), "Ítem")
+            reajustes = _cert_cent(_rj_decimal(linea.get("reajustes_acumulados") or 0, "Reajustes acumulados", admite_negativo=True))
+            cantidad = None
+            if item_id is not None:
+                item = next((i for i in datos["items"] if i["id"] == item_id), None)
+                if item is None:
+                    raise _seg_error(f"El ítem {item_id} no pertenece a la OC indicada.")
+                if modalidad != "ITEMS":
+                    raise _seg_error("En modalidad GLOBAL el acumulado inicial se carga por OC, no por ítem.")
+                cantidad = _cert_cant(_seg_decimal(linea.get("cantidad"), f"Ítem {item['numero']}: cantidad", requerido=True))
+                if cantidad > _cert_dec(item["cantidad"]):
+                    raise _seg_error(f"Ítem {item['numero']}: la cantidad supera la contratada.")
+                base = _cert_cent(_cert_dec(item["total"])) if cantidad == _cert_dec(item["cantidad"]) else _cert_cent(cantidad * _cert_dec(item["precio"]))
+            else:
+                base = _cert_cent(_seg_decimal(linea.get("base_acumulada") or 0, f"{_cert_etiqueta_oc(datos['orden'])}: base acumulada"))
+                if modalidad == "ITEMS" and base != 0:
+                    raise _seg_error("En modalidad por ítems la base acumulada se carga por ítem (cantidades); por OC solo los reajustes.")
+            clave = (orden_id, item_id)
+            if clave in vistos:
+                raise _seg_error("Hay líneas repetidas en el acumulado inicial.")
+            vistos.add(clave)
+            filas.append((orden_id, item_id, float(cantidad) if cantidad is not None else None, float(base), float(reajustes)))
+        ahora = fecha_actual_iso()
+        anterior = _rj_saldo_inicial(conn, seguimiento_id)["registro"]
+        cursor = conn.execute(
+            "INSERT INTO certificados_saldo_inicial (seguimiento_cc_id, hasta_numero, justificacion, creado_por, creado_en) VALUES (?, ?, ?, ?, ?)",
+            (seguimiento_id, hasta, _seg_texto(justificacion, "Justificación", 2000), perfil["usuario"], ahora),
+        )
+        conn.executemany(
+            "INSERT INTO certificados_saldo_inicial_lineas (saldo_inicial_id, orden_compra_cliente_id, item_oc_cliente_id, cantidad, "
+            "base_acumulada, reajustes_acumulados) VALUES (?, ?, ?, ?, ?, ?)",
+            [(cursor.lastrowid, *fila) for fila in filas],
+        )
+        if (seguimiento["numero_proximo_certificado"] or 1) <= hasta:
+            conn.execute("UPDATE seguimiento_cc SET numero_proximo_certificado = ? WHERE id = ?", (hasta + 1, seguimiento_id))
+        _rj_auditar(conn, seguimiento_id, "Acumulado inicial corregido" if anterior else "Acumulado inicial registrado",
+                    "certificados_saldo_inicial", cursor.lastrowid, perfil["usuario"], {
+                        "hasta_numero": hasta, "justificacion": justificacion, "reemplaza_registro": anterior["id"] if anterior else None,
+                        "lineas": [{"orden_compra_cliente_id": f[0], "item_oc_cliente_id": f[1], "cantidad": f[2],
+                                    "base_acumulada": f[3], "reajustes_acumulados": f[4]} for f in filas],
+                    })
+
+    _cert_ejecutar(operacion)
+    return {"ok": True, "mensaje": "Acumulado inicial registrado."}
+
+
+@app.post(CERT_RUTA + "/historico")
+async def incorporar_certificado_historico(request: Request, seguimiento_id: int):
+    """Certificado emitido fuera del sistema: se registra como EMITIDO (origen HISTORICO) con los reajustes efectivamente pagados."""
+    perfil = _cert_requiere(request, "incorporar_historico")
+    payload = await _seg_leer_json(request)
+    numero = _cert_id(payload.get("numero"), "Número")
+    if numero is None or numero < 1:
+        raise _seg_error("Indique el número del certificado anterior.")
+    justificacion = str(payload.get("justificacion") or "").strip()
+    if len(justificacion) < CERT_MIN_JUSTIFICACION:
+        raise _seg_error(f"La justificación es obligatoria (al menos {CERT_MIN_JUSTIFICACION} caracteres).")
+    pagados = []
+    for pago in payload.get("reajustes_pagados") or []:
+        if not isinstance(pago, dict):
+            raise _seg_error("Cada reajuste pagado debe ser un objeto.")
+        importe = _cert_cent(_rj_decimal(pago.get("importe"), "Reajuste pagado", admite_negativo=True))
+        if importe == 0:
+            continue
+        coeficiente = _rj_decimal(pago.get("coeficiente"), "Coeficiente aplicado", requerido=False, positivo=True)
+        pagados.append({
+            "orden_compra_cliente_id": _cert_id(pago.get("orden_compra_cliente_id"), "OC"),
+            "componente": _cert_opcion(pago.get("componente") or "POLINOMICA", REAJ_COMPONENTES, "Componente"),
+            "importe": importe, "coeficiente": str(coeficiente) if coeficiente is not None else None,
+        })
+    archivos_creados = []
+
+    def operacion(conn):
+        if conn.execute("SELECT 1 FROM certificados_cliente WHERE seguimiento_cc_id = ? AND numero = ?", (seguimiento_id, numero)).fetchone():
+            raise _seg_error(f"Ya existe el certificado N° {numero}.", 409)
+        inicial = _rj_saldo_inicial(conn, seguimiento_id)["registro"]
+        if inicial and numero <= inicial["hasta_numero"]:
+            raise _seg_error(f"El N° {numero} ya está cubierto por el acumulado inicial (hasta el N° {inicial['hasta_numero']}).", 409)
+        primero_sistema = conn.execute(
+            "SELECT MIN(numero) FROM certificados_cliente WHERE seguimiento_cc_id = ? AND origen = 'SISTEMA' AND numero IS NOT NULL",
+            (seguimiento_id,),
+        ).fetchone()[0]
+        if primero_sistema is not None and numero > primero_sistema:
+            raise _seg_error(f"Los certificados anteriores deben numerarse antes del primero emitido en el sistema (N° {primero_sistema}).", 409)
+        calculo = _cert_calcular(conn, seguimiento_id, payload, None, pagados)
+        ordenes_cert = {l["orden_compra_cliente_id"] for l in calculo["lineas"]}
+        if any(p["orden_compra_cliente_id"] not in ordenes_cert for p in pagados):
+            raise _seg_error("Un reajuste pagado corresponde a una OC fuera del alcance del certificado.")
+        ahora = fecha_actual_iso()
+        emision = {"usuario": perfil["usuario"], "nombre": perfil.get("nombre_apellido"), "fecha": ahora}
+        if calculo["cabecera"]["exceso_importe"] > 0:
+            emision.update({"exceso_justificacion": justificacion, "exceso_autorizado_por": perfil["usuario"], "exceso_autorizado_en": ahora})
+        certificado_id = _cert_guardar(conn, seguimiento_id, calculo, perfil["usuario"])
+        snapshot = _cert_snapshot(conn, seguimiento_id, calculo, numero, emision)
+        snapshot["historico"] = {"justificacion": justificacion, "incorporado_por": perfil["usuario"], "incorporado_en": ahora}
+        contenido = _cert_pdf_bytes(snapshot, "REGISTRO HISTÓRICO")
+        numero_texto = _cert_numero_texto(seguimiento_id, numero)
+        ruta_relativa = os.path.join("Doc_Certificados", _numero_seguimiento_cliente(seguimiento_id), f"{numero_texto}-HISTORICO.pdf")
+        ruta = os.path.join(DATA_DIR, ruta_relativa)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        try:
+            with open(ruta, "xb") as archivo:
+                archivo.write(contenido)
+        except FileExistsError:
+            raise _seg_error(f"Ya existe el archivo {ruta_relativa}; no se sobrescribe.", 409)
+        archivos_creados.append(ruta)
+        conn.execute(
+            """
+            UPDATE certificados_cliente
+            SET estado = 'EMITIDO', numero = ?, emitido_por = ?, emitido_en = ?, snapshot_json = ?, pdf_ruta = ?, pdf_sha256 = ?,
+                exceso_justificacion = ?, exceso_autorizado_por = ?, exceso_autorizado_en = ?
+            WHERE id = ? AND estado = 'BORRADOR'
+            """,
+            (numero, perfil["usuario"], ahora, json.dumps(snapshot, ensure_ascii=False, sort_keys=True), ruta_relativa.replace(os.sep, "/"),
+             hashlib.sha256(contenido).hexdigest(), emision.get("exceso_justificacion"), emision.get("exceso_autorizado_por"),
+             emision.get("exceso_autorizado_en"), certificado_id),
+        )
+        _cert_evento(conn, seguimiento_id, certificado_id, "HISTORICO_INCORPORADO", perfil["usuario"], {
+            "numero": numero_texto, "importe_periodo": calculo["cabecera"]["importe_periodo"],
+            "reajustes_pagados": calculo["cabecera"]["reajuste_periodo"], "justificacion": justificacion,
+        })
+        _rj_auditar(conn, seguimiento_id, "Certificado anterior incorporado", "certificados_cliente", certificado_id, perfil["usuario"], {
+            "numero": numero_texto, "periodo": calculo["cabecera"]["periodo_ejecucion"], "base": calculo["cabecera"]["importe_periodo"],
+            "reajustes_pagados": calculo["cabecera"]["reajuste_periodo"], "justificacion": justificacion,
+        })
+        return certificado_id, numero_texto
+
+    try:
+        certificado_id, numero_texto = _cert_ejecutar(operacion)
+    except Exception:
+        for ruta in archivos_creados:
+            try:
+                os.remove(ruta)
+            except OSError:
+                logger.exception("No se pudo eliminar el PDF de una incorporación revertida: %s", ruta)
+        raise
+    return {"ok": True, "certificado_id": certificado_id, "mensaje": f"Certificado {numero_texto} incorporado como histórico."}
 
 @app.get("/operaciones/centros-costos")
 @app.get("/api/operaciones/centros-costos")
@@ -3961,6 +7763,7 @@ async def crear_centro_costo(request: Request, payload: dict = Body(...)):
         "importe_contratado": payload.get("importe_contratado") or 0,
         "presupuesto": payload.get("presupuesto") or 0,
         "observaciones": str(payload.get("observaciones") or "").strip() or None,
+        "provincia": str(payload.get("provincia") or "").strip()[:100] or None,
     }
 
     with get_sqlite_connection() as conn:
@@ -3977,13 +7780,13 @@ async def crear_centro_costo(request: Request, payload: dict = Body(...)):
                 INSERT INTO centros_costos (
                     id, nombre, activo, cliente_id, proyecto_id, ubicacion, responsable_id,
                     contrato, orden_compra, fecha_inicio, fecha_fin_prevista, fecha_fin_real,
-                    estado, moneda, importe_contratado, presupuesto, observaciones, updated_at
-                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    estado, moneda, importe_contratado, presupuesto, observaciones, provincia, updated_at
+                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (id_centro, nombre, datos["cliente_id"], datos["proyecto_id"], datos["ubicacion"], datos["responsable_id"],
                  datos["contrato"], datos["orden_compra"], datos["fecha_inicio"], datos["fecha_fin_prevista"],
                  datos["fecha_fin_real"], datos["estado"], datos["moneda"], datos["importe_contratado"],
-                 datos["presupuesto"], datos["observaciones"]),
+                 datos["presupuesto"], datos["observaciones"], datos["provincia"]),
             )
             conn.commit()
         except sqlite3.IntegrityError:
@@ -4015,6 +7818,7 @@ async def editar_centro_costo(request: Request, id_centro: int, payload: dict = 
         "importe_contratado": payload.get("importe_contratado") or 0,
         "presupuesto": payload.get("presupuesto") or 0,
         "observaciones": str(payload.get("observaciones") or "").strip() or None,
+        "provincia": str(payload.get("provincia") or "").strip()[:100] or None,
     }
 
     with get_sqlite_connection() as conn:
@@ -4040,6 +7844,9 @@ async def editar_centro_costo(request: Request, id_centro: int, payload: dict = 
             )
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Centro de Costos no encontrado.")
+            # La provincia solo se modifica si el formulario la envía (los formularios previos no la conocen).
+            if "provincia" in payload:
+                conn.execute("UPDATE centros_costos SET provincia = ? WHERE id = ?", (datos["provincia"], id_centro))
             conn.commit()
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=400, detail="Ya existe un Centro de Costos con ese nombre.")
@@ -10471,16 +14278,19 @@ def dashboard_almacen_v2(top_n: int = Query(default=10, ge=1, le=50)):
             """
         ).fetchall()
 
-        consumo_por_proyecto = conn.execute(
+        # Destino tal como quedo registrado en el remito de salida ("Obra o Direccion");
+        # si falta, el proyecto del movimiento. Sin limite para que la suma coincida con las salidas.
+        consumo_por_centro_costos = conn.execute(
             """
             SELECT
-                COALESCE(NULLIF(TRIM(proyecto), ''), 'Sin proyecto') AS proyecto,
-                COALESCE(SUM(cantidad), 0) AS total
-            FROM movimientos_stock
-            WHERE UPPER(tipo) = 'SALIDA'
-            GROUP BY COALESCE(NULLIF(TRIM(proyecto), ''), 'Sin proyecto')
-            ORDER BY total DESC
-            LIMIT 12
+                COALESCE(NULLIF(TRIM(r.direccion), ''), NULLIF(TRIM(m.proyecto), ''), 'Sin centro de costos') AS centro_costos,
+                COALESCE(SUM(m.cantidad), 0) AS total,
+                COUNT(DISTINCT m.remito_id) AS remitos
+            FROM movimientos_stock m
+            LEFT JOIN remitos_entrega r ON r.id = m.remito_id
+            WHERE UPPER(m.tipo) = 'SALIDA'
+            GROUP BY COALESCE(NULLIF(TRIM(r.direccion), ''), NULLIF(TRIM(m.proyecto), ''), 'Sin centro de costos')
+            ORDER BY total DESC, centro_costos ASC
             """
         ).fetchall()
 
@@ -10547,7 +14357,7 @@ def dashboard_almacen_v2(top_n: int = Query(default=10, ge=1, le=50)):
         "sin_stock": sin_stock,
         "movimientos_mensuales": [dict(r) for r in movimientos_mensuales],
         "stock_por_categoria": [dict(r) for r in por_categoria],
-        "consumo_por_proyecto": [dict(r) for r in consumo_por_proyecto],
+        "consumo_por_centro_costos": [dict(r) for r in consumo_por_centro_costos],
         "top_materiales": [dict(r) for r in top_materiales],
         "alertas_criticas": [dict(r) for r in alertas_criticas],
         "sin_stock_items": [dict(r) for r in sin_stock_items],
@@ -11792,3 +15602,564 @@ def listar_adjuntos_v2(
         salida.append(d)
     return salida
 
+
+# ============================================================================
+# Facturación y Cobranzas (módulo independiente del Menú Principal)
+# La lógica, los cálculos con Decimal y la migración están en facturacion.py; acá solo
+# permisos, transacciones y forma de las respuestas. Tango sigue siendo el sistema oficial.
+# ============================================================================
+import facturacion as fac  # noqa: E402
+import facturacion_pdf  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+FAC_API = "/api/facturacion"
+FACTURACION_PATH = os.path.join(BASE_DIR, "facturacion.html")
+FAC_ESTADO_HTTP = {"PERMISO": 403, "NO_EXISTE": 404, "DUPLICADO": 409}
+
+
+@app.get("/facturacion", response_class=HTMLResponse)
+def facturacion_view(request: Request):
+    try:
+        _requiere_modulo(request, fac.MODULO)
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    return _leer_html(FACTURACION_PATH)
+
+
+def _fac_perfil(request: Request, carga=False):
+    """Consulta: cualquier usuario con el módulo. Carga: todos menos el perfil CONSULTOR."""
+    perfil = _requiere_modulo(request, fac.MODULO)
+    if carga and str(perfil.get("tipo_usuario", "")).upper() == "CONSULTOR":
+        raise HTTPException(status_code=403, detail="Su perfil es de consulta: no puede registrar en Facturación y Cobranzas")
+    return perfil
+
+
+def _fac_es_responsable(conn, perfil):
+    """Responsable = usuario nominal asignado en Administración › Responsables por módulo (no la cuenta de contingencia)."""
+    if (perfil or {}).get("origen") != "usuarios" or not perfil.get("usuario_id"):
+        return False
+    return conn.execute("SELECT 1 FROM responsables_modulo WHERE modulo = ? AND usuario_id = ?",
+                        (fac.MODULO, perfil["usuario_id"])).fetchone() is not None
+
+
+def _fac_hoy():
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _fac_error(exc):
+    return JSONResponse({"detail": str(exc).split(": ", 1)[-1], "codigo": exc.codigo},
+                        status_code=FAC_ESTADO_HTTP.get(exc.codigo, 400))
+
+
+def _fac_ejecutar(operacion, escritura=True):
+    """Escrituras en BEGIN IMMEDIATE (serializa saldos y numeración). Errores del servicio → JSON con código."""
+    conn = get_sqlite_connection()
+    try:
+        if escritura:
+            conn.execute("BEGIN IMMEDIATE")
+        resultado = operacion(conn)
+        if escritura:
+            conn.commit()
+        return _cert_json(resultado) if not isinstance(resultado, Response) else resultado
+    except fac.FacError as exc:
+        conn.rollback()
+        return _fac_error(exc)
+    except HTTPException:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"La operación viola una regla de integridad: {exc}", "codigo": "INTEGRIDAD"}, status_code=409)
+    except (KeyError, TypeError, ValueError, ArithmeticError) as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Datos incompletos o inválidos ({exc})", "codigo": "DATOS"}, status_code=400)
+    except sqlite3.Error as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Error de base de datos: {exc}", "codigo": "BASE"}, status_code=500)
+    finally:
+        conn.close()
+
+
+async def _fac_cuerpo(request: Request):
+    cuerpo = await request.body()
+    if not cuerpo.strip():
+        return {}
+    try:
+        datos = json.loads(cuerpo)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="El cuerpo no es JSON válido")
+    if not isinstance(datos, dict):
+        raise HTTPException(status_code=400, detail="Se esperaba un objeto JSON")
+    return datos
+
+
+def _fac_idempotencia(request: Request, datos):
+    clave = request.headers.get("Idempotency-Key") or datos.get("idempotencia")
+    datos["idempotencia"] = str(clave)[:80] if clave else None
+    return datos["idempotencia"]
+
+
+def _fac_alta(request, datos, entidad, registrar):
+    """Alta con clave de idempotencia: un reintento devuelve el registro ya creado en lugar de duplicarlo."""
+    clave = _fac_idempotencia(request, datos)
+
+    def op(conn):
+        previo = fac.buscar_idempotente(conn, entidad, clave)
+        if previo:
+            return {"id": previo, "repetido": True}
+        return {"id": registrar(conn), "repetido": False}
+    return _fac_ejecutar(op)
+
+
+# ---------------------------------------------------------------- sesión, catálogos y configuración
+
+@app.get(FAC_API + "/sesion")
+def fac_sesion(request: Request):
+    perfil = _fac_perfil(request)
+
+    def op(conn):
+        return {
+            "usuario": perfil.get("usuario"), "nombre": perfil.get("nombre_apellido"), "hoy": _fac_hoy(),
+            "puede_cargar": str(perfil.get("tipo_usuario", "")).upper() != "CONSULTOR",
+            "es_responsable": _fac_es_responsable(conn, perfil),
+            "config": {c: fac.leer_config(conn, c) for c in fac.CONFIG_INICIAL},
+            "corte": fac.corte_actual(conn),
+            "clientes_validados": conn.execute("SELECT count(*) FROM fac_estado_inicial WHERE estado = 'VIGENTE'").fetchone()[0],
+        }
+    return _fac_ejecutar(op, escritura=False)
+
+
+@app.get(FAC_API + "/catalogos")
+def fac_catalogos(request: Request):
+    _fac_perfil(request)
+
+    def op(conn):
+        certificados = fac._filas(conn, """
+            SELECT c.id, c.seguimiento_cc_id, c.numero, c.moneda, c.total_a_facturar, c.periodo_desde, c.periodo_hasta,
+                   s.cliente_codigo, s.centro_costo_id
+            FROM certificados_cliente c JOIN seguimiento_cc s ON s.id = c.seguimiento_cc_id
+            WHERE c.estado = 'EMITIDO' ORDER BY c.seguimiento_cc_id, c.numero""")
+        for c in certificados:
+            c["numero_texto"] = _cert_numero_texto(c["seguimiento_cc_id"], c["numero"])
+            c["facturado"] = fac.facturado_certificado(conn, c["id"])
+            c["pendiente"] = fac.pendiente_certificado(conn, c["id"])
+        return {
+            "clientes": fac._filas(conn, "SELECT codigo, razon_social, cuit FROM clientes ORDER BY razon_social"),
+            "certificados": certificados,
+            "ordenes_compra": fac._filas(conn, "SELECT o.id, o.seguimiento_cc_id, o.orden_compra, o.revision, o.moneda, s.cliente_codigo "
+                                               "FROM Orden_de_compra_cliente o LEFT JOIN seguimiento_cc s ON s.id = o.seguimiento_cc_id "
+                                               "ORDER BY o.id"),
+            "centros_costos": fac._filas(conn, "SELECT id, nombre FROM centros_costos ORDER BY id"),
+        }
+    return _fac_ejecutar(op, escritura=False)
+
+
+@app.put(FAC_API + "/config/{clave}")
+async def fac_config(request: Request, clave: str):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    if clave not in fac.CONFIG_INICIAL:
+        raise HTTPException(status_code=400, detail="Clave de configuración desconocida")
+
+    def op(conn):
+        valor = datos.get("valor")
+        if clave == "adjuntos_requeridos":
+            if not isinstance(valor, dict) or set(valor) - set(fac.ENTIDADES_ADJUNTO):
+                raise fac.FacError("CONFIG", "adjuntos_requeridos debe indicar true/false por entidad")
+            valor = {e: bool(valor.get(e, False)) for e in fac.ENTIDADES_ADJUNTO}
+        elif clave == "adjuntos_almacenamiento" and valor not in ("ENLACE", "DISCO"):
+            raise fac.FacError("CONFIG", "almacenamiento: ENLACE o DISCO")
+        fac.guardar_config(conn, clave, valor, perfil["usuario"], fecha_actual_iso(), _fac_es_responsable(conn, perfil))
+        return {"ok": True, "clave": clave, "valor": fac.leer_config(conn, clave)}
+    return _fac_ejecutar(op)
+
+
+@app.get(FAC_API + "/tablero")
+def fac_tablero(request: Request, cliente: str = Query(default="")):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.tablero(conn, _fac_hoy(), cliente or None), escritura=False)
+
+
+@app.get(FAC_API + "/eventos")
+def fac_eventos(request: Request, entidad: str, entidad_id: int):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.eventos_de(conn, entidad.upper(), entidad_id), escritura=False)
+
+
+# ---------------------------------------------------------------- pedidos de facturación
+
+@app.get(FAC_API + "/pedidos")
+def fac_listar_pedidos(request: Request, cliente: str = Query(default=""), estado: str = Query(default="")):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.listar_pedidos(conn, cliente or None, estado or None), escritura=False)
+
+
+@app.get(FAC_API + "/pedidos/{pedido_id}")
+def fac_obtener_pedido(request: Request, pedido_id: int):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.detalle_pedido(conn, pedido_id), escritura=False)
+
+
+@app.get(FAC_API + "/certificados/{certificado_id}/precarga")
+def fac_precarga_certificado(request: Request, certificado_id: int):
+    """Datos para un pedido desde un certificado EMITIDO (Operaciones › Seguimiento de Cliente)."""
+    _fac_perfil(request)
+
+    def op(conn):
+        c = fac._filas(conn, """
+            SELECT c.id, c.seguimiento_cc_id, c.numero, c.moneda, c.total_a_facturar, c.periodo_desde, c.periodo_hasta, c.estado,
+                   c.orden_compra_cliente_id, s.cliente_codigo, s.cotizacion, s.centro_costo_id, s.condiciones_comerciales,
+                   o.orden_compra, o.revision, cc.nombre AS centro_costo
+            FROM certificados_cliente c JOIN seguimiento_cc s ON s.id = c.seguimiento_cc_id
+            LEFT JOIN Orden_de_compra_cliente o ON o.id = c.orden_compra_cliente_id
+            LEFT JOIN centros_costos cc ON cc.id = s.centro_costo_id WHERE c.id = ?""", (certificado_id,))
+        if not c or c[0]["estado"] != "EMITIDO":
+            raise fac.FacError("NO_EXISTE", "certificado inexistente o no emitido")
+        c = c[0]
+        oc = " ".join(x for x in (c["orden_compra"], c["revision"]) if x)
+        comprometido = fac._cert_comprometido(conn, certificado_id, 0)
+        pendiente = fac.r2(c["total_a_facturar"]) - comprometido
+        periodo = f"Período {facturacion_pdf.fecha(c['periodo_desde'])} al {facturacion_pdf.fecha(c['periodo_hasta'])}"
+        return {
+            "tipo_solicitado": "FACTURA", "cliente_codigo": c["cliente_codigo"], "moneda": c["moneda"], "cotizacion": c["cotizacion"],
+            "orden_compra_cliente_id": c["orden_compra_cliente_id"], "oc_texto": oc, "centro_costo_id": c["centro_costo_id"],
+            "seguimiento_cc_id": c["seguimiento_cc_id"], "observaciones": f"Centro de Costo {c['centro_costo_id']}" if c["centro_costo_id"] else "",
+            "condiciones_comerciales": c["condiciones_comerciales"], "total_a_facturar": c["total_a_facturar"],
+            "comprometido_en_pedidos": comprometido, "pendiente": pendiente,
+            "linea": {"cantidad": 1, "precio_unitario": pendiente, "alicuota_iva": "21", "certificado_id": certificado_id,
+                      "detalle": "\n".join(x for x in (f"Certificado N°{c['numero']}", c["centro_costo"] or "", periodo,
+                                                         f"OC {oc}" if oc else "") if x)},
+        }
+    return _fac_ejecutar(op, escritura=False)
+
+
+@app.post(FAC_API + "/pedidos")
+async def fac_crear_pedido(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_alta(request, datos, "PEDIDO",
+                     lambda conn: fac.guardar_pedido_borrador(conn, datos, perfil["usuario"], fecha_actual_iso()))
+
+
+@app.put(FAC_API + "/pedidos/{pedido_id}")
+async def fac_actualizar_pedido(request: Request, pedido_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: {"id": fac.guardar_pedido_borrador(conn, datos, perfil["usuario"], fecha_actual_iso(), pedido_id)})
+
+
+@app.delete(FAC_API + "/pedidos/{pedido_id}")
+def fac_descartar_pedido(request: Request, pedido_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    return _fac_ejecutar(lambda conn: fac.descartar_pedido(conn, pedido_id, perfil["usuario"], fecha_actual_iso()) or {"ok": True})
+
+
+@app.post(FAC_API + "/pedidos/{pedido_id}/emitir")
+async def fac_emitir_pedido(request: Request, pedido_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+
+    def op(conn):
+        numero = fac.emitir_pedido(conn, pedido_id, perfil["usuario"], fecha_actual_iso(), facturacion_pdf.generar_pdf,
+                                   datos.get("adjuntos") or ())
+        return {"id": pedido_id, "numero_solicitud": numero}
+    return _fac_ejecutar(op)
+
+
+@app.post(FAC_API + "/pedidos/{pedido_id}/anular")
+async def fac_anular_pedido(request: Request, pedido_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_pedido(conn, pedido_id, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
+                                                        _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.get(FAC_API + "/pedidos/{pedido_id}/pdf")
+def fac_pdf_pedido(request: Request, pedido_id: int):
+    _fac_perfil(request)
+
+    def op(conn):
+        fila = conn.execute("SELECT estado, snapshot_json, pdf_sha256, numero_solicitud FROM fac_pedidos WHERE id = ?", (pedido_id,)).fetchone()
+        if not fila:
+            raise fac.FacError("NO_EXISTE", "pedido inexistente")
+        if fila["estado"] == "BORRADOR":
+            snapshot = fac.detalle_pedido(conn, pedido_id)
+            contenido, nombre = facturacion_pdf.generar_pdf(snapshot, marca="BORRADOR"), f"pedido_{pedido_id}_borrador.pdf"
+        else:
+            snapshot = json.loads(fila["snapshot_json"])
+            contenido = facturacion_pdf.generar_pdf(snapshot)
+            if hashlib.sha256(contenido).hexdigest() != fila["pdf_sha256"]:
+                raise fac.FacError("INTEGRIDAD_PDF", "el PDF regenerado no coincide con el emitido (SHA-256); revise la versión del generador")
+            if fila["estado"] == "ANULADO":
+                contenido = facturacion_pdf.generar_pdf(snapshot, marca="ANULADO")
+            nombre = f"Solicitud_emision_{fila['numero_solicitud']}.pdf"
+        return Response(content=contenido, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nombre}"'})
+    return _fac_ejecutar(op, escritura=False)
+
+
+# ---------------------------------------------------------------- comprobantes (FC / ND / NC)
+
+@app.get(FAC_API + "/documentos")
+def fac_listar_documentos(request: Request, cliente: str = Query(default=""), tipo: str = Query(default=""),
+                          moneda: str = Query(default=""), estado: str = Query(default=""), desde: str = Query(default=""),
+                          hasta: str = Query(default=""), pendientes: int = Query(default=0)):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.listar_documentos(conn, _fac_hoy(), cliente or None, tipo or None, moneda or None,
+                                                            estado or None, desde or None, hasta or None, bool(pendientes)),
+                         escritura=False)
+
+
+@app.get(FAC_API + "/documentos/{documento_id}")
+def fac_obtener_documento(request: Request, documento_id: int):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.detalle_documento(conn, documento_id, _fac_hoy()), escritura=False)
+
+
+@app.post(FAC_API + "/documentos/validar")
+async def fac_validar_documento(request: Request):
+    """Vista previa sin guardar: importes calculados por el servidor y avisos (posible duplicado)."""
+    _fac_perfil(request)
+    datos = await _fac_cuerpo(request)
+
+    def op(conn):
+        imp, avisos = fac.advertencias_documento(conn, datos)
+        return {"importes": imp, "avisos": avisos}
+    return _fac_ejecutar(op, escritura=False)
+
+
+@app.post(FAC_API + "/documentos")
+async def fac_registrar_documento(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+
+    def registrar(conn):
+        ahora = fecha_actual_iso()
+        doc_id = fac.registrar_documento(conn, datos, perfil["usuario"], ahora, datos.get("adjuntos") or ())
+        for a in datos.get("aplicaciones") or ():
+            fac.aplicar_nc(conn, doc_id, a["documento_id"], a["importe"], perfil["usuario"], ahora)
+        return doc_id
+    return _fac_alta(request, datos, "DOCUMENTO", registrar)
+
+
+@app.post(FAC_API + "/documentos/{documento_id}/aplicaciones")
+async def fac_aplicar_nc(request: Request, documento_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+
+    def op(conn):
+        ahora = fecha_actual_iso()
+        ids = [fac.aplicar_nc(conn, documento_id, a["documento_id"], a["importe"], perfil["usuario"], ahora)
+               for a in datos.get("aplicaciones") or ()]
+        if not ids:
+            raise fac.FacError("APLICACION", "indique al menos una aplicación")
+        return {"ids": ids}
+    return _fac_ejecutar(op)
+
+
+@app.post(FAC_API + "/documentos/{documento_id}/anular")
+async def fac_anular_documento(request: Request, documento_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_documento(conn, documento_id, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
+                                                           _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.post(FAC_API + "/aplicaciones/{aplicacion_id}/anular")
+async def fac_anular_aplicacion(request: Request, aplicacion_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_aplicacion(conn, aplicacion_id, datos.get("motivo"), perfil["usuario"],
+                                                            fecha_actual_iso(), _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+# ---------------------------------------------------------------- cobranzas
+
+@app.get(FAC_API + "/recibos")
+def fac_listar_recibos(request: Request, cliente: str = Query(default="")):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.listar_recibos(conn, cliente or None), escritura=False)
+
+
+@app.post(FAC_API + "/recibos/sugerencia")
+async def fac_sugerir_asignacion(request: Request):
+    _fac_perfil(request)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.sugerir_asignacion(conn, datos["cliente_codigo"], datos["moneda"], datos["importe"],
+                                                             datos.get("tipo_cambio")), escritura=False)
+
+
+@app.post(FAC_API + "/recibos")
+async def fac_registrar_recibo(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_alta(request, datos, "RECIBO",
+                     lambda conn: fac.registrar_recibo(conn, datos, perfil["usuario"], fecha_actual_iso(), datos.get("adjuntos") or ()))
+
+
+@app.post(FAC_API + "/recibos/{recibo_id}/imputaciones")
+async def fac_imputar_a_cuenta(request: Request, recibo_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.imputar_a_cuenta(conn, recibo_id, datos.get("imputaciones") or [], perfil["usuario"],
+                                                           fecha_actual_iso()) or {"ok": True})
+
+
+@app.post(FAC_API + "/recibos/{recibo_id}/anular")
+async def fac_anular_recibo(request: Request, recibo_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_recibo(conn, recibo_id, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
+                                                        _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.post(FAC_API + "/imputaciones/{imputacion_id}/anular")
+async def fac_anular_imputacion(request: Request, imputacion_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_imputacion(conn, imputacion_id, datos.get("motivo"), perfil["usuario"],
+                                                            fecha_actual_iso(), _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.get(FAC_API + "/cuenta-corriente")
+def fac_cuenta_corriente(request: Request, cliente: str, moneda: str):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.cuenta_corriente(conn, cliente, moneda, _fac_hoy()), escritura=False)
+
+
+# ---------------------------------------------------------------- adjuntos (opcionales; hoy solo enlaces)
+
+@app.post(FAC_API + "/adjuntos")
+async def fac_agregar_adjunto(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    entidad = str(datos.get("entidad", "")).upper()
+    tablas = {"PEDIDO": "fac_pedidos", "DOCUMENTO": "fac_documentos", "RECIBO": "fac_recibos", "CORTE": "fac_cortes"}
+    if entidad not in tablas:
+        raise HTTPException(status_code=400, detail="Entidad de adjunto inválida")
+
+    def op(conn):
+        if not conn.execute(f"SELECT 1 FROM {tablas[entidad]} WHERE id = ?", (datos.get("entidad_id"),)).fetchone():
+            raise fac.FacError("NO_EXISTE", "el registro al que se adjunta no existe")
+        fac.adjuntar(conn, entidad, int(datos["entidad_id"]), {"tipo": datos.get("tipo") or "COMPROBANTE", "nombre": datos.get("nombre"),
+                                                               "url_externa": datos.get("url_externa"), "ruta": datos.get("ruta")},
+                     perfil["usuario"], fecha_actual_iso())
+        return {"ok": True}
+    return _fac_ejecutar(op)
+
+
+# ---------------------------------------------------------------- corte de saldos iniciales
+
+@app.get(FAC_API + "/corte")
+def fac_obtener_corte(request: Request):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.resumen_corte(conn, _fac_hoy()), escritura=False)
+
+
+@app.post(FAC_API + "/corte")
+async def fac_crear_corte(request: Request):
+    """La fecha puede quedar vacía: está pendiente de confirmar con Contabilidad."""
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: {"id": fac.crear_corte(conn, perfil["usuario"], fecha_actual_iso(), datos.get("fecha_corte") or None,
+                                                             datos.get("observaciones"))})
+
+
+@app.put(FAC_API + "/corte/fecha")
+async def fac_fijar_fecha_corte(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.fijar_fecha_corte(conn, datos["fecha_corte"], perfil["usuario"], fecha_actual_iso()) or {"ok": True})
+
+
+@app.post(FAC_API + "/corte/conciliacion")
+async def fac_cargar_conciliacion(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+
+    def op(conn):
+        corte = fac.corte_actual(conn)
+        if not corte or corte["estado"] != "BORRADOR":
+            raise fac.FacError("CORTE_CERRADO", "la conciliación se carga con el corte en borrador")
+        fac.cargar_conciliacion(conn, corte["id"], datos["cliente_codigo"], datos["moneda"], datos["saldo_tango"], datos.get("nota"),
+                                perfil["usuario"], fecha_actual_iso())
+        fac.evento(conn, "CORTE", corte["id"], "CONCILIACION_CARGADA", perfil["usuario"], fecha_actual_iso(), datos)
+        return {"ok": True}
+    return _fac_ejecutar(op)
+
+
+@app.post(FAC_API + "/corte/estimar")
+async def fac_estimar_cancelado(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+
+    def op(conn):
+        corte = fac.corte_actual(conn)
+        if not corte:
+            raise fac.FacError("CORTE_INEXISTENTE", "no hay corte creado")
+        return {"filas": fac.estimar_por_antiguedad(conn, corte["id"], datos["cliente_codigo"], datos["moneda"], datos["saldo_tango"],
+                                                    perfil["usuario"], fecha_actual_iso()), "criterio": "ESTIMADO_ANTIGUEDAD"}
+    return _fac_ejecutar(op)
+
+
+@app.post(FAC_API + "/corte/revisar")
+async def fac_revisar_cancelado(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    nuevas = {int(k): v for k, v in (datos.get("nuevas") or {}).items()}
+    return _fac_ejecutar(lambda conn: fac.revisar_cancelaciones(conn, datos["cliente_codigo"], datos["moneda"], nuevas, datos.get("criterio"),
+                                                                datos.get("nota"), perfil["usuario"], fecha_actual_iso(),
+                                                                _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.post(FAC_API + "/corte/confirmar")
+def fac_confirmar_corte(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    return _fac_ejecutar(lambda conn: fac.confirmar_corte(conn, perfil["usuario"], fecha_actual_iso(),
+                                                          _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+# ---------------------------------------------------------------- puesta en marcha: estado inicial por cliente y antecedentes
+
+@app.get(FAC_API + "/puesta-en-marcha")
+def fac_puesta_en_marcha(request: Request):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.puesta_en_marcha(conn), escritura=False)
+
+
+@app.get(FAC_API + "/puesta-en-marcha/{cliente}")
+def fac_detalle_inicial_cliente(request: Request, cliente: str):
+    _fac_perfil(request)
+    return _fac_ejecutar(lambda conn: fac.detalle_inicial_cliente(conn, cliente, _fac_hoy()), escritura=False)
+
+
+@app.post(FAC_API + "/puesta-en-marcha/{cliente}/validar")
+async def fac_validar_estado_inicial(request: Request, cliente: str):
+    """Control explícito: solo un responsable (usuario nominal) valida el estado inicial y habilita al cliente."""
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: {"id": fac.validar_estado_inicial(conn, cliente, datos.get("situacion"), datos.get("nota"),
+                                                                        perfil["usuario"], fecha_actual_iso(),
+                                                                        _fac_es_responsable(conn, perfil))})
+
+
+@app.post(FAC_API + "/puesta-en-marcha/{cliente}/reabrir")
+async def fac_reabrir_estado_inicial(request: Request, cliente: str):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.reabrir_estado_inicial(conn, cliente, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
+                                                                 _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+@app.post(FAC_API + "/antecedentes")
+async def fac_registrar_antecedente(request: Request):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_alta(request, datos, "ANTECEDENTE", lambda conn: fac.registrar_antecedente(conn, datos, perfil["usuario"], fecha_actual_iso()))
+
+
+@app.post(FAC_API + "/antecedentes/{antecedente_id}/anular")
+async def fac_anular_antecedente(request: Request, antecedente_id: int):
+    perfil = _fac_perfil(request, carga=True)
+    datos = await _fac_cuerpo(request)
+    return _fac_ejecutar(lambda conn: fac.anular_antecedente(conn, antecedente_id, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
+                                                             _fac_es_responsable(conn, perfil)) or {"ok": True})

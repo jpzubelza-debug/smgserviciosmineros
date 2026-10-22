@@ -2,7 +2,13 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import main
+import os
+import tempfile
+
+# Importar main ejecuta init_sqlite(): sin esto migraría el dashboard.db de la carpeta donde se corre la prueba.
+os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="smg_test_"))
+
+import main  # noqa: E402
 
 
 class FakeCursor:

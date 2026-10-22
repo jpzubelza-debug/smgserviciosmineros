@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta Facturación SMG</title>
+<style>
+  /* ======================================================================
+     Maqueta del módulo Facturación y Cobranzas.
+     Reutiliza el tema aprobado en maquetas/certificados_maqueta.html
+     (app-shell, sidebar azul marino, panel-section, tablas .t, badges, modales).
+     ====================================================================== */
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --line: #dbe3ee; --line-strong: #c3d0e0;
+    --text: #0f2440; --muted: #5b6b80; --navy: #0f2847; --navy-2: #12305a;
+    --blue: #1565c0; --blue-hover: #0f4f9c; --blue-soft: #e3edf9; --blue-head: #dce8f7; --blue-tot: #e8f1fb;
+    --amber: #b45309; --amber-soft: #fff7e6; --amber-line: #f5c46b;
+    --red: #b91c1c; --red-soft: #fdecec; --green: #15803d; --green-soft: #e7f6ec;
+    --violet: #6d28d9; --violet-soft: #f1ebfd; --grey-soft: #eef2f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); font-size: 13px; overflow-x: hidden; }
+  button, input, select, textarea { font: inherit; }
+  a { color: var(--blue); cursor: pointer; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+
+  .app-shell { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; min-height: 100vh; padding: 0 14px 14px 0; transition: grid-template-columns 0.22s ease; }
+  .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 250px minmax(0, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+  .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 14px; }
+
+  .sidebar.card { background: linear-gradient(180deg, var(--navy), var(--navy-2)); color: #e6edf7; border: 0; border-radius: 0; position: sticky; top: 0; height: 100vh; }
+  .sidebar { padding: 12px; display: flex; flex-direction: column; gap: 12px; width: 100%; overflow: hidden; }
+  .brand { display: flex; justify-content: center; align-items: center; min-height: 90px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(255,255,255,0.95); }
+  .brand img { width: 78%; max-width: 160px; object-fit: contain; }
+  .sidebar:not(:hover):not(:focus-within) .brand img { width: 38px; }
+  .menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .menu-btn { border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: inherit; border-radius: 8px; padding: 11px 12px; font-weight: 600; font-size: 13px;
+              cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: background 0.18s ease; }
+  .menu-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .menu-btn.active { background: var(--blue); border-color: #8fb4e6; color: #fff; box-shadow: 0 4px 12px rgba(21,101,192,0.35); }
+  .menu-icon { width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .menu-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sidebar:not(:hover):not(:focus-within) .menu-label { display: none; }
+  .sidebar:not(:hover):not(:focus-within) .menu-btn { justify-content: center; padding: 11px 0; }
+  .menu-sep { border-top: 1px solid rgba(255,255,255,0.14); margin: 4px 0; }
+
+  .maqueta { padding: 6px 12px; background: #fff8e1; border: 1px solid #f1d58a; border-radius: 8px; color: #7a5300; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .crumbs { color: var(--muted); } .crumbs b { color: var(--text); } .crumbs i { font-style: normal; margin: 0 6px; }
+
+  .seguimiento-panel { padding: 0; overflow: hidden; }
+  .seguimiento-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  .seguimiento-header h2 { margin: 0; font-size: 24px; line-height: 1.2; color: var(--navy); }
+  .seguimiento-header p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .seguimiento-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .seguimiento-main { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel-section { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .panel-section-header { background: #f7faff; color: var(--navy); padding: 9px 12px; font-size: 14px; font-weight: 700; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel-section-header .right { margin-left: auto; display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .panel-section-body { padding: 10px 12px 12px; }
+  .wrap { overflow-x: auto; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .filters .field { min-width: 150px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 5px; border: 1px solid var(--blue);
+         background: #fff; color: var(--blue); font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: var(--blue-soft); }
+  .btn.primary { background: var(--blue); color: #fff; } .btn.primary:hover { background: var(--blue-hover); }
+  .btn.danger { border-color: var(--red); color: var(--red); } .btn.danger:hover { background: var(--red-soft); }
+  .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  input, select, textarea { border: 1px solid var(--line-strong); border-radius: 5px; padding: 6px 8px; background: #fff; color: var(--text); }
+  .field input, .field select, .field textarea { width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(21,101,192,0.25); border-color: var(--blue); }
+  input[readonly] { background: #eef2f7; color: var(--muted); }
+  input.num { text-align: right; }
+  .field { display: flex; flex-direction: column; gap: 3px; } .field > label { color: var(--muted); font-size: 12.5px; }
+  .field > label .req { color: var(--red); }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px 14px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px 14px; }
+  .span2 { grid-column: span 2; } .span3 { grid-column: span 3; } .span4 { grid-column: 1 / -1; }
+  .seg-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 5px; overflow: hidden; }
+  .seg-toggle button { border: 0; background: #fff; color: var(--text); padding: 6px 16px; cursor: pointer; }
+  .seg-toggle button.on { background: var(--blue); color: #fff; font-weight: 600; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .b-ok { background: var(--green-soft); color: var(--green); }
+  .b-warn { background: var(--amber-soft); color: var(--amber); }
+  .b-err { background: var(--red-soft); color: var(--red); }
+  .b-info { background: var(--blue-head); color: var(--navy); }
+  .b-nc { background: var(--violet-soft); color: var(--violet); }
+  .b-grey { background: var(--grey-soft); color: var(--muted); text-decoration: line-through; }
+  .tipo { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+  .tipo-FC { background: var(--blue-head); color: var(--navy); } .tipo-ND { background: var(--amber-soft); color: var(--amber); } .tipo-NC { background: var(--violet-soft); color: var(--violet); }
+  .tipo-REC { background: var(--green-soft); color: var(--green); }
+  .mon { font-size: 10.5px; font-weight: 700; color: var(--muted); margin-right: 3px; }
+  .alert { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--amber-line); background: var(--amber-soft); color: #7a4a06; border-radius: 6px; padding: 9px 12px; }
+  .alert b { color: var(--amber); }
+  .alert.info { border-color: #b7cff0; background: var(--blue-soft); color: #1d3c66; } .alert.info b { color: var(--blue); }
+  .alert.err { border-color: #f1b4b4; background: var(--red-soft); color: #7f1d1d; } .alert.err b { color: var(--red); }
+  .alert.ok { border-color: #a7dcb8; background: var(--green-soft); color: #14532d; } .alert.ok b { color: var(--green); }
+  .tag { font-size: 10.5px; color: #8a5a00; border: 1px dashed #d9a521; border-radius: 4px; padding: 0 5px; margin-left: 4px; font-weight: 400; }
+
+  table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .t th, .t td { border: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; text-align: left; }
+  .t thead th { background: var(--blue-head); color: var(--navy); font-weight: 700; text-align: center; }
+  .t td.r, .t th.r { text-align: right; } .t td.c { text-align: center; }
+  .t tbody tr:hover td { background: #f7faff; }
+  .t tbody tr.click { cursor: pointer; }
+  .t tr.tot td { background: var(--blue-tot); font-weight: 700; }
+  .t tr.anul td { color: #94a3b8; text-decoration: line-through; }
+  .t td.neg { color: var(--red); } .t td.pos { color: var(--green); }
+  .t td.wrapc { white-space: normal; min-width: 220px; }
+  table.t[style*="white-space:normal"] td, table.t[style*="white-space:normal"] th { white-space: normal; }
+  .t input, .t select { padding: 3px 5px; }
+
+  .kpis { display: grid; grid-template-columns: 70px repeat(6, minmax(0,1fr)); gap: 8px; align-items: stretch; }
+  .kpi { border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; background: #fbfdff; }
+  .kpi .lbl { color: var(--muted); font-size: 11.5px; display: block; margin-bottom: 3px; }
+  .kpi b { font-size: 17px; color: var(--navy); }
+  .kpi small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .kpi.warn b { color: var(--amber); } .kpi.err b { color: var(--red); } .kpi.ok b { color: var(--green); }
+  .kpi-mon { display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #fff; background: var(--navy); border-radius: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  .kv.final { background: var(--blue-tot); font-weight: 700; padding: 9px 8px; border: 0; margin-top: 4px; border-radius: 4px; }
+  .timeline { list-style: none; margin: 0; padding: 0; } .timeline li { border-left: 3px solid var(--blue); padding: 3px 0 9px 10px; }
+  .timeline li.nc { border-color: var(--violet); } .timeline li.rec { border-color: var(--green); } .timeline li.anul { border-color: var(--red); }
+  .timeline small { color: var(--muted); }
+
+  /* Modales */
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,36,64,0.45); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 24px 14px; overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #fff; border-radius: 10px; width: min(1180px, 100%); box-shadow: 0 20px 50px rgba(15,36,64,0.3); }
+  .modal.sm { width: min(600px, 100%); }
+  .modal-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .modal-h h3 { margin: 0; font-size: 18px; color: var(--navy); }
+  .modal-b { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-f { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .modal-f .muted { margin-right: auto; }
+  .close { border: 0; background: none; font-size: 22px; color: var(--muted); cursor: pointer; }
+  .toast { position: fixed; right: 20px; bottom: 20px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 6px; z-index: 200; display: none; max-width: 460px; }
+
+  /* Editor de pedido: formulario + vista previa del formulario oficial D.C. 1-9-14 */
+  .editor { display: grid; grid-template-columns: minmax(0, 1fr) 620px; gap: 14px; align-items: start; }
+  .preview-wrap { background: #e2e8f0; padding: 14px; border-radius: 8px; position: sticky; top: 14px; }
+  .hoja { background: #fff; color: #000; font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 10.5px; padding: 22px 22px 18px; box-shadow: 0 4px 18px rgba(15,36,64,0.18); aspect-ratio: 210 / 297; display: flex; flex-direction: column; }
+  .hoja .marco { border: 2px solid #000; padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .hoja table { border-collapse: collapse; width: 100%; }
+  .hoja .enc td { border: 1px solid #000; }
+  .hoja .enc .logo { width: 26%; text-align: center; } .hoja .enc .logo img { height: 34px; }
+  .hoja .enc .tit { text-align: center; font-weight: 700; font-size: 15px; }
+  .hoja .enc .tit .rojo { color: #e00000; font-size: 15px; display: block; margin-top: 3px; }
+  .hoja .enc .meta td { border: 1px solid #000; padding: 1px 4px; font-size: 9px; text-align: center; }
+  .hoja .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .hoja .cam { display: flex; gap: 6px; border-bottom: 1px solid #000; padding: 2px 0; min-height: 17px; align-items: flex-end; }
+  .hoja .cam b { white-space: nowrap; } .hoja .cam span { flex: 1; text-align: center; }
+  .hoja .cam.der span { text-align: right; }
+  .hoja .rojo { color: #e00000; font-weight: 700; }
+  .hoja .intro { text-align: center; font-weight: 700; margin: 6px 0 2px; }
+  .hoja .det { width: 84%; margin: 0 auto; }
+  .hoja .det th { border: 1px solid #000; padding: 4px; font-size: 10px; }
+  .hoja .det td { border-left: 1px solid #000; border-right: 1px solid #000; padding: 4px 5px; vertical-align: middle; font-weight: 700; }
+  .hoja .det tbody tr:last-child td { border-bottom: 1px solid #000; height: 34px; }
+  .hoja .det td.d { white-space: pre-line; }
+  .hoja .det td.m { text-align: right; white-space: nowrap; font-weight: 400; }
+  .hoja .tots { width: 84%; margin: 0 auto; } .hoja .tots td { padding: 1px 5px; text-align: right; } .hoja .tots td.l { font-weight: 700; width: 70%; }
+  .hoja .obs { display: grid; grid-template-columns: 26% 1fr; border: 1px solid #000; min-height: 26px; }
+  .hoja .obs > div { padding: 5px; display: flex; align-items: center; justify-content: center; } .hoja .obs > div + div { border-left: 1px solid #000; }
+  .hoja .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 6px; }
+  .hoja .firma { border: 1px solid #000; display: flex; flex-direction: column; }
+  .hoja .firma .h { border-bottom: 1px solid #000; padding: 1px 4px; } .hoja .firma .c { flex: 1; min-height: 52px; display: grid; place-items: center; text-align: center; white-space: pre-line; padding: 4px; }
+  .hoja .firma .p { border-top: 1px solid #000; text-align: center; padding: 1px; }
+  .hoja .pie { border: 1px solid #000; text-align: center; font-weight: 700; padding: 7px 10px; margin-top: 6px; }
+  .hoja .sello { margin-top: auto; text-align: right; font-size: 8px; color: #555; }
+  .lineas td input { width: 100%; }
+  .lineas td textarea { width: 100%; min-height: 54px; resize: vertical; }
+  table.lineas { table-layout: fixed; } .lineas select { width: 100%; }
+
+  /* Diagrama de entidades */
+  .er { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .ent { border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; font-size: 11.5px; overflow: hidden; }
+  .ent h4 { margin: 0; padding: 6px 8px; background: var(--navy); color: #fff; font-size: 12px; }
+  .ent.ext h4 { background: #64748b; }
+  .ent ul { margin: 0; padding: 6px 8px 8px 22px; } .ent li { margin: 1px 0; }
+  .ent li.k { font-weight: 700; } .ent li.fk { color: var(--blue); }
+  .formula { font-family: Consolas, monospace; background: var(--blue-soft); border-radius: 5px; padding: 8px 10px; white-space: pre-wrap; line-height: 1.5; }
+  .flujo { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+  .paso { flex: 1 1 150px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; background: #fbfdff; position: relative; }
+  .paso b { display: block; color: var(--navy); margin-bottom: 3px; } .paso .who { font-size: 11px; color: var(--muted); }
+  .paso .n { position: absolute; top: -9px; left: 8px; background: var(--blue); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800; padding: 0 7px; }
+  ol.dec li { margin-bottom: 7px; }
+
+  @media (max-width: 1250px) { .editor { grid-template-columns: 1fr; } .preview-wrap { position: static; } .kpis { grid-template-columns: repeat(3, 1fr); } .kpi-mon { grid-column: 1 / -1; padding: 4px; } .er { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; padding: 0 8px 8px; } .sidebar { display: none; } .two, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } .span2, .span3 { grid-column: auto; } .er { grid-template-columns: 1fr; } }
+  /* ---- Agregados v2 ---- */
+  .si { display: inline-block; font-size: 10px; font-weight: 800; color: #7a4a06; background: var(--amber-soft); border: 1px solid var(--amber-line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  .menu-card { border: 1px solid #cfdff3; border-radius: 12px; padding: 14px 16px; background: linear-gradient(180deg, #fff, #f3f8ff); max-width: 360px; }
+  .menu-card b { display: block; font-size: 16px; color: var(--navy); margin-bottom: 4px; } .menu-card span { color: var(--muted); font-size: 12.5px; }
+  .tot-box .kv { padding: 5px 4px; }
+  .t td.sub { color: var(--muted); font-size: 11.5px; }
+  .t tr.ini td { background: #fffaf0; }
+  .t tfoot td { background: #f7faff; font-weight: 700; }
+  .cobro-x td { background: #fbfdff; }
+  .mini { font-size: 11px; color: var(--muted); display: block; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar card" aria-label="Menú de Facturación y Cobranzas">
+    <div class="brand"><img src="../Imagenes/09-smg.png" alt="Logo SMG"></div>
+    <nav class="menu">
+      <button class="menu-btn active" data-vista="tablero"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span class="menu-label">Tablero de Seguimiento</span></button>
+      <button class="menu-btn" data-vista="pedidos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span><span class="menu-label">Pedidos de Facturación</span></button>
+      <button class="menu-btn" data-vista="documentos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 1V2l-1 1-3-2-3 2-3-2-3 2-3-2z"></path><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></span><span class="menu-label">Facturas, ND y NC</span></button>
+      <button class="menu-btn" data-vista="cobranzas"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg></span><span class="menu-label">Cobranzas y Recibos</span></button>
+      <button class="menu-btn" data-vista="ctacte"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg></span><span class="menu-label">Cuenta Corriente</span></button>
+      <button class="menu-btn" data-vista="saldos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 22V4"></path><path d="M4 4h12l-2 4 2 4H4"></path></svg></span><span class="menu-label">Saldos Iniciales (corte)</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-btn" data-vista="diseno"><span class="menu-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span><span class="menu-label">Modelo y reglas (maqueta)</span></button>
+      <a class="menu-btn" style="margin-top: auto;"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span><span class="menu-label">Menú Principal</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="maqueta"><b>MAQUETA v2</b> · Datos de ejemplo tomados de las planillas adjuntas · No conectada a dashboard.db · Hoy simulado <b>19/10/2026</b> · Fecha de corte <b>pendiente de confirmar con Contabilidad</b> (se simula 31/12/2025 solo para mostrar las pantallas; los saldos iniciales son ilustrativos, no definitivos)
+      <span class="crumbs" id="crumbs"></span></div>
+
+    <!-- ===================================================== TABLERO ===================================================== -->
+    <section class="card seguimiento-panel vista" id="v-tablero">
+      <div class="seguimiento-header">
+        <div><h2>Facturación y Cobranzas</h2><p>Seguimiento de pedidos, comprobantes cargados desde Tango, vencimientos y saldos. Cada moneda tiene su propio saldo: nunca se suman entre sí.</p></div>
+        <div class="seguimiento-actions">
+          <button class="btn" onclick="nuevoPedido('cert')">+ Pedido de facturación</button>
+          <button class="btn" onclick="abrirDoc(1)">+ Registrar comprobante</button>
+          <button class="btn primary" onclick="abrirCobro('000069')">+ Registrar cobranza</button>
+        </div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="filters">
+          <div class="field"><label>Cliente</label><select id="f-cli" onchange="renderTablero()"><option value="">Todos</option></select></div>
+          <div class="field"><label>Centro de costos / obra</label><select><option>Todos</option><option>209 · Mantenimiento de camino SSR</option><option>210 · Mant. de camino SSR tramo 2</option><option>106 · Obra EXAR</option><option>906 · VIAP SRL</option></select></div>
+          <div class="field"><label>Emitidos desde</label><input type="date" value="2025-01-01"></div>
+          <div class="field"><label>Hasta</label><input type="date" value="2026-10-19"></div>
+          <button class="btn sm" style="margin-left:auto">Exportar Excel</button>
+        </div>
+        <div id="kpis"></div>
+        <div class="two">
+          <div class="panel-section">
+            <div class="panel-section-header">Pedidos pendientes de facturar <span class="badge b-warn" id="cnt-pend"></span></div>
+            <div class="wrap"><table class="t" id="t-pend"></table></div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-header">Antigüedad de la deuda (saldo según días desde el vencimiento)</div>
+            <div class="wrap"><table class="t" id="t-aging"></table></div>
+          </div>
+        </div>
+        <div class="panel-section">
+          <div class="panel-section-header">Vencidos y próximos vencimientos (30 días)
+            <span class="right"><span class="seg-toggle" id="tg-venc"><button class="on" data-v="todos">Todos</button><button data-v="venc">Vencidos</button><button data-v="prox">Por vencer</button></span></span></div>
+          <div class="wrap"><table class="t" id="t-venc"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== PEDIDOS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-pedidos">
+      <div class="seguimiento-header">
+        <div><h2>Pedidos de facturación</h2><p>Formulario oficial «Solicitud de Emisión» D.C. 1-9-14 Rev. 02 para pedir Factura, Nota de Crédito o Nota de Débito al Departamento Contable.</p></div>
+        <div class="seguimiento-actions">
+          <button class="btn" onclick="nuevoPedido('libre')">+ Pedido independiente</button>
+          <button class="btn primary" onclick="nuevoPedido('cert')">+ Desde certificado</button>
+        </div>
+      </div>
+      <div class="seguimiento-main" id="ped-lista">
+        <div class="filters">
+          <div class="field"><label>Estado</label><select id="fp-est" onchange="renderPedidos()"><option value="">Todos</option><option>BORRADOR</option><option>PENDIENTE DE FACTURAR</option><option>FACTURADO PARCIAL</option><option>FACTURADO</option><option>ANULADO</option></select></div>
+          <div class="field"><label>Tipo solicitado</label><select><option>Todos</option><option>Factura</option><option>Nota de crédito</option><option>Nota de débito</option></select></div>
+          <div class="field"><label>Buscar</label><input placeholder="Nº solicitud, cliente, OC, certificado…"></div>
+        </div>
+        <div class="wrap"><table class="t" id="t-ped"></table></div>
+        <p class="muted" style="margin:0">«Facturado» = suma de los netos que cada comprobante vigente le asigna al pedido. Un pedido puede tener varias facturas, y una factura puede cubrir varios pedidos (ejemplo: FC 6-523 de VIAP).</p>
+      </div>
+
+      <div class="seguimiento-main hidden" id="ped-editor">
+        <div class="alert info" id="ped-origen"></div>
+        <div class="editor">
+          <div style="display:flex; flex-direction:column; gap:12px">
+            <div class="panel-section">
+              <div class="panel-section-header">Vínculos <span class="tag">opcionales</span></div>
+              <div class="panel-section-body grid3">
+                <div class="field span2"><label>Agregar certificado emitido (se agrega como línea; un pedido puede incluir varios)</label>
+                  <div style="display:flex; gap:6px"><select id="pe-cert-add" style="flex:1"></select><button class="btn sm" style="height:32px" onclick="agregarCert()">Agregar</button></div></div>
+                <div class="field"><label>Centro de costos / obra</label><select id="pe-cc" onchange="previa()"><option value="">—</option><option value="209">209 · Mantenimiento de camino SSR</option><option value="210">210 · Mant. de camino SSR tramo 2</option><option value="106">106 · Obra EXAR</option><option value="906">906 · VIAP SRL</option></select></div>
+                <div class="field"><label>Orden de compra del cliente</label><select id="pe-oc" onchange="previa()"><option value="">— Sin OC —</option><option>O75088 Rev.001</option><option>O75087 Rev.001</option><option>66/1764</option></select></div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Encabezado del formulario</div>
+              <div class="panel-section-body grid3">
+                <div class="field"><label>Comprobante solicitado <span class="req">*</span></label><select id="pe-tipo" onchange="previa()"><option value="FACTURA">FACTURA</option><option value="NOTA DE CREDITO">NOTA DE CREDITO</option><option value="NOTA DE DEBITO">NOTA DE DEBITO</option></select></div>
+                <div class="field"><label>Solicitud Nº</label><input id="pe-num" readonly value="se asigna al emitir"></div>
+                <div class="field"><label>Fecha de emisión <span class="req">*</span></label><input id="pe-fecha" type="date" value="2026-10-19" oninput="previa()"></div>
+                <div class="field"><label>Depto. origen</label><input id="pe-depto" value="15" oninput="previa()"></div>
+                <div class="field"><label>Cotización</label><input id="pe-cot" oninput="previa()"></div>
+                <div class="field"><label>Moneda <span class="req">*</span></label><select id="pe-mon" onchange="previa()"><option>USD</option><option>ARS</option><option>EUR</option></select></div>
+                <div class="field span2"><label>Cliente <span class="req">*</span> <span class="tag">tabla clientes (código Tango)</span></label><select id="pe-cli" onchange="aplicarCli()"></select></div>
+                <div class="field"><label>CUIT</label><input id="pe-cuit" readonly></div>
+                <div class="field span2"><label>Domicilio</label><input id="pe-dom" value=".-" oninput="previa()"></div>
+                <div class="field"><label>Condición de pago <span class="req">*</span></label><input id="pe-cond" list="conds" oninput="previa()"><datalist id="conds"><option>30 FF</option><option>45 FF</option><option>15 FF</option><option>Al día</option><option>Inmediato</option><option>Contado</option></datalist></div>
+                <div class="field span3"><label>Tipo de cambio a informar (factura en USD que se cobra en pesos)</label><select id="pe-tc" onchange="previa()"><option value="">— No aplica —</option><option selected>TC de la fecha efectiva de pago</option></select></div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Detalle <span class="tag">alícuota de IVA por línea</span> <span class="right"><button class="btn sm" onclick="agregarLinea()">+ Línea</button></span></div>
+              <div class="panel-section-body">
+                <table class="t lineas"><thead><tr><th style="width:70px">Cant.</th><th>Detalle</th><th style="width:150px">Certificado</th><th style="width:96px">IVA</th><th style="width:130px">Precio unitario</th><th style="width:120px">Subtotal</th><th style="width:34px"></th></tr></thead><tbody id="pe-lineas"></tbody></table>
+                <div class="grid2" style="margin-top:10px">
+                  <div class="field"><label>Observaciones (se imprimen en rojo)</label><input id="pe-obs" oninput="previa()"></div>
+                  <div class="tot-box" id="pe-tot"></div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-section-header">Firmas</div>
+              <div class="panel-section-body grid2">
+                <div class="field"><label>Solicitó (usuario de la sesión)</label><textarea id="pe-sol" rows="3" oninput="previa()">ZUBELZA JUAN PABLO
+ADMINISTRACIÓN DE OBRA
+SMG S.R.L.</textarea></div>
+                <div class="field"><label>Recibe (en blanco para firma manuscrita)</label><textarea id="pe-rec" rows="3" oninput="previa()"></textarea></div>
+              </div>
+            </div>
+            <div id="ped-val"></div>
+            <div style="display:flex; gap:8px; justify-content:flex-end">
+              <button class="btn" onclick="cerrarEditor()">Cancelar</button>
+              <button class="btn" onclick="toast('Borrador guardado. Se puede editar hasta emitirlo.'); cerrarEditor()">Guardar borrador</button>
+              <button class="btn primary" onclick="emitirPedido()">Emitir y generar PDF</button>
+            </div>
+          </div>
+          <div class="preview-wrap">
+            <div class="hoja" id="hoja"></div>
+            <p class="muted" style="margin:8px 2px 0; font-size:12px">Vista previa del PDF A4 que genera reportlab replicando el formulario D.C. 1-9-14. Si hay varias alícuotas, aparece una fila de IVA por cada una. Al emitir se congela un snapshot y se guarda el SHA-256, igual que en Certificados.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== DOCUMENTOS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-documentos">
+      <div class="seguimiento-header">
+        <div><h2>Facturas, notas de débito y notas de crédito</h2><p>Comprobantes emitidos en Tango y cargados a mano en SMG. El estado de cobro se calcula solo; no se edita.</p></div>
+        <div class="seguimiento-actions"><button class="btn primary" onclick="abrirDoc(1)">+ Registrar comprobante</button></div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="filters">
+          <div class="field"><label>Tipo</label><select id="fd-tipo" onchange="renderDocs()"><option value="">Todos</option><option value="FC">Factura</option><option value="ND">Nota de débito</option><option value="NC">Nota de crédito</option></select></div>
+          <div class="field"><label>Estado</label><select id="fd-est" onchange="renderDocs()"><option value="">Todos</option><option>PENDIENTE</option><option>PARCIAL</option><option>VENCIDA</option><option>CANCELADA</option><option>CANCELADA POR NC</option><option>SIN APLICAR</option><option>APLICADA</option><option>ANULADO</option></select></div>
+          <div class="field"><label>Moneda</label><select id="fd-mon" onchange="renderDocs()"><option value="">Todas</option><option>USD</option><option>ARS</option></select></div>
+          <div class="field"><label>Cliente</label><select id="fd-cli" onchange="renderDocs()"><option value="">Todos</option></select></div>
+          <label style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="fd-anul" onchange="renderDocs()"> Mostrar registros anulados</label>
+        </div>
+        <div class="wrap"><table class="t" id="t-docs"></table></div>
+        <p class="muted" style="margin:0"><span class="si">SI</span> = comprobante cargado como saldo inicial a la fecha de corte. Su saldo parte del importe pendiente a esa fecha.</p>
+      </div>
+    </section>
+
+    <!-- ===================================================== COBRANZAS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-cobranzas">
+      <div class="seguimiento-header">
+        <div><h2>Cobranzas y recibos</h2><p>Cada recibo de Tango se carga una sola vez, con sus valores (transferencias, cheques, retenciones) y la asignación a facturas y notas de débito. Los cobros en pesos de facturas en USD guardan los pesos recibidos, el tipo de cambio de la fecha de pago y el equivalente en USD.</p></div>
+        <div class="seguimiento-actions"><button class="btn primary" onclick="abrirCobro('000069')">+ Registrar cobranza</button></div>
+      </div>
+      <div class="seguimiento-main">
+        <div class="wrap"><table class="t" id="t-rec"></table></div>
+        <p class="muted" style="margin:0">«A cuenta» = parte del recibo que no se asignó a ningún comprobante, en la moneda del recibo. Equivale a la línea «Comprobantes a cuenta» de Tango y se puede asignar más adelante.</p>
+      </div>
+    </section>
+
+    <!-- ===================================================== CUENTA CORRIENTE ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-ctacte">
+      <div class="seguimiento-header">
+        <div><h2>Cuenta corriente por cliente</h2><p>Mismo formato que «Viap RT Cuentas.xlsx»: Fecha · Tipo · Número · Vencimiento · Debe · Haber · Saldo, con enlaces a comprobante, certificado y pedido. Cada moneda se muestra por separado.</p></div>
+        <div class="seguimiento-actions">
+          <div class="field" style="min-width:300px"><select id="cc-cli" onchange="renderCtaCte()"></select></div>
+          <span class="seg-toggle" id="tg-mon"><button class="on" data-m="USD">USD</button><button data-m="ARS">ARS</button></span>
+          <button class="btn sm">Exportar Excel</button>
+        </div>
+      </div>
+      <div class="seguimiento-main"><div id="ctacte"></div></div>
+    </section>
+
+    <!-- ===================================================== SALDOS INICIALES ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-saldos">
+      <div class="seguimiento-header">
+        <div><h2>Saldos iniciales a la fecha de corte</h2><p>El módulo arranca con los comprobantes que estaban abiertos al corte; no se importa el histórico. Cada saldo se respalda con el informe de Tango a esa fecha.</p></div>
+        <div class="seguimiento-actions"><span class="badge b-warn" style="height:26px;display:inline-flex;align-items:center">BORRADOR · fecha de corte pendiente</span><button class="btn" onclick="toast('Alta de saldo inicial (maqueta). Con el corte en borrador se puede editar; después de confirmarlo, un comprobante omitido requiere motivo.')">+ Comprobante abierto al corte…</button><button class="btn primary" disabled title="Requiere fecha de corte confirmada y todas las filas conciliadas">Confirmar corte</button></div>
+      </div>
+      <div class="seguimiento-main" id="saldos"></div>
+    </section>
+
+    <!-- ===================================================== MODELO Y REGLAS ===================================================== -->
+    <section class="card seguimiento-panel vista hidden" id="v-diseno">
+      <div class="seguimiento-header"><div><h2>Modelo, flujo y reglas de saldo</h2><p>Resumen visual. El detalle completo está en <b>maquetas/especificacion_facturacion.md</b>.</p></div></div>
+      <div class="seguimiento-main">
+        <div class="panel-section"><div class="panel-section-header">Configuración del módulo <span class="tag">la cambia un responsable · queda en fac_eventos</span></div><div class="panel-section-body">
+          <div class="wrap"><table class="t"><thead><tr><th>Adjunto obligatorio en…</th><th>Pedido</th><th>Factura</th><th>Nota de débito</th><th>Nota de crédito</th><th>Cobranza</th><th>Corte (informe Tango)</th></tr></thead>
+          <tbody><tr><td>Valor actual</td><td class="c">No</td><td class="c">No</td><td class="c">No</td><td class="c">No</td><td class="c">No</td><td class="c">No</td></tr></tbody></table></div>
+          <div class="grid3" style="margin-top:8px">
+            <div class="field"><label>Almacenamiento de adjuntos</label><input value="Solo enlaces externos (Drive)" readonly></div>
+            <div class="field"><label>Comprobantes y cobranzas</label><input value="Se habilitan al confirmar el corte" readonly></div>
+            <div class="field"><label>Tolerancia de redondeo vs. Tango</label><input value="± 0,05" readonly></div>
+          </div>
+          <p class="muted" style="margin:6px 0 0">Si más adelante se exige un adjunto, aplica solo a las altas nuevas: los registros anteriores no se bloquean y se listan como «sin adjunto» para completarlos. Subir archivos al servidor queda deshabilitado hasta resolver el almacenamiento.</p>
+        </div></div>
+        <div class="two">
+          <div class="panel-section"><div class="panel-section-header">Acceso desde el Menú Principal (módulo independiente)</div><div class="panel-section-body">
+            <div class="menu-card"><b>Facturación y Cobranzas</b><span>Pedidos de facturación, comprobantes de Tango, cobranzas, vencimientos y cuenta corriente por cliente.</span></div>
+            <p class="muted" style="margin:8px 0 0">Entrada nueva en <code>MODULOS</code> de menu_principal.html: <code>key: "facturacion"</code>, <code>href: "/facturacion"</code>. Solo la ven los usuarios con el módulo asignado en Administración (<code>modulos_json</code>).</p>
+          </div></div>
+          <div class="panel-section"><div class="panel-section-header">Integración con Operaciones (opcional)</div><div class="panel-section-body">
+            <p style="margin:0">Operaciones › Seguimiento de Cliente › certificado EMITIDO → botón <b>«Pedido de facturación»</b>, que abre este módulo con el certificado precargado. Además, un bloque <b>«Avance de facturación»</b> por OC: certificado, facturado, falta facturar, cobrado y saldo, todo leído de este módulo.</p>
+          </div></div>
+        </div>
+        <div class="panel-section"><div class="panel-section-header">Flujo completo</div><div class="panel-section-body">
+          <div class="flujo">
+            <div class="paso"><span class="n">0</span><b>Saldos iniciales</b><span class="who">Una vez, al poner en marcha</span><br>Facturas abiertas al corte con respaldo de Tango; conciliar y confirmar.</div>
+            <div class="paso"><span class="n">1</span><b>Certificado emitido</b><span class="who">Operaciones · opcional</span><br>Uno o varios certificados por pedido.</div>
+            <div class="paso"><span class="n">2</span><b>Pedido de facturación</b><span class="who">Administración de obra</span><br>Borrador → Emitido (Nº AAAAMMDD-n + PDF D.C. 1-9-14).</div>
+            <div class="paso"><span class="n">3</span><b>Emisión en Tango</b><span class="who">Depto. Contable · fuera de SMG</span><br>FC / NC / ND, incluidas las de diferencia de cambio.</div>
+            <div class="paso"><span class="n">4</span><b>Registrar comprobante</b><span class="who">Administración</span><br>Líneas por alícuota, percepciones, vínculo con varios pedidos y certificados.</div>
+            <div class="paso"><span class="n">5</span><b>Aplicar NC</b><span class="who">Administración</span><br>A una o varias FC/ND de la misma moneda.</div>
+            <div class="paso"><span class="n">6</span><b>Registrar cobranza</b><span class="who">Administración</span><br>Pesos recibidos + TC de la fecha de pago → equivalente en USD asignado a la factura.</div>
+            <div class="paso"><span class="n">7</span><b>Seguimiento</b><span class="who">Todos</span><br>Tablero, cuenta corriente y avance en Seguimiento de Cliente.</div>
+          </div>
+        </div></div>
+        <div class="panel-section"><div class="panel-section-header">Entidades nuevas (prefijo fac_) y existentes que se reutilizan</div><div class="panel-section-body">
+          <div class="er">
+            <div class="ent"><h4>fac_pedidos</h4><ul><li class="k">id · numero_solicitud (único)</li><li>tipo_solicitado FC|NC|ND</li><li>estado BORRADOR|EMITIDO|ANULADO</li><li class="fk">cliente_codigo → clientes</li><li class="fk">orden_compra_cliente_id · centro_costo_id</li><li>moneda · condicion_pago · cotizacion</li><li>subtotal · iva_total · total (calculados)</li><li>snapshot_json · pdf_ruta · pdf_sha256</li><li class="fk">reemplaza_a_id</li></ul></div>
+            <div class="ent"><h4>fac_pedido_lineas</h4><ul><li class="k">id</li><li class="fk">pedido_id</li><li class="fk">certificado_id (opcional, uno por línea)</li><li>cantidad · detalle · precio_unitario</li><li>alicuota_iva (21 · 10,5 · 27 · 0 · NG)</li><li>subtotal</li></ul></div>
+            <div class="ent"><h4>fac_documentos</h4><ul><li class="k">id · tipo FC|ND|NC</li><li class="k">letra · punto_venta · numero</li><li>estado VIGENTE|ANULADO</li><li>origen NORMAL|SALDO_INICIAL</li><li class="fk">cliente_codigo (+ snapshot CUIT)</li><li>fecha_emision · fecha_vencimiento</li><li>moneda · tipo_cambio_emision (info)</li><li>neto_gravado · no_gravado · exento · iva_total · tributos_total · total (calculados)</li><li>cancelado antes del corte → fac_cancelaciones_corte</li><li>motivo (ND/NC)</li><li class="fk">documento_origen_id · OC · CC</li><li class="fk">reemplaza_a_id</li></ul></div>
+            <div class="ent"><h4>fac_documento_lineas</h4><ul><li class="k">id</li><li class="fk">documento_id</li><li>descripcion</li><li>alicuota_iva</li><li>neto · iva (calculado)</li></ul></div>
+            <div class="ent"><h4>fac_documento_tributos</h4><ul><li class="k">id</li><li class="fk">documento_id</li><li>tipo (percepción IIBB / IVA / Ganancias, imp. interno, redondeo, otro)</li><li>jurisdicción · base · alícuota</li><li>importe</li></ul></div>
+            <div class="ent"><h4>fac_documento_vinculos</h4><ul><li class="k">id</li><li class="fk">documento_id</li><li class="fk">pedido_id <i>o</i> certificado_id</li><li>neto_asignado</li><li>N:M en ambas direcciones</li></ul></div>
+            <div class="ent"><h4>fac_aplicaciones_nc</h4><ul><li class="k">id</li><li class="fk">nc_id → fac_documentos</li><li class="fk">documento_id → FC / ND</li><li>importe (misma moneda)</li><li>estado VIGENTE|ANULADO</li></ul></div>
+            <div class="ent"><h4>fac_recibos · fac_recibo_valores</h4><ul><li class="k">punto_venta · numero (único)</li><li class="fk">cliente_codigo</li><li>fecha_pago (efectiva) · moneda · total</li><li>valores: medio, importe, banco, referencia, retenciones</li></ul></div>
+            <div class="ent"><h4>fac_imputaciones</h4><ul><li class="k">id</li><li class="fk">recibo_id · documento_id</li><li>importe_recibo (p. ej. ARS recibidos)</li><li>tipo_cambio · fecha_tipo_cambio</li><li>importe_documento (equivalente USD)</li><li>saldo_documento_antes / después (snapshot)</li></ul></div>
+            <div class="ent"><h4>fac_cancelaciones_corte</h4><ul><li class="k">id</li><li class="fk">documento_id (saldo inicial)</li><li>importe</li><li>criterio SEGUN_TANGO | ESTIMADO_ANTIGUEDAD | REVISADO</li><li>revision_de_id · nota</li><li>se revisa anulando y cargando de nuevo</li></ul></div>
+            <div class="ent"><h4>fac_config</h4><ul><li class="k">clave</li><li>adjuntos_requeridos (por entidad, hoy todo «no»)</li><li>adjuntos_almacenamiento (ENLACE)</li><li>requiere_corte_confirmado · tolerancia_redondeo</li></ul></div>
+            <div class="ent"><h4>fac_cortes</h4><ul><li class="k">id · fecha_corte (nula hasta que Contabilidad la confirme)</li><li>estado BORRADOR|CONFIRMADO</li><li>conciliación por cliente y moneda (saldo SMG vs saldo Tango)</li><li>adjunto del informe de Tango</li><li>confirmado_por/en</li></ul></div>
+            <div class="ent"><h4>fac_adjuntos · fac_eventos</h4><ul><li>entidad + entidad_id</li><li>adjuntos opcionales (configurable por entidad)</li><li>hoy: enlace a Drive; archivo en servidor cuando se resuelva el almacenamiento</li><li>evento + usuario + fecha + detalle_json</li></ul></div>
+            <div class="ent ext"><h4>Existentes</h4><ul><li>clientes (codigo = código Tango)</li><li>certificados_cliente (EMITIDO, total_a_facturar)</li><li>Orden_de_compra_cliente</li><li>centros_costos · seguimiento_cc</li><li>usuarios · responsables_modulo</li></ul></div>
+          </div>
+        </div></div>
+        <div class="two">
+          <div class="panel-section"><div class="panel-section-header">Cálculo de saldos (siempre en la moneda del comprobante)</div><div class="panel-section-body">
+<div class="formula">IVA(alícuota)  = round(Σ netos de esa alícuota × alícuota; 2)
+Total          = Σ netos + Σ IVA + Σ tributos (percepciones)
+
+Saldo FC / ND  = total
+               − cancelado_antes_corte        (solo saldo inicial)
+               − Σ NC aplicadas
+               − Σ cobros asignados (importe_documento)
+
+Cobro en ARS de una FC en USD:
+   equivalente USD = round(ARS recibidos ÷ TC fecha pago; 2)
+   saldo restante USD = saldo USD − equivalente USD
+
+Disponible NC  = total NC − Σ aplicaciones
+A cuenta REC   = total recibo − Σ importe_recibo asignado
+
+Saldo cliente[moneda] = Σ saldos FC/ND − Σ disponibles NC − Σ a cuenta</div>
+            <p class="muted">Tolerancia: 0,01. Solo se suman registros VIGENTES. No se calculan ni generan diferencias de cambio: se cargan las ND/NC que emite Tango.</p>
+          </div></div>
+          <div class="panel-section"><div class="panel-section-header">Estados calculados</div><div class="panel-section-body wrap">
+            <table class="t" style="white-space:normal"><thead><tr><th>Comprobante</th><th>Estado</th><th>Condición</th></tr></thead><tbody>
+              <tr><td>FC / ND</td><td><span class="badge b-info">PENDIENTE</span></td><td>saldo = saldo inicial y no vencido</td></tr>
+              <tr><td></td><td><span class="badge b-warn">PARCIAL</span></td><td>se redujo el saldo y no está vencido</td></tr>
+              <tr><td></td><td><span class="badge b-err">VENCIDA</span></td><td>saldo &gt; 0 y hoy &gt; vencimiento</td></tr>
+              <tr><td></td><td><span class="badge b-ok">CANCELADA</span></td><td>saldo = 0 con al menos un cobro</td></tr>
+              <tr><td></td><td><span class="badge b-nc">CANCELADA POR NC</span></td><td>saldo = 0 solo con NC</td></tr>
+              <tr><td>NC</td><td><span class="badge b-warn">SIN APLICAR</span> / <span class="badge b-ok">APLICADA</span></td><td>según el disponible</td></tr>
+              <tr><td>Pedido</td><td><span class="badge b-warn">PENDIENTE DE FACTURAR</span> → <span class="badge b-info">FACTURADO PARCIAL</span> → <span class="badge b-ok">FACTURADO</span></td><td>neto del pedido vs Σ neto asignado por los comprobantes</td></tr>
+              <tr><td>Cualquiera</td><td><span class="badge b-grey">ANULADO</span></td><td>error de carga en SMG; motivo, usuario y fecha</td></tr>
+            </tbody></table>
+          </div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===================================================== MODAL: DETALLE ===================================================== -->
+<div class="modal-bg" id="m-det"><div class="modal">
+  <div class="modal-h"><h3 id="det-tit"></h3><button class="close" onclick="cerrar('m-det')">×</button></div>
+  <div class="modal-b" id="det-body"></div>
+  <div class="modal-f" id="det-foot"></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REGISTRAR COMPROBANTE ===================================================== -->
+<div class="modal-bg" id="m-doc"><div class="modal">
+  <div class="modal-h"><h3>Registrar comprobante emitido en Tango</h3><button class="close" onclick="cerrar('m-doc')">×</button></div>
+  <div class="modal-b">
+    <div class="panel-section"><div class="panel-section-header">Comprobante
+      <span class="right"><span class="seg-toggle" id="tg-tipo"><button class="on" data-t="FC">Factura</button><button data-t="ND">Nota de débito</button><button data-t="NC">Nota de crédito</button></span></span></div>
+      <div class="panel-section-body grid4">
+        <div class="field"><label>Letra <span class="req">*</span></label><select id="d-letra" onchange="valDoc()"><option>A</option><option>B</option><option>E</option></select></div>
+        <div class="field"><label>Punto de venta <span class="req">*</span></label><input id="d-pv" class="num" value="0006" oninput="valDoc()"></div>
+        <div class="field"><label>Número <span class="req">*</span></label><input id="d-nro" class="num" value="00000524" oninput="valDoc()"></div>
+        <div class="field"><label>Número completo (como Tango)</label><input id="d-full" readonly></div>
+        <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="d-cli" onchange="docNCopciones(); valDoc()"></select></div>
+        <div class="field"><label>CUIT (de la tabla clientes)</label><input id="d-cuit" readonly></div>
+        <div class="field"><label>Moneda <span class="req">*</span></label><select id="d-mon" onchange="docNCopciones(); valDoc()"><option>USD</option><option>ARS</option></select></div>
+        <div class="field"><label>Fecha de emisión <span class="req">*</span></label><input id="d-fe" type="date" value="2026-10-19" oninput="valDoc()"></div>
+        <div class="field" id="d-vto-w"><label>Vencimiento <span class="req">*</span> <span class="tag">sugerido por la condición de pago</span></label><input id="d-vto" type="date" value="2026-11-18" oninput="valDoc()"></div>
+        <div class="field"><label>TC de emisión <span class="tag">informativo, para conciliar con Tango</span></label><input id="d-tc" class="num" placeholder="ej. 1.385,50"></div>
+        <div class="field"><label>Condición de pago</label><input value="30 FF"></div>
+      </div></div>
+
+    <div class="panel-section"><div class="panel-section-header">Detalle por alícuota de IVA <span class="tag">el IVA se calcula solo</span><span class="right"><button class="btn sm" onclick="DL.push({d:'',ali:'21',neto:0}); renderDL()">+ Línea</button></span></div>
+      <div class="panel-section-body"><table class="t"><thead><tr><th>Descripción</th><th style="width:150px">Alícuota</th><th style="width:160px">Neto</th><th style="width:140px">IVA</th><th style="width:34px"></th></tr></thead><tbody id="d-lin"></tbody></table></div></div>
+
+    <div class="two">
+      <div class="panel-section"><div class="panel-section-header">Percepciones y otros tributos <span class="right"><button class="btn sm" onclick="TR.push({t:'Percepción IIBB',jur:'Jujuy',base:0,ali:0}); renderTR()">+ Tributo</button></span></div>
+        <div class="panel-section-body"><table class="t"><thead><tr><th>Tipo</th><th>Jurisdicción</th><th>Base</th><th>Alícuota %</th><th>Importe</th><th></th></tr></thead><tbody id="d-trib"></tbody></table>
+        <p class="muted" style="margin:6px 0 0">Importe = base × alícuota. La base se propone con el neto gravado y se puede cambiar.</p></div></div>
+      <div class="panel-section"><div class="panel-section-header">Totales <span class="tag">automáticos</span></div><div class="panel-section-body tot-box">
+        <div id="d-tots"></div>
+        <div class="field" style="margin-top:8px"><label>Control: total impreso en el PDF de Tango</label><input id="d-pdf" class="num" placeholder="opcional, para detectar errores de tipeo" oninput="valDoc()"></div>
+        <label id="d-red-w" class="hidden" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="d-red" onchange="valDoc()"> Registrar la diferencia de redondeo como tributo «Redondeo»</label>
+      </div></div>
+    </div>
+
+    <div class="panel-section"><div class="panel-section-header">Vínculos con pedidos y certificados <span class="tag">opcionales · una factura puede cubrir varios</span><span class="right"><button class="btn sm" onclick="VL.push({tipo:'P',ref:'',neto:0}); renderVL()">+ Vínculo</button></span></div>
+      <div class="panel-section-body"><table class="t"><thead><tr><th style="width:130px">Tipo</th><th>Pedido / certificado</th><th style="width:150px">Pendiente</th><th style="width:160px">Neto asignado</th><th style="width:34px"></th></tr></thead><tbody id="d-vin"></tbody></table>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field"><label>Orden de compra</label><select><option>— Se hereda de los pedidos —</option><option>O75088 Rev.001</option><option>66/1764</option></select></div>
+        <div class="field"><label>Centro de costos / obra</label><select><option>— Se hereda de los pedidos —</option><option>209 · Mantenimiento de camino SSR</option><option>106 · Obra EXAR</option><option>906 · VIAP SRL</option></select></div>
+        <div class="field hidden" id="d-orig-w"><label>Comprobante original <span class="req">*</span> <span class="tag">el que corrige la ND/NC</span></label><select id="d-orig"></select></div>
+      </div></div></div>
+
+    <div class="panel-section hidden" id="d-mot-w"><div class="panel-section-header">Motivo <span class="req" style="color:var(--red)">*</span></div><div class="panel-section-body grid3">
+      <div class="field"><label>Motivo</label><select><option>Descuento de combustible</option><option>Diferencia de cambio</option><option>Anulación total de factura</option><option>Ajuste de precio</option><option>Desacopio de anticipo financiero</option><option>Otro (detallar)</option></select></div>
+      <div class="field span2"><label>Detalle (texto del comprobante de Tango)</label><input placeholder="p. ej. Dif. de cambio s/ FC 6-505"></div>
+    </div></div>
+    <div class="panel-section hidden" id="d-apl-w"><div class="panel-section-header">Aplicación de la nota de crédito <span class="tag">a una o varias FC/ND del mismo cliente y moneda</span></div>
+      <div class="panel-section-body"><div class="wrap"><table class="t" id="d-apl"></table></div></div></div>
+    <div class="panel-section"><div class="panel-section-header">Adjuntos <span class="tag">opcionales</span></div><div class="panel-section-body">
+      <div class="grid3">
+        <div class="field"><label>Enlace al PDF del comprobante (Drive)</label><input placeholder="https://drive.google.com/… (opcional)"></div>
+        <div class="field"><label>Otros enlaces (remito, HES, conformidad)</label><input placeholder="opcional"></div>
+        <div class="field"><label>Subir archivo</label><input type="file" disabled title="Deshabilitado hasta resolver el almacenamiento del servidor"></div>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Se puede registrar sin adjuntos y agregarlos después. La subida de archivos queda deshabilitada hasta resolver el almacenamiento del servidor; si un responsable los vuelve obligatorios por configuración, este campo lo indicará.</p>
+    </div></div>
+    <div id="d-val"></div>
+  </div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-doc')">Cancelar</button><button class="btn primary" id="d-ok" onclick="guardarDoc()">Registrar</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REGISTRAR COBRANZA ===================================================== -->
+<div class="modal-bg" id="m-cob"><div class="modal">
+  <div class="modal-h"><h3>Registrar cobranza (recibo de Tango)</h3><button class="close" onclick="cerrar('m-cob')">×</button></div>
+  <div class="modal-b">
+    <div class="panel-section"><div class="panel-section-header">Recibo</div><div class="panel-section-body grid4">
+      <div class="field"><label>Punto de venta <span class="req">*</span></label><input id="c-pv" class="num" value="0001" oninput="valCob()"></div>
+      <div class="field"><label>Número de recibo <span class="req">*</span></label><input id="c-nro" class="num" value="00000481" oninput="valCob()"></div>
+      <div class="field"><label>Fecha efectiva de pago <span class="req">*</span></label><input id="c-fecha" type="date" value="2026-10-19"></div>
+      <div class="field"><label>Moneda recibida <span class="req">*</span></label><select id="c-mon" onchange="renderCobro()"><option>ARS</option><option>USD</option></select></div>
+      <div class="field span2"><label>Cliente <span class="req">*</span></label><select id="c-cli" onchange="renderCobro()"></select></div>
+      <div class="field"><label>TC de la fecha de pago <span class="tag">el del recibo de Tango</span></label><input id="c-tc" class="num" value="1385.50" oninput="aplicarTcGeneral()"></div>
+      <div class="field"><label>Enlace al recibo <span class="tag">opcional</span></label><input placeholder="https://drive.google.com/…"></div>
+    </div></div>
+    <div class="panel-section"><div class="panel-section-header">Valores recibidos <span class="tag">retenciones incluidas</span><span class="right"><button class="btn sm" onclick="addValor()">+ Valor</button></span></div><div class="panel-section-body">
+      <table class="t"><thead><tr><th>Medio de pago</th><th>Importe</th><th>Banco / emisor</th><th>Nº operación / cheque / certificado de retención</th><th>Acreditación</th><th></th></tr></thead><tbody id="c-val"></tbody></table>
+    </div></div>
+    <div class="panel-section"><div class="panel-section-header">Asignación a comprobantes pendientes del cliente
+      <span class="right"><button class="btn sm" onclick="sugerirFifo()">Sugerir por vencimiento (el más antiguo primero)</button><button class="btn sm" onclick="limpiarImp()">Limpiar</button></span></div>
+      <div class="panel-section-body"><div class="wrap"><table class="t" id="c-imp"></table></div>
+      <p class="muted" style="margin:6px 0 0">Para un comprobante en otra moneda se carga cuántos pesos se le asignan; el sistema calcula el equivalente en USD con el TC de la fecha de pago. Si los pesos alcanzan para todo el saldo (tolerancia USD 0,01), el comprobante queda cancelado exacto. No se generan diferencias de cambio.</p></div></div>
+    <div class="two"><div id="c-res"></div><div id="c-msg"></div></div>
+  </div>
+  <div class="modal-f"><span class="muted">Una vez registrado no se edita: para corregirlo se anula con motivo y se carga de nuevo.</span><button class="btn" onclick="cerrar('m-cob')">Cancelar</button><button class="btn primary" id="c-ok" onclick="guardarCobro()">Registrar cobranza</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: REVISAR CANCELADO ANTES DEL CORTE ===================================================== -->
+<div class="modal-bg" id="m-rev"><div class="modal">
+  <div class="modal-h"><h3 id="rev-tit">Revisar cancelado antes del corte</h3><button class="close" onclick="cerrar('m-rev')">×</button></div>
+  <div class="modal-b" id="rev-body"></div>
+  <div class="modal-f"><span class="muted">Se registra con tu usuario y la fecha y hora del servidor.</span><button class="btn" onclick="cerrar('m-rev')">Cancelar</button><button class="btn primary" id="rev-ok" disabled onclick="guardarRev()">Guardar revisión</button></div>
+</div></div>
+
+<!-- ===================================================== MODAL: ANULAR ===================================================== -->
+<div class="modal-bg" id="m-anu"><div class="modal sm">
+  <div class="modal-h"><h3 id="anu-tit">Anular registro</h3><button class="close" onclick="cerrar('m-anu')">×</button></div>
+  <div class="modal-b">
+    <div class="alert err"><div><b>Esto no anula el comprobante en Tango.</b> Solo marca como anulado un registro de SMG cargado por error. Si en Tango se anuló una factura con una NC, registrá la NC y aplicala: la factura queda «Cancelada por NC».</div></div>
+    <div id="anu-bloqueo"></div>
+    <div class="field"><label>Motivo <span class="req">*</span> (mínimo 20 caracteres)</label><textarea id="anu-mot" rows="3" oninput="document.getElementById('anu-ok').disabled = this.value.trim().length < 20"></textarea></div>
+    <label style="display:flex;gap:6px;align-items:center"><input type="checkbox"> Cargar después el registro correcto (queda vinculado como reemplazo)</label>
+  </div>
+  <div class="modal-f"><span class="muted">Usuario: jpzubelza · 19/10/2026 hh:mm</span><button class="btn" onclick="cerrar('m-anu')">Cancelar</button><button class="btn danger" id="anu-ok" disabled onclick="confirmarAnul()">Anular registro</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+window.onerror = (m, s, l) => { const t = document.getElementById('toast'); t.textContent = 'Error JS: ' + m + ' (línea ' + l + ')'; t.style.display = 'block'; t.style.background = '#b91c1c'; };
+/* ============================== DATOS DE EJEMPLO ==============================
+   Basados en Pedido de Facturacion.xlsx, Viap RT Cuentas.xlsx (saldos reales al 31/12/2025) y la tabla clientes. */
+const HOY = '2026-10-19', CORTE = '2025-12-31';
+const CLI = {
+  '000069': { rs: 'MINA PIRQUITAS SA', cuit: '30-67989306-4' },
+  '000070': { rs: 'MINERA EXAR S.A.', cuit: '30-70966758-7' },
+  '000125': { rs: 'VIAP S.R.L.', cuit: '30-71496153-1' },
+  '000142': { rs: 'MODULAR SOLUTIONS S.R.L.', cuit: '30-71755065-6' },
+};
+const CERTS = [
+  { id: 'C1', txt: 'SEG-0001 · Cert. Nº1', cli: '000069', mon: 'USD', oc: 'O75088 Rev.001', cc: '209', neto: 125439.68, cond: '30 FF', cot: 'P-20260714',
+    det: 'Certificado N°1\nServicio mantenimiento de Camino ruta Transporte de Mineral\nPeriodo 01/09/2026 al 30/09/2026\nOC O75088 Rev.001\nNeto Descuento de Gasoil' },
+  { id: 'C2', txt: 'SEG-0001 · Cert. Nº1 · reajuste', cli: '000069', mon: 'USD', oc: 'O75088 Rev.001', cc: '209', neto: 4870.12, cond: '30 FF', cot: 'P-20260714',
+    det: 'Reajuste de precios Certificado N°1\nPeriodo 01/09/2026 al 30/09/2026' },
+];
+const certTxt = id => (CERTS.find(c => c.id === id) || {}).txt || '';
+let PED = [
+  { id: 1, num: '20261009-1', tipo: 'FACTURA', fecha: '2026-10-09', cli: '000069', mon: 'USD', oc: 'O75088 Rev.001', cc: '209', cond: '30 FF', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Certificado N°1 · Mantenimiento de camino · Período 01/09/2026 al 30/09/2026', pu: 125439.68, ali: '21', cert: 'C1' }] },
+  { id: 2, num: '20261009-2', tipo: 'FACTURA', fecha: '2026-10-09', cli: '000069', mon: 'USD', oc: 'O75087 Rev.001', cc: '210', cond: '30 FF', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Servicio mantenimiento de camino tramo 2 · Sep26', pu: 90000, ali: '21' }, { c: 1, d: 'Bomba sumergible (bien de capital)', pu: 8210, ali: '10.5' }] },
+  { id: 3, num: '20261014-1', tipo: 'FACTURA', fecha: '2026-10-14', cli: '000070', mon: 'USD', oc: '66/1764', cc: '106', cond: 'FF 29/10/26', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Mantenimiento camino Exar · Sep26', pu: 150000, ali: '21' }, { c: 1, d: 'Reposición de combustible · Sep26', pu: 30000, ali: '21' }] },
+  { id: 4, num: '20260514-1', tipo: 'NOTA DE CREDITO', fecha: '2026-05-14', cli: '000070', mon: 'USD', oc: '4610000136 / 6600001745', cc: '106', cond: '', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Fact 06-512, saldo período Dic25', pu: 137065.31, ali: '21' }, { c: 1, d: 'Fact 06-513, período Ene26', pu: 254254.25, ali: '21' },
+             { c: 1, d: 'Fact 06-514, período Feb26', pu: 240268.24, ali: '21' }, { c: 1, d: 'Fact 06-515, parcial período Mar26', pu: 99412.20, ali: '21' }] },
+  { id: 5, num: '20260605-1', tipo: 'FACTURA', fecha: '2026-06-05', cli: '000125', mon: 'USD', oc: 'Sin OC', cc: '906', cond: 'Pago al Día', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Servicios de Rinconadillas', pu: 26159.95, ali: '21' }] },
+  { id: 7, num: '20261016-1', tipo: 'FACTURA', fecha: '2026-10-16', cli: '000125', mon: 'USD', oc: 'Sin OC', cc: '906', cond: 'Pago al Día', estado: 'EMITIDO',
+    lineas: [{ c: 1, d: 'Alquiler de minibús · Octubre 2026', pu: 5000, ali: '21' }] },
+  { id: 6, num: '—', tipo: 'FACTURA', fecha: '2026-10-19', cli: '000125', mon: 'USD', oc: 'Sin OC', cc: '906', cond: 'Pago al Día', estado: 'BORRADOR',
+    lineas: [{ c: 1, d: 'Servicios del 2022', pu: 7105.25, ali: '21' }] },
+];
+let DOC = [
+  { id: 1, tipo: 'FC', letra: 'A', pv: 6, nro: 512, cli: '000070', fe: '2025-12-31', vto: '2026-01-30', mon: 'USD', neto: 137065.31, iva: 28783.72, trib: 0, total: 165849.03, det: 'Mto. camino Exar · saldo Dic25', cc: '106',
+    si: { cp: 0, nota: 'Informe Tango de comprobantes pendientes al 31/12/2025' } },
+  { id: 2, tipo: 'FC', letra: 'A', pv: 6, nro: 513, cli: '000070', fe: '2026-01-31', vto: '2026-03-02', mon: 'USD', neto: 300000, iva: 63000, trib: 0, total: 363000, det: 'Mto. camino Exar · Ene26', cc: '106' },
+  { id: 3, tipo: 'FC', letra: 'A', pv: 6, nro: 514, cli: '000070', fe: '2026-02-28', vto: '2026-03-30', mon: 'USD', neto: 290000, iva: 60900, trib: 0, total: 350900, det: 'Mto. camino Exar · Feb26', cc: '106' },
+  { id: 4, tipo: 'FC', letra: 'A', pv: 6, nro: 515, cli: '000070', fe: '2026-03-31', vto: '2026-04-30', mon: 'USD', neto: 99412.20, iva: 20876.56, trib: 0, total: 120288.76, det: 'Mto. camino Exar · Mar26 parcial', cc: '106' },
+  { id: 5, tipo: 'NC', letra: 'A', pv: 5, nro: 185, cli: '000070', fe: '2026-05-14', vto: null, mon: 'USD', neto: 731000, iva: 153510, trib: 0, total: 884510, vin: [{ p: 4, neto: 731000 }], motivo: 'Ajuste de precio', det: 'Ajuste períodos Dic25–Mar26', cc: '106', origen: 2 },
+  { id: 6, tipo: 'FC', letra: 'A', pv: 6, nro: 522, cli: '000070', fe: '2026-10-15', vto: '2026-10-29', mon: 'USD', neto: 180000, iva: 37800, trib: 0, total: 217800, sinAdj: true, vin: [{ p: 3, neto: 180000 }], det: 'Mto. camino + reposición combustible Sep26', cc: '106', oc: '66/1764' },
+  { id: 7, tipo: 'NC', letra: 'A', pv: 5, nro: 190, cli: '000070', fe: '2026-10-15', vto: null, mon: 'USD', neto: 8264.46, iva: 1735.54, trib: 0, total: 10000, vin: [{ p: 3, neto: 8264.46 }], motivo: 'Descuento de combustible', det: 'Descuento gasoil Sep26', cc: '106', origen: 6 },
+  { id: 8, tipo: 'FC', letra: 'A', pv: 6, nro: 521, cli: '000069', fe: '2026-10-10', vto: '2026-11-09', mon: 'USD', neto: 98210, iva: 19762.05, trib: 982.10, total: 118954.15, vin: [{ p: 2, neto: 98210 }], det: 'Mto. camino tramo 2 + bomba · Sep26', cc: '210', oc: 'O75087 Rev.001',
+    lineas: [{ d: 'Servicio mantenimiento de camino tramo 2 · Sep26', ali: '21', neto: 90000 }, { d: 'Bomba sumergible (bien de capital)', ali: '10.5', neto: 8210 }],
+    tribs: [{ t: 'Percepción IIBB', jur: 'Jujuy', base: 98210, ali: 1, imp: 982.10 }] },
+  { id: 9, tipo: 'FC', letra: 'A', pv: 6, nro: 505, cli: '000069', fe: '2026-08-12', vto: '2026-09-11', mon: 'USD', neto: 110000, iva: 23100, trib: 0, total: 133100, tcEm: 1340, det: 'Mto. camino · Jul26', cc: '209', oc: 'O70754' },
+  { id: 10, tipo: 'FC', letra: 'A', pv: 6, nro: 520, cli: '000069', fe: '2026-10-10', vto: '2026-11-09', mon: 'USD', neto: 98201, iva: 20622.21, trib: 0, total: 118823.21, vin: [{ p: 2, neto: 98201 }], det: 'Mto. camino tramo 2 · Sep26', cc: '210', estado: 'ANULADO',
+    anul: { por: 'jpzubelza', en: '10/10/2026 16:42', mot: 'Número, alícuotas y percepción mal transcriptos del PDF de Tango (era 6-521).' }, reempl: 8 },
+  { id: 14, tipo: 'ND', letra: 'A', pv: 5, nro: 25, cli: '000069', fe: '2026-09-20', vto: '2026-10-20', mon: 'ARS', neto: 3300000, iva: 693000, trib: 0, total: 3993000, motivo: 'Diferencia de cambio', origen: 9,
+    det: 'Dif. de cambio s/ FC 6-505 según ND emitida por Tango (TC emisión 1.340 · TC pago 1.370)' },
+  { id: 15, tipo: 'FC', letra: 'A', pv: 6, nro: 523, cli: '000125', fe: '2026-10-18', vto: '2026-10-25', mon: 'USD', neto: 31159.95, iva: 6543.59, trib: 0, total: 37703.54, sinAdj: true, vin: [{ p: 5, neto: 26159.95 }, { p: 7, neto: 5000 }], det: 'Servicios Rinconadillas + alquiler minibús Oct26', cc: '906' },
+  { id: 11, tipo: 'FC', letra: 'A', pv: 6, nro: 511, cli: '000125', fe: '2026-04-20', vto: '2026-04-21', mon: 'ARS', neto: 72513849.04, iva: 15227908.30, trib: 0, total: 87741757.34, det: 'Venta HidroGrúa XCMG', cc: '906' },
+  { id: 13, tipo: 'FC', letra: 'A', pv: 6, nro: 445, cli: '000125', fe: '2024-08-15', vto: '2024-08-16', mon: 'ARS', neto: 8348404.24, iva: 1753164.89, trib: 0, total: 10101569.13, det: 'Certificado Nº3 Alquiler de retropala',
+    si: { cp: 2470627.90, crit: 'ESTIMADO_ANTIGUEDAD', nota: 'Tango no informa qué facturas canceló cada recibo: lo cobrado antes del corte se estimó por antigüedad para igualar el saldo de Tango ($ 7.630.941,23). No es una imputación real.' } },
+  { id: 12, tipo: 'FC', letra: 'A', pv: 6, nro: 484, cli: '000142', fe: '2025-09-29', vto: '2025-10-06', mon: 'ARS', neto: 56077075.54, iva: 11776185.86, trib: 0, total: 67853261.40, det: 'Alquiler de equipos · Salar Ratones, Salta',
+    si: { cp: 0, nota: 'Saldo de la cuenta corriente Tango al 31/12/2025' } },
+];
+let APL = [{ id: 1, nc: 5, doc: 1, imp: 165849.03 }, { id: 2, nc: 5, doc: 2, imp: 307647.64 }, { id: 3, nc: 5, doc: 3, imp: 290724.57 }, { id: 4, nc: 5, doc: 4, imp: 120288.76 }, { id: 5, nc: 7, doc: 6, imp: 10000 }];
+// imp: d = importe en moneda del documento · r = importe en moneda del recibo · tc = tipo de cambio de la fecha de pago (solo si las monedas difieren)
+let REC = [
+  { id: 1, pv: 1, nro: 455, cli: '000070', fe: '2026-06-20', mon: 'USD', valores: [{ m: 'Transferencia', imp: 55352.36, ref: 'Galicia · op. 88123' }], imp: [{ doc: 2, d: 55352.36, r: 55352.36 }] },
+  { id: 6, pv: 1, nro: 475, cli: '000125', fe: '2026-07-10', mon: 'ARS', valores: [{ m: 'Transferencia', imp: 3000000, ref: 'BNA · op. 30122' }], imp: [{ doc: 13, d: 3000000, r: 3000000 }] },
+  { id: 2, pv: 1, nro: 462, cli: '000069', fe: '2026-09-15', mon: 'ARS', valores: [{ m: 'Transferencia', imp: 180000000, ref: 'Macro · op. 554120' }, { m: 'Retención Ganancias', imp: 2347000, ref: 'Cert. 0001-00012345' }],
+    imp: [{ doc: 9, d: 133100, r: 182347000, tc: 1370 }] },
+  { id: 5, pv: 1, nro: 480, cli: '000125', fe: '2026-09-30', mon: 'ARS', valores: [{ m: 'Transferencia', imp: 2000000, ref: 'BNA · op. 33019' }], imp: [] },
+  { id: 7, pv: 1, nro: 472, cli: '000070', fe: '2026-10-16', mon: 'ARS', valores: [{ m: 'Transferencia', imp: 41500000, ref: 'Galicia · op. 90411' }, { m: 'Retención IIBB', imp: 500000, ref: 'Cert. IIBB Jujuy 2026-0091' }],
+    imp: [{ doc: 3, d: 30368.76, r: 42000000, tc: 1383 }] },
+  { id: 3, pv: 1, nro: 470, cli: '000069', fe: '2026-10-17', mon: 'USD', valores: [{ m: 'Transferencia', imp: 50000, ref: 'Santander USD · op. 77310' }], imp: [{ doc: 8, d: 50000, r: 50000 }] },
+];
+
+/* ============================== CÁLCULOS ============================== */
+const EPS = 0.005;
+const vig = x => (x.estado || 'VIGENTE') !== 'ANULADO';
+const docById = id => DOC.find(d => d.id === id);
+// Redondeo decimal HALF_UP a 2 decimales (el backend usa Decimal).
+const r2 = n => Math.sign(n) * Math.round(Number(Math.abs(n).toFixed(6) + 'e2')) / 100;
+const ALIS = { '27': 27, '21': 21, '10.5': 10.5, '0': 0, 'NG': 0 };
+const ALI_TXT = { '27': '27 %', '21': '21 %', '10.5': '10,5 %', '0': 'Exento', 'NG': 'No gravado' };
+function ivaPorAlicuota(lineas) { // [{ali, neto}] → [{ali, base, iva}] solo gravadas
+  const g = {}; lineas.forEach(l => { if (ALIS[l.ali] > 0) g[l.ali] = (g[l.ali] || 0) + l.neto; });
+  return Object.keys(g).sort((a, b) => ALIS[b] - ALIS[a]).map(a => ({ ali: a, base: r2(g[a]), iva: r2(g[a] * ALIS[a] / 100) }));
+}
+const cancPrev = d => d.si ? d.si.cp : 0;
+const saldoInicial = d => r2(d.total - cancPrev(d));
+function aplicadoNC(d) { return r2(APL.filter(a => a.doc === d.id && vig(a) && vig(docById(a.nc))).reduce((s, a) => s + a.imp, 0)); }
+function imputsDe(d) { return REC.filter(vig).flatMap(r => r.imp.filter(i => i.doc === d.id).map(i => ({ ...i, rec: r }))); }
+function cobrado(d) { return r2(imputsDe(d).reduce((s, i) => s + i.d, 0)); }
+function saldo(d) { return d.tipo === 'NC' ? 0 : r2(saldoInicial(d) - aplicadoNC(d) - cobrado(d)); }
+function dispNC(d) { return r2(d.total - APL.filter(a => a.nc === d.id && vig(a)).reduce((s, a) => s + a.imp, 0)); }
+function recTotal(r) { return r2(r.valores.reduce((s, v) => s + v.imp, 0)); }
+function recImputado(r) { return r2(r.imp.reduce((s, i) => s + i.r, 0)); }
+function recACuenta(r) { return r2(recTotal(r) - recImputado(r)); }
+function dias(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+function estadoDoc(d) {
+  if (!vig(d)) return 'ANULADO';
+  if (d.tipo === 'NC') { const disp = dispNC(d); return disp <= EPS ? 'APLICADA' : (disp < d.total ? 'APLICADA PARCIAL' : 'SIN APLICAR'); }
+  const s = saldo(d);
+  if (s <= EPS) return cobrado(d) <= EPS ? 'CANCELADA POR NC' : 'CANCELADA';
+  if (d.vto && HOY > d.vto) return 'VENCIDA';
+  return s < saldoInicial(d) - EPS ? 'PARCIAL' : 'PENDIENTE';
+}
+const vinculos = d => d.vin || [];
+function tiposPedido(p) { return p.tipo === 'NOTA DE CREDITO' ? ['NC'] : p.tipo === 'NOTA DE DEBITO' ? ['ND'] : ['FC', 'ND']; }
+function pedNeto(p) { return r2(p.lineas.reduce((s, l) => s + l.c * l.pu, 0)); }
+function pedIvas(p) { return ivaPorAlicuota(p.lineas.map(l => ({ ali: l.ali, neto: l.c * l.pu }))); }
+function pedTotal(p) { return r2(pedNeto(p) + pedIvas(p).reduce((s, x) => s + x.iva, 0)); }
+function docsDePedido(p) { return DOC.filter(d => vig(d) && vinculos(d).some(v => v.p === p.id)); }
+function pedFacturado(p) { const t = tiposPedido(p); return r2(docsDePedido(p).filter(d => t.includes(d.tipo)).reduce((s, d) => s + vinculos(d).filter(v => v.p === p.id).reduce((x, v) => x + v.neto, 0), 0)); }
+function estadoPed(p) {
+  if (p.estado !== 'EMITIDO') return p.estado;
+  const f = pedFacturado(p), n = pedNeto(p);
+  return f <= EPS ? 'PENDIENTE DE FACTURAR' : (f < n - EPS ? 'FACTURADO PARCIAL' : 'FACTURADO');
+}
+
+/* ============================== FORMATO ============================== */
+const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nf4 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const m = (n, mon) => `${mon ? `<span class="mon">${mon}</span>` : ''}${nf.format(n)}`;
+const f = s => s ? s.split('-').reverse().join('/') : '—';
+const pad = (n, l) => String(n).padStart(l, '0');
+const numDoc = d => `${d.letra}-${pad(d.pv, 4)}-${pad(d.nro, 8)}`;
+const numCorto = d => `${d.pv}-${d.nro}`;
+const numRec = r => `${pad(r.pv, 4)}-${pad(r.nro, 8)}`;
+const BADGE = { 'PENDIENTE': 'b-info', 'PARCIAL': 'b-warn', 'VENCIDA': 'b-err', 'CANCELADA': 'b-ok', 'CANCELADA POR NC': 'b-nc', 'SIN APLICAR': 'b-warn', 'APLICADA PARCIAL': 'b-warn', 'APLICADA': 'b-ok', 'ANULADO': 'b-grey',
+  'BORRADOR': 'b-warn', 'PENDIENTE DE FACTURAR': 'b-warn', 'FACTURADO PARCIAL': 'b-info', 'FACTURADO': 'b-ok', 'VIGENTE': 'b-ok', 'CONCILIADO': 'b-ok', 'DIFERENCIA': 'b-err', 'SIN RESPALDO': 'b-warn' };
+const badge = e => `<span class="badge ${BADGE[e] || 'b-info'}">${e}</span>`;
+const tipoB = t => `<span class="tipo tipo-${t}">${t}</span>`;
+const siB = d => d.si ? '<span class="si" title="Saldo inicial al corte">SI</span>' + (d.si.crit === 'ESTIMADO_ANTIGUEDAD' ? ' <span class="badge b-warn" title="Cancelado antes del corte estimado por antigüedad: revisable, no es una imputación real">EST.</span>' : '') : '';
+const CRIT_TXT = { ESTIMADO_ANTIGUEDAD: 'ESTIMADO POR ANTIGÜEDAD', SEGUN_TANGO: 'SEGÚN TANGO', REVISADO: 'REVISADO' };
+const critB = d => d.si && d.si.cp ? `<span class="badge ${d.si.crit === 'ESTIMADO_ANTIGUEDAD' ? 'b-warn' : 'b-ok'}">${CRIT_TXT[d.si.crit] || 'SEGÚN TANGO'}</span>` : '';
+const $ = id => document.getElementById(id);
+const num = s => { const x = parseFloat(String(s).replace(/\s/g, '')); return isNaN(x) ? 0 : x; };
+function toast(t) { const el = $('toast'); el.style.background = ''; el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 4500); }
+function abrir(id) { $(id).classList.add('open'); } function cerrar(id) { $(id).classList.remove('open'); }
+const MONEDAS = ['USD', 'ARS'];
+const optsCli = () => Object.entries(CLI).map(([k, c]) => `<option value="${k}">${k} · ${c.rs}</option>`).join('');
+
+/* ============================== NAVEGACIÓN ============================== */
+const TITULOS = { tablero: 'Tablero de Seguimiento', pedidos: 'Pedidos de Facturación', documentos: 'Facturas, ND y NC', cobranzas: 'Cobranzas y Recibos', ctacte: 'Cuenta Corriente', saldos: 'Saldos Iniciales', diseno: 'Modelo y reglas' };
+function ir(v) {
+  document.querySelectorAll('.vista').forEach(s => s.classList.toggle('hidden', s.id !== 'v-' + v));
+  document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.classList.toggle('active', b.dataset.vista === v));
+  $('crumbs').innerHTML = `Menú Principal<i>›</i>Facturación y Cobranzas<i>›</i><b>${TITULOS[v]}</b>`;
+  if (v === 'pedidos') cerrarEditor();
+  renderTodo();
+}
+document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.onclick = () => ir(b.dataset.vista));
+function toggle(id, cb) { $(id).querySelectorAll('button').forEach(b => b.onclick = () => { $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb(b); }); }
+
+/* ============================== TABLERO ============================== */
+let filtroVenc = 'todos';
+toggle('tg-venc', b => { filtroVenc = b.dataset.v; renderTablero(); });
+function renderTablero() {
+  const cli = $('f-cli').value;
+  const docs = DOC.filter(d => vig(d) && (!cli || d.cli === cli));
+  const peds = PED.filter(p => !cli || p.cli === cli);
+  let h = '<div class="kpis">';
+  MONEDAS.forEach(mon => {
+    const deb = docs.filter(d => d.mon === mon && d.tipo !== 'NC');
+    const pend = peds.filter(p => p.mon === mon && ['PENDIENTE DE FACTURAR', 'FACTURADO PARCIAL'].includes(estadoPed(p)));
+    const pendNeto = pend.reduce((s, p) => s + pedNeto(p) - pedFacturado(p), 0);
+    const deuda = deb.reduce((s, d) => s + saldo(d), 0);
+    const venc = deb.filter(d => saldo(d) > EPS && d.vto < HOY).reduce((s, d) => s + saldo(d), 0);
+    const prox = deb.filter(d => saldo(d) > EPS && d.vto >= HOY && dias(HOY, d.vto) <= 30).reduce((s, d) => s + saldo(d), 0);
+    const cobMes = REC.filter(r => vig(r) && r.fe >= '2026-10-01' && (!cli || r.cli === cli)).flatMap(r => r.imp).filter(i => docById(i.doc).mon === mon).reduce((s, i) => s + i.d, 0);
+    const favor = docs.filter(d => d.mon === mon && d.tipo === 'NC').reduce((s, d) => s + dispNC(d), 0) + REC.filter(r => vig(r) && r.mon === mon && (!cli || r.cli === cli)).reduce((s, r) => s + recACuenta(r), 0);
+    h += `<div class="kpi-mon">${mon}</div>
+      <div class="kpi warn"><span class="lbl">Pendiente de facturar (neto)</span><b>${nf.format(pendNeto)}</b><small>${pend.length} pedido(s) emitido(s)</small></div>
+      <div class="kpi"><span class="lbl">Saldo a cobrar</span><b>${nf.format(deuda)}</b><small>${deb.filter(d => saldo(d) > EPS).length} comprobante(s) abierto(s)</small></div>
+      <div class="kpi err"><span class="lbl">Vencido</span><b>${nf.format(venc)}</b><small>${deuda > 0 ? Math.round(venc / deuda * 100) : 0}% de la deuda</small></div>
+      <div class="kpi"><span class="lbl">Vence en 30 días</span><b>${nf.format(prox)}</b><small>hasta 18/11/2026</small></div>
+      <div class="kpi ok"><span class="lbl">Cobrado en octubre</span><b>${nf.format(cobMes)}</b><small>asignado a comprobantes en ${mon}</small></div>
+      <div class="kpi"><span class="lbl">A favor del cliente</span><b>${nf.format(favor)}</b><small>NC sin aplicar + recibos a cuenta</small></div>`;
+  });
+  $('kpis').innerHTML = h + '</div>';
+  const pend = peds.filter(p => ['PENDIENTE DE FACTURAR', 'FACTURADO PARCIAL', 'BORRADOR'].includes(estadoPed(p)));
+  $('cnt-pend').textContent = pend.length;
+  $('t-pend').innerHTML = `<thead><tr><th>Solicitud</th><th>Cliente</th><th>Origen</th><th>Pendiente (neto)</th><th>Días</th><th>Estado</th></tr></thead><tbody>` +
+    pend.map(p => { const cs = [...new Set(p.lineas.filter(l => l.cert).map(l => certTxt(l.cert)))];
+      return `<tr class="click" onclick="ir('pedidos')"><td>${p.num}</td><td>${CLI[p.cli].rs}</td><td>${cs.join(', ') || (p.oc && p.oc !== 'Sin OC' ? 'OC ' + p.oc : 'Independiente')}</td><td class="r">${m(pedNeto(p) - pedFacturado(p), p.mon)}</td><td class="c">${p.estado === 'BORRADOR' ? '—' : dias(p.fecha, HOY)}</td><td>${badge(estadoPed(p))}</td></tr>`; }).join('') + '</tbody>';
+  const tramos = [['Sin vencer', d => d.vto >= HOY], ['1–30', d => d.vto < HOY && dias(d.vto, HOY) <= 30], ['31–60', d => dias(d.vto, HOY) > 30 && dias(d.vto, HOY) <= 60], ['61–90', d => dias(d.vto, HOY) > 60 && dias(d.vto, HOY) <= 90], ['+90', d => dias(d.vto, HOY) > 90]];
+  $('t-aging').innerHTML = `<thead><tr><th>Moneda</th>${tramos.map(t => `<th>${t[0]}</th>`).join('')}<th>Total</th></tr></thead><tbody>` +
+    MONEDAS.map(mon => { const ab = docs.filter(d => d.mon === mon && d.tipo !== 'NC' && saldo(d) > EPS); let tot = 0;
+      return `<tr><td><b>${mon}</b></td>${tramos.map((t, i) => { const v = ab.filter(t[1]).reduce((s, d) => s + saldo(d), 0); tot += v; return `<td class="r ${i > 0 && v > 0 ? 'neg' : ''}">${v ? nf.format(v) : '—'}</td>`; }).join('')}<td class="r"><b>${nf.format(tot)}</b></td></tr>`; }).join('') + '</tbody>';
+  let ab = docs.filter(d => d.tipo !== 'NC' && saldo(d) > EPS && (d.vto < HOY || dias(HOY, d.vto) <= 30));
+  if (filtroVenc === 'venc') ab = ab.filter(d => d.vto < HOY); if (filtroVenc === 'prox') ab = ab.filter(d => d.vto >= HOY);
+  ab.sort((a, b) => a.vto.localeCompare(b.vto));
+  $('t-venc').innerHTML = `<thead><tr><th>Tipo</th><th>Número</th><th>Cliente</th><th>Emisión</th><th>Vencimiento</th><th>Días</th><th>Saldo inicial</th><th>NC aplicadas</th><th>Cobrado</th><th>Saldo</th><th>Estado</th></tr></thead><tbody>` +
+    ab.map(d => { const dd = dias(d.vto, HOY);
+      return `<tr class="click" onclick="verDoc(${d.id})"><td class="c">${tipoB(d.tipo)}</td><td>${numDoc(d)}${siB(d)}</td><td>${CLI[d.cli].rs}</td><td>${f(d.fe)}</td><td>${f(d.vto)}</td><td class="r ${dd > 0 ? 'neg' : ''}">${dd > 0 ? dd + ' vencido' : 'en ' + (-dd)}</td><td class="r">${m(saldoInicial(d), d.mon)}</td><td class="r">${aplicadoNC(d) ? nf.format(aplicadoNC(d)) : '—'}</td><td class="r">${cobrado(d) ? nf.format(cobrado(d)) : '—'}</td><td class="r"><b>${m(saldo(d), d.mon)}</b></td><td>${badge(estadoDoc(d))}</td></tr>`; }).join('') + '</tbody>';
+}
+
+/* ============================== PEDIDOS ============================== */
+function renderPedidos() {
+  const fe = $('fp-est').value;
+  const rows = PED.filter(p => !fe || estadoPed(p) === fe);
+  $('t-ped').innerHTML = `<thead><tr><th>Solicitud Nº</th><th>Fecha</th><th>Comprobante</th><th>Cliente</th><th>OC</th><th>Certificados</th><th>CC</th><th>Neto</th><th>IVA</th><th>Total</th><th>Facturado (neto)</th><th>Pendiente</th><th>Comprobantes</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>` +
+    rows.map(p => { const n = pedNeto(p), fa = pedFacturado(p), docs = docsDePedido(p), cs = [...new Set(p.lineas.filter(l => l.cert).map(l => certTxt(l.cert)))];
+      return `<tr><td><b>${p.num}</b></td><td>${f(p.fecha)}</td><td>${p.tipo}</td><td>${CLI[p.cli].rs}</td><td>${p.oc || '—'}</td><td>${cs.join('<br>') || '<span class="muted">—</span>'}</td><td class="c">${p.cc || '—'}</td>
+      <td class="r">${m(n, p.mon)}</td><td class="r">${pedIvas(p).map(x => `${nf.format(x.iva)} <span class="muted">(${ALI_TXT[x.ali]})</span>`).join('<br>')}</td><td class="r">${nf.format(pedTotal(p))}</td><td class="r">${fa ? nf.format(fa) : '—'}</td><td class="r ${n - fa > EPS ? 'neg' : ''}">${nf.format(n - fa)}</td>
+      <td>${docs.map(d => `<a onclick="verDoc(${d.id})">${tipoB(d.tipo)} ${numCorto(d)}</a>`).join(' ') || '—'}</td><td>${badge(estadoPed(p))}</td>
+      <td>${p.estado === 'BORRADOR' ? `<button class="btn sm" onclick="nuevoPedido('libre')">Editar</button>` : `<button class="btn sm" onclick="toast('Descarga del PDF sellado ${p.num}.pdf (SHA-256 verificado)')">PDF</button>`}
+        ${p.estado === 'EMITIDO' && estadoPed(p) !== 'FACTURADO' ? `<button class="btn sm" onclick="abrirDoc(${p.id})">Registrar comprobante</button>` : ''}</td></tr>`; }).join('') + '</tbody>';
+}
+let LINEAS = [];
+function nuevoPedido(origen) {
+  ir('pedidos');
+  $('ped-lista').classList.add('hidden'); $('ped-editor').classList.remove('hidden');
+  $('pe-cli').innerHTML = optsCli();
+  $('pe-cert-add').innerHTML = CERTS.map(c => `<option value="${c.id}">${c.txt} · ${c.mon} ${nf.format(c.neto)}</option>`).join('');
+  LINEAS = [];
+  if (origen === 'cert') { $('pe-cert-add').value = 'C1'; agregarCert(); }
+  else { $('pe-cli').value = '000125'; $('pe-cc').value = '906'; $('pe-oc').value = ''; $('pe-cond').value = 'Pago al Día'; $('pe-cot').value = ''; $('pe-obs').value = 'CC 906';
+         LINEAS = [{ c: 1, d: 'Servicios del 2022', pu: 7105.25, ali: '21', cert: '' }]; aplicarCli(); renderLineas(); }
+  $('ped-origen').innerHTML = origen === 'cert'
+    ? '<div><b>Pedido desde certificado.</b> Cliente, CUIT, OC, moneda, condición de pago y centro de costos se toman del certificado y su seguimiento. Cada certificado entra como una línea con su neto (podés agregar más de uno). Todo se puede editar hasta emitir.</div>'
+    : '<div><b>Pedido independiente.</b> No requiere certificado ni OC (alquileres, ventas, anticipos, NC por descuentos). Los vínculos se pueden agregar después.</div>';
+}
+function cerrarEditor() { $('ped-lista').classList.remove('hidden'); $('ped-editor').classList.add('hidden'); }
+function agregarCert() {
+  const c = CERTS.find(x => x.id === $('pe-cert-add').value); if (!c) return;
+  if (!LINEAS.length) { $('pe-cli').value = c.cli; $('pe-mon').value = c.mon; $('pe-oc').value = c.oc; $('pe-cc').value = c.cc; $('pe-cond').value = c.cond; $('pe-cot').value = c.cot; $('pe-obs').value = 'Centro de Costo ' + c.cc; $('pe-tipo').value = 'FACTURA'; }
+  LINEAS.push({ c: 1, d: c.det, pu: c.neto, ali: '21', cert: c.id }); aplicarCli(); renderLineas();
+}
+function aplicarCli() { $('pe-cuit').value = CLI[$('pe-cli').value].cuit; previa(); }
+function agregarLinea() { LINEAS.push({ c: 1, d: '', pu: 0, ali: '21', cert: '' }); renderLineas(); }
+function renderLineas() {
+  $('pe-lineas').innerHTML = LINEAS.map((l, i) => `<tr><td><input class="num" value="${l.c}" oninput="LINEAS[${i}].c=num(this.value); previa()"></td>
+    <td><textarea oninput="LINEAS[${i}].d=this.value; previa()">${l.d}</textarea></td>
+    <td><select onchange="LINEAS[${i}].cert=this.value; previa()"><option value="">—</option>${CERTS.map(c => `<option value="${c.id}" ${c.id === l.cert ? 'selected' : ''}>${c.txt}</option>`).join('')}</select></td>
+    <td><select onchange="LINEAS[${i}].ali=this.value; previa()">${Object.keys(ALI_TXT).map(a => `<option value="${a}" ${a === l.ali ? 'selected' : ''}>${ALI_TXT[a]}</option>`).join('')}</select></td>
+    <td><input class="num" value="${l.pu}" oninput="LINEAS[${i}].pu=num(this.value); previa()"></td><td class="r" id="ls-${i}">${nf.format(l.c * l.pu)}</td>
+    <td class="c"><button class="btn sm" onclick="LINEAS.splice(${i},1); renderLineas()">×</button></td></tr>`).join('');
+  previa();
+}
+function previa() {
+  LINEAS.forEach((l, i) => { const el = $('ls-' + i); if (el) el.textContent = nf.format(l.c * l.pu); });
+  const mon = $('pe-mon').value, neto = r2(LINEAS.reduce((s, l) => s + l.c * l.pu, 0));
+  const ivas = ivaPorAlicuota(LINEAS.map(l => ({ ali: l.ali, neto: l.c * l.pu }))), totIva = ivas.reduce((s, x) => s + x.iva, 0);
+  $('pe-tot').innerHTML = `<div class="kv"><span>Subtotal neto</span><span>${m(neto, mon)}</span></div>${ivas.map(x => `<div class="kv"><span>IVA ${ALI_TXT[x.ali]} s/ ${nf.format(x.base)}</span><span>${m(x.iva, mon)}</span></div>`).join('')}<div class="kv final"><span>Total</span><span>${m(neto + totIva, mon)}</span></div>`;
+  const cli = CLI[$('pe-cli').value] || { rs: '', cuit: '' };
+  const tc = $('pe-tc').value;
+  $('hoja').innerHTML = `<div class="marco">
+    <table class="enc"><tr><td class="logo"><img src="../Imagenes/09-smg.png" alt="SMG"></td>
+      <td class="tit">SOLICITUD DE EMISION<span class="rojo">${$('pe-tipo').value}</span></td>
+      <td style="width:26%; padding:0"><table class="meta"><tr><td>Código</td><td>D.C. 1-9-14</td></tr><tr><td>Rev.</td><td>02</td></tr><tr><td>Vigencia</td><td>24/8/2017</td></tr><tr><td>Páginas</td><td>1 de 1</td></tr></table></td></tr></table>
+    <div class="fila"><div class="cam"><b>SOLICITUD Nº</b><span><i style="color:#888">AAAAMMDD-n</i></span></div><div class="cam der"><b>FECHA DE EMISION:</b><span>${f($('pe-fecha').value)}</span></div></div>
+    <div class="fila"><div class="cam"><b>DEPTO. ORIGEN:</b><span>${$('pe-depto').value}</span></div><div></div></div>
+    <div class="fila"><div class="cam"><b>PARA: DEPARTAMENTO CONTABLE</b><span></span></div><div class="cam"><b>COTIZACION :</b><span>${$('pe-cot').value}</span></div></div>
+    <div class="fila"><div class="cam"><b>CLIENTE:</b><span>${cli.rs}</span></div><div class="cam"><b>CUIT:</b><span>${cli.cuit}</span></div></div>
+    <div class="fila"><div class="cam"><b>DOMICILIO:</b><span>${$('pe-dom').value}</span></div><div class="cam"><b>&nbsp;&nbsp;&nbsp;MONEDA:</b><span><b>${mon}</b></span></div></div>
+    <div class="fila"><div class="cam"><b>CONDICIÓN DE PAGO:</b><span class="rojo">${$('pe-cond').value}</span></div><div class="cam"><b>ORDEN DE COMPRA Nº: ${$('pe-oc').value || 'Sin OC'}</b><span></span></div></div>
+    <div class="intro">Se solicita la Facturación y gestión de cobro del siguiente servicio realizado al cliente de referencia.</div>
+    <table class="det"><thead><tr><th style="width:13%">CANTIDAD</th><th>DETALLE</th><th style="width:22%">PRECIO UNITARIO</th><th style="width:20%">SUBTOTAL</th></tr></thead><tbody>
+      ${LINEAS.map(l => `<tr><td style="text-align:center;font-weight:400">${l.c}</td><td class="d">${l.d.replace(/</g, '&lt;')}${ivas.length > 1 ? ` <span style="font-weight:400">(IVA ${ALI_TXT[l.ali]})</span>` : ''}</td><td class="m">${mon} ${nf.format(l.pu)}</td><td class="m">${mon} ${nf.format(l.c * l.pu)}</td></tr>`).join('')}
+      <tr><td></td><td></td><td></td><td></td></tr></tbody></table>
+    <table class="tots"><tr><td class="l"></td><td>${mon} ${nf.format(neto)}</td></tr>${ivas.map(x => `<tr><td class="l">IVA ${ALI_TXT[x.ali].replace(' ', '')}</td><td>${mon} ${nf.format(x.iva)}</td></tr>`).join('')}<tr><td class="l">TOTAL</td><td>${mon} ${nf.format(neto + totIva)}</td></tr></table>
+    <div class="obs"><div>Observaciones:</div><div class="rojo">${$('pe-obs').value}${tc && mon !== 'ARS' ? ' · Cobro en pesos al ' + tc : ''}</div></div>
+    <div class="firmas"><div class="firma"><div class="h">SOLICITÓ</div><div class="c">${$('pe-sol').value}</div><div class="p">Firma y Aclaración</div></div>
+      <div class="firma"><div class="h">RECIBE</div><div class="c">${$('pe-rec').value}</div><div class="p">Firma y Aclaración</div></div></div>
+    <div class="pie">UNA VEZ EMITIDA LA FACTURA EL DEPARTAMENTO CONTABLE PONDRÁ A DISPOSICIÓN LA MISMA EN LA NUBE DE LA EMPRESA PARA QUE EL SOLICITANTE TENGA ACCESO A LA MISMA</div>
+    <div class="sello">Emitido desde SMG Dashboard Operaciones · verificación SHA-256 al pie del PDF</div></div>`;
+  const al = [];
+  LINEAS.filter(l => l.cert).forEach(l => { const c = CERTS.find(x => x.id === l.cert);
+    if (c.mon !== mon) al.push(`<div class="alert err"><div><b>${c.txt} está en ${c.mon}</b> y el pedido en ${mon}. Un pedido no mezcla monedas.</div></div>`);
+    if (Math.abs(l.c * l.pu - c.neto) > EPS) al.push(`<div class="alert"><div><b>La línea de ${c.txt} (${nf.format(l.c * l.pu)}) no coincide con el total a facturar del certificado (${nf.format(c.neto)}).</b> Al emitir se pide justificación (puede ser una facturación parcial).</div></div>`); });
+  if (LINEAS.some(l => l.cert === 'C1')) al.push(`<div class="alert info"><div><b>Control de duplicados:</b> el Cert. Nº1 ya está en el pedido 20261009-1, emitido y pendiente de facturar. La suma de los pedidos vigentes de un certificado no puede superar su total a facturar.</div></div>`);
+  $('ped-val').innerHTML = al.join('');
+}
+function emitirPedido() { toast('Pedido emitido: Nº 20261019-1 · PDF generado y sellado. Queda inmutable (solo se puede anular con motivo).'); cerrarEditor(); }
+
+/* ============================== DOCUMENTOS ============================== */
+function renderDocs() {
+  const t = $('fd-tipo').value, e = $('fd-est').value, mo = $('fd-mon').value, cl = $('fd-cli').value, an = $('fd-anul').checked;
+  const rows = DOC.filter(d => (!t || d.tipo === t) && (!mo || d.mon === mo) && (!cl || d.cli === cl) && (an || vig(d)) && (!e || estadoDoc(d) === e)).sort((a, b) => b.fe.localeCompare(a.fe));
+  $('t-docs').innerHTML = `<thead><tr><th>Tipo</th><th>Número</th><th>Cliente</th><th>Emisión</th><th>Vencimiento</th><th>Neto</th><th>IVA</th><th>Percep.</th><th>Total</th><th>NC aplicadas</th><th>Cobrado</th><th>Saldo / disponible</th><th>Estado</th><th>Vínculos</th></tr></thead><tbody>` +
+    rows.map(d => `<tr class="click ${vig(d) ? '' : 'anul'}" onclick="verDoc(${d.id})"><td class="c">${tipoB(d.tipo)}</td><td><b>${numDoc(d)}</b>${siB(d)}</td><td>${CLI[d.cli].rs}</td><td>${f(d.fe)}</td><td>${f(d.vto)}</td>
+      <td class="r">${m(d.neto, d.mon)}</td><td class="r">${nf.format(d.iva)}</td><td class="r">${d.trib ? nf.format(d.trib) : '—'}</td><td class="r">${nf.format(d.total)}</td>
+      <td class="r">${d.tipo === 'NC' ? '—' : (aplicadoNC(d) ? nf.format(aplicadoNC(d)) : '—')}</td><td class="r">${d.tipo === 'NC' ? '—' : (cobrado(d) ? nf.format(cobrado(d)) : '—')}</td>
+      <td class="r"><b>${d.tipo === 'NC' ? nf.format(dispNC(d)) : nf.format(saldo(d))}</b></td><td>${badge(estadoDoc(d))}</td>
+      <td>${vinculos(d).map(v => 'Ped. ' + PED.find(p => p.id === v.p).num).join(' + ')}${d.cc ? ' · CC ' + d.cc : ''}${d.origen ? ' · s/ FC ' + numCorto(docById(d.origen)) : ''}</td></tr>`).join('') + '</tbody>';
+}
+let DOC_SEL = null;
+function verDoc(id) {
+  const d = docById(id); DOC_SEL = d;
+  $('det-tit').innerHTML = `${tipoB(d.tipo)} ${numDoc(d)} · ${CLI[d.cli].rs} ${badge(estadoDoc(d))}`;
+  // Movimientos con saldo restante en la moneda del comprobante
+  let movs = '';
+  if (d.tipo === 'NC') {
+    movs = `<table class="t"><thead><tr><th>Aplicada a</th><th>Importe</th></tr></thead><tbody>${APL.filter(a => a.nc === d.id).map(a => `<tr><td>${tipoB(docById(a.doc).tipo)} <a onclick="verDoc(${a.doc})">${numDoc(docById(a.doc))}</a></td><td class="r">${m(a.imp, d.mon)}</td></tr>`).join('')}
+      <tr class="tot"><td>Disponible</td><td class="r">${m(dispNC(d), d.mon)}</td></tr></tbody></table>`;
+  } else {
+    const ev = [];
+    APL.filter(a => a.doc === d.id && vig(a)).forEach(a => { const nc = docById(a.nc); ev.push({ fe: nc.fe, mov: `${tipoB('NC')} ${numDoc(nc)} <span class="mini">${nc.motivo}</span>`, orig: '', tc: '', imp: a.imp }); });
+    imputsDe(d).forEach(i => { const r = i.rec;
+      ev.push({ fe: r.fe, mov: `${tipoB('REC')} ${numRec(r)} <span class="mini">${r.valores.map(v => v.m).join(' + ')}</span>`, orig: m(i.r, r.mon), tc: i.tc ? nf4.format(i.tc) : '—', imp: i.d }); });
+    ev.sort((a, b) => a.fe.localeCompare(b.fe));
+    let s = d.total;
+    const filas = [`<tr><td>${f(d.fe)}</td><td>Importe original del comprobante</td><td></td><td></td><td></td><td class="r"><b>${m(s, d.mon)}</b></td></tr>`];
+    if (d.si) { s = r2(s - d.si.cp); filas.push(`<tr class="ini"><td>${f(CORTE)}</td><td class="wrapc">Cancelado antes del corte <span class="si">SI</span> ${critB(d)}<span class="mini">${d.si.nota}</span>${d.si.crit === 'ESTIMADO_ANTIGUEDAD' ? `<span class="mini"><a onclick="abrirRev('${d.cli}','${d.mon}')">Revisar asignación…</a></span>` : ''}</td><td></td><td></td><td class="r">− ${nf.format(d.si.cp)}</td><td class="r"><b>${m(s, d.mon)}</b></td></tr>`); }
+    ev.forEach(x => { s = r2(s - x.imp); filas.push(`<tr><td>${f(x.fe)}</td><td class="wrapc">${x.mov}</td><td class="r">${x.orig}</td><td class="r">${x.tc}</td><td class="r">− ${m(x.imp, d.mon)}</td><td class="r"><b>${m(s, d.mon)}</b></td></tr>`); });
+    movs = `<table class="t"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Importe recibido</th><th>TC fecha de pago</th><th>Equivalente asignado (${d.mon})</th><th>Saldo restante (${d.mon})</th></tr></thead><tbody>${filas.join('')}</tbody></table>`;
+  }
+  const lin = d.lineas || [{ d: d.det, ali: '21', neto: d.neto }];
+  const hist = [`<li><b>Registrado</b> por jpzubelza · ${d.si ? '05/01/2026 (saldo inicial)' : f(d.fe) + ' 17:05'}</li>`];
+  if (d.anul) hist.push(`<li class="anul"><b>Registro anulado</b> por ${d.anul.por} · ${d.anul.en}<br><small>Motivo: ${d.anul.mot}</small></li>`);
+  if (d.reempl) hist.push(`<li class="anul"><b>Reemplazado por</b> ${numDoc(docById(d.reempl))}</li>`);
+  const rA = DOC.find(x => x.reempl === d.id); if (rA) hist.push(`<li><b>Reemplaza</b> al registro anulado ${numDoc(rA)} <small>(error de carga)</small></li>`);
+  $('det-body').innerHTML = `
+    ${!vig(d) ? `<div class="alert err"><div><b>Registro anulado en SMG.</b> No suma en saldos ni reportes. Se conserva para auditoría.</div></div>` : ''}
+    <div class="two">
+      <div class="panel-section"><div class="panel-section-header">Datos del comprobante</div><div class="panel-section-body">
+        <div class="kv"><span>Cliente</span><span>${d.cli} · ${CLI[d.cli].rs} · CUIT ${CLI[d.cli].cuit}</span></div>
+        <div class="kv"><span>Emisión / vencimiento</span><span>${f(d.fe)} · ${f(d.vto)}</span></div>
+        <div class="kv"><span>Moneda</span><span>${d.mon}${d.tcEm ? ` · TC de emisión ${nf.format(d.tcEm)} (informativo)` : ''}</span></div>
+        ${d.motivo ? `<div class="kv"><span>Motivo</span><span>${d.motivo}</span></div>` : ''}
+        <div class="kv"><span>Pedidos vinculados</span><span>${vinculos(d).map(v => `${PED.find(p => p.id === v.p).num} (neto ${nf.format(v.neto)})`).join('<br>') || 'Independiente'}</span></div>
+        <div class="kv"><span>OC · CC</span><span>${d.oc || '—'} · ${d.cc || '—'}</span></div>
+        ${d.origen ? `<div class="kv"><span>Comprobante original</span><span><a onclick="verDoc(${d.origen})">${numDoc(docById(d.origen))}</a></span></div>` : ''}
+        <div class="kv"><span>Adjuntos <span class="tag">opcional</span></span><span>${d.sinAdj ? '<span class="muted">Sin adjuntos</span> · <a onclick="agregarEnlace()">+ Agregar enlace</a>' : `<a>${numDoc(d)}.pdf</a> <span class="muted">(enlace a Drive)</span>`}</span></div>
+      </div></div>
+      <div class="panel-section"><div class="panel-section-header">Importes (${d.mon})</div><div class="panel-section-body">
+        <table class="t"><thead><tr><th>Detalle</th><th>Alícuota</th><th>Neto</th></tr></thead><tbody>${lin.map(l => `<tr><td style="white-space:normal">${l.d}</td><td class="c">${ALI_TXT[l.ali]}</td><td class="r">${nf.format(l.neto)}</td></tr>`).join('')}</tbody></table>
+        ${ivaPorAlicuota(lin).map(x => `<div class="kv"><span>IVA ${ALI_TXT[x.ali]}</span><span>${m(x.iva, d.mon)}</span></div>`).join('')}
+        ${(d.tribs || []).map(t => `<div class="kv"><span>${t.t} ${t.jur} (${nf.format(t.ali)} % s/ ${nf.format(t.base)})</span><span>${m(t.imp, d.mon)}</span></div>`).join('')}
+        <div class="kv final"><span>Total</span><span>${m(d.total, d.mon)}</span></div>
+      </div></div>
+    </div>
+    <div class="panel-section"><div class="panel-section-header">${d.tipo === 'NC' ? 'Aplicaciones' : 'Saldo y movimientos'} <span class="right"><b>${d.tipo === 'NC' ? 'Disponible ' + m(dispNC(d), d.mon) : 'Saldo pendiente ' + m(saldo(d), d.mon)}</b></span></div><div class="panel-section-body wrap">${movs}</div></div>
+    <div class="panel-section"><div class="panel-section-header">Historial de auditoría (fac_eventos)</div><div class="panel-section-body"><ul class="timeline">${hist.join('')}</ul></div></div>`;
+  $('det-foot').innerHTML = vig(d) ? `<span class="muted">Los importes no se editan: para corregir, se anula el registro y se carga de nuevo.</span>
+    <button class="btn danger" onclick="abrirAnul()">Anular registro…</button>
+    ${d.tipo === 'NC' && dispNC(d) > EPS ? '<button class="btn">Aplicar a factura…</button>' : ''}
+    ${d.tipo !== 'NC' && saldo(d) > EPS ? `<button class="btn primary" onclick="cerrar('m-det'); abrirCobro('${d.cli}')">Registrar cobranza</button>` : ''}` : `<button class="btn" onclick="cerrar('m-det')">Cerrar</button>`;
+  abrir('m-det');
+}
+function abrirAnul() {
+  const d = DOC_SEL, bloq = [];
+  if (d.tipo !== 'NC' && (aplicadoNC(d) > EPS || cobrado(d) > EPS)) bloq.push('tiene NC aplicadas o cobranzas asignadas');
+  if (d.tipo === 'NC' && dispNC(d) < d.total - EPS) bloq.push('tiene aplicaciones vigentes');
+  if (d.si) bloq.push('es un saldo inicial confirmado (se registra el motivo en el corte)');
+  $('anu-tit').textContent = 'Anular registro ' + numDoc(d);
+  $('anu-bloqueo').innerHTML = bloq.length ? `<div class="alert"><div><b>Atención:</b> el comprobante ${bloq.join(' y ')}. Al confirmar se anulan también sus aplicaciones o asignaciones (los recibos no): esos importes vuelven a quedar «sin aplicar» o «a cuenta». Todo queda en el historial.</div></div>` : '';
+  $('anu-mot').value = ''; $('anu-ok').disabled = true; abrir('m-anu');
+}
+function confirmarAnul() { cerrar('m-anu'); cerrar('m-det'); toast('Registro anulado (maqueta). Se guardaron usuario, fecha, motivo y el estado anterior en fac_eventos.'); }
+
+/* ---------- Registrar comprobante ---------- */
+let TIPO_DOC = 'FC', DL = [], TR = [], VL = [];
+toggle('tg-tipo', b => { TIPO_DOC = b.dataset.t; formTipo(); });
+function abrirDoc(pedId) {
+  $('d-cli').innerHTML = optsCli();
+  const p = PED.find(x => x.id === pedId) || PED[0];
+  $('d-cli').value = p.cli; $('d-mon').value = p.mon;
+  TIPO_DOC = p.tipo === 'NOTA DE CREDITO' ? 'NC' : p.tipo === 'NOTA DE DEBITO' ? 'ND' : 'FC';
+  $('tg-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === TIPO_DOC));
+  DL = p.lineas.map(l => ({ d: l.d.split('\n')[0], ali: l.ali, neto: r2(l.c * l.pu) }));
+  TR = p.cli === '000069' ? [{ t: 'Percepción IIBB', jur: 'Jujuy', base: pedNeto(p), ali: 1 }] : [];
+  VL = [{ tipo: 'P', ref: String(p.id), neto: r2(pedNeto(p) - pedFacturado(p)) }];
+  if (p.id === 1) VL.push({ tipo: 'C', ref: 'C1', neto: 125439.68 });
+  $('d-pdf').value = ''; $('d-red').checked = false;
+  formTipo(); renderDL(); renderTR(); renderVL(); abrir('m-doc');
+}
+function formTipo() {
+  const nc = TIPO_DOC === 'NC', nd = TIPO_DOC === 'ND';
+  $('d-pv').value = nc || nd ? '0005' : '0006'; $('d-nro').value = nc ? '00000191' : nd ? '00000026' : '00000524';
+  $('d-vto-w').classList.toggle('hidden', nc); $('d-mot-w').classList.toggle('hidden', !(nc || nd));
+  $('d-orig-w').classList.toggle('hidden', !(nc || nd)); $('d-apl-w').classList.toggle('hidden', !nc);
+  docNCopciones(); valDoc();
+}
+function renderDL() {
+  $('d-lin').innerHTML = DL.map((l, i) => `<tr><td><input style="width:100%" value="${l.d.replace(/"/g, '&quot;')}" oninput="DL[${i}].d=this.value"></td>
+    <td><select onchange="DL[${i}].ali=this.value; valDoc()">${Object.keys(ALI_TXT).map(a => `<option value="${a}" ${a === l.ali ? 'selected' : ''}>${ALI_TXT[a]}</option>`).join('')}</select></td>
+    <td><input class="num" style="width:100%" value="${l.neto}" oninput="DL[${i}].neto=num(this.value); valDoc()"></td><td class="r" id="dl-iva-${i}"></td>
+    <td><button class="btn sm" onclick="DL.splice(${i},1); renderDL()">×</button></td></tr>`).join('');
+  valDoc();
+}
+function renderTR() {
+  const TIPOS = ['Percepción IIBB', 'Percepción IVA', 'Percepción Ganancias', 'Impuesto interno', 'Otro'];
+  $('d-trib').innerHTML = TR.map((t, i) => `<tr><td><select onchange="TR[${i}].t=this.value">${TIPOS.map(x => `<option ${x === t.t ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+    <td><input style="width:90px" value="${t.jur}" oninput="TR[${i}].jur=this.value"></td>
+    <td><input class="num" style="width:110px" value="${t.base}" oninput="TR[${i}].base=num(this.value); valDoc()"></td>
+    <td><input class="num" style="width:70px" value="${t.ali}" oninput="TR[${i}].ali=num(this.value); valDoc()"></td><td class="r" id="tr-imp-${i}"></td>
+    <td><button class="btn sm" onclick="TR.splice(${i},1); renderTR()">×</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin percepciones.</td></tr>';
+  valDoc();
+}
+function renderVL() {
+  const peds = PED.filter(p => p.estado === 'EMITIDO');
+  $('d-vin').innerHTML = VL.map((v, i) => { const pend = v.tipo === 'P' ? (p => p ? `${p.mon} ${nf.format(pedNeto(p) - pedFacturado(p))}` : '—')(PED.find(p => String(p.id) === v.ref)) : (c => c ? `${c.mon} ${nf.format(c.neto)}` : '—')(CERTS.find(c => c.id === v.ref));
+    return `<tr><td><select onchange="VL[${i}].tipo=this.value; VL[${i}].ref=''; renderVL()"><option value="P" ${v.tipo === 'P' ? 'selected' : ''}>Pedido</option><option value="C" ${v.tipo === 'C' ? 'selected' : ''}>Certificado</option></select></td>
+    <td><select style="width:100%" onchange="VL[${i}].ref=this.value; renderVL()"><option value="">—</option>${v.tipo === 'P' ? peds.map(p => `<option value="${p.id}" ${String(p.id) === v.ref ? 'selected' : ''}>${p.num} · ${p.tipo} · ${CLI[p.cli].rs}</option>`).join('') : CERTS.map(c => `<option value="${c.id}" ${c.id === v.ref ? 'selected' : ''}>${c.txt}</option>`).join('')}</select></td>
+    <td class="r">${pend}</td><td><input class="num" style="width:100%" value="${v.neto}" oninput="VL[${i}].neto=num(this.value); valDoc()"></td>
+    <td><button class="btn sm" onclick="VL.splice(${i},1); renderVL()">×</button></td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Comprobante independiente (sin pedido ni certificado).</td></tr>';
+  valDoc();
+}
+function docNCopciones() {
+  const cli = $('d-cli').value, mon = $('d-mon').value;
+  const abiertos = DOC.filter(d => vig(d) && d.cli === cli && d.tipo !== 'NC');
+  $('d-orig').innerHTML = abiertos.map(d => `<option>${d.tipo} ${numDoc(d)} · ${d.mon} ${nf.format(d.total)}</option>`).join('') || '<option>— Sin comprobantes —</option>';
+  const ab = abiertos.filter(d => d.mon === mon && saldo(d) > EPS);
+  $('d-apl').innerHTML = `<thead><tr><th>Comprobante</th><th>Vencimiento</th><th>Saldo actual</th><th>Aplicar</th><th>Saldo resultante</th></tr></thead><tbody>` +
+    (ab.map(d => `<tr><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${f(d.vto)}</td><td class="r">${m(saldo(d), d.mon)}</td><td><input class="num apl" data-s="${saldo(d)}" style="width:130px" value="0" oninput="valDoc()"></td><td class="r apl-res">${nf.format(saldo(d))}</td></tr>`).join('')
+     || `<tr><td colspan="5" class="muted">No hay comprobantes abiertos en ${mon}: la NC queda sin aplicar (crédito a favor).</td></tr>`) + '</tbody>';
+}
+function valDoc() {
+  if (!$('d-cli').value) return;
+  $('d-full').value = `${$('d-letra').value}-${pad($('d-pv').value, 4)}-${pad($('d-nro').value, 8)}`;
+  $('d-cuit').value = CLI[$('d-cli').value].cuit;
+  const mon = $('d-mon').value, al = []; let bloquea = false;
+  // IVA automático por alícuota
+  DL.forEach((l, i) => { const el = $('dl-iva-' + i); if (el) el.textContent = ALIS[l.ali] > 0 ? nf.format(r2(l.neto * ALIS[l.ali] / 100)) : '—'; });
+  const ivas = ivaPorAlicuota(DL);
+  const gravado = r2(DL.filter(l => ALIS[l.ali] > 0).reduce((s, l) => s + l.neto, 0));
+  const exento = r2(DL.filter(l => l.ali === '0').reduce((s, l) => s + l.neto, 0)), ng = r2(DL.filter(l => l.ali === 'NG').reduce((s, l) => s + l.neto, 0));
+  TR.forEach((t, i) => { const el = $('tr-imp-' + i); if (el) el.textContent = nf.format(r2(t.base * t.ali / 100)); });
+  const trib = r2(TR.reduce((s, t) => s + r2(t.base * t.ali / 100), 0));
+  let total = r2(gravado + exento + ng + ivas.reduce((s, x) => s + x.iva, 0) + trib);
+  const pdf = $('d-pdf').value.trim() ? num($('d-pdf').value) : null, dif = pdf === null ? 0 : r2(pdf - total);
+  $('d-red-w').classList.toggle('hidden', !(pdf !== null && Math.abs(dif) > 0.001 && Math.abs(dif) <= 0.05));
+  const red = pdf !== null && $('d-red').checked && Math.abs(dif) <= 0.05 ? dif : 0;
+  total = r2(total + red);
+  $('d-tots').innerHTML = `<div class="kv"><span>Neto gravado</span><span>${m(gravado, mon)}</span></div>
+    ${exento ? `<div class="kv"><span>Exento</span><span>${m(exento, mon)}</span></div>` : ''}${ng ? `<div class="kv"><span>No gravado</span><span>${m(ng, mon)}</span></div>` : ''}
+    ${ivas.map(x => `<div class="kv"><span>IVA ${ALI_TXT[x.ali]} s/ ${nf.format(x.base)}</span><span>${m(x.iva, mon)}</span></div>`).join('')}
+    ${trib ? `<div class="kv"><span>Percepciones y tributos</span><span>${m(trib, mon)}</span></div>` : ''}${red ? `<div class="kv"><span>Redondeo</span><span>${m(red, mon)}</span></div>` : ''}
+    <div class="kv final"><span>Total del comprobante</span><span>${m(total, mon)}</span></div>`;
+  if (pdf !== null) {
+    if (Math.abs(dif) <= 0.001) al.push('<div class="alert ok"><div><b>El total calculado coincide con el PDF de Tango.</b></div></div>');
+    else if (Math.abs(dif) <= 0.05) { if (!red) { al.push(`<div class="alert"><div><b>Diferencia de redondeo de ${nf.format(dif)}</b> con el PDF de Tango. Marcá «Registrar la diferencia de redondeo» para que el total quede igual al de Tango.</div></div>`); bloquea = true; } }
+    else { al.push(`<div class="alert err"><div><b>El total calculado difiere en ${nf.format(dif)} del PDF de Tango.</b> Revisá los netos, las alícuotas o las percepciones.</div></div>`); bloquea = true; }
+  }
+  if (total <= 0) { al.push('<div class="alert err"><div><b>El total debe ser mayor que cero.</b></div></div>'); bloquea = true; }
+  if ($('d-fe').value <= CORTE) { al.push(`<div class="alert err"><div><b>Fecha anterior o igual al corte (${f(CORTE)}, simulado).</b> Los comprobantes de antes del corte solo entran como saldo inicial, para no duplicar saldos.</div></div>`); bloquea = true; }
+  const dup = DOC.find(d => vig(d) && d.tipo === TIPO_DOC && d.letra === $('d-letra').value && d.pv === +$('d-pv').value && d.nro === +$('d-nro').value);
+  if (dup) { al.push(`<div class="alert err"><div><b>Comprobante duplicado:</b> ${TIPO_DOC} ${numDoc(dup)} ya está registrado (${CLI[dup.cli].rs}).</div></div>`); bloquea = true; }
+  const sim = !dup && DOC.find(d => vig(d) && d.cli === $('d-cli').value && Math.abs(d.total - total) < 0.01 && d.tipo === TIPO_DOC);
+  if (sim) al.push(`<div class="alert"><div><b>Posible duplicado:</b> ya existe ${sim.tipo} ${numDoc(sim)} del mismo cliente y por el mismo total.</div></div>`);
+  if (TIPO_DOC !== 'NC' && $('d-vto').value < $('d-fe').value) { al.push('<div class="alert err"><div><b>El vencimiento es anterior a la emisión.</b></div></div>'); bloquea = true; }
+  // Vínculos N:M
+  const netoDoc = r2(gravado + exento + ng), asign = r2(VL.reduce((s, v) => s + v.neto, 0));
+  VL.forEach(v => { if (v.tipo === 'P') { const p = PED.find(x => String(x.id) === v.ref); if (!p) return;
+      if (p.mon !== mon) { al.push(`<div class="alert err"><div><b>El pedido ${p.num} está en ${p.mon}</b> y el comprobante en ${mon}.</div></div>`); bloquea = true; }
+      if (v.neto > pedNeto(p) - pedFacturado(p) + EPS) al.push(`<div class="alert"><div><b>Lo asignado al pedido ${p.num} supera su pendiente.</b> Se pide confirmación.</div></div>`); }
+    else { const c = CERTS.find(x => x.id === v.ref); if (c && c.mon !== mon) { al.push(`<div class="alert err"><div><b>${c.txt} está en ${c.mon}.</b></div></div>`); bloquea = true; } } });
+  const asignP = r2(VL.filter(v => v.tipo === 'P').reduce((s, v) => s + v.neto, 0)), asignC = r2(VL.filter(v => v.tipo === 'C').reduce((s, v) => s + v.neto, 0));
+  if (asignP > netoDoc + EPS || asignC > netoDoc + EPS) { al.push(`<div class="alert err"><div><b>Se asigna más neto (${nf.format(Math.max(asignP, asignC))}) que el del comprobante (${nf.format(netoDoc)}).</b></div></div>`); bloquea = true; }
+  // NC
+  if (TIPO_DOC === 'NC') {
+    let tot = 0; document.querySelectorAll('#d-apl input.apl').forEach(i => { const a = num(i.value), s = +i.dataset.s; tot += a; i.closest('tr').querySelector('.apl-res').textContent = nf.format(s - a);
+      if (a > s + EPS) { al.push('<div class="alert err"><div><b>Una aplicación supera el saldo del comprobante.</b></div></div>'); bloquea = true; } });
+    if (tot > total + EPS) { al.push(`<div class="alert err"><div><b>Se aplican ${nf.format(tot)}</b>, más que el total de la NC.</div></div>`); bloquea = true; }
+    else al.push(`<div class="alert info"><div>Aplicado ${nf.format(tot)}. Quedan <b>${nf.format(total - tot)}</b> sin aplicar (crédito a favor del cliente).</div></div>`);
+  }
+  if (!al.length) al.push('<div class="alert ok"><div><b>Validaciones OK.</b> Número único, IVA y total calculados, moneda coherente con los vínculos.</div></div>');
+  $('d-val').innerHTML = al.join(''); $('d-ok').disabled = bloquea;
+}
+function guardarDoc() { cerrar('m-doc'); toast('Comprobante registrado (maqueta). Los pedidos y certificados vinculados recalculan su avance de facturación.'); }
+
+/* ============================== COBRANZAS ============================== */
+function renderRecibos() {
+  $('t-rec').innerHTML = `<thead><tr><th>Recibo</th><th>Fecha de pago</th><th>Cliente</th><th>Moneda</th><th>Valores</th><th>Total recibo</th><th>Asignado</th><th>A cuenta</th><th>Asignado a (moneda del comprobante)</th><th>Estado</th></tr></thead><tbody>` +
+    REC.slice().sort((a, b) => b.fe.localeCompare(a.fe)).map(r => `<tr><td><b>${numRec(r)}</b></td><td>${f(r.fe)}</td><td>${CLI[r.cli].rs}</td><td class="c">${r.mon}</td>
+      <td class="wrapc">${r.valores.map(v => `${v.m} ${nf.format(v.imp)}${v.ref ? ` <span class="muted">(${v.ref})</span>` : ''}`).join('<br>')}</td>
+      <td class="r">${m(recTotal(r), r.mon)}</td><td class="r">${nf.format(recImputado(r))}</td><td class="r ${recACuenta(r) > EPS ? 'neg' : ''}">${nf.format(recACuenta(r))}</td>
+      <td>${r.imp.map(i => { const d = docById(i.doc); return `<a onclick="verDoc(${d.id})">${tipoB(d.tipo)} ${numCorto(d)}</a> ${m(i.d, d.mon)}${i.tc ? ` <span class="muted">= ${r.mon} ${nf.format(i.r)} ÷ TC ${nf4.format(i.tc)}</span>` : ''}`; }).join('<br>') || '<span class="muted">— a cuenta —</span>'}</td>
+      <td>${badge(vig(r) ? 'VIGENTE' : 'ANULADO')}</td></tr>`).join('') + '</tbody>';
+}
+let VALORES = [];
+function abrirCobro(cli) {
+  $('c-cli').innerHTML = optsCli(); $('c-cli').value = cli || '000069'; $('c-mon').value = 'ARS';
+  VALORES = [{ m: 'Transferencia', imp: 98800000, b: 'Banco Macro', ref: 'op. 559871' }, { m: 'Retención Ganancias', imp: 728974.83, b: '', ref: 'Cert. 0001-00012410' }];
+  renderCobro(); abrir('m-cob');
+}
+function addValor() { VALORES.push({ m: 'Transferencia', imp: 0, b: '', ref: '' }); renderCobro(); }
+function renderCobro() {
+  const MED = ['Transferencia', 'Cheque', 'E-cheq', 'Efectivo', 'Retención IVA', 'Retención Ganancias', 'Retención IIBB', 'Retención SUSS', 'Otro'];
+  const monR = $('c-mon').value;
+  $('c-val').innerHTML = VALORES.map((v, i) => `<tr><td><select onchange="VALORES[${i}].m=this.value">${MED.map(x => `<option ${x === v.m ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+    <td><input class="num" style="width:150px" value="${v.imp}" oninput="VALORES[${i}].imp=num(this.value); valCob()"> <span class="mon">${monR}</span></td><td><input value="${v.b}"></td><td><input value="${v.ref}"></td><td><input type="date" value="2026-10-19"></td>
+    <td><button class="btn sm" onclick="VALORES.splice(${i},1); renderCobro()">×</button></td></tr>`).join('');
+  const cli = $('c-cli').value;
+  const ab = DOC.filter(d => vig(d) && d.cli === cli && d.tipo !== 'NC' && saldo(d) > EPS).sort((a, b) => a.vto.localeCompare(b.vto));
+  $('c-imp').innerHTML = `<thead><tr><th>Comprobante</th><th>Vencimiento</th><th>Saldo (moneda original)</th><th>Asignar (${monR} recibidos)</th><th>TC fecha de pago</th><th>Equivalente asignado</th><th>Saldo restante</th></tr></thead><tbody>` +
+    (ab.map(d => { const cruz = d.mon !== monR;
+      return `<tr class="${cruz ? 'cobro-x' : ''}" data-id="${d.id}" data-s="${saldo(d)}" data-mon="${d.mon}"><td>${tipoB(d.tipo)} ${numDoc(d)}${siB(d)}</td><td>${f(d.vto)} ${d.vto < HOY ? '<span class="badge b-err">vencida</span>' : ''}</td><td class="r">${m(saldo(d), d.mon)}</td>
+        <td><input class="num imp" style="width:150px" value="0" oninput="valCob()"></td>
+        <td>${cruz ? `<input class="num tc" style="width:100px" value="${$('c-tc').value}" oninput="valCob()">` : '<span class="muted">misma moneda</span>'}</td><td class="r eq">0,00</td><td class="r res">${m(saldo(d), d.mon)}</td></tr>`; }).join('')
+     || '<tr><td colspan="7" class="muted">El cliente no tiene comprobantes abiertos: todo el recibo queda a cuenta.</td></tr>') + '</tbody>';
+  valCob();
+}
+function aplicarTcGeneral() { document.querySelectorAll('#c-imp .tc').forEach(i => i.value = $('c-tc').value); valCob(); }
+// Equivalente en la moneda del documento: si los pesos cubren el saldo completo (±0,01 de la moneda original) se cancela exacto.
+function equivalente(r, s, tc) { const necesario = r2(s * tc); if (Math.abs(r - necesario) <= r2(0.01 * tc)) return s; return r2(r / tc); }
+function sugerirFifo() {
+  let rest = r2(VALORES.reduce((s, v) => s + v.imp, 0));
+  document.querySelectorAll('#c-imp tbody tr[data-id]').forEach(tr => {
+    const s = +tr.dataset.s, tcI = tr.querySelector('.tc'), tc = tcI ? num(tcI.value) : 1, necesario = r2(s * tc), a = r2(Math.max(0, Math.min(rest, necesario)));
+    tr.querySelector('.imp').value = a; rest = r2(rest - a);
+  }); valCob();
+}
+function limpiarImp() { document.querySelectorAll('#c-imp input.imp').forEach(i => i.value = 0); valCob(); }
+function valCob() {
+  const monR = $('c-mon').value, tot = r2(VALORES.reduce((s, v) => s + v.imp, 0)); let imp = 0; const al = []; let bloquea = false, hayCruz = false;
+  document.querySelectorAll('#c-imp tbody tr[data-id]').forEach(tr => {
+    const r = num(tr.querySelector('.imp').value), s = +tr.dataset.s, mon = tr.dataset.mon, tcI = tr.querySelector('.tc'), tc = tcI ? num(tcI.value) : 1;
+    if (tcI && r > 0) hayCruz = true;
+    if (tcI && r > 0 && !tc) { al.push('<div class="alert err"><div><b>Falta el tipo de cambio</b> de la fecha de pago.</div></div>'); bloquea = true; }
+    const eq = tc ? equivalente(r, s, tc) : 0;
+    tr.querySelector('.eq').innerHTML = m(eq, mon); tr.querySelector('.res').innerHTML = `<b>${m(r2(s - eq), mon)}</b>${r2(s - eq) > EPS && eq > 0 ? ' <span class="badge b-warn">parcial</span>' : eq > 0 ? ' <span class="badge b-ok">cancela</span>' : ''}`;
+    if (eq > s + EPS) { al.push(`<div class="alert err"><div><b>Lo asignado supera el saldo.</b> El excedente tiene que quedar a cuenta en ${monR}.</div></div>`); bloquea = true; }
+    imp += r;
+  });
+  imp = r2(imp);
+  if (imp > tot + EPS) { al.push(`<div class="alert err"><div><b>Se asigna más (${nf.format(imp)}) que el total del recibo (${nf.format(tot)}).</b></div></div>`); bloquea = true; }
+  const dup = REC.find(r => vig(r) && r.pv === +$('c-pv').value && r.nro === +$('c-nro').value);
+  if (dup) { al.push(`<div class="alert err"><div><b>Recibo duplicado:</b> ${numRec(dup)} ya está registrado.</div></div>`); bloquea = true; }
+  if (hayCruz) al.push(`<div class="alert info"><div><b>Cobro en ${monR} de un comprobante en USD.</b> Se guardan los pesos recibidos, el TC de la fecha de pago y el equivalente en USD, que es lo que baja el saldo de la factura. El saldo restante queda en USD. Si Tango emite una ND o NC por diferencia de cambio, se carga como un comprobante aparte.</div></div>`);
+  $('c-res').innerHTML = `<div class="panel-section"><div class="panel-section-header">Resumen del recibo (${monR})</div><div class="panel-section-body">
+    <div class="kv"><span>Total de valores (incluye retenciones)</span><span>${m(tot, monR)}</span></div><div class="kv"><span>Asignado a comprobantes</span><span>${m(imp, monR)}</span></div>
+    <div class="kv final"><span>Queda a cuenta</span><span>${m(tot - imp, monR)}</span></div></div></div>`;
+  $('c-msg').innerHTML = al.join('') || '<div class="alert ok"><div><b>Validaciones OK.</b></div></div>';
+  $('c-ok').disabled = bloquea;
+}
+function guardarCobro() { cerrar('m-cob'); toast('Cobranza registrada (maqueta). Saldos y estados recalculados.'); }
+
+/* ============================== CUENTA CORRIENTE ============================== */
+let MON_CC = 'USD';
+toggle('tg-mon', b => { MON_CC = b.dataset.m; renderCtaCte(); });
+function renderCtaCte() {
+  const cli = $('cc-cli').value, mon = MON_CC, L = [];
+  DOC.filter(d => vig(d) && d.cli === cli && d.mon === mon).forEach(d => {
+    const peds = vinculos(d).map(v => PED.find(p => p.id === v.p).num);
+    const debe = d.tipo === 'NC' ? 0 : saldoInicial(d);
+    L.push({ fe: d.si ? CORTE : d.fe, ini: !!d.si, tipo: d.tipo === 'FC' ? 'FAC' : d.tipo === 'NC' ? 'N/C' : 'N/D', num: `${d.letra}${pad(d.pv, 4)}${pad(d.nro, 8)}`, vto: d.vto, debe, haber: d.tipo === 'NC' ? d.total : 0,
+      det: d.si ? `Saldo inicial · emitida ${f(d.fe)} por ${nf.format(d.total)}${d.si.cp ? `, cancelado antes del corte ${nf.format(d.si.cp)}${d.si.crit === 'ESTIMADO_ANTIGUEDAD' ? ' (estimado por antigüedad, revisable)' : ''}` : ''} · ${d.det}` : d.det + (d.motivo ? ` · ${d.motivo}` : ''),
+      comp: true, ped: peds.join(', ') || 'Sin Solicitud', id: d.id });
+  });
+  REC.filter(r => vig(r) && r.cli === cli).forEach(r => {
+    const imps = r.imp.filter(i => docById(i.doc).mon === mon), hab = r2(imps.reduce((s, i) => s + i.d, 0));
+    if (hab > 0) L.push({ fe: r.fe, tipo: 'REC', num: `${pad(r.pv, 5)}${pad(r.nro, 8)}`, debe: 0, haber: hab,
+      det: `Asignado a ${imps.map(i => numCorto(docById(i.doc)) + (i.tc ? ` (${r.mon} ${nf.format(i.r)} ÷ TC ${nf4.format(i.tc)})` : '')).join(', ')}` });
+    if (r.mon === mon && recACuenta(r) > EPS) L.push({ fe: r.fe, tipo: 'REC', num: `${pad(r.pv, 5)}${pad(r.nro, 8)}`, debe: 0, haber: recACuenta(r), det: 'A cuenta (sin asignar)' });
+  });
+  L.sort((a, b) => a.fe.localeCompare(b.fe) || (b.ini - a.ini));
+  let s = 0;
+  const filas = L.map(l => { s = r2(s + l.debe - l.haber);
+    return `<tr class="${l.id ? 'click' : ''} ${l.ini ? 'ini' : ''}" ${l.id ? `onclick="verDoc(${l.id})"` : ''}><td>${f(l.fe)}</td><td class="c">${l.tipo}${l.ini ? '<span class="si">SI</span>' : ''}</td><td>${l.num}</td><td>${f(l.vto)}</td><td class="r">${l.debe ? nf.format(l.debe) : ''}</td><td class="r">${l.haber ? nf.format(l.haber) : ''}</td><td class="r"><b>${nf.format(s)}</b></td>
+    <td class="wrapc">${l.det}</td><td>${l.comp ? '<a>PDF</a>' : ''}</td><td>${l.ped ? (l.ped === 'Sin Solicitud' ? '<span class="muted">Sin Solicitud</span>' : `<a>${l.ped}</a>`) : ''}</td></tr>`; }).join('');
+  const docs = DOC.filter(d => vig(d) && d.cli === cli && d.mon === mon);
+  const abiertos = docs.filter(d => d.tipo !== 'NC').reduce((x, d) => x + saldo(d), 0), ncDisp = docs.filter(d => d.tipo === 'NC').reduce((x, d) => x + dispNC(d), 0);
+  const aCta = REC.filter(r => vig(r) && r.cli === cli && r.mon === mon).reduce((x, r) => x + recACuenta(r), 0);
+  const otra = MONEDAS.filter(x => x !== mon && (DOC.some(d => vig(d) && d.cli === cli && d.mon === x) || REC.some(r => vig(r) && r.cli === cli && r.mon === x && recACuenta(r) > EPS)));
+  $('ctacte').innerHTML = `
+    <div class="panel-section"><div class="panel-section-header">CLIENTE : ${cli} · ${CLI[cli].rs} · CUIT ${CLI[cli].cuit} <span class="badge b-info">${mon}</span>
+      ${otra.length ? `<span class="right muted">También tiene movimientos en ${otra.join(', ')} (saldo aparte)</span>` : ''}</div>
+      <div class="wrap"><table class="t"><thead><tr><th>Fecha</th><th>Tipo</th><th>Número</th><th>Fecha vto.</th><th>Debe</th><th>Haber</th><th>Saldo</th><th>Detalle</th><th>Comprobante</th><th>Pedido de Facturación</th></tr></thead>
+      <tbody>${filas || `<tr><td colspan="10" class="muted">Sin movimientos en ${mon}.</td></tr>`}</tbody>
+      <tfoot><tr><td colspan="6">SALDO DEL CLIENTE (${mon})</td><td class="r">${nf.format(s)}</td><td colspan="3"></td></tr></tfoot></table></div></div>
+    <div class="two">
+      <div class="panel-section"><div class="panel-section-header">Composición del saldo</div><div class="panel-section-body">
+        <div class="kv"><span>Saldo de facturas y ND abiertas</span><span>${m(abiertos, mon)}</span></div>
+        <div class="kv"><span>NC sin aplicar</span><span>− ${m(ncDisp, mon)}</span></div>
+        <div class="kv"><span>Recibos a cuenta</span><span>− ${m(aCta, mon)}</span></div>
+        <div class="kv final"><span>Saldo del cliente</span><span>${m(abiertos - ncDisp - aCta, mon)}</span></div>
+        <p class="muted" style="margin:8px 0 0">Coincide con la columna Saldo (Σ Debe − Σ Haber). Los saldos iniciales entran por el importe pendiente al corte.</p></div></div>
+      <div class="alert info" style="align-self:start"><div><b>Conciliación con Tango.</b> Cada comprobante conserva su moneda e importes originales. Los cobros en pesos de facturas en USD muestran los pesos recibidos y el TC aplicado, para cruzarlos con los recibos de Tango. Si hay diferencias, manda Tango: el registro de SMG se anula y se carga de nuevo.</div></div>
+    </div>`;
+}
+
+/* ============================== SALDOS INICIALES ============================== */
+const TANGO_CORTE = { '000070|USD': 165849.03, '000125|ARS': 7630941.23, '000142|ARS': 67853261.40 }; // saldo según el informe de Tango al corte
+function renderSaldos() {
+  const si = DOC.filter(d => d.si && vig(d));
+  const grupos = {}; si.forEach(d => { const k = d.cli + '|' + d.mon; (grupos[k] = grupos[k] || []).push(d); });
+  const conc = Object.entries(grupos).map(([k, ds]) => { const [cli, mon] = k.split('|'), smg = r2(ds.reduce((s, d) => s + saldoInicial(d), 0)), tg = TANGO_CORTE[k];
+    const est = tg === undefined ? 'SIN RESPALDO' : Math.abs(smg - tg) <= 0.01 ? 'CONCILIADO' : 'DIFERENCIA';
+    const estim = r2(ds.filter(d => d.si.crit === 'ESTIMADO_ANTIGUEDAD').reduce((s, d) => s + d.si.cp, 0));
+    return `<tr><td>${CLI[cli].rs}</td><td class="c">${mon}</td><td class="c">${ds.length}</td><td class="r">${nf.format(smg)}</td><td class="r">${tg === undefined ? '—' : nf.format(tg)}</td><td class="r">${tg === undefined ? '—' : nf.format(smg - tg)}</td>
+      <td class="r">${estim ? `<span class="badge b-warn">EST.</span> ${nf.format(estim)} <a onclick="abrirRev('${cli}','${mon}')">Revisar</a>` : '—'}</td><td>${badge(est)}</td></tr>`; }).join('');
+  const nEst = si.filter(d => d.si.crit === 'ESTIMADO_ANTIGUEDAD').length;
+  $('saldos').innerHTML = `
+    <div class="alert"><div><b>Pendiente de Contabilidad.</b> La fecha de corte todavía no está confirmada y no se cargó ningún saldo definitivo.
+      Las filas de abajo son <b>ejemplos ilustrativos</b> tomados de las planillas para mostrar la pantalla. Los saldos reales se cargan cuando esté el informe de Tango conciliado.</div></div>
+    <div class="grid4">
+      <div class="field"><label>Fecha de corte</label><input type="date" value=""><span class="muted" style="font-size:11px">Pendiente de confirmar con Contabilidad. El corte se crea sin fecha y se completa después.</span></div>
+      <div class="field"><label>Estado</label><input value="BORRADOR (editable)" readonly></div>
+      <div class="field span2"><label>Informe de Tango que respalda el corte <span class="tag">adjunto opcional</span></label><input placeholder="Enlace al informe de comprobantes pendientes por cliente (cuando Contabilidad lo emita)"></div>
+    </div>
+    <div class="alert info"><div><b>Reglas del corte.</b>
+      (1) Solo se cargan las FC/ND con saldo pendiente al corte, más las NC sin aplicar y los anticipos a cuenta a esa fecha. No se importa el histórico.
+      (2) Cada comprobante guarda su importe original y lo «cancelado antes del corte»; su saldo arranca en la diferencia.
+      (3) <b>Cancelado antes del corte:</b> si Tango informa a qué facturas se aplicó cada recibo, se carga «según Tango». Si no lo informa, el sistema puede <b>estimarlo por antigüedad</b> (primero lo más viejo) para igualar el saldo de Tango. Esa estimación queda marcada <span class="badge b-warn">ESTIMADO</span>, no se presenta como imputación real y se puede revisar en cualquier momento.
+      (4) Antes de confirmar, se concilia por cliente y moneda contra el informe de Tango. Se confirma solo con la fecha definida y todas las filas conciliadas o justificadas.
+      (5) Una vez confirmado, el corte no se edita: un comprobante omitido se agrega con motivo. Las estimaciones se pueden seguir revisando, redistribuyendo entre comprobantes del mismo cliente y moneda sin cambiar el total conciliado.
+      (6) Mientras no haya un corte confirmado se pueden preparar y emitir pedidos; los comprobantes y cobranzas se habilitan al confirmar el corte.</div></div>
+    ${nEst ? `<div class="alert"><div><b>${nEst} comprobante(s) con cancelación estimada.</b> Revisalos con Contabilidad: se pueden pasar a «según Tango» o «revisado» con una nota. Cada cambio queda en el historial.</div></div>` : ''}
+    <div class="panel-section"><div class="panel-section-header">Conciliación por cliente y moneda <span class="tag">ejemplo</span></div><div class="wrap">
+      <table class="t"><thead><tr><th>Cliente</th><th>Moneda</th><th>Comprob.</th><th>Saldo SMG al corte</th><th>Saldo según Tango</th><th>Diferencia</th><th>Cancelado estimado</th><th>Estado</th></tr></thead><tbody>${conc}</tbody></table></div></div>
+    <div class="panel-section"><div class="panel-section-header">Comprobantes abiertos al corte <span class="tag">ejemplo</span></div><div class="wrap">
+      <table class="t"><thead><tr><th>Cliente</th><th>Comprobante</th><th>Emisión</th><th>Vencimiento</th><th>Moneda</th><th>Importe original</th><th>Cancelado antes del corte</th><th>Saldo al corte</th><th>Saldo actual</th><th>Nota / respaldo</th></tr></thead><tbody>
+      ${si.map(d => `<tr class="click" onclick="verDoc(${d.id})"><td>${CLI[d.cli].rs}</td><td>${tipoB(d.tipo)} ${numDoc(d)}</td><td>${f(d.fe)}</td><td>${f(d.vto)}</td><td class="c">${d.mon}</td><td class="r">${nf.format(d.total)}</td><td class="r">${d.si.cp ? nf.format(d.si.cp) + '<br>' + critB(d) : '—'}</td><td class="r"><b>${nf.format(saldoInicial(d))}</b></td><td class="r">${nf.format(saldo(d))}<br>${badge(estadoDoc(d))}</td><td class="wrapc" style="min-width:220px">${d.si.nota}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+}
+
+/* ============================== REVISIÓN DE LO CANCELADO ANTES DEL CORTE ============================== */
+let REV = null;
+function agregarEnlace() { toast('Agregar enlace a Drive (maqueta). Se puede adjuntar en cualquier momento, también después de registrar.'); }
+function abrirRev(cli, mon) {
+  REV = { cli, mon, docs: DOC.filter(d => d.si && vig(d) && d.cli === cli && d.mon === mon && d.tipo !== 'NC') };
+  $('rev-tit').textContent = `Revisar cancelado antes del corte · ${CLI[cli].rs} · ${mon}`;
+  $('rev-body').innerHTML = `
+    <div class="alert"><div><b>Lo actual es una estimación por antigüedad</b>, no una imputación real. Cargá lo que informe Tango o Contabilidad. La fila estimada no se borra: queda anulada en el historial y se vincula con la nueva.</div></div>
+    <div class="wrap"><table class="t"><thead><tr><th>Comprobante</th><th>Emisión</th><th>Importe original</th><th>Actual</th><th>Criterio actual</th><th>Nuevo cancelado</th><th>Saldo al corte</th></tr></thead><tbody>
+    ${REV.docs.map((d, i) => `<tr><td>${numDoc(d)}</td><td>${f(d.fe)}</td><td class="r">${nf.format(d.total)}</td><td class="r">${nf.format(d.si.cp)}</td><td>${critB(d) || '—'}</td>
+      <td><input class="num" id="rev-i${i}" value="${d.si.cp.toFixed(2)}" oninput="valRev()"></td><td class="r" id="rev-s${i}"></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label>Nuevo criterio <span class="req">*</span></label><select id="rev-crit"><option value="SEGUN_TANGO">Según Tango (imputación informada)</option><option value="REVISADO">Revisado con Contabilidad</option></select></div>
+      <div class="field span2"><label>Nota / respaldo <span class="req">*</span> (mínimo 10 caracteres)</label><input id="rev-nota" oninput="valRev()" placeholder="p. ej. Contabilidad informa que el REC 0001-410 canceló parte de la FC 6-445"></div>
+    </div>
+    <div id="rev-val"></div>`;
+  abrir('m-rev'); valRev();
+}
+function valRev() {
+  const tg = TANGO_CORTE[REV.cli + '|' + REV.mon];
+  let ok = $('rev-nota').value.trim().length >= 10, tot = 0;
+  const al = [];
+  REV.docs.forEach((d, i) => { const v = parseFloat($('rev-i' + i).value) || 0; tot += v;
+    if (v < 0 || v >= d.total) { ok = false; al.push(`<div class="alert err"><div>${numDoc(d)}: lo cancelado debe ser ≥ 0 y menor que el importe original.</div></div>`); }
+    $('rev-s' + i).innerHTML = `<b>${nf.format(r2(d.total - v))}</b>`; });
+  const otros = DOC.filter(d => d.si && vig(d) && d.cli === REV.cli && d.mon === REV.mon && !REV.docs.includes(d)).reduce((s, d) => s + (d.tipo === 'NC' ? -saldoInicial(d) : saldoInicial(d)), 0);
+  const smg = r2(REV.docs.reduce((s, d) => s + d.total, 0) - tot + otros);
+  if (tg !== undefined) al.push(Math.abs(smg - tg) <= 0.01
+    ? `<div class="alert ok"><div>Saldo SMG al corte ${nf.format(smg)} = saldo Tango ${nf.format(tg)}.</div></div>`
+    : `<div class="alert"><div>Saldo SMG al corte ${nf.format(smg)} ≠ saldo Tango ${nf.format(tg)} (diferencia ${nf.format(r2(smg - tg))}). Con el corte en borrador se puede guardar y la fila queda «con diferencia»; con el corte confirmado el total por cliente y moneda no puede cambiar.</div></div>`);
+  $('rev-val').innerHTML = al.join(''); $('rev-ok').disabled = !ok;
+}
+function guardarRev() {
+  const crit = $('rev-crit').value, nota = $('rev-nota').value.trim();
+  REV.docs.forEach((d, i) => { const v = r2(parseFloat($('rev-i' + i).value) || 0); d.si = { cp: v, crit: v ? crit : null, nota: (crit === 'SEGUN_TANGO' ? 'Según Tango: ' : 'Revisado con Contabilidad: ') + nota }; });
+  cerrar('m-rev'); cerrar('m-det'); renderTodo(); toast('Revisión guardada (maqueta). La estimación anterior quedó anulada en fac_cancelaciones_corte y el cambio en fac_eventos.');
+}
+
+/* ============================== INICIO ============================== */
+function renderTodo() { renderTablero(); renderPedidos(); renderDocs(); renderRecibos(); renderCtaCte(); renderSaldos(); }
+(function init() {
+  const o = optsCli();
+  $('f-cli').innerHTML += o; $('fd-cli').innerHTML += o; $('cc-cli').innerHTML = o; $('cc-cli').value = '000070';
+  // Accesos directos: #pedido, #comprobante, #nc, #cobranza, #detalle, #detalle-si, #revision o el nombre de una vista.
+  const h = location.hash.slice(1);
+  ir(TITULOS[h] ? h : 'tablero');
+  if (h === 'pedido') nuevoPedido('cert');
+  if (h === 'comprobante') abrirDoc(1);
+  if (h === 'nc') abrirDoc(4);
+  if (h === 'cobranza') { abrirCobro('000069'); sugerirFifo(); }
+  if (h === 'detalle') verDoc(3);
+  if (h === 'detalle-si') verDoc(13);
+  if (h === 'revision') { ir('saldos'); abrirRev('000125', 'ARS'); }
+})();
+</script>
+</body>
+</html>

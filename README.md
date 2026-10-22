@@ -56,3 +56,23 @@ Migrar endpoints de a bloques:
 3. `recursos` y `ordenes`
 
 Mantener una bandera de compatibilidad para poder volver temporalmente a JSON si aparece un incidente.
+
+## Autenticación y sesiones
+
+Desde octubre de 2026 las sesiones se guardan en el servidor (tabla `sesiones`).
+
+- Al iniciar sesión se genera un token aleatorio (`secrets.token_urlsafe(32)`) que viaja en la cookie
+  `dash_session` (`HttpOnly`, `SameSite=Lax`, `Secure` cuando la solicitud llega por HTTPS).
+  En la base solo se guarda el hash SHA-256 del token.
+- La cookie anterior `dash_auth_user` contenía el usuario en texto plano y permitía suplantarlo
+  editándola. Ahora se ignora y se borra del navegador: **todos los usuarios deben volver a iniciar sesión**.
+- Vencimiento: 60 minutos sin actividad (la actividad renueva el plazo) y 12 horas como máximo absoluto.
+- Se revocan las sesiones del usuario al cerrar sesión, al iniciar una sesión nueva desde el mismo navegador,
+  al bloquearlo, al inactivarlo y al cambiar o restablecer su contraseña.
+- Los permisos (módulos, paneles, acciones) se siguen leyendo de `usuarios` en cada solicitud;
+  no se modificaron usuarios ni permisos existentes.
+- La cuenta de contingencia (`APP_LOGIN_USER` / `APP_LOGIN_PASSWORD`) también usa sesiones del servidor
+  y queda registrada en `historial_accesos` como `LOGIN_CONTINGENCIA`. Si esas variables no están
+  configuradas, se usan los valores por defecto del código: configúrelas siempre en producción.
+- Pruebas: `.venv\Scripts\python.exe -m unittest tests.test_sesiones -v` (se ejecutan sobre una copia
+  temporal de `dashboard.db`, nunca sobre la base real).

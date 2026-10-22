@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS centros_costos (
     importe_contratado REAL DEFAULT 0,
     presupuesto REAL DEFAULT 0,
     observaciones TEXT,
-    updated_at TEXT
+    updated_at TEXT,
+    provincia TEXT
 );
 
 CREATE TABLE IF NOT EXISTS seguimiento_cc (
@@ -217,6 +218,8 @@ CREATE TABLE IF NOT EXISTS seguimiento_cc (
     direccion TEXT,
     contacto TEXT,
     disponibilidad TEXT,
+    -- Se fija al emitir el primer certificado (ver migrar_certificados_cliente en main.py).
+    modalidad_certificacion TEXT CHECK (modalidad_certificacion IN ('ITEMS', 'GLOBAL')),
     FOREIGN KEY (centro_costo_id) REFERENCES centros_costos(id)
 );
 
@@ -253,6 +256,11 @@ CREATE TABLE IF NOT EXISTS items_oc_cliente (
 
 CREATE INDEX IF NOT EXISTS idx_items_oc_cliente_orden
     ON items_oc_cliente (orden_compra_cliente_id);
+
+-- Certificados de cliente: tablas, índices y triggers de integridad se crean en
+-- migrar_certificados_cliente (main.py, constante CERT_DDL) para mantener una sola definición.
+-- Reajustes por polinómica, índices, previsión, acumulado inicial y auditoría: migrar_reajustes
+-- (main.py, constante REAJ_DDL), con la misma convención.
 
 INSERT OR IGNORE INTO centros_costos (id, nombre, activo) VALUES
     (1, 'ADMINISTRACION', 1),
@@ -778,6 +786,27 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_correo ON usuarios (correo);
 CREATE INDEX IF NOT EXISTS idx_usuarios_estado ON usuarios (estado);
 CREATE INDEX IF NOT EXISTS idx_historial_fecha ON historial_accesos (created_at);
 CREATE INDEX IF NOT EXISTS idx_historial_usuario ON historial_accesos (usuario_id);
+
+-- Sesiones del lado del servidor: la cookie solo lleva un token aleatorio y aquí se guarda su hash.
+CREATE TABLE IF NOT EXISTS sesiones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    origen TEXT NOT NULL CHECK (origen IN ('usuarios', 'contingencia')),
+    usuario_id INTEGER,
+    usuario TEXT NOT NULL,
+    creada_en TEXT NOT NULL,
+    ultima_actividad TEXT NOT NULL,
+    expira_en TEXT NOT NULL,
+    expira_absoluta_en TEXT NOT NULL,
+    revocada_en TEXT,
+    motivo_revocacion TEXT,
+    ip TEXT,
+    user_agent TEXT,
+    CHECK ((origen = 'usuarios') = (usuario_id IS NOT NULL)),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones (usuario_id);
 
 CREATE TABLE IF NOT EXISTS responsables_modulo (
     modulo TEXT NOT NULL,
