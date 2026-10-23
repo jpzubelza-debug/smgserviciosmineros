@@ -19,6 +19,7 @@ import re
 import secrets
 import sqlite3
 import smtplib
+import tempfile
 import time
 import unicodedata
 from email.policy import SMTPUTF8
@@ -42,6 +43,7 @@ DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.html")
 MENU_PRINCIPAL_PATH = os.path.join(BASE_DIR, "menu_principal.html")
 LOGIN_PATH = os.path.join(BASE_DIR, "login.html")
 ADMINISTRACION_PATH = os.path.join(BASE_DIR, "administracion.html")
+IMPORTAR_HORAS_MAQUINAS_PATH = os.path.join(BASE_DIR, "importar_horas_maquinas.html")
 FORM_VIAJE_PATH = os.path.join(BASE_DIR, "form_viaje.html")
 FORM_RECURSOS_PATH = os.path.join(BASE_DIR, "form_recursos.html")
 PERSONAL_FORM_PATH = os.path.join(BASE_DIR, "personal.html")
@@ -3530,6 +3532,57 @@ def administracion_view(request: Request):
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(ADMINISTRACION_PATH)
+
+
+# Carga masiva de horas_maquinas desde un .db exportado de la base local (ver importar_horas_maquinas.py).
+import importar_horas_maquinas as ihm  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
+
+IMPORTAR_HORAS_MAX_BYTES = 200 * 1024 * 1024
+
+
+@app.get("/admin/importar-horas-maquinas", response_class=HTMLResponse)
+def importar_horas_maquinas_view(request: Request):
+    try:
+        _requiere_administrador(request)
+    except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    return _leer_html(IMPORTAR_HORAS_MAQUINAS_PATH)
+
+
+def _importar_horas_maquinas(ruta, modo, simular):
+    respaldo = None if simular else ihm.respaldar_base(SQLITE_DB_PATH, os.path.join(DATA_DIR, "backups"))
+    conn = get_sqlite_connection()
+    try:
+        resultado = ihm.importar(conn, ruta, modo, simular=simular)
+    finally:
+        conn.close()
+    resultado["respaldo"] = os.path.relpath(respaldo, DATA_DIR) if respaldo else None
+    return resultado
+
+
+@app.post("/api/admin/importar-horas-maquinas")
+async def admin_importar_horas_maquinas(
+    request: Request,
+    archivo: UploadFile = File(...),
+    modo: str = Form("agregar"),
+    simular: bool = Form(True),
+):
+    perfil = _requiere_administrador(request)
+    contenido = await archivo.read(IMPORTAR_HORAS_MAX_BYTES + 1)
+    if len(contenido) > IMPORTAR_HORAS_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="El archivo supera los 200 MB")
+    temporal = tempfile.NamedTemporaryFile(prefix="import_horas_", suffix=".db", dir=DATA_DIR, delete=False)
+    try:
+        with temporal:
+            temporal.write(contenido)
+        resultado = await run_in_threadpool(_importar_horas_maquinas, temporal.name, str(modo).strip().lower(), simular)
+    except ihm.ErrorImportacion as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        os.remove(temporal.name)
+    logger.info("Importación horas_maquinas por %s: %s", perfil.get("usuario", ""), resultado)
+    return resultado
 
 
 @app.get("/mantenimiento", response_class=HTMLResponse)

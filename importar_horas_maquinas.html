@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importar Horas Maquinas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111c34;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #233458;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Outfit", sans-serif;
+      background: radial-gradient(circle at 20% 10%, #12345f 0, transparent 35%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+    .panel { max-width: 640px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    p { color: var(--muted); margin: 0 0 18px; line-height: 1.5; }
+    code { color: var(--accent); }
+    label { display: block; margin: 14px 0 6px; font-weight: 500; }
+    .opcion { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; font-weight: 400; }
+    .opcion small { color: var(--muted); display: block; }
+    input[type=file] { width: 100%; color: var(--text); }
+    .acciones { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+    button { border: 0; border-radius: 8px; padding: 10px 16px; font: inherit; font-weight: 500; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .secundario { background: var(--line); color: var(--text); }
+    .primario { background: var(--accent); color: #0f172a; }
+    .volver { color: var(--muted); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+    #resultado { margin-top: 20px; padding: 14px; border-radius: 8px; border: 1px solid var(--line); display: none; }
+    #resultado.ok { border-color: var(--ok); }
+    #resultado.simulacion { border-color: var(--warn); }
+    #resultado.error { border-color: var(--danger); color: #fecaca; }
+    #resultado table { width: 100%; border-collapse: collapse; }
+    #resultado td { padding: 4px 0; border-bottom: 1px solid var(--line); }
+    #resultado td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <a class="volver" href="/administracion">&larr; Administración</a>
+    <h1>Importar horas de máquinas</h1>
+    <p>Subí el archivo generado en la PC con <code>python exportar_horas_maquinas.py</code>
+      (<code>horas_maquinas_export.db</code>). Primero simulá para ver qué va a pasar; al importar se guarda antes
+      una copia de la base en <code>backups/</code>.</p>
+
+    <form id="form">
+      <label for="archivo">Archivo (.db)</label>
+      <input id="archivo" name="archivo" type="file" accept=".db,.sqlite,.sqlite3" required />
+
+      <label>Modo</label>
+      <label class="opcion"><input type="radio" name="modo" value="agregar" checked />
+        <span>Agregar<small>Inserta solo los partes que todavía no están cargados.</small></span></label>
+      <label class="opcion"><input type="radio" name="modo" value="reemplazar" />
+        <span>Reemplazar<small>Borra todos los partes actuales y deja exactamente los del archivo.</small></span></label>
+
+      <div class="acciones">
+        <button type="button" class="secundario" data-simular="true">Simular</button>
+        <button type="button" class="primario" data-simular="false">Importar</button>
+      </div>
+    </form>
+    <div id="resultado"></div>
+  </div>
+
+  <script>
+    const ETIQUETAS = {
+      filas_archivo: 'Filas en el archivo',
+      insertadas: 'Insertadas',
+      omitidas_existentes: 'Omitidas (ya estaban cargadas)',
+      rechazadas_sin_fecha: 'Rechazadas (sin fecha_parte)',
+      filas_antes: 'Filas en la tabla antes',
+      filas_despues: 'Filas en la tabla después',
+    };
+    const form = document.getElementById('form');
+    const resultado = document.getElementById('resultado');
+    const botones = form.querySelectorAll('button');
+
+    function mostrar(clase, html) {
+      resultado.className = clase;
+      resultado.style.display = 'block';
+      resultado.innerHTML = html;
+    }
+
+    function escapar(texto) {
+      const div = document.createElement('div');
+      div.textContent = String(texto);
+      return div.innerHTML;
+    }
+
+    botones.forEach((boton) => boton.addEventListener('click', async () => {
+      const archivo = document.getElementById('archivo').files[0];
+      if (!archivo) { mostrar('error', 'Elegí un archivo.'); return; }
+      const simular = boton.dataset.simular === 'true';
+      const modo = form.querySelector('input[name=modo]:checked').value;
+      if (!simular && !confirm(modo === 'reemplazar'
+        ? 'Se van a BORRAR todos los partes actuales y reemplazar por los del archivo. ¿Continuar?'
+        : 'Se van a agregar los partes nuevos del archivo. ¿Continuar?')) return;
+
+      const datos = new FormData();
+      datos.append('archivo', archivo);
+      datos.append('modo', modo);
+      datos.append('simular', simular ? 'true' : 'false');
+      botones.forEach((b) => { b.disabled = true; });
+      mostrar('', 'Procesando…');
+      try {
+        const res = await fetch('/api/admin/importar-horas-maquinas', { method: 'POST', body: datos });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.detail || `Error ${res.status}`);
+        const filas = Object.entries(ETIQUETAS)
+          .map(([k, etiqueta]) => `<tr><td>${etiqueta}</td><td>${Number(json[k] || 0).toLocaleString('es-AR')}</td></tr>`)
+          .join('');
+        const titulo = json.simulacion
+          ? '<strong>Simulación:</strong> no se guardó nada.'
+          : '<strong>Importación completada.</strong>';
+        const extra = [
+          json.respaldo ? `Copia previa: <code>${escapar(json.respaldo)}</code>` : '',
+          json.columnas_ignoradas && json.columnas_ignoradas.length
+            ? `Columnas del archivo que no existen en la tabla (ignoradas): ${escapar(json.columnas_ignoradas.join(', '))}` : '',
+        ].filter(Boolean).map((t) => `<p style="margin:10px 0 0">${t}</p>`).join('');
+        mostrar(json.simulacion ? 'simulacion' : 'ok', `<p style="margin:0 0 10px;color:inherit">${titulo}</p><table>${filas}</table>${extra}`);
+      } catch (err) {
+        mostrar('error', escapar(err.message));
+      } finally {
+        botones.forEach((b) => { b.disabled = false; });
+      }
+    }));
+  </script>
+</body>
+</html>
