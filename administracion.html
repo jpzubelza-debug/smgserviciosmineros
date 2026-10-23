@@ -504,7 +504,8 @@
       operaciones: [
         ["dashboard", "Dashboard"],
         ["carga_partes_diarios", "Carga de Partes Diarios"],
-        ["seguimiento_cliente", "Seguimiento de Cliente – Certificados"],
+        ["centros_costos", "Centro de Costos"],
+        ["seguimiento_cliente", "Seguimiento de Clientes"],
       ],
     };
 
@@ -594,7 +595,28 @@
       },
       // Las acciones marcadas "usuario nominal" no pueden ejecutarse con la cuenta de contingencia.
       operaciones: {
+        dashboard: [
+          ["ver", "Ver dashboard de operaciones"],
+        ],
+        carga_partes_diarios: [
+          ["consultar", "Consultar historial y detalle de partes"],
+          ["crear", "Cargar parte diario"],
+          ["editar", "Editar parte diario"],
+          ["controlar", "Marcar parte como controlado"],
+          ["eliminar", "Eliminar parte diario"],
+          ["exportar_excel", "Exportar Excel"],
+        ],
+        centros_costos: [
+          ["consultar", "Consultar centros de costos"],
+          ["crear", "Crear centro de costos"],
+          ["editar", "Editar centro de costos"],
+          ["eliminar", "Eliminar centro de costos"],
+        ],
         seguimiento_cliente: [
+          ["consultar_seguimientos", "Consultar seguimientos"],
+          ["editar_seguimiento", "Crear y editar seguimientos"],
+          ["gestionar_ordenes", "Gestionar órdenes de compra del cliente"],
+          ["gestionar_items", "Gestionar ítems contratados"],
           ["consultar", "Consultar certificados"],
           ["certificar", "Crear y editar borradores"],
           ["emitir_certificado", "Emitir certificados (usuario nominal)"],

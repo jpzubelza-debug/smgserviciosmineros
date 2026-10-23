@@ -112,6 +112,8 @@ CLAVE = "Clave-Prueba-1"
 SEG_RUTA = "/operaciones/seguimiento-cliente/{sid}"
 CERT_RUTA = SEG_RUTA + "/certificados"
 ACCIONES_BASE = ["consultar", "certificar", "emitir_certificado", "anular_certificado", "cambiar_modalidad"]
+# Acciones del propio Seguimiento (cabecera, OC e ítems); todo usuario de prueba con el panel las tiene.
+ACCIONES_SEGUIMIENTO = ["consultar_seguimientos", "editar_seguimiento", "gestionar_ordenes", "gestionar_items"]
 
 
 def _db():
@@ -136,7 +138,7 @@ def _crear_usuario(correo, modulos, paneles=None, acciones=None):
 
 
 def _permisos(acciones):
-    return {"operaciones": ["seguimiento_cliente"]}, {"operaciones": {"seguimiento_cliente": acciones}}
+    return {"operaciones": ["seguimiento_cliente"]}, {"operaciones": {"seguimiento_cliente": ACCIONES_SEGUIMIENTO + acciones}}
 
 
 def _cliente(usuario, clave=CLAVE):
@@ -339,10 +341,12 @@ class B_Permisos(Base):
                               lineas=[{"importe_periodo": 100}])
         self.assertEqual(respuesta.status_code, 403)
 
-    def test_b3_endpoints_seg_existentes_conservan_su_permiso(self):
+    def test_b3_endpoints_seg_exigen_panel_y_accion(self):
         sid, ocs, _ = self.global_simple()
-        self.assertEqual(self.sinpanel.get("/operaciones/seguimientos-cliente").status_code, 200)
-        self.assertEqual(self.sinpanel.get(SEG_RUTA.format(sid=sid)).status_code, 200)
+        self.assertEqual(self.sinpanel.get("/operaciones/seguimientos-cliente").status_code, 403)
+        self.assertEqual(self.sinpanel.get(SEG_RUTA.format(sid=sid)).status_code, 403)
+        self.assertEqual(self.oper.get("/operaciones/seguimientos-cliente").status_code, 200)
+        self.assertEqual(self.oper.get(SEG_RUTA.format(sid=sid)).status_code, 200)
 
     def test_b4_contingencia_no_ejecuta_acciones_nominales(self):
         sid, ocs, _ = self.global_simple()

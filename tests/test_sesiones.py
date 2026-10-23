@@ -81,16 +81,17 @@ def _db():
     return conn
 
 
-def _crear_usuario(correo, modulos, tipo="OPERADOR"):
+def _crear_usuario(correo, modulos, tipo="OPERADOR", paneles=None, acciones=None):
     with _db() as conn:
         conn.execute("DELETE FROM usuarios WHERE correo = ?", (correo,))
         cur = conn.execute(
             """
             INSERT INTO usuarios (nombre_apellido, correo, password_hash, estado, tipo_usuario, modulos_json,
                                   paneles_json, acciones_json, bloqueado, intentos_fallidos)
-            VALUES (?, ?, ?, 'ACTIVO', ?, ?, '{}', '{}', 0, 0)
+            VALUES (?, ?, ?, 'ACTIVO', ?, ?, ?, ?, 0, 0)
             """,
-            (correo, correo, hashlib.sha256(CLAVE.encode()).hexdigest(), tipo, main.json.dumps(modulos)),
+            (correo, correo, hashlib.sha256(CLAVE.encode()).hexdigest(), tipo, main.json.dumps(modulos),
+             main.json.dumps(paneles or {}), main.json.dumps(acciones or {})),
         )
         return cur.lastrowid
 
@@ -119,7 +120,8 @@ def _cliente_con_cookie(nombre, valor):
 class SesionesTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.id_oper = _crear_usuario(CORREO_OPER, ["operaciones"])
+        cls.id_oper = _crear_usuario(CORREO_OPER, ["operaciones"], paneles={"operaciones": ["seguimiento_cliente"]},
+                                     acciones={"operaciones": {"seguimiento_cliente": ["consultar_seguimientos"]}})
         cls.id_sin = _crear_usuario(CORREO_SIN, ["logistica"])
 
     # --- Suplantación ---------------------------------------------------
@@ -201,7 +203,7 @@ class SesionesTests(unittest.TestCase):
         self.assertTrue(_cliente_con_cookie(main.AUTH_COOKIE_NAME, token_2).get("/me").json()["autenticado"])
 
     # --- Permisos existentes ---------------------------------------------
-    def test_permisos_por_modulo_se_conservan(self):
+    def test_permisos_de_operaciones_se_respetan(self):
         cliente_oper, _ = _login(CORREO_OPER, CLAVE)
         cliente_sin, _ = _login(CORREO_SIN, CLAVE)
         self.assertEqual(cliente_oper.get("/operaciones/seguimientos-cliente").status_code, 200)

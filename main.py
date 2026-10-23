@@ -173,7 +173,7 @@ CONTINGENCY_PANELS = {
     "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
     "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
-    "operaciones": ["dashboard", "carga_partes_diarios", "seguimiento_cliente"],
+    "operaciones": ["dashboard", "carga_partes_diarios", "centros_costos", "seguimiento_cliente"],
     "rrhh": ["dashboard"],
     "mantenimiento": ["dashboard"],
     "dashboard_ejecutivo": ["dashboard"],
@@ -5040,7 +5040,7 @@ def _seg_listar(conn, centro_costo_id=None):
 
 @app.get("/operaciones/seguimientos-cliente")
 def listar_seguimientos_cliente(request: Request, centro_costo_id: int | None = Query(None)):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "consultar_seguimientos")
     conn = get_sqlite_connection()
     try:
         return _seg_listar(conn, centro_costo_id)
@@ -5050,7 +5050,7 @@ def listar_seguimientos_cliente(request: Request, centro_costo_id: int | None = 
 
 @app.get("/operaciones/seguimiento-cliente/{seguimiento_id}")
 def obtener_seguimiento_cliente(request: Request, seguimiento_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "consultar_seguimientos")
     conn = get_sqlite_connection()
     try:
         return _seg_detalle(conn, seguimiento_id)
@@ -5061,7 +5061,7 @@ def obtener_seguimiento_cliente(request: Request, seguimiento_id: int):
 @app.post("/operaciones/seguimiento-cliente")
 async def guardar_seguimiento_cliente(request: Request):
     """Crea un seguimiento o, si se envía seguimiento_id, actualiza solo su cabecera."""
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "editar_seguimiento")
     payload = await _seg_leer_json(request)
     seguimiento_id = payload.get("seguimiento_id")
     if seguimiento_id not in (None, ""):
@@ -5089,7 +5089,7 @@ async def guardar_seguimiento_cliente(request: Request):
 
 @app.put("/operaciones/seguimiento-cliente/{seguimiento_id}")
 async def actualizar_seguimiento_cliente(request: Request, seguimiento_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "editar_seguimiento")
     payload = await _seg_leer_json(request)
     payload.pop("seguimiento_id", None)
 
@@ -5152,7 +5152,7 @@ def _seg_validar_oc_unica(conn, seguimiento_id, registro, orden_id=None):
 
 @app.get("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes")
 def listar_ordenes_seguimiento_cliente(request: Request, seguimiento_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "consultar_seguimientos")
     conn = get_sqlite_connection()
     try:
         _seg_obtener(conn, seguimiento_id)
@@ -5164,7 +5164,7 @@ def listar_ordenes_seguimiento_cliente(request: Request, seguimiento_id: int):
 
 @app.post("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes")
 async def crear_orden_seguimiento_cliente(request: Request, seguimiento_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_ordenes")
     payload = await _seg_leer_json(request)
 
     def operacion(conn):
@@ -5189,7 +5189,7 @@ async def crear_orden_seguimiento_cliente(request: Request, seguimiento_id: int)
 
 @app.put("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}")
 async def actualizar_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_ordenes")
     payload = await _seg_leer_json(request)
 
     def operacion(conn):
@@ -5211,7 +5211,7 @@ async def actualizar_orden_seguimiento_cliente(request: Request, seguimiento_id:
 
 @app.delete("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}")
 def eliminar_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_ordenes")
 
     def operacion(conn):
         orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
@@ -5262,7 +5262,7 @@ def _seg_item_desde_payload(payload, orden, actual=None):
 
 @app.get("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items")
 def listar_items_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "consultar_seguimientos")
     conn = get_sqlite_connection()
     try:
         orden = _seg_obtener_orden(conn, seguimiento_id, orden_id)
@@ -5273,7 +5273,7 @@ def listar_items_orden_seguimiento_cliente(request: Request, seguimiento_id: int
 
 @app.post("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items")
 async def crear_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_items")
     payload = await _seg_leer_json(request)
 
     def operacion(conn):
@@ -5298,7 +5298,7 @@ async def crear_item_orden_seguimiento_cliente(request: Request, seguimiento_id:
 @app.put("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items/{item_id}")
 async def actualizar_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int, item_id: int):
     """Actualiza un ítem. Con orden_compra_cliente_id lo mueve a otra OC del mismo seguimiento."""
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_items")
     payload = await _seg_leer_json(request)
 
     def operacion(conn):
@@ -5334,7 +5334,7 @@ async def actualizar_item_orden_seguimiento_cliente(request: Request, seguimient
 
 @app.delete("/operaciones/seguimiento-cliente/{seguimiento_id}/ordenes/{orden_id}/items/{item_id}")
 def eliminar_item_orden_seguimiento_cliente(request: Request, seguimiento_id: int, orden_id: int, item_id: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "gestionar_items")
 
     def operacion(conn):
         _seg_obtener_orden(conn, seguimiento_id, orden_id)
@@ -5355,7 +5355,7 @@ def eliminar_item_orden_seguimiento_cliente(request: Request, seguimiento_id: in
 @app.get("/api/operaciones/centros-costos/{id_centro}/seguimientos")
 def consolidado_seguimientos_centro_costo(request: Request, id_centro: int):
     """Vista consolidada (solo lectura) de los SEG de un Centro de Costos, con totales por moneda."""
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "seguimiento_cliente", "consultar_seguimientos")
     conn = get_sqlite_connection()
     try:
         centro = _seg_centro_costo_info(conn, id_centro)
@@ -7780,6 +7780,7 @@ async def incorporar_certificado_historico(request: Request, seguimiento_id: int
 @app.get("/operaciones/centros-costos")
 @app.get("/api/operaciones/centros-costos")
 def listar_centros_costos(request: Request):
+    # Lista de referencia que también usan Carga de Partes y Seguimiento: solo exige el módulo.
     _requiere_modulo(request, "operaciones")
     with get_sqlite_connection() as conn:
         filas = conn.execute("SELECT * FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall()
@@ -7789,7 +7790,7 @@ def listar_centros_costos(request: Request):
 @app.post("/operaciones/centros-costos")
 @app.post("/api/operaciones/centros-costos")
 async def crear_centro_costo(request: Request, payload: dict = Body(...)):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "centros_costos", "crear")
     try:
         id_centro = int(payload.get("id"))
     except (TypeError, ValueError):
@@ -7851,7 +7852,7 @@ async def crear_centro_costo(request: Request, payload: dict = Body(...)):
 @app.put("/operaciones/centros-costos/{id_centro}")
 @app.put("/api/operaciones/centros-costos/{id_centro}")
 async def editar_centro_costo(request: Request, id_centro: int, payload: dict = Body(...)):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "centros_costos", "editar")
     nombre = str(payload.get("nombre") or "").strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="El nombre del Centro de Costos es obligatorio.")
@@ -7910,7 +7911,7 @@ async def editar_centro_costo(request: Request, id_centro: int, payload: dict = 
 @app.delete("/operaciones/centros-costos/{id_centro}")
 @app.delete("/api/operaciones/centros-costos/{id_centro}")
 def eliminar_centro_costo(request: Request, id_centro: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "centros_costos", "eliminar")
     with get_sqlite_connection() as conn:
         cursor = conn.execute(
             "UPDATE centros_costos SET activo = 0 WHERE id = ? AND COALESCE(activo, 1) = 1",
@@ -8077,7 +8078,7 @@ def listar_horas_maquinas(
     page: int = Query(1, ge=1),
     limit: int = Query(30, ge=1, le=500),
 ):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "carga_partes_diarios", "consultar")
     search_term = q or busqueda
     with get_sqlite_connection() as conn:
         where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
@@ -8113,7 +8114,7 @@ def listar_horas_maquinas(
 @app.get("/operaciones/horas-maquinas/ultimo-horometro")
 @app.get("/api/horas-maquinas/ultimo-horometro")
 def obtener_ultimo_horometro(request: Request, ci: str = Query(..., min_length=1)):
-    _requiere_modulo(request, "operaciones")
+    _requiere_panel(request, "operaciones", "carga_partes_diarios")
     with get_sqlite_connection() as conn:
         fila = conn.execute(
             """
@@ -8143,7 +8144,7 @@ def obtener_ultimo_horometro(request: Request, ci: str = Query(..., min_length=1
 @app.get("/operaciones/horas-maquinas/ultimo-kilometro")
 @app.get("/api/horas-maquinas/ultimo-kilometro")
 def obtener_ultimo_kilometro(request: Request, ci: str = Query(..., min_length=1)):
-    _requiere_modulo(request, "operaciones")
+    _requiere_panel(request, "operaciones", "carga_partes_diarios")
     with get_sqlite_connection() as conn:
         fila = conn.execute(
             """
@@ -8183,7 +8184,7 @@ def exportar_horas_maquinas_excel(
     busqueda: str | None = Query(None),
     limit: int | None = Query(None, ge=1, le=10000),
 ):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "carga_partes_diarios", "exportar_excel")
     search_term = q or busqueda
 
     try:
@@ -8298,7 +8299,7 @@ def exportar_horas_maquinas_excel(
 @app.get("/operaciones/horas-maquinas/{id_parte}")
 @app.get("/api/horas-maquinas/{id_parte}")
 def obtener_hora_maquina_detalle(request: Request, id_parte: int):
-    _requiere_modulo(request, "operaciones")
+    _requiere_accion(request, "operaciones", "carga_partes_diarios", "consultar")
     with get_sqlite_connection() as conn:
         fila = conn.execute(
             "SELECT * FROM horas_maquinas WHERE id = ?",
@@ -8312,7 +8313,7 @@ def obtener_hora_maquina_detalle(request: Request, id_parte: int):
 @app.post("/operaciones/horas-maquinas")
 @app.post("/api/horas-maquinas")
 async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
-    perfil = _requiere_modulo(request, "operaciones")
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "crear")
 
     ci = str(payload.get("ci") or "").strip()
     fecha_parte = str(payload.get("fecha_parte") or "").strip()
@@ -8449,7 +8450,7 @@ async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
 @app.put("/operaciones/horas-maquinas/{id_parte}")
 @app.put("/api/horas-maquinas/{id_parte}")
 async def actualizar_hora_maquina(request: Request, id_parte: int, payload: dict = Body(...)):
-    perfil = _requiere_modulo(request, "operaciones")
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "editar")
 
     ci = str(payload.get("ci") or "").strip()
     fecha_parte = str(payload.get("fecha_parte") or "").strip()
@@ -8606,7 +8607,7 @@ async def actualizar_hora_maquina(request: Request, id_parte: int, payload: dict
 @app.post("/operaciones/horas-maquinas/{id_parte}/controlar")
 @app.post("/api/horas-maquinas/{id_parte}/controlar")
 def controlar_hora_maquina(request: Request, id_parte: int):
-    perfil = _requiere_modulo(request, "operaciones")
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "controlar")
     usuario = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
     if not usuario:
         raise HTTPException(status_code=401, detail="No se pudo identificar al usuario de la sesión.")
@@ -8644,7 +8645,7 @@ def controlar_hora_maquina(request: Request, id_parte: int):
 @app.delete("/operaciones/horas-maquinas/{id_parte}")
 @app.delete("/api/horas-maquinas/{id_parte}")
 def eliminar_hora_maquina(request: Request, id_parte: int):
-    perfil = _requiere_modulo(request, "operaciones")
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "eliminar")
 
     with get_sqlite_connection() as conn:
         fila = conn.execute("SELECT id, nro_parte, ci FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()

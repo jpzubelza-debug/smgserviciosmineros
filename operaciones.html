@@ -1788,9 +1788,9 @@
         <div class="seguimiento-actions">
           <span id="seg-badge" class="seg-badge nuevo">Nuevo seguimiento (sin guardar)</span>
           <button class="seg-btn primary hidden" id="btn-certificados-cliente" type="button" disabled title="Guarde el seguimiento para gestionar sus certificados">Certificados</button>
-          <button class="seg-btn" id="btn-nuevo-seguimiento" type="button" data-seg-accion>+ Nuevo seguimiento</button>
+          <button class="seg-btn" id="btn-nuevo-seguimiento" type="button" data-seg-accion data-op-req="seguimiento_cliente:editar_seguimiento">+ Nuevo seguimiento</button>
           <button class="seg-btn" id="btn-cancelar-seguimiento" type="button" data-seg-accion title="Descartar los cambios no guardados de la cabecera">Cancelar cambios</button>
-          <button class="seg-btn primary" id="btn-guardar-seguimiento" type="button" data-seg-accion>Crear seguimiento</button>
+          <button class="seg-btn primary" id="btn-guardar-seguimiento" type="button" data-seg-accion data-op-req="seguimiento_cliente:editar_seguimiento">Crear seguimiento</button>
         </div>
       </div>
 
@@ -1803,7 +1803,7 @@
           </div>
           <div class="field">
             <label for="seg-registro">N° Registro</label>
-            <select id="seg-registro">
+            <select id="seg-registro" data-op-req="seguimiento_cliente:consultar_seguimientos">
               <option value="">Nuevo seguimiento</option>
             </select>
           </div>
@@ -1835,7 +1835,7 @@
             <div id="seg-obra" class="seg-obra field-wide" hidden>
               <div class="seg-obra-header">
                 <span id="seg-obra-titulo">Seguimientos de esta obra</span>
-                <button class="seg-btn" id="btn-nuevo-seg-obra" type="button" data-seg-accion>+ Nuevo SEG para esta obra</button>
+                <button class="seg-btn" id="btn-nuevo-seg-obra" type="button" data-seg-accion data-op-req="seguimiento_cliente:editar_seguimiento">+ Nuevo SEG para esta obra</button>
               </div>
               <div id="seg-obra-aviso" class="seg-obra-aviso" role="status" hidden></div>
               <div id="seg-obra-lista" class="seg-table-wrap"></div>
@@ -1938,13 +1938,13 @@
               </div>
               <div class="seg-form-actions">
                 <button class="seg-btn" id="btn-cancelar-oc" type="button" data-seg-accion>Cancelar</button>
-                <button class="seg-btn primary" id="btn-guardar-oc" type="button" data-seg-accion>Guardar OC</button>
+                <button class="seg-btn primary" id="btn-guardar-oc" type="button" data-seg-accion data-op-req="seguimiento_cliente:gestionar_ordenes">Guardar OC</button>
               </div>
             </div>
 
             <div class="seg-toolbar">
               <span id="seg-oc-hint" class="seg-hint">Guarde el seguimiento para poder agregar órdenes de compra.</span>
-              <button id="btn-agregar-orden-cliente" class="seg-btn primary" type="button" data-seg-accion>+ Agregar Orden de Compra</button>
+              <button id="btn-agregar-orden-cliente" class="seg-btn primary" type="button" data-seg-accion data-op-req="seguimiento_cliente:gestionar_ordenes">+ Agregar Orden de Compra</button>
             </div>
           </div>
         </div>
@@ -1978,14 +1978,14 @@
               </div>
               <div class="seg-form-actions">
                 <button class="seg-btn" id="btn-cancelar-item" type="button" data-seg-accion>Cancelar</button>
-                <button class="seg-btn primary" id="btn-guardar-item" type="button" data-seg-accion>Guardar ítem</button>
+                <button class="seg-btn primary" id="btn-guardar-item" type="button" data-seg-accion data-op-req="seguimiento_cliente:gestionar_items">Guardar ítem</button>
               </div>
             </div>
 
             <div id="seg-items-totales"></div>
             <div class="seg-toolbar">
               <span id="seg-item-hint" class="seg-hint">Seleccione una orden de compra para ver y cargar sus ítems.</span>
-              <button id="btn-agregar-item-cliente" class="seg-btn primary" type="button" data-seg-accion>+ Agregar Ítem</button>
+              <button id="btn-agregar-item-cliente" class="seg-btn primary" type="button" data-seg-accion data-op-req="seguimiento_cliente:gestionar_items">+ Agregar Ítem</button>
             </div>
           </div>
         </div>
@@ -2344,7 +2344,7 @@
               <span>Actualizar</span>
             </button>
 
-            <button type="button" class="btn btn-secondary input-sm" id="btn-exportar-excel" style="padding: 0 12px;" title="Exportar a Excel">
+            <button type="button" class="btn btn-secondary input-sm" id="btn-exportar-excel" data-op-req="carga_partes_diarios:exportar_excel" style="padding: 0 12px;" title="Exportar a Excel">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span>Exportar</span>
             </button>
@@ -2558,6 +2558,63 @@
   };
   state.centrosCostos = [];
 
+  // ===== Permisos de Operaciones =====
+  // Paneles y acciones se asignan en Administración; el servidor vuelve a validar cada operación.
+  const OP_SIN_PERMISO = 'Su usuario no tiene este permiso (se asigna en Administración)';
+  const opPermisos = { perfil: null };
+
+  async function opCargarPerfil() {
+    try {
+      const res = await fetch('/me');
+      opPermisos.perfil = res.ok ? await res.json() : null;
+    } catch (err) {
+      opPermisos.perfil = null;
+    }
+    return opPermisos.perfil;
+  }
+  function opTienePanel(panel) {
+    const p = opPermisos.perfil;
+    if (!p) return false;
+    return !!p.es_desarrollador || ((p.paneles || {}).operaciones || []).includes(panel);
+  }
+  function opPuede(panel, accion) {
+    if (!opTienePanel(panel)) return false;
+    const p = opPermisos.perfil;
+    return !!p.es_desarrollador || ((((p.acciones || {}).operaciones || {})[panel]) || []).includes(accion);
+  }
+  function opExigir(panel, accion) {
+    if (opPuede(panel, accion)) return true;
+    showToast(OP_SIN_PERMISO, 'error');
+    return false;
+  }
+  // Deshabilita (nunca habilita) los controles con data-op-req="panel:accion" que el usuario no puede usar,
+  // así se combina con la lógica propia de cada pantalla que habilita/deshabilita botones.
+  function opAplicarPermisos(raiz = document) {
+    raiz.querySelectorAll('[data-op-req]').forEach(el => {
+      const [panel, accion] = el.dataset.opReq.split(':');
+      if (!opPuede(panel, accion)) {
+        el.disabled = true;
+        el.title = OP_SIN_PERMISO;
+      }
+    });
+  }
+  function opActualizarBotonParte() {
+    const btn = document.getElementById('btn-submit-form');
+    const ok = opPuede('carga_partes_diarios', state.modoEdicion ? 'editar' : 'crear');
+    btn.disabled = !ok;
+    btn.title = ok ? '' : OP_SIN_PERMISO;
+  }
+  function opActualizarBotonCentro() {
+    const btn = document.getElementById('btn-guardar-centro-costo');
+    const editando = !!document.getElementById('centro-costo-edit-id').value;
+    const ok = opPuede('centros_costos', editando ? 'editar' : 'crear');
+    btn.disabled = !ok;
+    btn.title = ok ? '' : OP_SIN_PERMISO;
+  }
+  function opFilaSinPermiso(tbody, columnas) {
+    tbody.innerHTML = `<tr><td colspan="${columnas}" style="text-align: center; padding: 24px; color: #94a3b8;">${OP_SIN_PERMISO}</td></tr>`;
+  }
+
   // Toast Helper
   function showToast(mensaje, tipo = 'info') {
     const container = document.getElementById('toast-container');
@@ -2592,6 +2649,11 @@
   async function cargarCentrosCostosPanel() {
     const tbody = document.getElementById('tabla-centros-costos');
     if (!tbody) return;
+    opActualizarBotonCentro();
+    if (!opPuede('centros_costos', 'consultar')) {
+      opFilaSinPermiso(tbody, 19);
+      return;
+    }
     try {
       const res = await fetch('/operaciones/centros-costos');
       const data = await res.json();
@@ -2621,12 +2683,13 @@
               <td>${escHtml(fila.created_at)}</td>
               <td>${escHtml(fila.updated_at)}</td>
               <td>
-                <button type="button" class="btn-action" title="Editar" onclick="editarCentroCosto(${fila.id})">Editar</button>
-                <button type="button" class="btn-action btn-del" title="Eliminar" onclick="eliminarCentroCosto(${fila.id}, '${escHtml(fila.nombre)}')">Eliminar</button>
+                <button type="button" class="btn-action" title="Editar" data-op-req="centros_costos:editar" onclick="editarCentroCosto(${fila.id})">Editar</button>
+                <button type="button" class="btn-action btn-del" title="Eliminar" data-op-req="centros_costos:eliminar" onclick="eliminarCentroCosto(${fila.id}, '${escHtml(fila.nombre)}')">Eliminar</button>
               </td>
             </tr>
           `).join('')
         : '<tr><td colspan="19">No hay Centros de Costos cargados.</td></tr>';
+      opAplicarPermisos(tbody);
     } catch (err) {
       console.error(err);
       tbody.innerHTML = `<tr><td colspan="19">${escHtml(err.message || 'Error al cargar datos.')}</td></tr>`;
@@ -2635,6 +2698,7 @@
   }
 
   function editarCentroCosto(id) {
+    if (!opExigir('centros_costos', 'editar')) return;
     const fila = state.centrosCostos.find(item => Number(item.id) === Number(id));
     if (!fila) return;
     document.getElementById('centro-costo-edit-id').value = id;
@@ -2656,6 +2720,7 @@
     document.getElementById('inp-centro-costo-presupuesto').value = fila.presupuesto || 0;
     document.getElementById('inp-centro-costo-observaciones').value = fila.observaciones || '';
     document.getElementById('btn-guardar-centro-costo').textContent = 'Guardar Cambios';
+    opActualizarBotonCentro();
     document.getElementById('inp-centro-costo-nombre').focus();
   }
 
@@ -2671,12 +2736,14 @@
     document.getElementById('inp-centro-costo-estado').value = 'Planificación';
     document.getElementById('inp-centro-costo-moneda').value = 'USD';
     document.getElementById('btn-guardar-centro-costo').textContent = 'Crear Centro';
+    opActualizarBotonCentro();
   }
 
   async function guardarCentroCosto() {
     const id = document.getElementById('centro-costo-edit-id').value;
     const idNuevo = document.getElementById('inp-centro-costo-id').value;
     const nombre = document.getElementById('inp-centro-costo-nombre').value.trim();
+    if (!opExigir('centros_costos', id ? 'editar' : 'crear')) return;
     if (!id && !idNuevo) {
       showToast('Debe ingresar el ID del Centro de Costos.', 'error');
       return;
@@ -2716,6 +2783,7 @@
   }
 
   async function eliminarCentroCosto(id, nombre) {
+    if (!opExigir('centros_costos', 'eliminar')) return;
     if (!confirm(`¿Eliminar el Centro de Costos "${nombre}"?`)) return;
     try {
       const res = await fetch(`/operaciones/centros-costos/${id}`, { method: 'DELETE' });
@@ -3233,6 +3301,10 @@
   // Cargar Historial de Horas Máquinas con Filtros y Paginación
   async function cargarHistorial() {
     const tbody = document.getElementById('tabla-body-partes');
+    if (!opPuede('carga_partes_diarios', 'consultar')) {
+      opFilaSinPermiso(tbody, 31);
+      return;
+    }
     tbody.innerHTML = `
       <tr>
           <td colspan="31" style="text-align: center; padding: 24px; color: #38bdf8;">
@@ -3332,16 +3404,16 @@
           <td class="text-right">${formatNum(row.no_programadas, 1)}</td>
           <td class="text-center">
             <div class="row-actions">
-              <button type="button" class="btn-action" ${row.control ? `disabled title="Controlado por ${row.control}" style="color: #22c55e; cursor: default;"` : `title="Marcar como controlado" onclick="controlarParte(${row.id}, '${row.nro_parte || row.id}')"`}>
+              <button type="button" class="btn-action" ${row.control ? `disabled title="Controlado por ${row.control}" style="color: #22c55e; cursor: default;"` : `title="Marcar como controlado" data-op-req="carga_partes_diarios:controlar" onclick="controlarParte(${row.id}, '${row.nro_parte || row.id}')"`}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
               </button>
               <button type="button" class="btn-action" title="Ver detalle" onclick="verDetalleParte(${row.id})">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
               </button>
-              <button type="button" class="btn-action" title="Editar parte" onclick="editarParte(${row.id})">
+              <button type="button" class="btn-action" title="Editar parte" data-op-req="carga_partes_diarios:editar" onclick="editarParte(${row.id})">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
               </button>
-              <button type="button" class="btn-action btn-del" title="Eliminar parte" onclick="confirmarEliminarParte(${row.id}, '${row.nro_parte || row.id}', '${row.ci || ''}')">
+              <button type="button" class="btn-action btn-del" title="Eliminar parte" data-op-req="carga_partes_diarios:eliminar" onclick="confirmarEliminarParte(${row.id}, '${row.nro_parte || row.id}', '${row.ci || ''}')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
             </div>
@@ -3349,6 +3421,7 @@
         </tr>
       `;
     }).join('');
+    opAplicarPermisos(tbody);
   }
 
   // Renderizado de Paginación
@@ -3442,11 +3515,13 @@
     document.getElementById('form-title-text').textContent = 'Carga de Partes Diarios';
     document.getElementById('form-subtitle-text').textContent = 'Registro de horas, kilómetros, consumo y novedades de equipos.';
     document.getElementById('btn-submit-label').textContent = 'Cargar Parte';
+    opActualizarBotonParte();
   }
 
   // Enviar Formulario (Crear / Actualizar)
   async function guardarParte() {
     const editId = document.getElementById('edit-id').value;
+    if (!opExigir('carga_partes_diarios', editId ? 'editar' : 'crear')) return;
     const ci = document.getElementById('inp-ci').value.trim();
     const fechaParte = document.getElementById('inp-fecha-parte').value.trim();
     const nroParte = document.getElementById('inp-nro-parte').value.trim();
@@ -3540,12 +3615,13 @@
       console.error(err);
       showToast(err.message || 'Error al guardar el parte diario.', 'error');
     } finally {
-      submitBtn.disabled = false;
+      opActualizarBotonParte();
     }
   }
 
   // Editar Parte (Carga en el formulario superior)
   async function editarParte(idParte) {
+    if (!opExigir('carga_partes_diarios', 'editar')) return;
     try {
       const res = await fetch(`/operaciones/horas-maquinas/${idParte}`);
       if (!res.ok) throw new Error('No se pudo cargar el registro a editar.');
@@ -3594,6 +3670,7 @@
       document.getElementById('form-title-text').textContent = `Editar Parte Diario Nº ${d.nro_parte || d.id}`;
       document.getElementById('form-subtitle-text').textContent = `Modificando registro del equipo ${d.ci || ''}.`;
       document.getElementById('btn-submit-label').textContent = 'Guardar Cambios';
+      opActualizarBotonParte();
 
       document.getElementById('sector-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
       showToast(`Editando Parte Diario Nº ${d.nro_parte || d.id}`, 'info');
@@ -3606,6 +3683,7 @@
 
   // Ver Detalle Completo en Modal
   async function verDetalleParte(idParte) {
+    if (!opExigir('carga_partes_diarios', 'consultar')) return;
     try {
       const res = await fetch(`/operaciones/horas-maquinas/${idParte}`);
       if (!res.ok) throw new Error('No se pudo cargar el detalle del parte.');
@@ -3681,6 +3759,7 @@
 
   // Eliminar Parte con Confirmación
   function confirmarEliminarParte(id, nroParte, ci) {
+    if (!opExigir('carga_partes_diarios', 'eliminar')) return;
     state.idParaEliminar = id;
     document.getElementById('eliminar-parte-info').textContent = `Parte Nº ${nroParte} (Equipo ${ci})`;
     document.getElementById('modal-eliminar').classList.add('open');
@@ -3692,6 +3771,7 @@
   }
 
   async function controlarParte(idParte, nroParte) {
+    if (!opExigir('carga_partes_diarios', 'controlar')) return;
     if (!confirm(`¿Marcar como controlado el Parte Nº ${nroParte}?`)) return;
 
     try {
@@ -3730,6 +3810,7 @@
 
   // Exportar Excel
   function exportarExcel() {
+    if (!opExigir('carga_partes_diarios', 'exportar_excel')) return;
     const params = new URLSearchParams();
     if (state.equipoSeleccionado) params.append('ci', state.equipoSeleccionado);
     if (state.busqueda) params.append('q', state.busqueda);
@@ -4020,7 +4101,7 @@
             <td class="num">${segImportesTexto(s.importes_por_moneda)}</td>
             <td>${s.id === actual
               ? '<span class="seg-hint">Abierto</span>'
-              : `<button class="seg-btn" type="button" data-seg-abrir="${s.id}" data-seg-accion>Abrir</button>`}</td>
+              : `<button class="seg-btn" type="button" data-seg-abrir="${s.id}" data-seg-accion data-op-req="seguimiento_cliente:consultar_seguimientos">Abrir</button>`}</td>
           </tr>`).join('')}
           <tr><td colspan="4"><strong>Total de la obra (${consolidado.cantidad_seguimientos || 0} SEG)</strong></td>
             <td class="num"><strong>${consolidado.cantidad_ordenes || 0}</strong></td>
@@ -4166,8 +4247,8 @@
         <td class="num ${Math.abs(diferencia) >= 0.005 ? 'seg-diff' : ''}">${segNum(diferencia)}</td>
         <td>${segEsc(o.observaciones || '')}</td>
         <td>
-          <button class="mini-btn primary" type="button" data-seg-editar-orden="${o.id}" data-seg-accion title="Editar OC">&#9998;</button>
-          <button class="mini-btn" type="button" data-seg-eliminar-orden="${o.id}" data-seg-accion title="Eliminar OC">&#10005;</button>
+          <button class="mini-btn primary" type="button" data-seg-editar-orden="${o.id}" data-seg-accion data-op-req="seguimiento_cliente:gestionar_ordenes" title="Editar OC">&#9998;</button>
+          <button class="mini-btn" type="button" data-seg-eliminar-orden="${o.id}" data-seg-accion data-op-req="seguimiento_cliente:gestionar_ordenes" title="Eliminar OC">&#10005;</button>
         </td>
       </tr>`;
     }).join('');
@@ -4196,8 +4277,8 @@
         <td class="num">${segNum(i.total)}</td>
         <td>${segEsc(i.observacion || '')}</td>
         <td>
-          <button class="mini-btn primary" type="button" data-seg-editar-item="${i.id}" data-seg-accion title="Editar ítem">&#9998;</button>
-          <button class="mini-btn" type="button" data-seg-eliminar-item="${i.id}" data-seg-accion title="Eliminar ítem">&#10005;</button>
+          <button class="mini-btn primary" type="button" data-seg-editar-item="${i.id}" data-seg-accion data-op-req="seguimiento_cliente:gestionar_items" title="Editar ítem">&#9998;</button>
+          <button class="mini-btn" type="button" data-seg-eliminar-item="${i.id}" data-seg-accion data-op-req="seguimiento_cliente:gestionar_items" title="Eliminar ítem">&#10005;</button>
         </td>
       </tr>`).join('') : '<tr class="seg-empty"><td colspan="9">Esta orden de compra no tiene ítems.</td></tr>';
     const diferencia = Number(orden.monto_oc || 0) - Number(orden.total_items || 0);
@@ -4225,6 +4306,7 @@
     segEl('seg-item-hint').textContent = orden
       ? `Los ítems nuevos se guardarán en la OC ${orden.orden_compra || orden.numero}.`
       : 'Seleccione una orden de compra para ver y cargar sus ítems.';
+    opAplicarPermisos(panel);
     if (typeof certActualizarBotonSeguimiento === 'function') certActualizarBotonSeguimiento();
   }
 
@@ -4536,13 +4618,18 @@
         if (!segState.detalle) segRenderCentroInfo(segCentroPorTexto(segEl('seg-centro-costo').value));
       })
       .catch(err => showToast(segEsc(err.message || 'No se pudieron cargar los Centros de Costos.'), 'error'));
-    segCargarLista().catch(err => showToast(segEsc(err.message || 'Error al cargar los seguimientos.'), 'error'));
+    if (opPuede('seguimiento_cliente', 'consultar_seguimientos')) {
+      segCargarLista().catch(err => showToast(segEsc(err.message || 'Error al cargar los seguimientos.'), 'error'));
+    }
   }
 
   // Event Listeners y Configuración Inicial
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     setHeaderDate();
     document.getElementById('inp-fecha-parte').value = new Date().toISOString().slice(0, 10);
+
+    // Los permisos deben estar cargados antes de pedir datos de cada panel.
+    await opCargarPerfil();
 
     // Metadata
     cargarMetadata();
@@ -4675,6 +4762,25 @@
       activarPanel(panelSeguimientoCliente, btnSeguimientoCliente);
       cargarSeguimientoCliente();
     });
+
+    // Solo se muestran los paneles habilitados en Administración; se abre el primero disponible.
+    const panelesHabilitados = [
+      ['carga_partes_diarios', btnPartes, opTienePanel('carga_partes_diarios')],
+      ['dashboard', btnDash, opPuede('dashboard', 'ver')],
+      ['centros_costos', btnCentrosCostos, opTienePanel('centros_costos')],
+      ['seguimiento_cliente', btnSeguimientoCliente, opTienePanel('seguimiento_cliente')],
+    ];
+    panelesHabilitados.forEach(([, boton, habilitado]) => boton.classList.toggle('hidden', !habilitado));
+    opActualizarBotonParte();
+    opAplicarPermisos();
+    const primero = panelesHabilitados.find(([, , habilitado]) => habilitado);
+    if (primero) {
+      primero[1].click();
+    } else {
+      activarPanel(panelDash, btnDash);
+      btnDash.classList.remove('active');
+      panelDash.innerHTML = '<h2>Operaciones</h2><p style="color: #94a3b8;">Su usuario no tiene paneles de Operaciones habilitados. Solicite los permisos en Administración.</p>';
+    }
   });
 </script>
 <script>
