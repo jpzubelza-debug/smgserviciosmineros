@@ -16478,7 +16478,10 @@ def operador_manifest():
             "display": "standalone",
             "background_color": "#0f172a",
             "theme_color": "#0f172a",
-            "icons": [{"src": "/Imagenes/09-smg.png", "sizes": "any", "type": "image/png"}],
+            "icons": [
+                {"src": "/Imagenes/smg-icono-192.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "/Imagenes/smg-icono-512.png", "sizes": "512x512", "type": "image/png"},
+            ],
         },
         media_type="application/manifest+json",
     )

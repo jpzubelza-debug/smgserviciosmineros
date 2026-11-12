@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SMG Partes">
 <link rel="manifest" href="/operador/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/Imagenes/09-smg.png">
-<link rel="icon" href="/Imagenes/09-smg.png">
+<link rel="apple-touch-icon" href="/Imagenes/smg-icono-180.png">
+<link rel="icon" type="image/png" href="/Imagenes/smg-icono-192.png">
 <title>SMG Partes</title>
 <style>
   :root {
@@ -80,7 +80,8 @@
     margin: 0 auto;
   }
   .brand { text-align: center; margin: 8px 0 24px; }
-  .brand img { width: 72px; height: 72px; object-fit: contain; border-radius: 16px; background: #fff; padding: 6px; box-shadow: var(--shadow); }
+  .brand .logo-card { display: inline-block; background: #fff; border-radius: 18px; padding: 14px 22px; box-shadow: var(--shadow); }
+  .brand .logo-card img { display: block; width: 210px; max-width: 60vw; height: auto; }
   .brand h1 { font-size: 1.45rem; margin: 14px 0 4px; letter-spacing: -.01em; }
   .brand p { margin: 0; color: var(--muted); }
   .auth-card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
@@ -109,7 +110,8 @@
     padding: calc(12px + var(--safe-t)) 16px 12px;
     display: flex; align-items: center; gap: 12px;
   }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; background: #1e3a8a; display: grid; place-items: center; font-weight: 700; flex: 0 0 auto; }
+  .logo-pill { flex: 0 0 auto; background: #fff; border-radius: 10px; padding: 4px 8px; display: grid; place-items: center; }
+  .logo-pill img { display: block; height: 30px; width: auto; }
   .topbar .me { flex: 1; min-width: 0; }
   .topbar .me strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar .me span { font-size: .82rem; opacity: .75; }
@@ -323,7 +325,7 @@
 <section id="auth" class="screen" hidden>
   <div class="auth">
     <div class="brand">
-      <img src="/Imagenes/09-smg.png" alt="SMG">
+      <div class="logo-card"><img src="/Imagenes/09-smg.png" alt="SMG Servicios Mineros"></div>
       <h1>Partes Diarios</h1>
       <p>Acceso para operadores</p>
     </div>
@@ -379,7 +381,7 @@
 <!-- ========== APP ========== -->
 <section id="app" class="screen" hidden>
   <header class="topbar">
-    <div class="avatar" id="me-ini"></div>
+    <span class="logo-pill"><img src="/Imagenes/09-smg.png" alt="SMG Servicios Mineros"></span>
     <div class="me"><strong id="me-nombre"></strong><span>Legajo <span id="me-legajo"></span></span></div>
     <button class="icon-btn" id="btn-salir" type="button">Salir</button>
   </header>
@@ -783,8 +785,6 @@
     state.me = { legajo: me.legajo, nombre: me.nombre };
     $('me-nombre').textContent = me.nombre;
     $('me-legajo').textContent = me.legajo;
-    const partes = String(me.nombre || '').replace(/,/g, ' ').split(/\s+/).filter(Boolean);
-    $('me-ini').textContent = ((partes[0] || '')[0] || '') + ((partes[1] || '')[0] || '');
     $('boot').hidden = true; $('auth').hidden = true; $('app').hidden = false;
     if (!state.meta) state.meta = await api('/operador/api/metadata');
     armarFormulario();
