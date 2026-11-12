@@ -130,8 +130,8 @@
 
   .section { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; margin-bottom: 12px; }
   .section h3 { margin: 0 0 10px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .field { margin-bottom: 12px; min-width: 0; }
   .field:last-child { margin-bottom: 0; }
   .row .field, .row3 .field { margin-bottom: 0; }
@@ -140,9 +140,14 @@
   label .req { color: var(--danger); }
   label small { font-weight: 400; color: var(--muted); }
   .input, .picker-btn {
-    width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 11px;
+    display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--line); border-radius: 11px;
     background: var(--surface-2); padding: 11px 12px; font-size: 16px; outline: none;
   }
+  /* Safari de iPhone da al campo fecha un ancho mínimo propio y desborda la grilla
+     (pisaba la casilla "Nº de parte"): se quita la apariencia nativa para que respete el ancho. */
+  input[type="date"].input { -webkit-appearance: none; appearance: none; line-height: 24px; }
+  input[type="date"].input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  input[type="date"].input::-webkit-datetime-edit { padding: 0; }
   .input:focus, .picker-btn:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
   .input[readonly] { color: var(--muted); }
   textarea.input { min-height: 88px; resize: vertical; }
