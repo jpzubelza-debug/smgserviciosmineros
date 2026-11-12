@@ -189,9 +189,13 @@ class OperadorAppTests(unittest.TestCase):
         meta = otro.get("/operador/api/metadata").json()
         self.assertIn(self.obra, meta["centros_costos"])
         self.assertNotIn("maquinistas", meta)
+        supervisor = self.emp_b["nombre"].strip()
+        self.assertIn(supervisor, meta["supervisores_smg"])
 
         # Carga: legajo y maquinista salen de la sesión; los campos de control se ignoran.
-        datos = self._parte(legajo_empleado="1", maquinista="OTRA PERSONA", control_supervisor="X", control="admin", certificado="C-1")
+        # Supervisor SMG inexistente: rechazado.
+        self.assertEqual(_enviar_parte(otro, self._parte(control_supervisor="NO EXISTE")).status_code, 400)
+        datos = self._parte(legajo_empleado="1", maquinista="OTRA PERSONA", control_supervisor=supervisor, control="admin", certificado="C-1")
         r = _enviar_parte(otro, datos)
         self.assertEqual(r.status_code, 200, r.text)
         with _db() as conn:
@@ -200,7 +204,7 @@ class OperadorAppTests(unittest.TestCase):
         self.assertEqual(fila["maquinista"], emp["nombre"].strip())
         self.assertEqual(fila["origen_carga"], "APP_OPERADOR")
         self.assertEqual(fila["total_hs"], 8)
-        self.assertIsNone(fila["control_supervisor"])
+        self.assertEqual(fila["control_supervisor"], supervisor)
         self.assertIsNone(fila["control"])
         self.assertIsNone(fila["certificado"])
 

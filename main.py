@@ -16314,7 +16314,7 @@ OP_CAMPOS_PARTE = (
     "ci", "fecha_parte", "nro_parte", "obra", "descripcion_trabajos", "turno", "acoplado",
     "cliente", "orden_compra", "hs_inicio", "hs_final", "total_hs", "km_inicio", "km_final",
     "km_total", "hs_desplazamiento", "hs_mantenimiento", "hs_reparaciones", "hs_disposicion",
-    "no_programadas", "viajes", "gasoil", "aceite", "novedades", "firma_parte",
+    "no_programadas", "viajes", "gasoil", "aceite", "novedades", "firma_parte", "control_supervisor",
 )
 # Períodos de "Mis partes": cantidad de días hacia atrás (anio = desde el 1/1; todo = sin límite).
 OP_PERIODOS_PARTES = {"30d": 30, "90d": 90, "anio": None, "todo": None}
@@ -16590,6 +16590,8 @@ def operador_metadata(request: Request):
         "turnos": datos["turnos"],
         "no_programadas_opciones": datos["no_programadas_opciones"],
         "firmas_supervisores": datos["firmas_supervisores"],
+        # Supervisor de turno SMG: empleados activos (solo el nombre, como en el escritorio).
+        "supervisores_smg": [m["nombre"] for m in datos["maquinistas"] if str(m["nombre"] or "").strip()],
     }
 
 
@@ -16742,8 +16744,9 @@ async def operador_crear_parte(request: Request):
         raise HTTPException(status_code=400, detail="La foto es demasiado grande (máximo 3 MB).")
     if not contenido.startswith(b"\xff\xd8\xff"):
         raise HTTPException(status_code=400, detail="La foto debe ser una imagen JPEG.")
-    # Solo los campos que carga el operador; los de control (supervisor, certificado,
-    # control) quedan para el escritorio. Legajo y maquinista salen de la sesión.
+    # Solo los campos que carga el operador; los de control de oficina (certificado, control)
+    # quedan para el escritorio. Legajo y maquinista salen de la sesión. El supervisor de turno
+    # SMG se valida contra los empleados activos (igual que en el escritorio).
     datos = {campo: payload.get(campo) for campo in OP_CAMPOS_PARTE}
     datos["proyecto"] = datos.get("obra")
     datos["legajo_empleado"] = operador["legajo"]

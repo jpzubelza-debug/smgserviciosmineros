@@ -587,6 +587,10 @@
           <label>Firma del parte <small>(supervisor del cliente)</small></label>
           <button type="button" class="picker-btn" data-picker="firma_parte"><span class="val ph">Elegir o escribir nombre</span></button>
         </div>
+        <div class="field">
+          <label>Supervisor de turno SMG</label>
+          <button type="button" class="picker-btn" data-picker="control_supervisor"><span class="val ph">Elegir supervisor SMG</span></button>
+        </div>
       </div>
 
       <div class="submit-bar"><button class="btn" type="submit" id="btn-revisar">Revisar y enviar</button></div>
@@ -652,7 +656,7 @@
 
   const state = {
     legajo: '', pin: '', me: null, meta: null,
-    picks: { ci: '', acoplado: '', obra: '', cliente: '', firma_parte: '' },
+    picks: { ci: '', acoplado: '', obra: '', cliente: '', firma_parte: '', control_supervisor: '' },
     turno: '', page: 1, total: 0,
     // Último horómetro / km final registrado del equipo elegido (misma regla que el escritorio).
     ultimos: { ci: '', hs: null, km: null },
@@ -1074,6 +1078,7 @@
     obra: { titulo: 'Centro de costos', ph: 'Elegir centro de costos', opciones: () => state.meta.centros_costos.map((c) => ({ v: c, t: c })) },
     cliente: { titulo: 'Cliente', ph: 'Elegir cliente', opciones: () => state.meta.clientes.map((c) => ({ v: c, t: c })) },
     firma_parte: { titulo: 'Firma del parte', ph: 'Elegir o escribir nombre', libre: true, vacio: 'Sin firma', opciones: () => state.meta.firmas_supervisores.map((f) => ({ v: f, t: f })) },
+    control_supervisor: { titulo: 'Supervisor de turno SMG', ph: 'Elegir supervisor SMG', vacio: 'Sin supervisor', opciones: () => (state.meta.supervisores_smg || []).map((n) => ({ v: n, t: n })) },
   };
 
   function textoDe(campo, valor) {
@@ -1198,7 +1203,7 @@
     } else {
       // Se recuerdan equipo, obra, cliente y turno del último parte enviado.
       Object.keys(state.picks).forEach((k) => { state.picks[k] = ''; });
-      ['ci', 'obra', 'cliente', 'acoplado'].forEach((k) => { if (valido(k, ultimos[k])) state.picks[k] = ultimos[k]; });
+      ['ci', 'obra', 'cliente', 'acoplado', 'control_supervisor'].forEach((k) => { if (valido(k, ultimos[k])) state.picks[k] = ultimos[k]; });
       state.turno = ultimos.turno || '';
       $('draft-note').hidden = true;
     }
@@ -1301,12 +1306,15 @@
         </div>
       </div>`;
     const lista = $('pk-list'), q = $('pk-q');
+    // Búsqueda sin distinguir mayúsculas ni tildes ("gomez" encuentra "GÓMEZ").
+    const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const textos = opciones.map((o) => norm(o.t));
     const pintar = () => {
-      const f = q.value.trim().toLowerCase();
-      const visibles = opciones.filter((o) => !f || o.t.toLowerCase().includes(f)).slice(0, 200);
+      const f = norm(q.value.trim());
+      const visibles = opciones.filter((o, i) => !f || textos[i].includes(f)).slice(0, 200);
       let html = '';
       if (cfg.vacio && !f) html += `<button type="button" class="opt" data-v="">${esc(cfg.vacio)}</button>`;
-      if (cfg.libre && f && !opciones.some((o) => o.t.toLowerCase() === f)) {
+      if (cfg.libre && f && !textos.some((t) => t === f)) {
         html += `<button type="button" class="opt" data-v="${esc(q.value.trim())}">Usar «${esc(q.value.trim())}»</button>`;
       }
       html += visibles.map((o) => `<button type="button" class="opt ${o.v === state.picks[campo] ? 'sel' : ''}" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('');
@@ -1347,6 +1355,7 @@
       hs_reparaciones: v('f-hs-rep'), hs_disposicion: v('f-hs-disp'), no_programadas: $('f-noprog').value,
       viajes: v('f-viajes'), gasoil: v('f-gasoil'), aceite: v('f-aceite'),
       descripcion_trabajos: v('f-desc'), novedades: v('f-nov'), firma_parte: state.picks.firma_parte,
+      control_supervisor: state.picks.control_supervisor,
     };
   }
   function validar(p) {
@@ -1378,6 +1387,7 @@
       ['Centro de costos', p.obra], ['Cliente', p.cliente],
       ['Horas', fmt(horas, 2)], ['Kilómetros', fmt(km)],
       ['Gasoil', p.gasoil ? `${p.gasoil} L` : '--'],
+      ['Firma del parte', p.firma_parte || '--'], ['Supervisor SMG', p.control_supervisor || '--'],
     ];
     const advertencias = advertenciasIniciales();
     abrirHoja('Revisá antes de enviar', `
@@ -1400,7 +1410,7 @@
       envio.append('datos', JSON.stringify(p));
       envio.append('foto', state.foto.blob, 'parte.jpg');
       const r = await api('/operador/api/partes', { method: 'POST', body: envio });
-      store.set(LAST_KEY, { ci: p.ci, obra: p.obra, cliente: p.cliente, acoplado: p.acoplado, turno: p.turno });
+      store.set(LAST_KEY, { ci: p.ci, obra: p.obra, cliente: p.cliente, acoplado: p.acoplado, turno: p.turno, control_supervisor: p.control_supervisor });
       store.del(DRAFT_KEY);
       cerrarSheet();
       toast(r.mensaje || 'Parte enviado.', 'ok');
@@ -1518,7 +1528,7 @@
         ['Hs a disposición', d.hs_disposicion ? fmt(d.hs_disposicion, 2) : ''],
         ['No programadas', d.no_programadas], ['Viajes', d.viajes ? fmt(d.viajes, 1) : ''],
         ['Gasoil', d.gasoil ? `${fmt(d.gasoil, 1)} L` : ''], ['Aceite', d.aceite ? `${fmt(d.aceite, 1)} L` : ''],
-        ['Firma del parte', d.firma_parte], ['Estado', d.control ? `Controlado por ${d.control}` : 'Pendiente de control'],
+        ['Firma del parte', d.firma_parte], ['Supervisor SMG', d.control_supervisor], ['Estado', d.control ? `Controlado por ${d.control}` : 'Pendiente de control'],
       ].filter(([, v]) => v !== '' && v != null && v !== '0');
       abrirHoja(`Parte Nº ${d.nro_parte || d.id}`, `
         <dl class="kv">${filas.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}
