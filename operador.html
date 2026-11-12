@@ -176,7 +176,15 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   }
   .foto-btn svg { width: 34px; height: 34px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .foto-btn.cargando { opacity: .6; }
+  .foto-btn.cargando, .foto-btn-sec.cargando { opacity: .6; }
+  .foto-btn-sec {
+    width: 100%; min-height: 52px; margin-top: 10px; border-radius: 13px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--text); font-weight: 600; font-size: .98rem;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .foto-btn-sec svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .foto-cambiar { font-size: .88rem; color: var(--muted); white-space: nowrap; }
+  .foto-cambiar .link { font-size: .88rem; padding: 4px 0; }
   .foto-prev { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line); }
   .foto-acciones { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
   .foto-acciones .help { margin: 0; }
@@ -409,19 +417,28 @@
 
       <div class="section">
         <h3>Foto del parte <span class="req">*</span></h3>
+        <!-- Dos entradas: con `capture` abre la cámara; sin `capture`, la galería / archivos. -->
         <input type="file" id="f-foto" accept="image/*" capture="environment" hidden>
+        <input type="file" id="f-foto-galeria" accept="image/*" hidden>
         <div id="foto-vacia">
           <button type="button" class="foto-btn" id="btn-foto">
             <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             Sacar foto del parte
           </button>
-          <p class="help">Obligatoria. Sacala con el parte en papel completo, derecho y legible.</p>
+          <button type="button" class="foto-btn-sec" id="btn-galeria">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            Elegir de la galería
+          </button>
+          <p class="help">Obligatoria. El parte en papel completo, derecho y legible. La foto se achica sola antes de enviarla.</p>
         </div>
         <div id="foto-lista" hidden>
           <img id="foto-prev" class="foto-prev" alt="Foto del parte">
           <div class="foto-acciones">
             <span class="help" id="foto-peso"></span>
-            <button type="button" class="link" id="btn-foto-cambiar">Cambiar foto</button>
+            <span class="foto-cambiar">Cambiar:
+              <button type="button" class="link" id="btn-foto-cambiar">Cámara</button> ·
+              <button type="button" class="link" id="btn-galeria-cambiar">Galería</button>
+            </span>
           </div>
         </div>
       </div>
@@ -1144,21 +1161,28 @@
     if (state.foto) URL.revokeObjectURL(state.foto.url);
     state.foto = null; pintarFoto();
   }
-  const abrirCamara = () => { $('f-foto').value = ''; $('f-foto').click(); };
-  $('btn-foto').addEventListener('click', abrirCamara);
-  $('btn-foto-cambiar').addEventListener('click', abrirCamara);
-  $('f-foto').addEventListener('change', async () => {
-    const file = $('f-foto').files && $('f-foto').files[0];
+  // Cámara o galería: las dos pasan por la misma compresión (máx. 1600 px, JPEG ~600 KB).
+  const abrir = (id) => () => { $(id).value = ''; $(id).click(); };
+  $('btn-foto').addEventListener('click', abrir('f-foto'));
+  $('btn-foto-cambiar').addEventListener('click', abrir('f-foto'));
+  $('btn-galeria').addEventListener('click', abrir('f-foto-galeria'));
+  $('btn-galeria-cambiar').addEventListener('click', abrir('f-foto-galeria'));
+  const usarFoto = async (input) => {
+    const file = input.files && input.files[0];
     if (!file) return;
-    const btn = $('btn-foto'); btn.classList.add('cargando'); btn.disabled = true;
+    if (file.type && !file.type.startsWith('image/')) { toast('Ese archivo no es una imagen.', 'err'); return; }
+    const botones = ['btn-foto', 'btn-galeria'].map($);
+    botones.forEach((b) => { b.classList.add('cargando'); b.disabled = true; });
     try {
       const blob = await comprimirFoto(file);
       quitarFoto();
       state.foto = { blob, url: URL.createObjectURL(blob) };
       pintarFoto();
     } catch (err) { toast(err.message || 'No se pudo usar esa foto.', 'err'); }
-    finally { btn.classList.remove('cargando'); btn.disabled = false; }
-  });
+    finally { botones.forEach((b) => { b.classList.remove('cargando'); b.disabled = false; }); }
+  };
+  $('f-foto').addEventListener('change', () => usarFoto($('f-foto')));
+  $('f-foto-galeria').addEventListener('change', () => usarFoto($('f-foto-galeria')));
 
   function resetFormulario(intentarBorrador) {
     form.reset();
