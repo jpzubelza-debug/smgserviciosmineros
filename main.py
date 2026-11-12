@@ -1209,6 +1209,57 @@ def migrar_sesiones(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones (usuario_id)")
 
 
+def migrar_operadores_app(conn):
+    """App móvil de operadores: PIN por legajo de `personal` y sesiones propias."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS operador_pines (
+            legajo TEXT PRIMARY KEY,
+            pin_hash TEXT,
+            pin_cifrado TEXT,
+            pin_creado_en TEXT,
+            intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+            bloqueado_hasta TEXT,
+            ultimo_acceso TEXT,
+            actualizado_en TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS operador_sesiones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT NOT NULL UNIQUE,
+            legajo TEXT NOT NULL,
+            creada_en TEXT NOT NULL,
+            expira_en TEXT NOT NULL,
+            revocada_en TEXT,
+            motivo_revocacion TEXT,
+            ip TEXT,
+            user_agent TEXT
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_operador_sesiones_legajo ON operador_sesiones (legajo)")
+    # Foto del parte (una por parte). `archivo` queda en NULL cuando, tras controlar el parte,
+    # se guardó en la PC y se quitó del servidor; se conserva quién, cuándo y con qué nombre.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS partes_fotos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parte_id INTEGER NOT NULL UNIQUE,
+            archivo TEXT,
+            bytes INTEGER,
+            subida_en TEXT NOT NULL,
+            subida_por TEXT,
+            archivada_en TEXT,
+            archivada_por TEXT,
+            nombre_archivo TEXT
+        )
+        """
+    )
+
+
 def migrar_email_templates(conn):
     conn.execute(
         """
@@ -1412,6 +1463,10 @@ def migrar_horas_maquinas(conn):
         cols = {r[1] for r in conn.execute("PRAGMA table_info(horas_maquinas)").fetchall()}
         if "aceite" not in cols:
             conn.execute("ALTER TABLE horas_maquinas ADD COLUMN aceite REAL DEFAULT 0")
+        # Desde dónde se cargó el parte: NULL = escritorio/importación, 'APP_OPERADOR' = app móvil.
+        if "origen_carga" not in cols:
+            conn.execute("ALTER TABLE horas_maquinas ADD COLUMN origen_carga TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_legajo ON horas_maquinas (legajo_empleado)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_ci ON horas_maquinas (ci)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_fecha ON horas_maquinas (fecha_parte)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_hm_ci_fecha ON horas_maquinas (ci, fecha_parte DESC)")
@@ -2262,6 +2317,7 @@ def init_sqlite():
                 migrar_usuarios_administracion(conn)
                 migrar_responsables_modulo(conn)
                 migrar_sesiones(conn)
+                migrar_operadores_app(conn)
                 migrar_email_templates(conn)
                 migrar_personal_dotacion(conn)
                 migrar_habilitaciones_personal(conn)
@@ -4501,129 +4557,134 @@ def _parse_op_entero(val, nombre):
 def operaciones_metadata(request: Request):
     _requiere_modulo(request, "operaciones")
     with get_sqlite_connection() as conn:
-        # Catalogo completo de equipos; un equipo nuevo puede no tener partes aun.
-        v_filas = conn.execute(
-            """
-            SELECT codigo, marca, modelo, tipo, propiedad, sector
-            FROM vehiculos
-            ORDER BY codigo ASC
-            """
-        ).fetchall()
-        equipos = []
-        for f in v_filas:
-            cod = (f["codigo"] or "").strip()
-            if not cod:
-                continue
-            desc_parts = [p for p in [(f["marca"] or "").strip(), (f["modelo"] or "").strip()] if p]
-            desc = " ".join(desc_parts) if desc_parts else (f["tipo"] or "").strip()
-            display = f"{cod} - {desc}" if desc else cod
-            equipos.append({
-                "ci": cod,
-                "codigo": cod,
-                "marca": f["marca"] or "",
-                "modelo": f["modelo"] or "",
-                "tipo": f["tipo"] or "",
-                "propiedad": f["propiedad"] or "",
-                "sector": f["sector"] or "",
-                "display": display
+        return _operaciones_metadata_datos(conn)
+
+
+def _operaciones_metadata_datos(conn):
+    """Catálogos del formulario de partes diarios (escritorio y app de operadores)."""
+    # Catalogo completo de equipos; un equipo nuevo puede no tener partes aun.
+    v_filas = conn.execute(
+        """
+        SELECT codigo, marca, modelo, tipo, propiedad, sector
+        FROM vehiculos
+        ORDER BY codigo ASC
+        """
+    ).fetchall()
+    equipos = []
+    for f in v_filas:
+        cod = (f["codigo"] or "").strip()
+        if not cod:
+            continue
+        desc_parts = [p for p in [(f["marca"] or "").strip(), (f["modelo"] or "").strip()] if p]
+        desc = " ".join(desc_parts) if desc_parts else (f["tipo"] or "").strip()
+        display = f"{cod} - {desc}" if desc else cod
+        equipos.append({
+            "ci": cod,
+            "codigo": cod,
+            "marca": f["marca"] or "",
+            "modelo": f["modelo"] or "",
+            "tipo": f["tipo"] or "",
+            "propiedad": f["propiedad"] or "",
+            "sector": f["sector"] or "",
+            "display": display
+        })
+
+    equipos.sort(key=lambda x: x["ci"])
+
+    # Maquinistas / Personal activo
+    p_filas = conn.execute(
+        """
+        SELECT legajo, nombre, cuil
+        FROM personal
+        WHERE UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO'
+        ORDER BY nombre ASC
+        """
+    ).fetchall()
+    maquinistas = [{"legajo": f["legajo"] or "", "nombre": f["nombre"] or "", "cuil": f["cuil"] or ""} for f in p_filas]
+
+    # Obras
+    obras_set = set()
+    for f in conn.execute("SELECT DISTINCT obra FROM horas_maquinas WHERE obra IS NOT NULL AND TRIM(obra) != ''").fetchall():
+        obras_set.add(f["obra"].strip())
+    for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
+        nombre = (f["nombre"] or "").strip()
+        if not nombre:
+            continue
+        obras_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
+    obras = sorted([o for o in obras_set if o])
+
+    # Proyectos
+    proy_set = set()
+    for f in conn.execute("SELECT DISTINCT proyecto FROM horas_maquinas WHERE proyecto IS NOT NULL AND TRIM(proyecto) != ''").fetchall():
+        proy_set.add(f["proyecto"].strip())
+    for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
+        nombre = (f["nombre"] or "").strip()
+        if not nombre:
+            continue
+        proy_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
+    for f in conn.execute("SELECT nombre FROM proyectos WHERE activo = 1").fetchall():
+        proy_set.add(f["nombre"].strip())
+    proyectos = sorted([p for p in proy_set if p])
+
+    # Clientes importados desde Clientes.xlsx
+    clientes = []
+    clientes_catalogo = []
+    for f in conn.execute(
+        "SELECT codigo, razon_social, cuit FROM clientes WHERE TRIM(COALESCE(codigo, '')) != '' ORDER BY codigo"
+    ).fetchall():
+        codigo = str(f["codigo"] or "").strip()
+        razon_social = str(f["razon_social"] or "").strip()
+        cuit = str(f["cuit"] or "").strip()
+        if codigo and razon_social:
+            clientes.append(f"{codigo} - {razon_social}")
+            clientes_catalogo.append({
+                "codigo": codigo,
+                "nombre": razon_social,
+                "cuit": cuit,
+                "display": f"{codigo} - {razon_social}",
             })
 
-        equipos.sort(key=lambda x: x["ci"])
-
-        # Maquinistas / Personal activo
-        p_filas = conn.execute(
-            """
-            SELECT legajo, nombre, cuil
-            FROM personal
-            WHERE UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO'
-            ORDER BY nombre ASC
-            """
-        ).fetchall()
-        maquinistas = [{"legajo": f["legajo"] or "", "nombre": f["nombre"] or "", "cuil": f["cuil"] or ""} for f in p_filas]
-
-        # Obras
-        obras_set = set()
-        for f in conn.execute("SELECT DISTINCT obra FROM horas_maquinas WHERE obra IS NOT NULL AND TRIM(obra) != ''").fetchall():
-            obras_set.add(f["obra"].strip())
-        for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
-            nombre = (f["nombre"] or "").strip()
-            if not nombre:
-                continue
-            obras_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
-        obras = sorted([o for o in obras_set if o])
-
-        # Proyectos
-        proy_set = set()
-        for f in conn.execute("SELECT DISTINCT proyecto FROM horas_maquinas WHERE proyecto IS NOT NULL AND TRIM(proyecto) != ''").fetchall():
-            proy_set.add(f["proyecto"].strip())
-        for f in conn.execute("SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id").fetchall():
-            nombre = (f["nombre"] or "").strip()
-            if not nombre:
-                continue
-            proy_set.add(f"{f['id']} - {nombre}" if f["id"] is not None else nombre)
-        for f in conn.execute("SELECT nombre FROM proyectos WHERE activo = 1").fetchall():
-            proy_set.add(f["nombre"].strip())
-        proyectos = sorted([p for p in proy_set if p])
-
-        # Clientes importados desde Clientes.xlsx
-        clientes = []
-        clientes_catalogo = []
+    firmas_supervisores = sorted({
+        str(f["firma_parte"] or "").strip()
         for f in conn.execute(
-            "SELECT codigo, razon_social, cuit FROM clientes WHERE TRIM(COALESCE(codigo, '')) != '' ORDER BY codigo"
-        ).fetchall():
-            codigo = str(f["codigo"] or "").strip()
-            razon_social = str(f["razon_social"] or "").strip()
-            cuit = str(f["cuit"] or "").strip()
-            if codigo and razon_social:
-                clientes.append(f"{codigo} - {razon_social}")
-                clientes_catalogo.append({
-                    "codigo": codigo,
-                    "nombre": razon_social,
-                    "cuit": cuit,
-                    "display": f"{codigo} - {razon_social}",
-                })
+            "SELECT DISTINCT firma_parte FROM horas_maquinas WHERE TRIM(COALESCE(firma_parte, '')) != ''"
+        ).fetchall()
+        if str(f["firma_parte"] or "").strip()
+    }, key=str.lower)
 
-        firmas_supervisores = sorted({
-            str(f["firma_parte"] or "").strip()
+    # Acoplados
+    acop_set = set()
+    for f in conn.execute("SELECT DISTINCT acoplado FROM horas_maquinas WHERE acoplado IS NOT NULL AND TRIM(acoplado) != ''").fetchall():
+        acop_set.add(f["acoplado"].strip())
+    for f in conn.execute("SELECT codigo FROM vehiculos WHERE LOWER(tipo) LIKE '%acoplado%' OR LOWER(tipo) LIKE '%semi%' OR LOWER(tipo) LIKE '%trailer%' OR LOWER(tipo) LIKE '%carreton%'").fetchall():
+        acop_set.add(f["codigo"].strip())
+    acoplados = sorted([a for a in acop_set if a])
+
+    turnos = ["Día", "Noche"]
+    no_programadas = [
+        "RM",
+        "RED",
+        "LOG",
+        "MO"
+    ]
+
+    return {
+        "equipos": equipos,
+        "maquinistas": maquinistas,
+        "centros_costos": [
+            f"{f['id']} - {(f['nombre'] or '').strip()}"
             for f in conn.execute(
-                "SELECT DISTINCT firma_parte FROM horas_maquinas WHERE TRIM(COALESCE(firma_parte, '')) != ''"
+                "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
             ).fetchall()
-            if str(f["firma_parte"] or "").strip()
-        }, key=str.lower)
-
-        # Acoplados
-        acop_set = set()
-        for f in conn.execute("SELECT DISTINCT acoplado FROM horas_maquinas WHERE acoplado IS NOT NULL AND TRIM(acoplado) != ''").fetchall():
-            acop_set.add(f["acoplado"].strip())
-        for f in conn.execute("SELECT codigo FROM vehiculos WHERE LOWER(tipo) LIKE '%acoplado%' OR LOWER(tipo) LIKE '%semi%' OR LOWER(tipo) LIKE '%trailer%' OR LOWER(tipo) LIKE '%carreton%'").fetchall():
-            acop_set.add(f["codigo"].strip())
-        acoplados = sorted([a for a in acop_set if a])
-
-        turnos = ["Día", "Noche"]
-        no_programadas = [
-            "RM",
-            "RED",
-            "LOG",
-            "MO"
-        ]
-
-        return {
-            "equipos": equipos,
-            "maquinistas": maquinistas,
-            "centros_costos": [
-                f"{f['id']} - {(f['nombre'] or '').strip()}"
-                for f in conn.execute(
-                    "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"
-                ).fetchall()
-                if (f['nombre'] or '').strip()
-            ],
-            "clientes": clientes,
-            "clientes_catalogo": clientes_catalogo,
-            "firmas_supervisores": firmas_supervisores,
-            "acoplados": acoplados,
-            "turnos": turnos,
-            "no_programadas_opciones": no_programadas
-        }
+            if (f['nombre'] or '').strip()
+        ],
+        "clientes": clientes,
+        "clientes_catalogo": clientes_catalogo,
+        "firmas_supervisores": firmas_supervisores,
+        "acoplados": acoplados,
+        "turnos": turnos,
+        "no_programadas_opciones": no_programadas
+    }
 
 
 def _operaciones_centro_costo_id(valor):
@@ -8307,14 +8368,16 @@ def obtener_hora_maquina_detalle(request: Request, id_parte: int):
         ).fetchone()
         if not fila:
             raise HTTPException(status_code=404, detail="Parte diario no encontrado")
-        return {"ok": True, "data": dict(fila)}
+        data = dict(fila)
+        data["foto"] = _foto_info(conn, fila)
+        return {"ok": True, "data": data}
 
 
-@app.post("/operaciones/horas-maquinas")
-@app.post("/api/horas-maquinas")
-async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
-    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "crear")
+def _insertar_parte_diario(conn, payload: dict, origen_carga=None):
+    """Valida y registra un parte diario; lo usan el escritorio y la app de operadores.
 
+    No hace commit: devuelve (id, ci, nro_parte) y el llamador confirma la transacción.
+    """
     ci = str(payload.get("ci") or "").strip()
     fecha_parte = str(payload.get("fecha_parte") or "").strip()
     nro_parte = str(payload.get("nro_parte") or "").strip()
@@ -8333,118 +8396,125 @@ async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
         raise HTTPException(status_code=400, detail="La Descripción de Trabajos Realizados es obligatoria.")
 
     # Validar duplicados por ci + fecha_parte + nro_parte
+    ci = _validar_ci_operaciones(conn, ci)
+    centro_costo = _validar_centro_costo_operaciones(conn, payload.get("obra") or payload.get("proyecto"))
+    cliente = _validar_cliente_operaciones(conn, payload.get("cliente"))
+    control_supervisor = _validar_control_supervisor_operaciones(conn, payload.get("control_supervisor"))
+    legajo_empleado, maquinista = _normalizar_maquinista_operaciones(
+        conn, payload.get("legajo_empleado"), maquinista
+    )
+    dup = conn.execute(
+        """
+        SELECT id FROM horas_maquinas
+        WHERE UPPER(ci) = UPPER(?) AND fecha_parte = ? AND UPPER(nro_parte) = UPPER(?)
+        """,
+        (ci, fecha_parte, nro_parte),
+    ).fetchone()
+    if dup:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ya existe un parte registrado con el Nº {nro_parte} para el equipo {ci} en la fecha {fecha_parte}."
+        )
+
+    # Calculo y validaciones numericas
+    hs_inicio = _parse_op_entero(payload.get("hs_inicio"), "El horómetro inicial")
+    hs_final = _parse_op_entero(payload.get("hs_final"), "El horómetro final")
+    total_hs = _parse_op_entero(payload.get("total_hs"), "El total de horas")
+    if hs_final >= hs_inicio and hs_final > 0:
+        total_hs = hs_final - hs_inicio
+
+    km_inicio = _parse_op_entero(payload.get("km_inicio"), "El kilómetro inicial")
+    km_final = _parse_op_entero(payload.get("km_final"), "El kilómetro final")
+    km_total = _parse_op_entero(payload.get("km_total"), "El total de kilómetros")
+    if km_final >= km_inicio and km_final > 0:
+        km_total = km_final - km_inicio
+
+    hs_desplazamiento = _parse_op_num(payload.get("hs_desplazamiento"), 0.0)
+    hs_mantenimiento = _parse_op_num(payload.get("hs_mantenimiento"), 0.0)
+    hs_reparaciones = _parse_op_num(payload.get("hs_reparaciones"), 0.0)
+    hs_disposicion = _parse_op_num(payload.get("hs_disposicion"), 0.0)
+    hs_reales = round(total_hs + hs_desplazamiento + hs_mantenimiento + hs_reparaciones + hs_disposicion, 2)
+    total_hs_control = hs_reales
+
+    viajes = _parse_op_num(payload.get("viajes") or payload.get("total_viajes"), 0.0)
+    gasoil = _parse_op_num(payload.get("gasoil"), 0.0)
+    aceite = _parse_op_num(payload.get("aceite"), 0.0)
+
+    no_programadas = str(payload.get("no_programadas") or "").strip()
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO horas_maquinas (
+            ci, fecha_parte, nro_parte, legajo_empleado, maquinista,
+            obra, proyecto, descripcion_trabajos, turno, acoplado,
+            cliente, orden_compra, hs_inicio, hs_final, total_hs,
+            km_inicio, km_final, km_total, viajes, gasoil, aceite,
+            novedades, firma_parte, hs_desplazamiento, hs_mantenimiento,
+            hs_reparaciones, hs_disposicion, total_hs_control, no_programadas,
+            certificado, estado_sub_alquiler, control_supervisor, control, origen_carga, created_at
+        ) VALUES (
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+        )
+        """,
+        (
+            ci,
+            fecha_parte,
+            nro_parte,
+            legajo_empleado,
+            maquinista,
+            centro_costo,
+            centro_costo,
+            descripcion_trabajos,
+            str(payload.get("turno") or "").strip(),
+            str(payload.get("acoplado") or "").strip(),
+            cliente,
+            str(payload.get("orden_compra") or "").strip(),
+            str(payload.get("hs_inicio") or hs_inicio),
+            str(payload.get("hs_final") or hs_final),
+            total_hs,
+            km_inicio,
+            km_final,
+            km_total,
+            viajes,
+            gasoil,
+            aceite,
+            str(payload.get("novedades") or "").strip(),
+            str(payload.get("firma_parte") or "").strip(),
+            hs_desplazamiento,
+            hs_mantenimiento,
+            hs_reparaciones,
+            hs_disposicion,
+            total_hs_control,
+            no_programadas,
+            str(payload.get("certificado") or "").strip() or None,
+            str(payload.get("estado_sub_alquiler") or "").strip() or None,
+            control_supervisor or None,
+            str(payload.get("control") or "").strip() or None,
+            origen_carga,
+        ),
+    )
+    return cursor.lastrowid, ci, nro_parte
+
+
+@app.post("/operaciones/horas-maquinas")
+@app.post("/api/horas-maquinas")
+async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
+    _requiere_accion(request, "operaciones", "carga_partes_diarios", "crear")
     with get_sqlite_connection() as conn:
-        ci = _validar_ci_operaciones(conn, ci)
-        centro_costo = _validar_centro_costo_operaciones(conn, payload.get("obra") or payload.get("proyecto"))
-        cliente = _validar_cliente_operaciones(conn, payload.get("cliente"))
-        control_supervisor = _validar_control_supervisor_operaciones(conn, payload.get("control_supervisor"))
-        legajo_empleado, maquinista = _normalizar_maquinista_operaciones(
-            conn, payload.get("legajo_empleado"), maquinista
-        )
-        dup = conn.execute(
-            """
-            SELECT id FROM horas_maquinas
-            WHERE UPPER(ci) = UPPER(?) AND fecha_parte = ? AND UPPER(nro_parte) = UPPER(?)
-            """,
-            (ci, fecha_parte, nro_parte),
-        ).fetchone()
-        if dup:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Ya existe un parte registrado con el Nº {nro_parte} para el equipo {ci} en la fecha {fecha_parte}."
-            )
-
-        # Calculo y validaciones numericas
-        hs_inicio = _parse_op_entero(payload.get("hs_inicio"), "El horómetro inicial")
-        hs_final = _parse_op_entero(payload.get("hs_final"), "El horómetro final")
-        total_hs = _parse_op_entero(payload.get("total_hs"), "El total de horas")
-        if hs_final >= hs_inicio and hs_final > 0:
-            total_hs = hs_final - hs_inicio
-
-        km_inicio = _parse_op_entero(payload.get("km_inicio"), "El kilómetro inicial")
-        km_final = _parse_op_entero(payload.get("km_final"), "El kilómetro final")
-        km_total = _parse_op_entero(payload.get("km_total"), "El total de kilómetros")
-        if km_final >= km_inicio and km_final > 0:
-            km_total = km_final - km_inicio
-
-        hs_desplazamiento = _parse_op_num(payload.get("hs_desplazamiento"), 0.0)
-        hs_mantenimiento = _parse_op_num(payload.get("hs_mantenimiento"), 0.0)
-        hs_reparaciones = _parse_op_num(payload.get("hs_reparaciones"), 0.0)
-        hs_disposicion = _parse_op_num(payload.get("hs_disposicion"), 0.0)
-        hs_reales = round(total_hs + hs_desplazamiento + hs_mantenimiento + hs_reparaciones + hs_disposicion, 2)
-        total_hs_control = hs_reales
-
-        viajes = _parse_op_num(payload.get("viajes") or payload.get("total_viajes"), 0.0)
-        gasoil = _parse_op_num(payload.get("gasoil"), 0.0)
-        aceite = _parse_op_num(payload.get("aceite"), 0.0)
-
-        no_programadas = str(payload.get("no_programadas") or "").strip()
-
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO horas_maquinas (
-                ci, fecha_parte, nro_parte, legajo_empleado, maquinista,
-                obra, proyecto, descripcion_trabajos, turno, acoplado,
-                cliente, orden_compra, hs_inicio, hs_final, total_hs,
-                km_inicio, km_final, km_total, viajes, gasoil, aceite,
-                novedades, firma_parte, hs_desplazamiento, hs_mantenimiento,
-                hs_reparaciones, hs_disposicion, total_hs_control, no_programadas,
-                certificado, estado_sub_alquiler, control_supervisor, control, created_at
-            ) VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?, CURRENT_TIMESTAMP
-            )
-            """,
-            (
-                ci,
-                fecha_parte,
-                nro_parte,
-                legajo_empleado,
-                maquinista,
-                centro_costo,
-                centro_costo,
-                descripcion_trabajos,
-                str(payload.get("turno") or "").strip(),
-                str(payload.get("acoplado") or "").strip(),
-                cliente,
-                str(payload.get("orden_compra") or "").strip(),
-                str(payload.get("hs_inicio") or hs_inicio),
-                str(payload.get("hs_final") or hs_final),
-                total_hs,
-                km_inicio,
-                km_final,
-                km_total,
-                viajes,
-                gasoil,
-                aceite,
-                str(payload.get("novedades") or "").strip(),
-                str(payload.get("firma_parte") or "").strip(),
-                hs_desplazamiento,
-                hs_mantenimiento,
-                hs_reparaciones,
-                hs_disposicion,
-                total_hs_control,
-                no_programadas,
-                str(payload.get("certificado") or "").strip() or None,
-                str(payload.get("estado_sub_alquiler") or "").strip() or None,
-                control_supervisor or None,
-                str(payload.get("control") or "").strip() or None,
-            ),
-        )
-        nuevo_id = cursor.lastrowid
+        nuevo_id, ci, nro_parte = _insertar_parte_diario(conn, payload)
         conn.commit()
-
-        return {
-            "ok": True,
-            "id": nuevo_id,
-            "mensaje": f"Parte Diario Nº {nro_parte} cargado exitosamente para el equipo {ci}."
-        }
+    return {
+        "ok": True,
+        "id": nuevo_id,
+        "mensaje": f"Parte Diario Nº {nro_parte} cargado exitosamente para el equipo {ci}."
+    }
 
 
 @app.put("/operaciones/horas-maquinas/{id_parte}")
@@ -8620,11 +8690,13 @@ def controlar_hora_maquina(request: Request, id_parte: int):
         if not parte:
             raise HTTPException(status_code=404, detail="Parte diario no encontrado")
 
+        completo = conn.execute("SELECT id, nro_parte, ci, fecha_parte FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()
         if parte["control"]:
             return {
                 "ok": True,
                 "id": id_parte,
                 "control": parte["control"],
+                "foto": _foto_info(conn, completo),
                 "mensaje": f"El parte diario Nº {parte['nro_parte'] or id_parte} ya fue controlado.",
             }
 
@@ -8638,6 +8710,7 @@ def controlar_hora_maquina(request: Request, id_parte: int):
             "ok": True,
             "id": id_parte,
             "control": usuario,
+            "foto": _foto_info(conn, completo),
             "mensaje": f"Parte diario Nº {parte['nro_parte'] or id_parte} controlado por {usuario}.",
         }
 
@@ -8652,8 +8725,12 @@ def eliminar_hora_maquina(request: Request, id_parte: int):
         if not fila:
             raise HTTPException(status_code=404, detail="El parte diario a eliminar no existe.")
 
+        foto = conn.execute("SELECT archivo FROM partes_fotos WHERE parte_id = ?", (id_parte,)).fetchone()
         conn.execute("DELETE FROM horas_maquinas WHERE id = ?", (id_parte,))
+        conn.execute("DELETE FROM partes_fotos WHERE parte_id = ?", (id_parte,))
         conn.commit()
+        if foto and foto["archivo"]:
+            _foto_borrar_archivo(foto["archivo"])
 
         return {
             "ok": True,
@@ -16217,3 +16294,957 @@ async def fac_anular_antecedente(request: Request, antecedente_id: int):
     datos = await _fac_cuerpo(request)
     return _fac_ejecutar(lambda conn: fac.anular_antecedente(conn, antecedente_id, datos.get("motivo"), perfil["usuario"], fecha_actual_iso(),
                                                              _fac_es_responsable(conn, perfil)) or {"ok": True})
+
+
+# --- App móvil de Operadores (/operador) --------------------------------------
+# Página pensada para el teléfono: el operador (empleado de `personal`) entra con
+# su legajo y un PIN que crea él mismo la primera vez (validando su DNI contra el
+# CUIL). Solo carga partes diarios y consulta los propios. Usa una cookie y una
+# tabla de sesiones separadas de las del sistema de escritorio, limitadas a /operador.
+OPERADOR_PATH = os.path.join(BASE_DIR, "operador.html")
+OP_COOKIE_NAME = "op_session"
+OP_SESION_DIAS = 30
+OP_PIN_RE = re.compile(r"^\d{4,6}$")
+OP_INTENTOS_POR_TRAMO = 5
+OP_INTENTOS_MAXIMOS = 10
+OP_BLOQUEO_MINUTOS = 15
+OP_BLOQUEO_PERMANENTE = "9999-12-31 00:00:00"
+OP_PBKDF2_ITERACIONES = 200_000
+OP_CAMPOS_PARTE = (
+    "ci", "fecha_parte", "nro_parte", "obra", "descripcion_trabajos", "turno", "acoplado",
+    "cliente", "orden_compra", "hs_inicio", "hs_final", "total_hs", "km_inicio", "km_final",
+    "km_total", "hs_desplazamiento", "hs_mantenimiento", "hs_reparaciones", "hs_disposicion",
+    "no_programadas", "viajes", "gasoil", "aceite", "novedades", "firma_parte",
+)
+# Períodos de "Mis partes": cantidad de días hacia atrás (anio = desde el 1/1; todo = sin límite).
+OP_PERIODOS_PARTES = {"30d": 30, "90d": 90, "anio": None, "todo": None}
+OP_MSG_BLOQUEO_PERMANENTE = "Acceso bloqueado por demasiados intentos. Pedí a Administración que lo desbloquee."
+OP_MSG_BLOQUEO_TEMPORAL = f"Demasiados intentos. Esperá {OP_BLOQUEO_MINUTOS} minutos y volvé a probar."
+
+
+def _op_pin_hash(pin: str) -> str:
+    sal = secrets.token_bytes(16)
+    derivado = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), sal, OP_PBKDF2_ITERACIONES)
+    return "pbkdf2_sha256$%d$%s$%s" % (OP_PBKDF2_ITERACIONES, sal.hex(), derivado.hex())
+
+
+def _op_pin_verificar(pin: str, almacenado: str) -> bool:
+    try:
+        _, iteraciones, sal_hex, hash_hex = str(almacenado or "").split("$")
+        derivado = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), bytes.fromhex(sal_hex), int(iteraciones))
+    except (ValueError, TypeError):
+        return False
+    return secrets.compare_digest(derivado.hex(), hash_hex)
+
+
+def _op_dni_de_cuil(cuil) -> str:
+    digitos = re.sub(r"\D", "", str(cuil or ""))
+    return digitos[2:10].lstrip("0") if len(digitos) == 11 else ""
+
+
+def _op_personal(conn, legajo):
+    """Empleado activo por legajo (acepta ceros a la izquierda: "0032" -> 32)."""
+    texto = str(legajo or "").strip()
+    if not texto:
+        return None
+    candidatos = [texto]
+    if texto.isdigit() and int(texto) > 0 and texto != str(int(texto)):
+        candidatos.append(str(int(texto)))
+    for candidato in candidatos:
+        fila = conn.execute(
+            """
+            SELECT legajo, nombre, cuil FROM personal
+            WHERE TRIM(CAST(legajo AS TEXT)) = ? AND UPPER(COALESCE(activo, 'ACTIVO')) = 'ACTIVO'
+            LIMIT 1
+            """,
+            (candidato,),
+        ).fetchone()
+        if fila:
+            return fila
+    return None
+
+
+def _op_registro(conn, legajo: str):
+    conn.execute(
+        "INSERT INTO operador_pines (legajo, actualizado_en) VALUES (?, ?) ON CONFLICT(legajo) DO NOTHING",
+        (legajo, _sesion_texto(_sesion_ahora())),
+    )
+    return conn.execute("SELECT * FROM operador_pines WHERE legajo = ?", (legajo,)).fetchone()
+
+
+def _op_controlar_bloqueo(registro):
+    hasta = registro["bloqueado_hasta"] if registro else None
+    if not hasta or hasta <= _sesion_texto(_sesion_ahora()):
+        return
+    if hasta == OP_BLOQUEO_PERMANENTE:
+        raise HTTPException(status_code=423, detail=OP_MSG_BLOQUEO_PERMANENTE)
+    raise HTTPException(status_code=429, detail=OP_MSG_BLOQUEO_TEMPORAL)
+
+
+def _op_registrar_fallo(conn, legajo: str, mensaje: str):
+    """Suma un intento fallido (bloqueo temporal cada 5, permanente a los 10) y corta la request."""
+    fila = conn.execute("SELECT intentos_fallidos FROM operador_pines WHERE legajo = ?", (legajo,)).fetchone()
+    intentos = (int(fila["intentos_fallidos"] or 0) if fila else 0) + 1
+    bloqueo = None
+    if intentos >= OP_INTENTOS_MAXIMOS:
+        bloqueo = OP_BLOQUEO_PERMANENTE
+    elif intentos % OP_INTENTOS_POR_TRAMO == 0:
+        bloqueo = _sesion_texto(_sesion_ahora() + timedelta(minutes=OP_BLOQUEO_MINUTOS))
+    conn.execute(
+        """
+        UPDATE operador_pines
+        SET intentos_fallidos = ?, bloqueado_hasta = COALESCE(?, bloqueado_hasta), actualizado_en = ?
+        WHERE legajo = ?
+        """,
+        (intentos, bloqueo, _sesion_texto(_sesion_ahora()), legajo),
+    )
+    conn.commit()
+    if bloqueo == OP_BLOQUEO_PERMANENTE:
+        raise HTTPException(status_code=423, detail=OP_MSG_BLOQUEO_PERMANENTE)
+    if bloqueo:
+        raise HTTPException(status_code=429, detail=OP_MSG_BLOQUEO_TEMPORAL)
+    raise HTTPException(status_code=401, detail=mensaje)
+
+
+def _op_iniciar_sesion(conn, request: Request, legajo: str, nombre: str):
+    token = secrets.token_urlsafe(32)
+    ahora = _sesion_ahora()
+    conn.execute(
+        "DELETE FROM operador_sesiones WHERE expira_en < ? OR revocada_en < ?",
+        (_sesion_texto(ahora - timedelta(days=7)),) * 2,
+    )
+    conn.execute(
+        """
+        INSERT INTO operador_sesiones (token_hash, legajo, creada_en, expira_en, ip, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _sesion_token_hash(token), legajo, _sesion_texto(ahora),
+            _sesion_texto(ahora + timedelta(days=OP_SESION_DIAS)),
+            request.client.host if request.client else "",
+            request.headers.get("user-agent", "")[:300],
+        ),
+    )
+    conn.execute(
+        """
+        UPDATE operador_pines
+        SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_acceso = ?, actualizado_en = ?
+        WHERE legajo = ?
+        """,
+        (_sesion_texto(ahora), _sesion_texto(ahora), legajo),
+    )
+    conn.commit()
+    response = JSONResponse({"ok": True, "legajo": legajo, "nombre": nombre})
+    response.set_cookie(
+        OP_COOKIE_NAME, token, max_age=OP_SESION_DIAS * 24 * 3600, httponly=True,
+        samesite="lax", secure=_sesion_es_https(request), path="/operador",
+    )
+    return response
+
+
+def _op_operador(request: Request):
+    """Devuelve {legajo, nombre} del operador con sesión vigente o corta con 401."""
+    token = str(request.cookies.get(OP_COOKIE_NAME, "")).strip()
+    if token:
+        with get_sqlite_connection() as conn:
+            fila = conn.execute(
+                """
+                SELECT s.legajo FROM operador_sesiones s
+                JOIN operador_pines p ON p.legajo = s.legajo AND p.pin_hash IS NOT NULL
+                WHERE s.token_hash = ? AND s.revocada_en IS NULL AND s.expira_en > ?
+                """,
+                (_sesion_token_hash(token), _sesion_texto(_sesion_ahora())),
+            ).fetchone()
+            persona = _op_personal(conn, fila["legajo"]) if fila else None
+            if persona:
+                return {"legajo": str(persona["legajo"]).strip(), "nombre": str(persona["nombre"] or "").strip()}
+    raise HTTPException(status_code=401, detail="Sesión vencida. Ingresá de nuevo con tu PIN.")
+
+
+@app.get("/operador", response_class=HTMLResponse)
+def operador_app_view():
+    with open(OPERADOR_PATH, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read(), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/operador/manifest.webmanifest")
+def operador_manifest():
+    return JSONResponse(
+        {
+            "name": "SMG Partes Diarios",
+            "short_name": "SMG Partes",
+            "start_url": "/operador",
+            "scope": "/operador",
+            "display": "standalone",
+            "background_color": "#0f172a",
+            "theme_color": "#0f172a",
+            "icons": [{"src": "/Imagenes/09-smg.png", "sizes": "any", "type": "image/png"}],
+        },
+        media_type="application/manifest+json",
+    )
+
+
+@app.post("/operador/api/identificar")
+async def operador_identificar(payload: dict = Body(...)):
+    with get_sqlite_connection() as conn:
+        persona = _op_personal(conn, payload.get("legajo"))
+        if not persona:
+            raise HTTPException(status_code=404, detail="No encontramos un empleado activo con ese legajo.")
+        legajo = str(persona["legajo"]).strip()
+        registro = conn.execute(
+            "SELECT pin_hash, bloqueado_hasta FROM operador_pines WHERE legajo = ?", (legajo,)
+        ).fetchone()
+        _op_controlar_bloqueo(registro)
+        return {"ok": True, "legajo": legajo, "tiene_pin": bool(registro and registro["pin_hash"])}
+
+
+@app.post("/operador/api/registrar")
+async def operador_registrar_pin(request: Request, payload: dict = Body(...)):
+    pin = str(payload.get("pin") or "").strip()
+    if not OP_PIN_RE.match(pin):
+        raise HTTPException(status_code=400, detail="El PIN debe tener entre 4 y 6 números.")
+    if pin != str(payload.get("pin_confirmacion") or "").strip():
+        raise HTTPException(status_code=400, detail="Los dos PIN no coinciden.")
+    if len(set(pin)) == 1 or pin in "0123456789" or pin in "9876543210":
+        raise HTTPException(status_code=400, detail="Elegí un PIN menos obvio (sin números repetidos ni consecutivos).")
+    with get_sqlite_connection() as conn:
+        persona = _op_personal(conn, payload.get("legajo"))
+        if not persona:
+            raise HTTPException(status_code=404, detail="No encontramos un empleado activo con ese legajo.")
+        legajo = str(persona["legajo"]).strip()
+        registro = _op_registro(conn, legajo)
+        _op_controlar_bloqueo(registro)
+        if registro["pin_hash"]:
+            raise HTTPException(status_code=409, detail="Ya tenés un PIN creado. Si lo olvidaste, pedilo en Administración.")
+        dni_esperado = _op_dni_de_cuil(persona["cuil"])
+        if not dni_esperado:
+            raise HTTPException(status_code=409, detail="Tu legajo no tiene CUIL cargado. Avisá a Administración.")
+        dni = re.sub(r"\D", "", str(payload.get("dni") or "")).lstrip("0")
+        if not dni or not secrets.compare_digest(dni, dni_esperado):
+            _op_registrar_fallo(conn, legajo, "El DNI no coincide con el registrado para ese legajo.")
+        ahora = _sesion_texto(_sesion_ahora())
+        conn.execute(
+            """
+            UPDATE operador_pines
+            SET pin_hash = ?, pin_cifrado = ?, pin_creado_en = ?, actualizado_en = ?
+            WHERE legajo = ?
+            """,
+            (_op_pin_hash(pin), _cifrar_password(pin) or None, ahora, ahora, legajo),
+        )
+        return _op_iniciar_sesion(conn, request, legajo, str(persona["nombre"] or "").strip())
+
+
+@app.post("/operador/api/login")
+async def operador_login(request: Request, payload: dict = Body(...)):
+    pin = str(payload.get("pin") or "").strip()
+    with get_sqlite_connection() as conn:
+        persona = _op_personal(conn, payload.get("legajo"))
+        if not persona:
+            raise HTTPException(status_code=404, detail="No encontramos un empleado activo con ese legajo.")
+        legajo = str(persona["legajo"]).strip()
+        registro = _op_registro(conn, legajo)
+        _op_controlar_bloqueo(registro)
+        if not registro["pin_hash"]:
+            raise HTTPException(status_code=409, detail="Todavía no creaste tu PIN.")
+        if not OP_PIN_RE.match(pin) or not _op_pin_verificar(pin, registro["pin_hash"]):
+            _op_registrar_fallo(conn, legajo, "PIN incorrecto.")
+        return _op_iniciar_sesion(conn, request, legajo, str(persona["nombre"] or "").strip())
+
+
+@app.post("/operador/api/logout")
+def operador_logout(request: Request):
+    token = str(request.cookies.get(OP_COOKIE_NAME, "")).strip()
+    if token:
+        with get_sqlite_connection() as conn:
+            conn.execute(
+                """
+                UPDATE operador_sesiones SET revocada_en = ?, motivo_revocacion = 'LOGOUT'
+                WHERE token_hash = ? AND revocada_en IS NULL
+                """,
+                (_sesion_texto(_sesion_ahora()), _sesion_token_hash(token)),
+            )
+            conn.commit()
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(OP_COOKIE_NAME, path="/operador")
+    return response
+
+
+@app.get("/operador/api/yo")
+def operador_yo(request: Request):
+    return {"ok": True, **_op_operador(request)}
+
+
+@app.get("/operador/api/metadata")
+def operador_metadata(request: Request):
+    _op_operador(request)
+    with get_sqlite_connection() as conn:
+        datos = _operaciones_metadata_datos(conn)
+    return {
+        "equipos": [{"ci": e["ci"], "display": e["display"]} for e in datos["equipos"]],
+        "centros_costos": datos["centros_costos"],
+        "clientes": datos["clientes"],
+        "acoplados": datos["acoplados"],
+        "turnos": datos["turnos"],
+        "no_programadas_opciones": datos["no_programadas_opciones"],
+        "firmas_supervisores": datos["firmas_supervisores"],
+    }
+
+
+@app.get("/operador/api/ultimos")
+def operador_ultimos_valores(request: Request, ci: str = Query(..., min_length=1)):
+    """Último horómetro y kilometraje final del equipo, para precargar los iniciales."""
+    _op_operador(request)
+    with get_sqlite_connection() as conn:
+        hs = conn.execute(
+            """
+            SELECT hs_final FROM horas_maquinas
+            WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))
+              AND TRIM(COALESCE(CAST(hs_final AS TEXT), '')) NOT IN ('', '0')
+            ORDER BY id DESC LIMIT 1
+            """,
+            (ci,),
+        ).fetchone()
+        km = conn.execute(
+            """
+            SELECT km_final FROM horas_maquinas
+            WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?)) AND COALESCE(km_final, 0) > 0
+            ORDER BY id DESC LIMIT 1
+            """,
+            (ci,),
+        ).fetchone()
+    return {
+        "hs_final": _parse_op_num(hs["hs_final"], 0.0) if hs else None,
+        "km_final": float(km["km_final"]) if km else None,
+    }
+
+
+@app.get("/operador/api/partes")
+def operador_listar_partes(
+    request: Request,
+    periodo: str = Query("30d"),
+    ci: str = Query(""),
+    proyecto: str = Query(""),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Partes propios paginados. Por defecto los últimos 30 días; se puede filtrar por equipo
+    y proyecto. `opciones` trae los equipos y proyectos del operador en ese período."""
+    operador = _op_operador(request)
+    dias = OP_PERIODOS_PARTES.get(periodo)
+    if periodo not in OP_PERIODOS_PARTES:
+        periodo, dias = "30d", OP_PERIODOS_PARTES["30d"]
+    condiciones, params = ["legajo_empleado = ?"], [operador["legajo"]]
+    if periodo != "todo":
+        hoy = datetime.now().date()
+        desde = hoy.replace(month=1, day=1) if periodo == "anio" else hoy - timedelta(days=dias - 1)
+        condiciones.append(f"{OP_FECHA_VALIDA} AND fecha_parte BETWEEN ? AND ?")
+        params += [desde.isoformat(), hoy.isoformat()]
+    filtro_periodo = " AND ".join(condiciones)
+    params_periodo = list(params)
+    ci = str(ci or "").strip()
+    proyecto = str(proyecto or "").strip()
+    if ci:
+        condiciones.append("UPPER(TRIM(ci)) = UPPER(?)")
+        params.append(ci)
+    if proyecto:
+        condiciones.append("TRIM(COALESCE(obra, '')) = ?")
+        params.append(proyecto)
+    filtro = " AND ".join(condiciones)
+    with get_sqlite_connection() as conn:
+        resumen = conn.execute(
+            f"SELECT COUNT(*) AS total, ROUND(COALESCE(SUM({OP_HS_PARTE}), 0), 1) AS hs FROM horas_maquinas WHERE {filtro}",
+            params,
+        ).fetchone()
+        total = resumen["total"]
+        paginas = max(1, -(-total // limit))
+        page = min(page, paginas)
+        filas = conn.execute(
+            f"""
+            SELECT id, fecha_parte, nro_parte, ci, obra, cliente, turno, total_hs, km_total,
+                   descripcion_trabajos, origen_carga, control, created_at
+            FROM horas_maquinas
+            WHERE {filtro}
+            ORDER BY ({OP_FECHA_VALIDA}) DESC, fecha_parte DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [limit, (page - 1) * limit],
+        ).fetchall()
+        equipos = [
+            f[0] for f in conn.execute(
+                f"""
+                SELECT UPPER(TRIM(ci)) AS c FROM horas_maquinas
+                WHERE {filtro_periodo} AND TRIM(COALESCE(ci, '')) != ''
+                GROUP BY c ORDER BY COUNT(*) DESC, c
+                """,
+                params_periodo,
+            )
+        ]
+        proyectos = [
+            f[0] for f in conn.execute(
+                f"""
+                SELECT TRIM(obra) AS o FROM horas_maquinas
+                WHERE {filtro_periodo} AND TRIM(COALESCE(obra, '')) != ''
+                GROUP BY o ORDER BY COUNT(*) DESC, o
+                """,
+                params_periodo,
+            )
+        ]
+    return {
+        "ok": True,
+        "periodo": periodo,
+        "total": total,
+        "hs": resumen["hs"],
+        "page": page,
+        "paginas": paginas,
+        "limit": limit,
+        "opciones": {"equipos": equipos, "proyectos": proyectos},
+        "data": [dict(f) for f in filas],
+    }
+
+
+@app.get("/operador/api/partes/{id_parte}")
+def operador_detalle_parte(request: Request, id_parte: int):
+    operador = _op_operador(request)
+    with get_sqlite_connection() as conn:
+        fila = conn.execute(
+            "SELECT * FROM horas_maquinas WHERE id = ? AND legajo_empleado = ?",
+            (id_parte, operador["legajo"]),
+        ).fetchone()
+        if fila:
+            data = dict(fila)
+            data["foto"] = _foto_info(conn, fila)
+    if not fila:
+        raise HTTPException(status_code=404, detail="Parte no encontrado.")
+    return {"ok": True, "data": data}
+
+
+@app.post("/operador/api/partes")
+async def operador_crear_parte(request: Request):
+    """Alta de parte desde el teléfono: multipart con `datos` (JSON) y `foto` (JPEG, obligatoria)."""
+    operador = _op_operador(request)
+    if not request.headers.get("content-type", "").startswith("multipart/form-data"):
+        raise HTTPException(status_code=400, detail="La foto del parte es obligatoria.")
+    formulario = await request.form()
+    try:
+        payload = json.loads(str(formulario.get("datos") or "{}"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Los datos del parte no son válidos.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Los datos del parte no son válidos.")
+    foto = formulario.get("foto")
+    if foto is None or not hasattr(foto, "read"):
+        raise HTTPException(status_code=400, detail="La foto del parte es obligatoria.")
+    contenido = await foto.read(FOTO_PARTE_MAX_BYTES + 1)
+    if len(contenido) > FOTO_PARTE_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="La foto es demasiado grande (máximo 3 MB).")
+    if not contenido.startswith(b"\xff\xd8\xff"):
+        raise HTTPException(status_code=400, detail="La foto debe ser una imagen JPEG.")
+    # Solo los campos que carga el operador; los de control (supervisor, certificado,
+    # control) quedan para el escritorio. Legajo y maquinista salen de la sesión.
+    datos = {campo: payload.get(campo) for campo in OP_CAMPOS_PARTE}
+    datos["proyecto"] = datos.get("obra")
+    datos["legajo_empleado"] = operador["legajo"]
+    datos["maquinista"] = operador["nombre"]
+
+    fecha = str(datos.get("fecha_parte") or "").strip()
+    try:
+        fecha_dt = datetime.strptime(fecha, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="La fecha del parte no es válida.")
+    if fecha_dt > datetime.now().date():
+        raise HTTPException(status_code=400, detail="La fecha del parte no puede ser futura.")
+    for inicio, fin, nombre in (("hs_inicio", "hs_final", "horómetro"), ("km_inicio", "km_final", "kilómetro")):
+        valor_inicio = _parse_op_num(datos.get(inicio), 0.0)
+        valor_fin = _parse_op_num(datos.get(fin), 0.0)
+        if valor_inicio < 0 or valor_fin < 0:
+            raise HTTPException(status_code=400, detail=f"El {nombre} no puede ser negativo.")
+        if valor_fin > 0 and valor_fin < valor_inicio:
+            raise HTTPException(status_code=400, detail=f"El {nombre} final no puede ser menor al inicial.")
+    if _parse_op_num(datos.get("hs_reparaciones"), 0.0) <= 0:
+        datos["no_programadas"] = ""
+    elif str(datos.get("no_programadas") or "").strip() not in ("", "RM", "RED", "LOG", "MO"):
+        raise HTTPException(status_code=400, detail="El código de No Programadas no es válido.")
+
+    archivo = None
+    with get_sqlite_connection() as conn:
+        try:
+            nuevo_id, ci, nro_parte = _insertar_parte_diario(conn, datos, origen_carga="APP_OPERADOR")
+            archivo = _foto_guardar_archivo(nuevo_id, contenido)
+            conn.execute(
+                "INSERT INTO partes_fotos (parte_id, archivo, bytes, subida_en, subida_por) VALUES (?, ?, ?, ?, ?)",
+                (nuevo_id, archivo, len(contenido), _sesion_texto(_sesion_ahora()), operador["legajo"]),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            if archivo:
+                _foto_borrar_archivo(archivo)
+            raise
+    return {"ok": True, "id": nuevo_id, "mensaje": f"Parte Nº {nro_parte} del equipo {ci} cargado."}
+
+
+# Administración de PINs de operadores (solo ADMINISTRADOR).
+@app.get("/admin/operadores-pin")
+def admin_operadores_pin(request: Request):
+    _requiere_administrador(request)
+    ahora = _sesion_texto(_sesion_ahora())
+    with get_sqlite_connection() as conn:
+        filas = conn.execute(
+            """
+            SELECT TRIM(CAST(p.legajo AS TEXT)) AS legajo, p.nombre,
+                   UPPER(COALESCE(p.activo, 'ACTIVO')) AS activo,
+                   o.pin_hash IS NOT NULL AS tiene_pin, o.pin_creado_en, o.ultimo_acceso,
+                   COALESCE(o.intentos_fallidos, 0) AS intentos_fallidos, o.bloqueado_hasta,
+                   COALESCE(a.partes, 0) AS partes_app
+            FROM personal p
+            LEFT JOIN operador_pines o ON o.legajo = TRIM(CAST(p.legajo AS TEXT))
+            LEFT JOIN (
+                SELECT legajo_empleado, COUNT(*) AS partes FROM horas_maquinas
+                WHERE origen_carga = 'APP_OPERADOR' GROUP BY legajo_empleado
+            ) a ON a.legajo_empleado = TRIM(CAST(p.legajo AS TEXT))
+            ORDER BY p.nombre COLLATE NOCASE
+            """
+        ).fetchall()
+    resultado = []
+    for fila in filas:
+        item = dict(fila)
+        item["tiene_pin"] = bool(item["tiene_pin"])
+        item["bloqueado"] = bool(item["bloqueado_hasta"] and item["bloqueado_hasta"] > ahora)
+        item["bloqueo_permanente"] = item["bloqueado_hasta"] == OP_BLOQUEO_PERMANENTE
+        resultado.append(item)
+    return resultado
+
+
+@app.get("/admin/operadores-pin/{legajo}/pin")
+def admin_operador_ver_pin(legajo: str, request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        fila = conn.execute("SELECT pin_hash, pin_cifrado FROM operador_pines WHERE legajo = ?", (legajo,)).fetchone()
+        if not fila or not fila["pin_hash"]:
+            raise HTTPException(status_code=404, detail="Ese operador todavía no creó su PIN.")
+        pin = _descifrar_password(fila["pin_cifrado"] or "")
+        _registrar_acceso_admin(conn, request, "PIN_OPERADOR_VISUALIZADO", f"legajo={legajo}")
+        conn.commit()
+    if pin is None:
+        return {"pin": None, "mensaje": "No disponible (falta PASSWORD_ENCRYPTION_KEY). Use 'Resetear' para que el operador cree uno nuevo."}
+    return {"pin": pin}
+
+
+@app.post("/admin/operadores-pin/{legajo}/reset")
+def admin_operador_reset_pin(legajo: str, request: Request):
+    """Borra el PIN y cierra sus sesiones: el operador vuelve a crearlo validando su DNI."""
+    _requiere_administrador(request)
+    ahora = _sesion_texto(_sesion_ahora())
+    with get_sqlite_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE operador_pines
+            SET pin_hash = NULL, pin_cifrado = NULL, pin_creado_en = NULL,
+                intentos_fallidos = 0, bloqueado_hasta = NULL, actualizado_en = ?
+            WHERE legajo = ?
+            """,
+            (ahora, legajo),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Ese operador no tiene PIN.")
+        conn.execute(
+            """
+            UPDATE operador_sesiones SET revocada_en = ?, motivo_revocacion = 'PIN_RESETEADO'
+            WHERE legajo = ? AND revocada_en IS NULL
+            """,
+            (ahora, legajo),
+        )
+        _registrar_acceso_admin(conn, request, "PIN_OPERADOR_RESETEADO", f"legajo={legajo}")
+        conn.commit()
+    return {"ok": True}
+
+
+@app.post("/admin/operadores-pin/{legajo}/desbloquear")
+def admin_operador_desbloquear(legajo: str, request: Request):
+    _requiere_administrador(request)
+    with get_sqlite_connection() as conn:
+        conn.execute(
+            """
+            UPDATE operador_pines SET intentos_fallidos = 0, bloqueado_hasta = NULL, actualizado_en = ?
+            WHERE legajo = ?
+            """,
+            (_sesion_texto(_sesion_ahora()), legajo),
+        )
+        _registrar_acceso_admin(conn, request, "PIN_OPERADOR_DESBLOQUEADO", f"legajo={legajo}")
+        conn.commit()
+    return {"ok": True}
+
+
+# --- Menú principal del operador: indicadores y ranking ----------------------
+# Horas = horas trabajadas del parte (total_hs). Un parte diario no puede superar
+# 24 hs: los valores mayores (errores de carga históricos) se recortan a 24 para
+# que no distorsionen el ranking. Solo cuentan fechas ISO válidas del período.
+OP_PERIODOS = {"mes": "Este mes", "mes_anterior": "Mes anterior", "trimestre": "Últimos 3 meses", "anio": "Este año"}
+OP_HS_PARTE = "MIN(MAX(COALESCE(total_hs, 0), 0), 24)"
+OP_FECHA_VALIDA = "fecha_parte GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'"
+# Los equipos cuyo código empieza con "V" (camionetas y minibuses) no cuentan para los indicadores.
+OP_EQUIPO_COMPUTABLE = "UPPER(TRIM(COALESCE(ci, ''))) NOT LIKE 'V%'"
+
+
+def _op_rango_periodo(periodo: str, hoy):
+    """(desde, hasta, desde_anterior, hasta_anterior) del período; hasta nunca supera hoy."""
+    if periodo == "mes_anterior":
+        fin = hoy.replace(day=1) - timedelta(days=1)
+        desde, hasta = fin.replace(day=1), fin
+        fin_ant = desde - timedelta(days=1)
+        return desde, hasta, fin_ant.replace(day=1), fin_ant
+    if periodo == "trimestre":
+        desde = hoy - timedelta(days=89)
+        return desde, hoy, desde - timedelta(days=90), desde - timedelta(days=1)
+    if periodo == "anio":
+        desde = hoy.replace(month=1, day=1)
+        hasta_ant = hoy - timedelta(days=366 if hoy.month > 2 and hoy.year % 4 == 0 else 365)
+        return desde, hoy, desde.replace(year=desde.year - 1), hasta_ant
+    desde = hoy.replace(day=1)
+    fin_ant = desde - timedelta(days=1)
+    # Mismo tramo del mes anterior (del 1 al mismo día), para comparar parejo.
+    dia = min(hoy.day, fin_ant.day)
+    return desde, hoy, fin_ant.replace(day=1), fin_ant.replace(day=dia)
+
+
+def _op_nombre_corto(nombre: str) -> str:
+    texto = " ".join(str(nombre or "").split())
+    if "," in texto:
+        apellido, resto = [p.strip() for p in texto.split(",", 1)]
+        return f"{apellido}, {resto[:1]}." if resto else apellido
+    partes = texto.split(" ")
+    return f"{partes[0]} {partes[1][:1]}." if len(partes) > 1 else texto
+
+
+def _op_base_indicadores():
+    """Filtro común de indicadores (fecha válida en rango, con legajo, sin equipos "V")."""
+    return (
+        f"{OP_FECHA_VALIDA} AND fecha_parte BETWEEN ? AND ? AND TRIM(COALESCE(legajo_empleado, '')) != '' "
+        f"AND {OP_EQUIPO_COMPUTABLE}"
+    )
+
+
+def _op_ranking(conn, rango, yo: str, proyecto: str = ""):
+    """Ranking de horas por operador; con `proyecto` solo cuenta las horas en ese centro de costos."""
+    condicion, params = _op_base_indicadores(), list(rango)
+    if proyecto:
+        condicion += " AND TRIM(COALESCE(h.obra, '')) = ?"
+        params.append(proyecto)
+    filas = conn.execute(
+        f"""
+        SELECT h.legajo_empleado AS legajo, MAX(COALESCE(p.nombre, h.maquinista)) AS nombre,
+               COUNT(*) AS partes, ROUND(SUM({OP_HS_PARTE}), 1) AS hs,
+               COUNT(DISTINCT h.fecha_parte) AS dias, COUNT(DISTINCT UPPER(TRIM(h.ci))) AS equipos
+        FROM horas_maquinas h
+        LEFT JOIN personal p ON TRIM(CAST(p.legajo AS TEXT)) = h.legajo_empleado
+        WHERE {condicion}
+        GROUP BY h.legajo_empleado
+        ORDER BY hs DESC, partes DESC, nombre
+        """,
+        params,
+    ).fetchall()
+    return [
+        {
+            "posicion": posicion, "nombre": _op_nombre_corto(fila["nombre"]),
+            "hs": fila["hs"] or 0, "partes": fila["partes"], "dias": fila["dias"],
+            "equipos": fila["equipos"], "yo": fila["legajo"] == yo,
+        }
+        for posicion, fila in enumerate(filas, start=1)
+    ]
+
+
+def _op_top_ranking(ranking):
+    """Top 10 y, si el operador quedó afuera, su fila al final."""
+    top = ranking[:10]
+    mio = next((r for r in ranking if r["yo"]), None)
+    if mio and mio["posicion"] > 10:
+        top.append(mio)
+    return top
+
+
+@app.get("/operador/api/resumen")
+def operador_resumen(request: Request, periodo: str = Query("mes")):
+    operador = _op_operador(request)
+    if periodo not in OP_PERIODOS:
+        periodo = "mes"
+    hoy = datetime.now().date()
+    desde, hasta, desde_ant, hasta_ant = _op_rango_periodo(periodo, hoy)
+    rango = (desde.isoformat(), hasta.isoformat())
+    base = _op_base_indicadores()
+    yo = operador["legajo"]
+
+    with get_sqlite_connection() as conn:
+        ranking = _op_ranking(conn, rango, yo)
+        mio = next((r for r in ranking if r["yo"]), None)
+
+        k = conn.execute(
+            f"""
+            SELECT COUNT(*) AS partes, ROUND(COALESCE(SUM({OP_HS_PARTE}), 0), 1) AS hs,
+                   COUNT(DISTINCT fecha_parte) AS dias, COUNT(DISTINCT UPPER(TRIM(ci))) AS equipos,
+                   COUNT(DISTINCT CASE WHEN TRIM(COALESCE(obra, '')) != '' THEN obra END) AS proyectos,
+                   ROUND(COALESCE(SUM(MAX(COALESCE(km_total, 0), 0)), 0)) AS km,
+                   ROUND(COALESCE(SUM(MAX(COALESCE(gasoil, 0), 0)), 0)) AS gasoil,
+                   COALESCE(SUM(CASE WHEN TRIM(COALESCE(control, '')) != '' THEN 1 ELSE 0 END), 0) AS controlados
+            FROM horas_maquinas WHERE {base} AND legajo_empleado = ?
+            """,
+            rango + (yo,),
+        ).fetchone()
+        hs_anterior = conn.execute(
+            f"SELECT COALESCE(SUM({OP_HS_PARTE}), 0) FROM horas_maquinas WHERE {base} AND legajo_empleado = ?",
+            (desde_ant.isoformat(), hasta_ant.isoformat(), yo),
+        ).fetchone()[0]
+
+        # Serie temporal: por día (mes), por semana (3 meses) o por mes (año).
+        if periodo in ("mes", "mes_anterior"):
+            clave, granularidad = "fecha_parte", "dia"
+        elif periodo == "trimestre":
+            clave, granularidad = "date(fecha_parte, '-' || ((CAST(strftime('%w', fecha_parte) AS INTEGER) + 6) % 7) || ' days')", "semana"
+        else:
+            clave, granularidad = "substr(fecha_parte, 1, 7)", "mes"
+        valores = {
+            f["k"]: (f["hs"], f["partes"])
+            for f in conn.execute(
+                f"""
+                SELECT {clave} AS k, ROUND(SUM({OP_HS_PARTE}), 1) AS hs, COUNT(*) AS partes
+                FROM horas_maquinas WHERE {base} AND legajo_empleado = ? GROUP BY k
+                """,
+                rango + (yo,),
+            )
+        }
+        serie = []
+        if granularidad == "dia":
+            dia = desde
+            while dia <= hasta:
+                hs, partes = valores.get(dia.isoformat(), (0, 0))
+                serie.append({"k": dia.isoformat(), "hs": hs, "partes": partes})
+                dia += timedelta(days=1)
+        elif granularidad == "semana":
+            lunes = desde - timedelta(days=desde.weekday())
+            while lunes <= hasta:
+                hs, partes = valores.get(lunes.isoformat(), (0, 0))
+                serie.append({"k": lunes.isoformat(), "hs": hs, "partes": partes})
+                lunes += timedelta(days=7)
+        else:
+            for mes in range(1, hasta.month + 1):
+                k_mes = f"{hasta.year}-{mes:02d}"
+                hs, partes = valores.get(k_mes, (0, 0))
+                serie.append({"k": k_mes, "hs": hs, "partes": partes})
+
+        por_equipo = [
+            dict(f) for f in conn.execute(
+                f"""
+                SELECT UPPER(TRIM(h.ci)) AS ci, MAX(TRIM(COALESCE(v.marca, '') || ' ' || COALESCE(v.modelo, ''))) AS detalle,
+                       ROUND(SUM({OP_HS_PARTE}), 1) AS hs, COUNT(*) AS partes
+                FROM horas_maquinas h
+                LEFT JOIN vehiculos v ON UPPER(TRIM(v.codigo)) = UPPER(TRIM(h.ci))
+                WHERE {base} AND h.legajo_empleado = ?
+                GROUP BY UPPER(TRIM(h.ci)) ORDER BY hs DESC, partes DESC LIMIT 6
+                """,
+                rango + (yo,),
+            )
+        ]
+        por_proyecto = [
+            dict(f) for f in conn.execute(
+                f"""
+                SELECT COALESCE(NULLIF(TRIM(obra), ''), 'Sin centro de costos') AS proyecto,
+                       ROUND(SUM({OP_HS_PARTE}), 1) AS hs, COUNT(*) AS partes
+                FROM horas_maquinas WHERE {base} AND legajo_empleado = ?
+                GROUP BY proyecto ORDER BY hs DESC, partes DESC LIMIT 6
+                """,
+                rango + (yo,),
+            )
+        ]
+        proyectos_disponibles = [
+            dict(f) for f in conn.execute(
+                f"""
+                SELECT TRIM(obra) AS proyecto, ROUND(SUM({OP_HS_PARTE}), 1) AS hs, COUNT(*) AS partes
+                FROM horas_maquinas WHERE {base} AND legajo_empleado = ? AND TRIM(COALESCE(obra, '')) != ''
+                GROUP BY TRIM(obra) ORDER BY hs DESC, partes DESC
+                """,
+                rango + (yo,),
+            )
+        ]
+
+    total_operadores = len(ranking)
+    promedio = round(sum(r["hs"] for r in ranking) / total_operadores, 1) if total_operadores else 0
+    return {
+        "ok": True,
+        "periodo": periodo,
+        "periodo_nombre": OP_PERIODOS[periodo],
+        "desde": rango[0],
+        "hasta": rango[1],
+        "kpis": {
+            **dict(k),
+            "pendientes": (k["partes"] or 0) - (k["controlados"] or 0),
+            "hs_anterior": round(hs_anterior or 0, 1),
+            "hs_por_dia": round(k["hs"] / k["dias"], 1) if k["dias"] else 0,
+        },
+        "posicion": mio["posicion"] if mio else None,
+        "total_operadores": total_operadores,
+        "promedio_hs": promedio,
+        "lider_hs": ranking[0]["hs"] if ranking else 0,
+        "ranking": _op_top_ranking(ranking),
+        "proyectos_disponibles": proyectos_disponibles,
+        "serie": {"granularidad": granularidad, "datos": serie},
+        "por_equipo": por_equipo,
+        "por_proyecto": por_proyecto,
+    }
+
+
+@app.get("/operador/api/ranking")
+def operador_ranking(request: Request, periodo: str = Query("mes"), proyecto: str = Query("")):
+    """Ranking de horas del período; con `proyecto` compara solo las horas hechas en ese proyecto.
+
+    Solo se aceptan proyectos en los que el operador trabajó en el período.
+    """
+    operador = _op_operador(request)
+    if periodo not in OP_PERIODOS:
+        periodo = "mes"
+    desde, hasta, _, _ = _op_rango_periodo(periodo, datetime.now().date())
+    rango = (desde.isoformat(), hasta.isoformat())
+    proyecto = str(proyecto or "").strip()
+    with get_sqlite_connection() as conn:
+        if proyecto:
+            propio = conn.execute(
+                f"""
+                SELECT 1 FROM horas_maquinas
+                WHERE {_op_base_indicadores()} AND legajo_empleado = ? AND TRIM(COALESCE(obra, '')) = ?
+                LIMIT 1
+                """,
+                rango + (operador["legajo"], proyecto),
+            ).fetchone()
+            if not propio:
+                raise HTTPException(status_code=400, detail="Ese proyecto no está entre los tuyos en este período.")
+        ranking = _op_ranking(conn, rango, operador["legajo"], proyecto)
+    mio = next((r for r in ranking if r["yo"]), None)
+    return {
+        "ok": True,
+        "periodo": periodo,
+        "proyecto": proyecto,
+        "posicion": mio["posicion"] if mio else None,
+        "total_operadores": len(ranking),
+        "ranking": _op_top_ranking(ranking),
+    }
+
+
+# --- Foto del parte ----------------------------------------------------------
+# El operador adjunta una foto (obligatoria) al cargar el parte. Queda en el servidor
+# hasta que el parte se controla en el escritorio: ahí se guarda en la PC con el nombre
+# Parte_<Nº>_<CI>_<fecha>.jpg y, confirmado el guardado, se borra del servidor.
+DOC_PARTES_DIR = os.path.join(DATA_DIR, "Doc_Partes")
+FOTO_PARTE_MAX_BYTES = 3 * 1024 * 1024  # el teléfono la manda comprimida (≤ ~600 KB)
+
+
+def _foto_ruta(archivo: str) -> str:
+    base = os.path.realpath(DOC_PARTES_DIR)
+    ruta = os.path.realpath(os.path.join(base, archivo))
+    if os.path.commonpath([base, ruta]) != base:
+        raise HTTPException(status_code=400, detail="Ruta de foto inválida.")
+    return ruta
+
+
+def _foto_guardar_archivo(parte_id: int, contenido: bytes) -> str:
+    ahora = datetime.now()
+    relativo = os.path.join(f"{ahora:%Y}", f"{ahora:%m}", f"{parte_id}_{secrets.token_hex(6)}.jpg")
+    ruta = _foto_ruta(relativo)
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    return relativo
+
+
+def _foto_borrar_archivo(archivo: str):
+    try:
+        os.remove(_foto_ruta(archivo))
+    except FileNotFoundError:
+        pass
+    except OSError:
+        logger.exception("No se pudo borrar la foto del parte %s", archivo)
+
+
+def _foto_nombre_archivo(parte) -> str:
+    """Parte_<Nº>_<CI>_<fecha>.jpg, sin caracteres que Windows no acepta en nombres de archivo."""
+    def limpio(valor, defecto):
+        texto = re.sub(r'[\\/:*?"<>|\s]+', "-", str(valor or "").strip()).strip("-.")
+        return texto or defecto
+    return f"Parte_{limpio(parte['nro_parte'], parte['id'])}_{limpio(parte['ci'], 'SIN-CI')}_{limpio(parte['fecha_parte'], 'sin-fecha')}.jpg"
+
+
+def _foto_info(conn, parte):
+    fila = conn.execute("SELECT * FROM partes_fotos WHERE parte_id = ?", (parte["id"],)).fetchone()
+    if not fila:
+        return None
+    return {
+        "en_servidor": bool(fila["archivo"]),
+        "bytes": fila["bytes"],
+        "subida_en": fila["subida_en"],
+        "nombre_archivo": fila["nombre_archivo"] or _foto_nombre_archivo(parte),
+        "archivada_en": fila["archivada_en"],
+        "archivada_por": fila["archivada_por"],
+    }
+
+
+def _foto_respuesta(conn, parte, descargar: bool):
+    fila = conn.execute("SELECT archivo FROM partes_fotos WHERE parte_id = ?", (parte["id"],)).fetchone()
+    if not fila or not fila["archivo"]:
+        raise HTTPException(status_code=404, detail="La foto de este parte ya no está en el servidor.")
+    ruta = _foto_ruta(fila["archivo"])
+    if not os.path.exists(ruta):
+        raise HTTPException(status_code=404, detail="No se encontró el archivo de la foto.")
+    return FileResponse(
+        ruta, media_type="image/jpeg", filename=_foto_nombre_archivo(parte),
+        content_disposition_type="attachment" if descargar else "inline",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@app.get("/operador/api/partes/{id_parte}/foto")
+def operador_foto_parte(request: Request, id_parte: int):
+    operador = _op_operador(request)
+    with get_sqlite_connection() as conn:
+        parte = conn.execute(
+            "SELECT id, nro_parte, ci, fecha_parte FROM horas_maquinas WHERE id = ? AND legajo_empleado = ?",
+            (id_parte, operador["legajo"]),
+        ).fetchone()
+        if not parte:
+            raise HTTPException(status_code=404, detail="Parte no encontrado.")
+        return _foto_respuesta(conn, parte, descargar=False)
+
+
+@app.get("/operaciones/horas-maquinas/{id_parte}/foto")
+def escritorio_foto_parte(request: Request, id_parte: int, descargar: int = Query(0)):
+    _requiere_accion(request, "operaciones", "carga_partes_diarios", "consultar")
+    with get_sqlite_connection() as conn:
+        parte = conn.execute("SELECT id, nro_parte, ci, fecha_parte FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()
+        if not parte:
+            raise HTTPException(status_code=404, detail="Parte diario no encontrado")
+        return _foto_respuesta(conn, parte, descargar=bool(descargar))
+
+
+@app.post("/operaciones/horas-maquinas/{id_parte}/foto/archivar")
+def escritorio_archivar_foto(request: Request, id_parte: int):
+    """Se llama cuando la foto ya se guardó en la PC: la quita del servidor y deja constancia."""
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "controlar")
+    usuario = str(perfil.get("usuario") or perfil.get("nombre_apellido") or "").strip()
+    with get_sqlite_connection() as conn:
+        parte = conn.execute(
+            "SELECT id, nro_parte, ci, fecha_parte, control FROM horas_maquinas WHERE id = ?", (id_parte,)
+        ).fetchone()
+        if not parte:
+            raise HTTPException(status_code=404, detail="Parte diario no encontrado")
+        if not str(parte["control"] or "").strip():
+            raise HTTPException(status_code=400, detail="Primero hay que controlar el parte.")
+        fila = conn.execute("SELECT archivo FROM partes_fotos WHERE parte_id = ?", (id_parte,)).fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="Este parte no tiene foto.")
+        if fila["archivo"]:
+            conn.execute(
+                """
+                UPDATE partes_fotos SET archivo = NULL, archivada_en = ?, archivada_por = ?, nombre_archivo = ?
+                WHERE parte_id = ?
+                """,
+                (_sesion_texto(_sesion_ahora()), usuario, _foto_nombre_archivo(parte), id_parte),
+            )
+            conn.commit()
+            _foto_borrar_archivo(fila["archivo"])
+        return {"ok": True, "foto": _foto_info(conn, parte)}

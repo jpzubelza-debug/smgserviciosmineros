@@ -2441,6 +2441,25 @@
   </div>
 </div>
 
+<!-- Modal Guardar foto del parte (al controlar) -->
+<div class="modal-backdrop" id="modal-foto">
+  <div class="modal-box" style="max-width: 520px;">
+    <div class="modal-head">
+      <h3>Guardar foto del parte</h3>
+      <button type="button" class="modal-close" onclick="cerrarModalFoto()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-top:0;">El parte quedó controlado. Guardá la foto en la PC: una vez guardada, se elimina del servidor.</p>
+      <img id="modal-foto-img" alt="Foto del parte" style="display:block; width:100%; max-height:320px; object-fit:contain; border-radius:8px; background:rgba(0,0,0,.25);">
+      <p style="margin-bottom:0;">Nombre del archivo: <strong id="modal-foto-nombre"></strong></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-secondary" onclick="cerrarModalFoto()">Más tarde</button>
+      <button type="button" class="btn btn-primary" id="modal-foto-guardar">Guardar foto…</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Confirmación Eliminación -->
 <div class="modal-backdrop" id="modal-eliminar">
   <div class="modal-box" style="max-width: 440px;">
@@ -3731,6 +3750,7 @@
           <div class="detail-item"><span class="label">Firma Parte</span><span class="val">${d.firma_parte || '--'}</span></div>
           <div class="detail-item"><span class="label">Certificado</span><span class="val">${d.certificado || '--'}</span></div>
           <div class="detail-item"><span class="label">Control Supervisor</span><span class="val">${d.control_supervisor || '--'}</span></div>
+          <div class="detail-item"><span class="label">Origen de carga</span><span class="val">${d.origen_carga === 'APP_OPERADOR' ? 'App del operador (teléfono)' : 'Escritorio / importación'}</span></div>
           <div class="detail-item"><span class="label">Controlado por</span><span class="val">${d.control || '--'}</span></div>
         </div>
 
@@ -3743,7 +3763,13 @@
           <span class="label">Novedades</span>
           <div class="val">${d.novedades || 'Sin novedades'}</div>
         </div>
+
+        ${bloqueFotoDetalle(d)}
       `;
+      const btnFoto = document.getElementById('detalle-foto-guardar');
+      if (btnFoto) btnFoto.onclick = async () => {
+        if (await guardarFotoParte(d.id, d.foto.nombre_archivo)) verDetalleParte(d.id);
+      };
 
       document.getElementById('modal-detalle').classList.add('open');
 
@@ -3751,6 +3777,30 @@
       console.error(err);
       showToast('Error al obtener el detalle del parte.', 'error');
     }
+  }
+
+  function bloqueFotoDetalle(d) {
+    const f = d.foto;
+    if (!f) return '';
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (!f.en_servidor) {
+      return `
+        <div class="detail-block">
+          <span class="label">Foto del parte</span>
+          <div class="val">Guardada en la PC como <strong>${esc(f.nombre_archivo)}</strong> el ${esc(f.archivada_en || '--')} por ${esc(f.archivada_por || '--')}. Ya no está en el servidor.</div>
+        </div>`;
+    }
+    const accion = d.control
+      ? `<button type="button" class="btn btn-primary" id="detalle-foto-guardar" style="margin-top:8px;">Guardar foto en la PC y quitar del servidor</button>`
+      : '<div style="margin-top:6px; opacity:.8;">Se guarda en la PC al controlar el parte.</div>';
+    return `
+      <div class="detail-block">
+        <span class="label">Foto del parte · ${esc(f.nombre_archivo)}</span>
+        <a href="/operaciones/horas-maquinas/${d.id}/foto" target="_blank" rel="noopener" title="Ver en tamaño completo">
+          <img src="/operaciones/horas-maquinas/${d.id}/foto" alt="Foto del parte" loading="lazy" style="display:block; width:100%; max-height:360px; object-fit:contain; border-radius:8px; margin-top:6px; background:rgba(0,0,0,.25);">
+        </a>
+        ${accion}
+      </div>`;
   }
 
   function cerrarModalDetalle() {
@@ -3783,9 +3833,75 @@
 
       showToast(data.mensaje || 'Parte diario controlado correctamente.', 'success');
       cargarHistorial();
+      if (data.foto && data.foto.en_servidor) abrirModalFoto(idParte, data.foto.nombre_archivo);
     } catch (err) {
       console.error(err);
       showToast(err.message || 'Error al controlar el parte diario.', 'error');
+    }
+  }
+
+  // --- Foto del parte: se guarda en la PC al controlar y luego se elimina del servidor ---
+  function abrirModalFoto(idParte, nombre) {
+    document.getElementById('modal-foto-img').src = `/operaciones/horas-maquinas/${idParte}/foto?t=${Date.now()}`;
+    document.getElementById('modal-foto-nombre').textContent = nombre;
+    document.getElementById('modal-foto-guardar').onclick = async () => {
+      if (await guardarFotoParte(idParte, nombre)) cerrarModalFoto();
+    };
+    document.getElementById('modal-foto').classList.add('open');
+  }
+
+  function cerrarModalFoto() {
+    document.getElementById('modal-foto').classList.remove('open');
+    document.getElementById('modal-foto-img').removeAttribute('src');
+  }
+
+  // Abre "Guardar como" con el nombre Parte_<Nº>_<CI>_<fecha>.jpg; solo si se escribió bien
+  // avisa al servidor para eliminar la foto. Devuelve true si quedó guardada y archivada.
+  async function guardarFotoParte(idParte, nombre) {
+    if (!opExigir('carga_partes_diarios', 'controlar')) return false;
+    try {
+      if ('showSaveFilePicker' in window) {
+        let destino;
+        try {
+          // Se pide el destino antes de descargar para no perder el gesto del clic.
+          destino = await window.showSaveFilePicker({
+            suggestedName: nombre,
+            types: [{ description: 'Imagen JPEG', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }],
+          });
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            showToast('No se guardó la foto. Sigue en el servidor; podés guardarla desde el detalle del parte.', 'info');
+            return false;
+          }
+          throw err;
+        }
+        const res = await fetch(`/operaciones/horas-maquinas/${idParte}/foto?descargar=1`);
+        if (!res.ok) throw new Error('No se pudo obtener la foto del servidor.');
+        const escritor = await destino.createWritable();
+        await escritor.write(await res.blob());
+        await escritor.close();
+      } else {
+        // Navegadores sin "Guardar como" programático: descarga normal y confirmación manual.
+        const res = await fetch(`/operaciones/horas-maquinas/${idParte}/foto?descargar=1`);
+        if (!res.ok) throw new Error('No se pudo obtener la foto del servidor.');
+        const url = URL.createObjectURL(await res.blob());
+        const a = document.createElement('a');
+        a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        if (!confirm(`¿Se guardó "${nombre}" en la PC?\nSi confirmás, la foto se elimina del servidor.`)) {
+          showToast('La foto sigue en el servidor; podés guardarla desde el detalle del parte.', 'info');
+          return false;
+        }
+      }
+      const arch = await fetch(`/operaciones/horas-maquinas/${idParte}/foto/archivar`, { method: 'POST' });
+      const datos = await arch.json();
+      if (!arch.ok) throw new Error(datos.detail || 'La foto se guardó, pero no se pudo quitar del servidor.');
+      showToast(`Foto guardada como ${nombre} y eliminada del servidor.`, 'success');
+      return true;
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'No se pudo guardar la foto.', 'error');
+      return false;
     }
   }
 

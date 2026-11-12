@@ -18,6 +18,7 @@ backups/
 
 # Runtime/generated folders
 Doc_Almacen/
+Doc_Partes/
 Doc_Log_Viajes/
 tmp/
 

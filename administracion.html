@@ -227,6 +227,12 @@
       margin-bottom: 4px;
     }
     .muted { color: var(--muted); }
+    .op-link { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .op-link code { background: rgba(8, 15, 33, 0.55); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; word-break: break-all; }
+    .op-link a.btn { text-decoration: none; }
+    .badge.ok-b { border-color: #166534; color: #86efac; }
+    .badge.err-b { border-color: #991b1b; color: #fca5a5; }
+    .pin-val { font-family: ui-monospace, Consolas, monospace; letter-spacing: .2em; }
     .msg { min-height: 20px; margin-top: 8px; font-size: 0.86rem; }
     .ok { color: #86efac; }
     .err { color: #fca5a5; }
@@ -456,6 +462,52 @@
             <tbody id="access-body"></tbody>
           </table>
         </div>
+      </article>
+
+      <article class="card users-card" id="operadores-card">
+        <div class="table-toolbar">
+          <div>
+            <h2>PIN de Operadores (app de Partes Diarios)</h2>
+            <p class="section-kicker">
+              Cada operador crea su PIN la primera vez que entra a la app, validando su DNI.
+              Desde aquí puede consultarlo, resetearlo (el operador vuelve a crearlo) o desbloquearlo.
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <select id="op-filtro" style="max-width:180px;">
+              <option value="">Todos</option>
+              <option value="con">Con PIN</option>
+              <option value="sin">Sin PIN</option>
+              <option value="bloq">Bloqueados</option>
+            </select>
+            <input id="op-search" type="search" placeholder="Buscar por nombre o legajo" autocomplete="off" />
+          </div>
+        </div>
+        <div class="op-link">
+          <span class="muted">Link de la app para los teléfonos:</span>
+          <code id="op-link-url"></code>
+          <button class="btn" type="button" id="op-link-copiar">Copiar</button>
+          <a class="btn" id="op-link-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
+        <div id="op-resumen" class="muted" style="margin:8px 0;"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Legajo</th>
+                <th>Operador</th>
+                <th>Estado</th>
+                <th>PIN</th>
+                <th>Creado</th>
+                <th>Último acceso</th>
+                <th>Partes desde app</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="op-body"></tbody>
+          </table>
+        </div>
+        <div id="op-msg" class="msg"></div>
       </article>
     </section>
   </div>
@@ -1083,7 +1135,107 @@
       await reloadEmailTemplates();
       renderAccess(await api("/admin/accesos?limit=100", { method: "GET", headers: {} }));
       fillForm(null);
+      await loadOperadores();
     }
+
+    // --- PIN de operadores (app móvil /operador) ---
+    function setOpMsg(text, ok = false) {
+      const el = $("op-msg");
+      el.textContent = text || "";
+      el.className = `msg ${ok ? "ok" : "err"}`;
+    }
+
+    async function loadOperadores() {
+      try {
+        state.operadores = await api("/admin/operadores-pin", { method: "GET", headers: {} });
+        setOpMsg("");
+      } catch (err) {
+        state.operadores = [];
+        setOpMsg(`No se pudo cargar la lista de operadores: ${err.message || err}`);
+      }
+      renderOperadores();
+    }
+
+    function renderOperadores() {
+      const lista = state.operadores || [];
+      const buscado = String($("op-search").value || "").trim().toLocaleLowerCase();
+      const filtro = $("op-filtro").value;
+      const filas = lista.filter((o) => {
+        if (filtro === "con" && !o.tiene_pin) return false;
+        if (filtro === "sin" && o.tiene_pin) return false;
+        if (filtro === "bloq" && !o.bloqueado) return false;
+        if (!buscado) return true;
+        return [o.nombre, o.legajo].some((v) => String(v || "").toLocaleLowerCase().includes(buscado));
+      });
+      const conPin = lista.filter((o) => o.tiene_pin).length;
+      const bloqueados = lista.filter((o) => o.bloqueado).length;
+      $("op-resumen").textContent = `${lista.length} empleados · ${conPin} con PIN · ${bloqueados} bloqueados`;
+      $("op-body").innerHTML = filas.map((o) => {
+        const leg = esc(o.legajo);
+        let estado = o.tiene_pin ? '<span class="badge ok-b">Con PIN</span>' : '<span class="badge">Sin PIN</span>';
+        if (o.bloqueado) estado += `<span class="badge err-b">${o.bloqueo_permanente ? "Bloqueado" : "Bloqueo temporal"}</span>`;
+        else if (o.intentos_fallidos) estado += `<span class="badge">${o.intentos_fallidos} intento(s) fallido(s)</span>`;
+        if (o.activo !== "ACTIVO") estado += '<span class="badge">Empleado inactivo</span>';
+        const acciones = [];
+        if (o.tiene_pin) acciones.push(`<button class="btn danger" data-op-accion="reset" data-legajo="${leg}">Resetear PIN</button>`);
+        if (o.bloqueado || o.intentos_fallidos) acciones.push(`<button class="btn warn" data-op-accion="desbloquear" data-legajo="${leg}">Desbloquear</button>`);
+        return `
+          <tr>
+            <td>${leg}</td>
+            <td><strong>${esc(o.nombre)}</strong></td>
+            <td>${estado}</td>
+            <td>${o.tiene_pin
+              ? `<span class="muted pin-val" id="op-pin-${leg}">••••</span> <button class="btn" data-op-accion="ver" data-legajo="${leg}">Ver</button>`
+              : '<span class="muted">-</span>'}</td>
+            <td>${esc(o.pin_creado_en || "-")}</td>
+            <td>${esc(o.ultimo_acceso || "-")}</td>
+            <td>${o.partes_app || 0}</td>
+            <td><div style="display:flex; gap:6px; flex-wrap:wrap;">${acciones.join("") || '<span class="muted">-</span>'}</div></td>
+          </tr>`;
+      }).join("") || '<tr><td colspan="8" class="muted">Sin resultados.</td></tr>';
+    }
+
+    $("op-body").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-op-accion]");
+      if (!btn) return;
+      const legajo = btn.dataset.legajo;
+      const op = (state.operadores || []).find((o) => String(o.legajo) === legajo);
+      const nombre = op ? op.nombre : `legajo ${legajo}`;
+      try {
+        if (btn.dataset.opAccion === "ver") {
+          const out = document.getElementById(`op-pin-${legajo}`);
+          if (btn.dataset.visible === "1") {
+            out.textContent = "••••"; btn.dataset.visible = "0"; btn.textContent = "Ver";
+            return;
+          }
+          const data = await api(`/admin/operadores-pin/${encodeURIComponent(legajo)}/pin`, { method: "GET", headers: {} });
+          if (!data.pin) { alert(data.mensaje || "No disponible"); return; }
+          out.textContent = data.pin; btn.dataset.visible = "1"; btn.textContent = "Ocultar";
+        } else if (btn.dataset.opAccion === "reset") {
+          if (!confirm(`¿Resetear el PIN de ${nombre}?\nSe cerrará su sesión en el teléfono y deberá crear un PIN nuevo validando su DNI.`)) return;
+          await api(`/admin/operadores-pin/${encodeURIComponent(legajo)}/reset`, { method: "POST" });
+          setOpMsg(`PIN de ${nombre} reseteado.`, true);
+          await loadOperadores();
+        } else if (btn.dataset.opAccion === "desbloquear") {
+          await api(`/admin/operadores-pin/${encodeURIComponent(legajo)}/desbloquear`, { method: "POST" });
+          setOpMsg(`${nombre} desbloqueado.`, true);
+          await loadOperadores();
+        }
+      } catch (err) {
+        setOpMsg(String(err.message || err));
+      }
+    });
+    $("op-search").addEventListener("input", renderOperadores);
+    $("op-filtro").addEventListener("change", renderOperadores);
+    (() => {
+      const url = `${window.location.origin}/operador`;
+      $("op-link-url").textContent = url;
+      $("op-link-abrir").href = "/operador";
+      $("op-link-copiar").addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(url); setOpMsg("Link copiado.", true); }
+        catch { setOpMsg(`Copie manualmente: ${url}`); }
+      });
+    })();
 
     async function editUser(id) {
       const u = state.users.find((x) => x.id === id);
