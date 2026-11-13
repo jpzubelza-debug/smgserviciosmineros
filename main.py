@@ -17254,3 +17254,330 @@ def escritorio_archivar_foto(request: Request, id_parte: int):
             conn.commit()
             _foto_borrar_archivo(fila["archivo"])
         return {"ok": True, "foto": _foto_info(conn, parte)}
+
+
+# --- Operaciones › Dashboard: partes diarios (app de operadores) -------------
+# Solo lectura. Por defecto mira los partes cargados desde la app (origen_carga =
+# 'APP_OPERADOR'); con origen=todos/escritorio incluye el resto. "Pendiente de
+# revisión" = parte sin `control` (nadie lo marcó como controlado en Operaciones).
+ADM_PARTES_ORIGENES = {"app", "todos", "escritorio"}
+ADM_PARTES_PENDIENTE = "TRIM(COALESCE(h.control, '')) = ''"
+ADM_PARTES_HS = "MIN(MAX(COALESCE(h.total_hs, 0), 0), 24)"
+# Nombre por legajo; se une sobre filas ya agrupadas/limitadas (unir fila a fila es lento).
+ADM_PER_CTE = "per AS (SELECT TRIM(CAST(legajo AS TEXT)) AS leg, MAX(nombre) AS nombre FROM personal GROUP BY 1)"
+
+
+def _adm_obra(alias: str = "h") -> str:
+    return f"COALESCE(NULLIF(TRIM({alias}.obra), ''), 'Sin centro de costos')"
+
+
+def _adm_fecha_iso(valor: str, defecto):
+    try:
+        return datetime.strptime(str(valor or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return defecto
+
+
+def _adm_partes_filtro(origen: str, desde: str, hasta: str, obra: str, legajo: str, ci: str, estado: str):
+    condiciones = [
+        "h.fecha_parte GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'",
+        "h.fecha_parte BETWEEN ? AND ?",
+    ]
+    params = [desde, hasta]
+    if origen == "app":
+        condiciones.append("h.origen_carga = 'APP_OPERADOR'")
+    elif origen == "escritorio":
+        condiciones.append("COALESCE(h.origen_carga, '') != 'APP_OPERADOR'")
+    if obra:
+        condiciones.append(f"{_adm_obra()} = ?")
+        params.append(obra)
+    if legajo:
+        condiciones.append("TRIM(COALESCE(h.legajo_empleado, '')) = ?")
+        params.append(legajo)
+    if ci:
+        condiciones.append("UPPER(TRIM(COALESCE(h.ci, ''))) = ?")
+        params.append(ci.upper())
+    if estado == "pendientes":
+        condiciones.append(ADM_PARTES_PENDIENTE)
+    elif estado == "controlados":
+        condiciones.append(f"NOT ({ADM_PARTES_PENDIENTE})")
+    return " AND ".join(condiciones), params
+
+
+@app.get("/operaciones/dashboard-partes")
+def operaciones_dashboard_partes(
+    request: Request,
+    desde: str = Query(""),
+    hasta: str = Query(""),
+    origen: str = Query("app"),
+    obra: str = Query(""),
+    legajo: str = Query(""),
+    ci: str = Query(""),
+    estado: str = Query(""),
+):
+    _requiere_accion(request, "operaciones", "dashboard", "ver")
+    hoy = datetime.now().date()
+    d_hasta = _adm_fecha_iso(hasta, hoy)
+    d_desde = _adm_fecha_iso(desde, d_hasta - timedelta(days=29))
+    if d_desde > d_hasta:
+        d_desde, d_hasta = d_hasta, d_desde
+    origen = origen if origen in ADM_PARTES_ORIGENES else "app"
+    estado = estado if estado in {"pendientes", "controlados"} else ""
+    obra, legajo, ci = obra.strip(), legajo.strip(), ci.strip()
+    rango = (d_desde.isoformat(), d_hasta.isoformat())
+    where, params = _adm_partes_filtro(origen, *rango, obra, legajo, ci, estado)
+    # Las opciones de los filtros salen del período/origen sin los demás filtros, para poder cambiarlos.
+    where_opc, params_opc = _adm_partes_filtro(origen, *rango, "", "", "", "")
+    ahora_utc = _sesion_ahora().replace(tzinfo=None)
+    ahora_txt = _sesion_texto(_sesion_ahora())
+    # Pendiente "atrasado" = el parte es de hace más de 3 días y nadie lo controló.
+    hace_3_dias = (hoy - timedelta(days=3)).isoformat()
+    obra_sql = _adm_obra()
+
+    with get_sqlite_connection() as conn:
+        k = dict(conn.execute(
+            f"""
+            SELECT COUNT(*) AS partes,
+                   COALESCE(SUM(CASE WHEN {ADM_PARTES_PENDIENTE} THEN 1 ELSE 0 END), 0) AS pendientes,
+                   COALESCE(SUM(CASE WHEN {ADM_PARTES_PENDIENTE} AND h.fecha_parte < ? THEN 1 ELSE 0 END), 0) AS pendientes_viejos,
+                   ROUND(COALESCE(SUM({ADM_PARTES_HS}), 0), 1) AS hs,
+                   COUNT(DISTINCT NULLIF(UPPER(TRIM(h.ci)), '')) AS equipos,
+                   COUNT(DISTINCT {obra_sql}) AS obras,
+                   COUNT(DISTINCT NULLIF(TRIM(h.legajo_empleado), '')) AS operadores,
+                   COUNT(DISTINCT h.fecha_parte) AS dias,
+                   ROUND(COALESCE(SUM(MAX(COALESCE(h.km_total, 0), 0)), 0)) AS km,
+                   ROUND(COALESCE(SUM(MAX(COALESCE(h.gasoil, 0), 0)), 0)) AS gasoil,
+                   COALESCE(SUM(CASE WHEN TRIM(COALESCE(h.control_supervisor, '')) = '' THEN 1 ELSE 0 END), 0) AS sin_supervisor,
+                   COALESCE(SUM(CASE WHEN COALESCE(h.total_hs, 0) > 24 THEN 1 ELSE 0 END), 0) AS mas_de_24hs,
+                   COALESCE(SUM(CASE WHEN UPPER(COALESCE(h.turno, '')) LIKE 'N%' THEN 1 ELSE 0 END), 0) AS turno_noche
+            FROM horas_maquinas h WHERE {where}
+            """,
+            [hace_3_dias] + params,
+        ).fetchone())
+        k["controlados"] = k["partes"] - k["pendientes"]
+        k["pct_controlados"] = round(100 * k["controlados"] / k["partes"]) if k["partes"] else None
+        k["turno_dia"] = k["partes"] - k["turno_noche"]
+
+        # Fotos de partes del período que siguen en el servidor (se archivan al controlar en Operaciones).
+        k["fotos_en_servidor"] = conn.execute(
+            f"""
+            SELECT COUNT(*) FROM horas_maquinas h JOIN partes_fotos f ON f.parte_id = h.id
+            WHERE {where} AND f.archivo IS NOT NULL
+            """,
+            params,
+        ).fetchone()[0]
+
+        # Partes cargados hoy (created_at está en UTC; Argentina = UTC-3), sin importar el período.
+        origen_cond = {
+            "app": "origen_carga = 'APP_OPERADOR'",
+            "escritorio": "COALESCE(origen_carga, '') != 'APP_OPERADOR'",
+            "todos": "1 = 1",
+        }[origen]
+        k["cargados_hoy"] = conn.execute(
+            f"SELECT COUNT(*) FROM horas_maquinas WHERE {origen_cond} AND date(created_at, '-3 hours') = ?",
+            (hoy.isoformat(),),
+        ).fetchone()[0]
+
+        serie_db = {
+            f["fecha"]: dict(f)
+            for f in conn.execute(
+                f"""
+                SELECT h.fecha_parte AS fecha, COUNT(*) AS partes,
+                       SUM(CASE WHEN {ADM_PARTES_PENDIENTE} THEN 1 ELSE 0 END) AS pendientes,
+                       ROUND(SUM({ADM_PARTES_HS}), 1) AS hs
+                FROM horas_maquinas h WHERE {where} GROUP BY h.fecha_parte
+                """,
+                params,
+            )
+        }
+        serie = []
+        if (d_hasta - d_desde).days <= 92:
+            granularidad = "dia"
+            dia = d_desde
+            while dia <= d_hasta:
+                f = serie_db.get(dia.isoformat(), {"partes": 0, "pendientes": 0, "hs": 0})
+                serie.append({"k": dia.isoformat(), "partes": f["partes"], "pendientes": f["pendientes"], "hs": f["hs"] or 0})
+                dia += timedelta(days=1)
+        else:
+            granularidad = "mes"
+            meses = {}
+            for fecha, f in serie_db.items():
+                m = meses.setdefault(fecha[:7], {"k": fecha[:7], "partes": 0, "pendientes": 0, "hs": 0})
+                m["partes"] += f["partes"]
+                m["pendientes"] += f["pendientes"]
+                m["hs"] = round(m["hs"] + (f["hs"] or 0), 1)
+            mes = d_desde.replace(day=1)
+            while mes <= d_hasta:
+                serie.append(meses.get(f"{mes:%Y-%m}", {"k": f"{mes:%Y-%m}", "partes": 0, "pendientes": 0, "hs": 0}))
+                mes = (mes + timedelta(days=32)).replace(day=1)
+
+        por_obra = [
+            dict(f) for f in conn.execute(
+                f"""
+                SELECT {obra_sql} AS obra, MAX(h.cliente) AS cliente, COUNT(*) AS partes,
+                       ROUND(SUM({ADM_PARTES_HS}), 1) AS hs,
+                       COUNT(DISTINCT NULLIF(UPPER(TRIM(h.ci)), '')) AS equipos,
+                       COUNT(DISTINCT NULLIF(TRIM(h.legajo_empleado), '')) AS operadores,
+                       SUM(CASE WHEN {ADM_PARTES_PENDIENTE} THEN 1 ELSE 0 END) AS pendientes,
+                       MAX(h.fecha_parte) AS ultima_fecha
+                FROM horas_maquinas h WHERE {where}
+                GROUP BY 1 ORDER BY hs DESC, partes DESC
+                """,
+                params,
+            )
+        ]
+        por_equipo = [
+            dict(f) for f in conn.execute(
+                f"""
+                WITH base AS (
+                    SELECT UPPER(TRIM(h.ci)) AS eq, h.fecha_parte, h.hs_final, h.legajo_empleado, h.control,
+                           h.total_hs, h.km_total, {obra_sql} AS obra_n,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY UPPER(TRIM(h.ci)) ORDER BY h.fecha_parte DESC, h.id DESC
+                           ) AS orden
+                    FROM horas_maquinas h WHERE {where} AND TRIM(COALESCE(h.ci, '')) != ''
+                ),
+                agg AS (
+                    SELECT h.eq AS ci, COUNT(*) AS partes, ROUND(SUM({ADM_PARTES_HS}), 1) AS hs,
+                           ROUND(SUM(MAX(COALESCE(h.km_total, 0), 0))) AS km,
+                           COUNT(DISTINCT NULLIF(TRIM(h.legajo_empleado), '')) AS operadores,
+                           SUM(CASE WHEN {ADM_PARTES_PENDIENTE} THEN 1 ELSE 0 END) AS pendientes,
+                           MAX(h.fecha_parte) AS ultima_fecha,
+                           MAX(CASE WHEN h.orden = 1 THEN h.hs_final END) AS ultimo_horometro,
+                           MAX(CASE WHEN h.orden = 1 THEN h.obra_n END) AS ultima_obra
+                    FROM base h GROUP BY h.eq
+                ),
+                veh AS (
+                    SELECT UPPER(TRIM(codigo)) AS eq,
+                           MAX(TRIM(COALESCE(tipo, '') || ' ' || COALESCE(marca, '') || ' ' || COALESCE(modelo, ''))) AS detalle
+                    FROM vehiculos GROUP BY UPPER(TRIM(codigo))
+                )
+                SELECT a.*, veh.detalle FROM agg a LEFT JOIN veh ON veh.eq = a.ci
+                ORDER BY a.hs DESC, a.partes DESC
+                """,
+                params,
+            )
+        ]
+        por_operador = [
+            dict(f) for f in conn.execute(
+                f"""
+                WITH agg AS (
+                    SELECT TRIM(h.legajo_empleado) AS legajo, MAX(h.maquinista) AS maquinista,
+                           COUNT(*) AS partes, ROUND(SUM({ADM_PARTES_HS}), 1) AS hs,
+                           COUNT(DISTINCT h.fecha_parte) AS dias,
+                           COUNT(DISTINCT NULLIF(UPPER(TRIM(h.ci)), '')) AS equipos,
+                           SUM(CASE WHEN {ADM_PARTES_PENDIENTE} THEN 1 ELSE 0 END) AS pendientes,
+                           MAX(h.fecha_parte) AS ultima_fecha, MAX(h.created_at) AS ultima_carga
+                    FROM horas_maquinas h
+                    WHERE {where} AND TRIM(COALESCE(h.legajo_empleado, '')) != ''
+                    GROUP BY TRIM(h.legajo_empleado)
+                ), {ADM_PER_CTE}
+                SELECT a.legajo, COALESCE(per.nombre, a.maquinista) AS nombre, a.partes, a.hs, a.dias,
+                       a.equipos, a.pendientes, a.ultima_fecha, a.ultima_carga,
+                       o.ultimo_acceso, o.pin_hash IS NOT NULL AS usa_app
+                FROM agg a
+                LEFT JOIN per ON per.leg = a.legajo
+                LEFT JOIN operador_pines o ON o.legajo = a.legajo
+                ORDER BY a.hs DESC, a.partes DESC
+                """,
+                params,
+            )
+        ]
+        pendientes = [
+            dict(f) for f in conn.execute(
+                f"""
+                WITH sel AS (
+                    SELECT h.id, h.nro_parte, h.fecha_parte, h.created_at, UPPER(TRIM(h.ci)) AS ci,
+                           h.maquinista, TRIM(h.legajo_empleado) AS legajo, {obra_sql} AS obra, h.turno,
+                           h.total_hs, h.control_supervisor, h.origen_carga
+                    FROM horas_maquinas h WHERE {where} AND {ADM_PARTES_PENDIENTE}
+                    ORDER BY h.fecha_parte, h.id LIMIT 300
+                ), {ADM_PER_CTE}
+                SELECT s.*, COALESCE(per.nombre, s.maquinista) AS operador, f.parte_id IS NOT NULL AS tiene_foto
+                FROM sel s LEFT JOIN per ON per.leg = s.legajo LEFT JOIN partes_fotos f ON f.parte_id = s.id
+                ORDER BY s.fecha_parte, s.id
+                """,
+                params,
+            )
+        ]
+        for fila in pendientes:
+            fila["tiene_foto"] = bool(fila["tiene_foto"])
+            fila["dias_espera"] = (hoy - _adm_fecha_iso(fila["fecha_parte"], hoy)).days
+        recientes = [
+            dict(f) for f in conn.execute(
+                f"""
+                WITH sel AS (
+                    SELECT h.id, h.nro_parte, h.fecha_parte, h.created_at, UPPER(TRIM(h.ci)) AS ci,
+                           h.maquinista, TRIM(h.legajo_empleado) AS legajo, {obra_sql} AS obra,
+                           h.turno, h.total_hs, h.control, h.origen_carga
+                    FROM horas_maquinas h WHERE {where} ORDER BY h.created_at DESC, h.id DESC LIMIT 15
+                ), {ADM_PER_CTE}
+                SELECT s.*, COALESCE(per.nombre, s.maquinista) AS operador
+                FROM sel s LEFT JOIN per ON per.leg = s.legajo
+                ORDER BY s.created_at DESC, s.id DESC
+                """,
+                params,
+            )
+        ]
+
+        app_operadores = dict(conn.execute(
+            """
+            SELECT COUNT(*) AS con_pin,
+                   COALESCE(SUM(CASE WHEN bloqueado_hasta > ? THEN 1 ELSE 0 END), 0) AS bloqueados,
+                   COALESCE(SUM(CASE WHEN ultimo_acceso >= ? THEN 1 ELSE 0 END), 0) AS accedieron_7d
+            FROM operador_pines WHERE pin_hash IS NOT NULL
+            """,
+            (ahora_txt, _sesion_texto(ahora_utc - timedelta(days=7))),
+        ).fetchone())
+        activos = {r["legajo"] for r in por_operador}
+        app_operadores["con_pin_sin_partes"] = [
+            dict(f) for f in conn.execute(
+                """
+                SELECT o.legajo, COALESCE(p.nombre, o.legajo) AS nombre, o.ultimo_acceso
+                FROM operador_pines o LEFT JOIN personal p ON TRIM(CAST(p.legajo AS TEXT)) = o.legajo
+                WHERE o.pin_hash IS NOT NULL ORDER BY nombre COLLATE NOCASE
+                """
+            )
+            if f["legajo"] not in activos
+        ]
+
+        opciones = {
+            "obras": [f[0] for f in conn.execute(
+                f"SELECT DISTINCT {obra_sql} AS o FROM horas_maquinas h WHERE {where_opc} ORDER BY o COLLATE NOCASE",
+                params_opc,
+            )],
+            "operadores": [dict(f) for f in conn.execute(
+                f"""
+                WITH agg AS (
+                    SELECT TRIM(h.legajo_empleado) AS legajo, MAX(h.maquinista) AS maquinista
+                    FROM horas_maquinas h WHERE {where_opc} AND TRIM(COALESCE(h.legajo_empleado, '')) != ''
+                    GROUP BY TRIM(h.legajo_empleado)
+                ), {ADM_PER_CTE}
+                SELECT a.legajo, COALESCE(per.nombre, a.maquinista) AS nombre
+                FROM agg a LEFT JOIN per ON per.leg = a.legajo ORDER BY nombre COLLATE NOCASE
+                """,
+                params_opc,
+            )],
+            "equipos": [f[0] for f in conn.execute(
+                f"""
+                SELECT DISTINCT UPPER(TRIM(h.ci)) AS c FROM horas_maquinas h
+                WHERE {where_opc} AND TRIM(COALESCE(h.ci, '')) != '' ORDER BY c
+                """,
+                params_opc,
+            )],
+        }
+
+    return {
+        "ok": True,
+        "filtros": {"desde": rango[0], "hasta": rango[1], "origen": origen, "obra": obra, "legajo": legajo, "ci": ci, "estado": estado},
+        "generado_en": ahora_txt,
+        "kpis": k,
+        "app_operadores": app_operadores,
+        "serie": {"granularidad": granularidad, "datos": serie},
+        "por_obra": por_obra,
+        "por_equipo": por_equipo,
+        "por_operador": por_operador,
+        "pendientes": pendientes,
+        "recientes": recientes,
+        "opciones": opciones,
+    }

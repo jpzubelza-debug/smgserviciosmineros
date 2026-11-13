@@ -1672,6 +1672,115 @@
   .cert-close { border: 0; background: none; font-size: 22px; color: var(--c-muted); cursor: pointer; }
 
   @media (max-width: 1100px) { .cert-stats { grid-template-columns: repeat(2, 1fr); } .cert-trio { grid-template-columns: 1fr; } }
+  /* ===== Dashboard Operaciones: partes diarios de la app de operadores ===== */
+  .opd-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .opd-box {
+    background: var(--subcard-bg); border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow: hidden;
+  }
+  .opd-box-head {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    padding: 9px 12px; background: rgba(30, 41, 59, 0.45); border-bottom: 1px solid var(--line);
+  }
+  .opd-box-head h3 { margin: 0; font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+  .opd-box-head p { margin: 2px 0 0; font-size: 11px; color: var(--text-muted); }
+  .opd-box-body { padding: 10px 12px; }
+  .opd-filtros { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; padding: 10px 12px; }
+  .opd-filtros .field { min-width: 130px; flex: 1 1 140px; max-width: 240px; }
+  .opd-filtros .field.opd-f-fecha { flex: 0 1 140px; }
+  .opd-filtros .field.opd-f-periodo { max-width: none; flex: 0 1 auto; }
+  .opd-filtros .opd-acciones { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .opd-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input-border); border-radius: 6px; overflow: hidden; background: var(--input-bg); }
+  .opd-seg button {
+    background: none; border: 0; border-right: 1px solid var(--input-border); color: #cbd5e1;
+    padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .opd-seg button:last-child { border-right: 0; }
+  .opd-seg button:hover { background: rgba(56, 189, 248, 0.12); color: #fff; }
+  .opd-seg button.on { background: linear-gradient(135deg, #1d4ed8, #0284c7); color: #fff; }
+  .opd-meta { color: var(--text-muted); font-size: 11px; }
+  .opd-err { color: #fca5a5; font-size: 12px; padding: 0 12px 10px; }
+  .opd-err:empty { display: none; }
+
+  .opd-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .opd-kpi {
+    background: var(--subcard-bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px;
+    text-align: left; color: var(--text); font: inherit; min-width: 0; position: relative; overflow: hidden;
+  }
+  .opd-kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: rgba(56, 189, 248, 0.55); }
+  button.opd-kpi { cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+  button.opd-kpi:hover { border-color: var(--line-active); background: rgba(15, 23, 42, 0.75); }
+  .opd-kpi .lbl { color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+  .opd-kpi .val { font-size: 26px; font-weight: 800; line-height: 1.15; margin-top: 4px; font-variant-numeric: tabular-nums; color: #fff; }
+  .opd-kpi .val small { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+  .opd-kpi .sub { color: var(--text-muted); font-size: 11px; margin-top: 3px; }
+  .opd-kpi.alerta { border-color: rgba(245, 158, 11, 0.55); }
+  .opd-kpi.alerta::before { background: #f59e0b; }
+  .opd-kpi.alerta .val { color: #fbbf24; }
+  .opd-kpi.bien::before { background: var(--text-green); }
+  .opd-kpi.bien .val { color: #86efac; }
+  .opd-meter { height: 5px; background: rgba(148, 163, 184, 0.2); border-radius: 3px; overflow: hidden; margin-top: 7px; }
+  .opd-meter i { display: block; height: 100%; background: var(--text-green); border-radius: 3px; }
+
+  .opd-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr); gap: 12px; }
+  .opd-row.mitad { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .opd-leyenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+  .opd-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+  .opd-leyenda i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  .opd-chart { position: relative; }
+  .opd-chart svg { display: block; width: 100%; }
+  .opd-chart .grid { stroke: rgba(148, 163, 184, 0.16); stroke-width: 1; }
+  .opd-chart .eje { fill: var(--text-muted); font-size: 11px; font-family: inherit; }
+  .opd-chart .hit { fill: transparent; }
+  .opd-chart .hit:hover { fill: rgba(56, 189, 248, 0.08); }
+  .opd-tip {
+    position: absolute; pointer-events: none; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px;
+    padding: 7px 10px; font-size: 12px; box-shadow: 0 8px 22px rgba(0,0,0,.5); white-space: nowrap; z-index: 6;
+  }
+  .opd-tip b { display: block; margin-bottom: 3px; color: #fff; }
+  .opd-tip .fila { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+  .opd-tip .fila strong { color: #fff; margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
+  .opd-tip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .opd-vacio { color: var(--text-muted); padding: 22px 8px; text-align: center; font-size: 12px; }
+
+  .opd-alertas { display: grid; gap: 6px; }
+  .opd-alerta {
+    display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; width: 100%;
+    border: 1px solid var(--line); background: rgba(2, 6, 23, 0.35); font: inherit; font-size: 12px; color: var(--text); text-align: left;
+  }
+  button.opd-alerta { cursor: pointer; }
+  button.opd-alerta:hover { border-color: var(--line-active); }
+  .opd-alerta .ico { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; flex: 0 0 20px; }
+  .opd-alerta .n { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .opd-alerta.ok .ico { background: rgba(34,197,94,.18); color: #86efac; }
+  .opd-alerta.warn .ico { background: rgba(245,158,11,.2); color: #fbbf24; }
+  .opd-alerta.danger .ico { background: rgba(239,68,68,.2); color: #fca5a5; }
+  .opd-split { display: flex; height: 10px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 6px 0; background: rgba(148, 163, 184, 0.2); }
+  .opd-split i { display: block; height: 100%; }
+  .opd-sub { font-size: 11px; color: #93c5fd; margin: 12px 0 4px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+  .opd-lista { display: grid; gap: 3px; font-size: 12px; color: var(--text-muted); }
+  .opd-lista b { color: #fff; }
+
+  #panel-dashboard .table-responsive { max-height: 440px; }
+  #panel-dashboard .hm-table tbody tr.clic { cursor: pointer; }
+  .opd-hb { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
+  .opd-hb span { display: inline-block; width: 64px; height: 5px; border-radius: 3px; background: rgba(148, 163, 184, 0.2); overflow: hidden; }
+  .opd-hb span i { display: block; height: 100%; background: #38bdf8; border-radius: 3px; }
+  .opd-pill { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; border: 1px solid; }
+  .opd-pill.ok { background: rgba(34,197,94,.15); color: #86efac; border-color: rgba(34,197,94,.35); }
+  .opd-pill.warn { background: rgba(245,158,11,.16); color: #fbbf24; border-color: rgba(245,158,11,.4); }
+  .opd-pill.danger { background: rgba(239,68,68,.16); color: #fca5a5; border-color: rgba(239,68,68,.4); }
+  .opd-pill.info { background: rgba(56,189,248,.15); color: #7dd3fc; border-color: rgba(56,189,248,.35); }
+  .opd-busca { width: 200px; }
+  @media (max-width: 1100px) {
+    .opd-row, .opd-row.mitad { grid-template-columns: 1fr; }
+    .opd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .opd-filtros .opd-acciones { margin-left: 0; }
+  }
+  @media (max-width: 620px) {
+    .opd-filtros .field, .opd-filtros .field.opd-f-fecha { max-width: none; flex: 1 1 100%; }
+    .opd-kpi .val { font-size: 21px; }
+  }
 </style>
 </head>
 <body>
@@ -1726,9 +1835,151 @@
   <!-- Main Content Area -->
   <main class="main">
     <!-- Dashboard Panel Placeholder (si se selecciona) -->
-    <section class="card form-card hidden" id="panel-dashboard" style="padding: 24px;">
-      <h2>Dashboard Operaciones</h2>
-      <p style="color: #94a3b8;">Indicadores operativos en desarrollo.</p>
+    <section class="card form-card hidden" id="panel-dashboard">
+      <div class="card-header-bar">
+        <div class="card-title-group">
+          <div class="header-icon-badge">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          </div>
+          <div>
+            <h2>Dashboard Operaciones</h2>
+            <div class="opd-meta">Indicadores de los partes diarios cargados desde la app de operadores</div>
+          </div>
+        </div>
+        <div class="header-meta">
+          <span class="opd-meta" id="opd-actualizado"></span>
+          <button class="btn btn-secondary" type="button" id="opd-limpiar">Limpiar filtros</button>
+          <button class="btn btn-primary" type="button" id="opd-refrescar">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="opd-body">
+        <div class="opd-box">
+          <div class="opd-filtros">
+            <div class="field opd-f-periodo">
+              <label>Período (fecha del parte)</label>
+              <div class="opd-seg" id="opd-presets">
+                <button type="button" data-p="hoy">Hoy</button>
+                <button type="button" data-p="7d">7 días</button>
+                <button type="button" data-p="30d">30 días</button>
+                <button type="button" data-p="mes">Este mes</button>
+                <button type="button" data-p="mes_ant">Mes anterior</button>
+                <button type="button" data-p="anio">Este año</button>
+              </div>
+            </div>
+            <div class="field opd-f-fecha"><label for="opd-desde">Desde</label><input type="date" id="opd-desde"></div>
+            <div class="field opd-f-fecha"><label for="opd-hasta">Hasta</label><input type="date" id="opd-hasta"></div>
+            <div class="field">
+              <label for="opd-origen">Origen de carga</label>
+              <select id="opd-origen">
+                <option value="app">App de operadores</option>
+                <option value="todos">Todos los partes</option>
+                <option value="escritorio">Escritorio / importación</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="opd-estado">Estado</label>
+              <select id="opd-estado">
+                <option value="">Todos</option>
+                <option value="pendientes">Pendientes de revisión</option>
+                <option value="controlados">Controlados</option>
+              </select>
+            </div>
+            <div class="field"><label for="opd-obra">Obra / centro de costos</label><select id="opd-obra"></select></div>
+            <div class="field"><label for="opd-operador">Operador</label><select id="opd-operador"></select></div>
+            <div class="field"><label for="opd-equipo">Equipo</label><select id="opd-equipo"></select></div>
+          </div>
+          <div class="opd-err" id="opd-msg"></div>
+        </div>
+
+        <div class="opd-kpis" id="opd-kpis"></div>
+
+        <div class="opd-row">
+          <div class="opd-box">
+            <div class="opd-box-head">
+              <div><h3 id="opd-serie-titulo">Partes por día</h3><p>Según la fecha del parte. Pase el mouse sobre una barra para ver el detalle.</p></div>
+              <div class="opd-leyenda">
+                <span><i style="background:#22c55e"></i>Controlados</span>
+                <span><i style="background:#f59e0b"></i>Pendientes de revisión</span>
+              </div>
+            </div>
+            <div class="opd-box-body"><div class="opd-chart" id="opd-serie"></div></div>
+          </div>
+          <div class="opd-box">
+            <div class="opd-box-head"><div><h3>Control y calidad</h3><p>Puntos a revisar en la selección.</p></div></div>
+            <div class="opd-box-body">
+              <div class="opd-alertas" id="opd-alertas"></div>
+              <p class="opd-sub">Turnos</p>
+              <div id="opd-turnos"></div>
+              <p class="opd-sub">Uso de la app</p>
+              <div id="opd-app"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="opd-box">
+          <div class="opd-box-head">
+            <div>
+              <h3>Pendientes de revisión <span class="opd-pill warn" id="opd-pend-cnt">0</span></h3>
+              <p>Partes sin controlar, del más antiguo al más reciente. Puede ver el detalle o controlarlos desde aquí.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="hm-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Nº Parte</th><th>Equipo</th><th>Operador</th><th>Obra</th><th class="text-center">Turno</th>
+                  <th class="text-right">Horas</th><th>Supervisor SMG</th><th class="text-center">Foto</th><th class="text-center">Origen</th>
+                  <th class="text-right">Espera</th><th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="opd-pend-body"></tbody>
+            </table>
+          </div>
+          <div class="opd-meta" id="opd-pend-nota" style="padding: 6px 12px;"></div>
+        </div>
+
+        <div class="opd-box">
+          <div class="opd-box-head">
+            <div><h3>Detalle por <span id="opd-desglose-titulo">equipo</span></h3><p>Haga clic en una fila para filtrar todo el tablero por ese elemento.</p></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <div class="opd-seg" id="opd-desglose">
+                <button type="button" data-d="equipos">Equipos <span id="opd-cnt-equipos"></span></button>
+                <button type="button" data-d="obras">Obras <span id="opd-cnt-obras"></span></button>
+                <button type="button" data-d="operadores">Operadores <span id="opd-cnt-operadores"></span></button>
+              </div>
+              <input type="search" class="opd-busca input-sm" id="opd-busca" placeholder="Buscar..." autocomplete="off">
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="hm-table">
+              <thead id="opd-desglose-head"></thead>
+              <tbody id="opd-desglose-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="opd-row mitad">
+          <div class="opd-box">
+            <div class="opd-box-head"><div><h3>Últimos partes cargados</h3><p>Por fecha y hora de carga.</p></div></div>
+            <div class="table-responsive">
+              <table class="hm-table">
+                <thead><tr><th>Cargado</th><th>Fecha</th><th>Equipo</th><th>Operador</th><th>Obra</th><th class="text-right">Horas</th><th class="text-center">Estado</th></tr></thead>
+                <tbody id="opd-recientes"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="opd-box">
+            <div class="opd-box-head"><div><h3>Operadores con PIN sin partes</h3><p>Ya crearon su PIN en la app pero no tienen partes en la selección.</p></div></div>
+            <div class="table-responsive">
+              <table class="hm-table">
+                <thead><tr><th>Legajo</th><th>Operador</th><th>Último acceso a la app</th></tr></thead>
+                <tbody id="opd-sinpartes"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="card form-card hidden centros-costos-panel" id="panel-centros-costos">
@@ -2469,7 +2720,7 @@
     </div>
     <div class="modal-body" style="font-size: 13.5px; color: #e2e8f0; line-height: 1.5;">
       ¿Está seguro de que desea eliminar el <strong id="eliminar-parte-info">Parte Diario</strong>?
-      <div style="margin-top: 8px; color: #94a3b8; font-size: 12px;">Esta acción no se puede deshacer y eliminará el registro de horas_maquinas.</div>
+      <div style="margin-top: 8px; color: #94a3b8; font-size: 12px;">Esta acción no se puede deshacer: se eliminan el registro de horas_maquinas y la foto del parte guardada en el servidor.</div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-secondary" onclick="cerrarModalEliminar()">Cancelar</button>
@@ -3917,6 +4168,7 @@
       showToast(data.mensaje || 'Parte eliminado correctamente.', 'success');
       cerrarModalEliminar();
       cargarHistorial();
+      if (window.opdTrasCambio) window.opdTrasCambio();
 
     } catch (err) {
       console.error(err);
@@ -4863,6 +5115,7 @@
 
     btnDash.addEventListener('click', () => {
       activarPanel(panelDash, btnDash);
+      window.opdAbrir();
     });
 
     btnPartes.addEventListener('click', () => {
@@ -4895,6 +5148,7 @@
     } else {
       activarPanel(panelDash, btnDash);
       btnDash.classList.remove('active');
+      panelDash.style.padding = '24px';
       panelDash.innerHTML = '<h2>Operaciones</h2><p style="color: #94a3b8;">Su usuario no tiene paneles de Operaciones habilitados. Solicite los permisos en Administración.</p>';
     }
   });
@@ -6122,6 +6376,466 @@
     certIndicesEventos();
     certActualizarBotonSeguimiento();
   });
+</script>
+<script>
+  // ===== Dashboard Operaciones: indicadores de los partes cargados desde la app de operadores =====
+  // Datos de GET /operaciones/dashboard-partes (solo lectura). Pendiente = parte sin "control".
+  (function () {
+    const el = (id) => document.getElementById(id);
+    const esc = (v) => escHtml(v);
+    const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 });
+    const n0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
+    const CLAVE = 'operaciones.dashboardPartes.filtros';
+    const VERDE = '#22c55e', AMBAR = '#f59e0b', CELESTE = '#38bdf8', VIOLETA = '#a78bfa';
+    const pd = { datos: null, desglose: 'equipos', cargando: false, iniciado: false, seq: 0, preset: '30d' };
+    const filtros = { desde: '', hasta: '', origen: 'app', estado: '', obra: '', legajo: '', ci: '' };
+
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fFecha = (s) => (s && /^\d{4}-\d{2}-\d{2}/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(2, 4)}` : esc(s || '—'));
+    // created_at y último acceso se guardan en UTC.
+    const fUtc = (s) => {
+      if (!s) return '—';
+      const d = new Date(String(s).replace(' ', 'T') + 'Z');
+      if (isNaN(d)) return esc(s);
+      return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+    const txt = (s, max = 40) => {
+      const t = String(s ?? '').trim();
+      if (!t) return '<span style="color:#64748b">—</span>';
+      return t.length > max ? `<span title="${esc(t)}">${esc(t.slice(0, max - 1))}…</span>` : esc(t);
+    };
+    const turno = (t) => {
+      const v = String(t || '').trim();
+      if (!v) return '<span style="color:#64748b">—</span>';
+      return /^n/i.test(v) ? `<span class="badge-turno badge-turno-noche">${esc(v)}</span>` : `<span class="badge-turno badge-turno-dia">${esc(v)}</span>`;
+    };
+
+    function rangoPreset(p) {
+      const hoy = new Date();
+      const d = new Date(hoy);
+      if (p === 'hoy') return [iso(hoy), iso(hoy)];
+      if (p === '7d') { d.setDate(d.getDate() - 6); return [iso(d), iso(hoy)]; }
+      if (p === '30d') { d.setDate(d.getDate() - 29); return [iso(d), iso(hoy)]; }
+      if (p === 'mes') return [iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), iso(hoy)];
+      if (p === 'mes_ant') return [iso(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)), iso(new Date(hoy.getFullYear(), hoy.getMonth(), 0))];
+      if (p === 'anio') return [iso(new Date(hoy.getFullYear(), 0, 1)), iso(hoy)];
+      return null;
+    }
+
+    function guardar() {
+      try { localStorage.setItem(CLAVE, JSON.stringify({ ...filtros, preset: pd.preset, desglose: pd.desglose })); } catch (e) { /* sin almacenamiento */ }
+    }
+    function restaurar() {
+      let g = null;
+      try { g = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { g = null; }
+      if (g && typeof g === 'object') {
+        ['origen', 'estado', 'obra', 'legajo', 'ci', 'desde', 'hasta'].forEach((k) => { if (typeof g[k] === 'string') filtros[k] = g[k]; });
+        if (typeof g.preset === 'string') pd.preset = g.preset;
+        if (['equipos', 'obras', 'operadores'].includes(g.desglose)) pd.desglose = g.desglose;
+      }
+      // Un período relativo ("30 días") se recalcula cada vez que se abre.
+      const r = rangoPreset(pd.preset);
+      if (r) [filtros.desde, filtros.hasta] = r;
+      if (!filtros.desde || !filtros.hasta) { pd.preset = '30d'; [filtros.desde, filtros.hasta] = rangoPreset('30d'); }
+    }
+
+    function pintarFiltros() {
+      el('opd-desde').value = filtros.desde;
+      el('opd-hasta').value = filtros.hasta;
+      el('opd-origen').value = filtros.origen;
+      el('opd-estado').value = filtros.estado;
+      document.querySelectorAll('#opd-presets button').forEach((b) => b.classList.toggle('on', b.dataset.p === pd.preset));
+      document.querySelectorAll('#opd-desglose button').forEach((b) => b.classList.toggle('on', b.dataset.d === pd.desglose));
+    }
+
+    function llenarSelect(sel, opciones, valor, todos) {
+      const lista = opciones.slice();
+      if (valor && !lista.some((o) => o.v === valor)) lista.unshift({ v: valor, t: `${valor} (sin partes)` });
+      sel.innerHTML = `<option value="">${todos}</option>` + lista.map((o) => `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+      sel.value = valor || '';
+    }
+
+    async function cargar() {
+      // Si cambian varios filtros seguidos, solo se pinta la respuesta de la última petición.
+      const turnoCarga = ++pd.seq;
+      pd.cargando = true;
+      el('opd-refrescar').disabled = true;
+      el('opd-msg').textContent = '';
+      const qs = new URLSearchParams(Object.entries(filtros).filter(([, v]) => v));
+      try {
+        const res = await fetch(`/operaciones/dashboard-partes?${qs}`, { credentials: 'same-origin' });
+        const datos = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(datos.detail || `HTTP ${res.status}`);
+        if (turnoCarga !== pd.seq) return;
+        pd.datos = datos;
+        render();
+        el('opd-actualizado').textContent = `Actualizado ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+      } catch (err) {
+        if (turnoCarga === pd.seq) el('opd-msg').textContent = `No se pudo cargar el tablero: ${String(err.message || err).slice(0, 200)}`;
+      } finally {
+        if (turnoCarga === pd.seq) {
+          pd.cargando = false;
+          el('opd-refrescar').disabled = false;
+        }
+      }
+    }
+
+    function aplicar(cambios) {
+      Object.assign(filtros, cambios);
+      guardar();
+      pintarFiltros();
+      cargar();
+    }
+
+    // ---- Render -----------------------------------------------------------
+    function render() {
+      const d = pd.datos;
+      const op = d.opciones;
+      llenarSelect(el('opd-obra'), op.obras.map((o) => ({ v: o, t: o })), filtros.obra, 'Todas');
+      llenarSelect(el('opd-operador'), op.operadores.map((o) => ({ v: o.legajo, t: `${o.nombre || '—'} (${o.legajo})` })), filtros.legajo, 'Todos');
+      llenarSelect(el('opd-equipo'), op.equipos.map((o) => ({ v: o, t: o })), filtros.ci, 'Todos');
+      renderKpis(d);
+      renderSerie(d.serie);
+      renderAlertas(d);
+      renderPendientes(d);
+      renderDesglose();
+      renderRecientes(d.recientes);
+      renderSinPartes(d.app_operadores.con_pin_sin_partes);
+    }
+
+    function kpi({ lbl, val, unidad = '', sub = '', clase = '', accion = '', extra = '' }) {
+      const tag = accion ? 'button' : 'div';
+      return `<${tag} class="opd-kpi ${clase}" ${accion ? `type="button" data-accion="${accion}"` : ''}>
+        <div class="lbl">${lbl}</div>
+        <div class="val">${val}${unidad ? `<small>${unidad}</small>` : ''}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ''}${extra}
+      </${tag}>`;
+    }
+
+    function renderKpis(d) {
+      const k = d.kpis;
+      const a = d.app_operadores;
+      const pct = k.pct_controlados;
+      el('opd-kpis').innerHTML = [
+        kpi({ lbl: 'Partes cargados', val: n0.format(k.partes), sub: `${n0.format(k.cargados_hoy)} cargados hoy · ${k.dias} días con partes`, accion: 'todos' }),
+        kpi({
+          lbl: 'Pendientes de revisión', val: n0.format(k.pendientes), accion: 'pendientes',
+          clase: k.pendientes ? 'alerta' : 'bien',
+          sub: k.pendientes_viejos ? `${n0.format(k.pendientes_viejos)} con más de 3 días` : 'Ninguno atrasado',
+        }),
+        kpi({
+          lbl: 'Controlados', val: pct === null ? '—' : pct, unidad: pct === null ? '' : '%', accion: 'controlados',
+          sub: `${n0.format(k.controlados)} de ${n0.format(k.partes)} partes`,
+          extra: `<div class="opd-meter"><i style="width:${pct || 0}%"></i></div>`,
+        }),
+        kpi({ lbl: 'Horas trabajadas', val: nf.format(k.hs), unidad: 'hs', sub: k.partes ? `${nf.format(k.hs / k.partes)} hs promedio por parte` : '' }),
+        kpi({ lbl: 'Equipos', val: n0.format(k.equipos), sub: 'con partes en el período', accion: 'ver:equipos' }),
+        kpi({ lbl: 'Obras', val: n0.format(k.obras), sub: 'centros de costos', accion: 'ver:obras' }),
+        kpi({ lbl: 'Operadores', val: n0.format(k.operadores), sub: `${n0.format(a.con_pin)} con PIN · ${n0.format(a.accedieron_7d)} entraron en 7 días`, accion: 'ver:operadores' }),
+        kpi({ lbl: 'Km recorridos', val: n0.format(k.km), unidad: 'km', sub: k.gasoil ? `${n0.format(k.gasoil)} l de gasoil` : 'Sin gasoil cargado' }),
+      ].join('');
+    }
+
+    function escalaMax(v) {
+      if (v <= 4) return 4;
+      const p = Math.pow(10, Math.floor(Math.log10(v)));
+      return [1, 2, 2.5, 5, 10].find((x) => x * p >= v) * p;
+    }
+
+    function renderSerie(serie) {
+      const cont = el('opd-serie');
+      const datos = serie.datos;
+      el('opd-serie-titulo').textContent = serie.granularidad === 'mes' ? 'Partes por mes' : 'Partes por día';
+      if (!datos.some((x) => x.partes)) { cont.innerHTML = '<div class="opd-vacio">No hay partes en el período seleccionado.</div>'; return; }
+      const W = Math.max(cont.clientWidth || 640, 280), H = W < 500 ? 210 : 260;
+      const m = { l: 36, r: 6, t: 10, b: 24 };
+      const pw = W - m.l - m.r, ph = H - m.t - m.b;
+      const max = escalaMax(Math.max(...datos.map((x) => x.partes)));
+      const n = datos.length, paso = pw / n;
+      const bw = Math.max(2, Math.min(26, paso - 2));
+      const y = (v) => m.t + ph - (v / max) * ph;
+      const partes = [];
+      for (let i = 0; i <= 4; i++) {
+        const v = (max / 4) * i, yy = y(v);
+        partes.push(`<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"></line>`);
+        partes.push(`<text class="eje" x="${m.l - 6}" y="${yy + 4}" text-anchor="end">${n0.format(v)}</text>`);
+      }
+      const cada = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+      const etiqueta = (k) => (serie.granularidad === 'mes'
+        ? new Date(`${k}-01T12:00:00`).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' })
+        : `${k.slice(8, 10)}/${k.slice(5, 7)}`);
+      datos.forEach((x, i) => {
+        const cx = m.l + paso * i + paso / 2, x0 = cx - bw / 2;
+        const ctrl = x.partes - x.pendientes;
+        const r = Math.min(3, bw / 2);
+        // Controlados abajo (verde), pendientes arriba (ámbar), separados por 2px.
+        if (ctrl > 0) {
+          const h = Math.max(1, (ctrl / max) * ph);
+          partes.push(`<rect x="${x0}" y="${m.t + ph - h}" width="${bw}" height="${h}" rx="${x.pendientes ? 0 : r}" fill="${VERDE}"></rect>`);
+        }
+        if (x.pendientes > 0) {
+          const base = m.t + ph - (ctrl > 0 ? (ctrl / max) * ph + 2 : 0);
+          const h = Math.max(1, (x.pendientes / max) * ph - (ctrl > 0 ? 2 : 0));
+          partes.push(`<rect x="${x0}" y="${base - h}" width="${bw}" height="${h}" rx="${r}" fill="${AMBAR}"></rect>`);
+        }
+        if (i % cada === 0) partes.push(`<text class="eje" x="${cx}" y="${H - 6}" text-anchor="middle">${etiqueta(x.k)}</text>`);
+        partes.push(`<rect class="hit" data-i="${i}" x="${m.l + paso * i}" y="${m.t}" width="${paso}" height="${ph}"></rect>`);
+      });
+      cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Partes por período">${partes.join('')}</svg><div class="opd-tip" hidden></div>`;
+      const tip = cont.querySelector('.opd-tip');
+      cont.querySelectorAll('.hit').forEach((rect) => {
+        rect.addEventListener('mousemove', (ev) => {
+          const x = datos[+rect.dataset.i];
+          const titulo = serie.granularidad === 'mes' ? etiqueta(x.k)
+            : new Date(`${x.k}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+          tip.innerHTML = `<b>${titulo}</b>
+            <div class="fila"><i style="background:${VERDE}"></i>Controlados<strong>${x.partes - x.pendientes}</strong></div>
+            <div class="fila"><i style="background:${AMBAR}"></i>Pendientes<strong>${x.pendientes}</strong></div>
+            <div class="fila">Horas<strong>${nf.format(x.hs)}</strong></div>`;
+          tip.hidden = false;
+          const caja = cont.getBoundingClientRect();
+          let left = ev.clientX - caja.left + 14;
+          if (left + tip.offsetWidth > caja.width) left = ev.clientX - caja.left - tip.offsetWidth - 14;
+          tip.style.left = `${Math.max(0, left)}px`;
+          tip.style.top = `${Math.max(0, ev.clientY - caja.top - tip.offsetHeight / 2)}px`;
+        });
+        rect.addEventListener('mouseleave', () => { tip.hidden = true; });
+      });
+    }
+
+    function alerta(tipo, ico, texto, n, accion = '') {
+      const tag = accion ? 'button' : 'div';
+      return `<${tag} class="opd-alerta ${tipo}" ${accion ? `type="button" data-accion="${accion}"` : ''}>
+        <span class="ico">${ico}</span><span>${texto}</span><span class="n">${n0.format(n)}</span></${tag}>`;
+    }
+
+    function renderAlertas(d) {
+      const k = d.kpis, a = d.app_operadores;
+      el('opd-alertas').innerHTML = [
+        k.pendientes_viejos
+          ? alerta('warn', '!', 'Pendientes con más de 3 días', k.pendientes_viejos, 'pendientes')
+          : alerta('ok', '✓', 'Sin pendientes atrasados', 0),
+        k.sin_supervisor ? alerta('warn', '!', 'Partes sin supervisor de turno SMG', k.sin_supervisor) : alerta('ok', '✓', 'Todos con supervisor de turno', 0),
+        k.mas_de_24hs ? alerta('danger', '×', 'Partes con más de 24 hs', k.mas_de_24hs) : alerta('ok', '✓', 'Ningún parte supera 24 hs', 0),
+        k.fotos_en_servidor ? alerta('warn', '!', 'Fotos en el servidor (se archivan al controlar)', k.fotos_en_servidor, 'pendientes') : alerta('ok', '✓', 'Sin fotos pendientes de archivar', 0),
+        a.bloqueados ? alerta('danger', '×', 'Operadores con PIN bloqueado (se desbloquean en Administración)', a.bloqueados) : '',
+      ].join('');
+
+      const total = k.turno_dia + k.turno_noche;
+      el('opd-turnos').innerHTML = total
+        ? `<div class="opd-split"><i style="width:${(k.turno_dia / total) * 100}%; background:${CELESTE}"></i><i style="width:${(k.turno_noche / total) * 100}%; background:${VIOLETA}"></i></div>
+           <div class="opd-leyenda"><span><i style="background:${CELESTE}"></i>Día ${n0.format(k.turno_dia)} (${Math.round((k.turno_dia / total) * 100)}%)</span>
+           <span><i style="background:${VIOLETA}"></i>Noche ${n0.format(k.turno_noche)} (${Math.round((k.turno_noche / total) * 100)}%)</span></div>`
+        : '<div class="opd-meta">Sin partes.</div>';
+      el('opd-app').innerHTML = `<div class="opd-lista">
+          <span>Operadores con PIN creado: <b>${n0.format(a.con_pin)}</b></span>
+          <span>Entraron a la app en los últimos 7 días: <b>${n0.format(a.accedieron_7d)}</b></span>
+          <span>Con PIN y sin partes en la selección: <b>${n0.format(a.con_pin_sin_partes.length)}</b></span>
+        </div>`;
+    }
+
+    const ICONO_VER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    const ICONO_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    const ICONO_EDITAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>';
+    const ICONO_ELIMINAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+
+    function renderPendientes(d) {
+      const filas = d.pendientes;
+      const puedeVer = opPuede('carga_partes_diarios', 'consultar');
+      const puedeControlar = opPuede('carga_partes_diarios', 'controlar');
+      const puedeEditar = opPuede('carga_partes_diarios', 'editar');
+      const puedeEliminar = opPuede('carga_partes_diarios', 'eliminar');
+      el('opd-pend-cnt').textContent = n0.format(d.kpis.pendientes);
+      el('opd-pend-cnt').className = `opd-pill ${d.kpis.pendientes ? 'warn' : 'ok'}`;
+      el('opd-pend-body').innerHTML = filas.length ? filas.map((p) => {
+        const espera = p.dias_espera;
+        const clase = espera > 7 ? 'danger' : espera > 3 ? 'warn' : 'info';
+        const nro = esc(String(p.nro_parte || p.id)).replace(/'/g, '');
+        return `<tr>
+          <td>${fFecha(p.fecha_parte)}</td>
+          <td>${esc(p.nro_parte || '—')}</td>
+          <td><b>${esc(p.ci || '—')}</b></td>
+          <td>${txt(p.operador, 30)}</td>
+          <td>${txt(p.obra, 34)}</td>
+          <td class="text-center">${turno(p.turno)}</td>
+          <td class="text-right">${nf.format(p.total_hs || 0)}</td>
+          <td>${p.control_supervisor ? txt(p.control_supervisor, 24) : '<span class="opd-pill warn">Sin supervisor</span>'}</td>
+          <td class="text-center">${p.tiene_foto ? '<span class="opd-pill ok">Con foto</span>' : '<span style="color:#64748b">—</span>'}</td>
+          <td class="text-center">${p.origen_carga === 'APP_OPERADOR' ? '<span class="opd-pill info">App</span>' : '<span style="color:#94a3b8">Escritorio</span>'}</td>
+          <td class="text-right"><span class="opd-pill ${clase}">${espera === 0 ? 'Hoy' : `${espera} d`}</span></td>
+          <td class="text-center"><div class="row-actions">
+            ${puedeVer ? `<button type="button" class="btn-action" title="Ver detalle" onclick="verDetalleParte(${Number(p.id)})">${ICONO_VER}</button>` : ''}
+            ${puedeControlar ? `<button type="button" class="btn-action" title="Marcar como controlado" onclick="opdControlar(${Number(p.id)}, '${nro}')">${ICONO_OK}</button>` : ''}
+            ${puedeEditar ? `<button type="button" class="btn-action" title="Editar parte" onclick="opdEditar(${Number(p.id)})">${ICONO_EDITAR}</button>` : ''}
+            ${puedeEliminar ? `<button type="button" class="btn-action btn-del" title="Eliminar parte (y su foto)" onclick="confirmarEliminarParte(${Number(p.id)}, '${nro}', '${esc(p.ci || '').replace(/'/g, '')}')">${ICONO_ELIMINAR}</button>` : ''}
+          </div></td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="12" class="opd-vacio">✓ No hay partes pendientes de revisión en la selección.</td></tr>';
+      el('opd-pend-nota').textContent = d.kpis.pendientes > filas.length
+        ? `Mostrando los ${filas.length} más antiguos de ${n0.format(d.kpis.pendientes)} pendientes. Acote el período u otro filtro para ver el resto.`
+        : '';
+    }
+
+    function hbar(v, max) {
+      return `<div class="opd-hb">${nf.format(v || 0)}<span><i style="width:${max ? Math.max(2, (v / max) * 100) : 0}%"></i></span></div>`;
+    }
+    const pendPill = (n) => (n ? `<span class="opd-pill warn">${n0.format(n)}</span>` : '<span class="opd-pill ok">0</span>');
+
+    const DESGLOSES = {
+      equipos: {
+        titulo: 'equipo',
+        filas: (d) => d.por_equipo,
+        texto: (r) => `${r.ci} ${r.detalle || ''} ${r.ultima_obra || ''}`,
+        head: '<tr><th>Equipo</th><th>Descripción</th><th>Última obra</th><th class="text-right">Partes</th><th class="text-right">Horas</th><th class="text-right">Km</th><th class="text-right">Operadores</th><th class="text-center">Pendientes</th><th>Último parte</th><th class="text-right">Último horómetro</th></tr>',
+        fila: (r, max) => `<tr class="clic" data-filtro="ci" data-valor="${esc(r.ci)}">
+          <td><b>${esc(r.ci)}</b></td><td>${txt(r.detalle, 38)}</td><td>${txt(r.ultima_obra, 32)}</td>
+          <td class="text-right">${n0.format(r.partes)}</td><td class="text-right">${hbar(r.hs, max)}</td><td class="text-right">${n0.format(r.km || 0)}</td>
+          <td class="text-right">${r.operadores}</td><td class="text-center">${pendPill(r.pendientes)}</td><td>${fFecha(r.ultima_fecha)}</td>
+          <td class="text-right">${esc(r.ultimo_horometro || '—')}</td></tr>`,
+      },
+      obras: {
+        titulo: 'obra',
+        filas: (d) => d.por_obra,
+        texto: (r) => `${r.obra} ${r.cliente || ''}`,
+        head: '<tr><th>Obra / centro de costos</th><th>Cliente</th><th class="text-right">Partes</th><th class="text-right">Horas</th><th class="text-right">Equipos</th><th class="text-right">Operadores</th><th class="text-center">Pendientes</th><th>Último parte</th></tr>',
+        fila: (r, max) => `<tr class="clic" data-filtro="obra" data-valor="${esc(r.obra)}">
+          <td>${txt(r.obra, 56)}</td><td>${txt(r.cliente, 30)}</td><td class="text-right">${n0.format(r.partes)}</td>
+          <td class="text-right">${hbar(r.hs, max)}</td><td class="text-right">${r.equipos}</td><td class="text-right">${r.operadores}</td>
+          <td class="text-center">${pendPill(r.pendientes)}</td><td>${fFecha(r.ultima_fecha)}</td></tr>`,
+      },
+      operadores: {
+        titulo: 'operador',
+        filas: (d) => d.por_operador,
+        texto: (r) => `${r.legajo} ${r.nombre || ''}`,
+        head: '<tr><th>Legajo</th><th>Operador</th><th class="text-center">App</th><th class="text-right">Partes</th><th class="text-right">Horas</th><th class="text-right">Días</th><th class="text-right">Equipos</th><th class="text-center">Pendientes</th><th>Último parte</th><th>Última carga</th><th>Último acceso app</th></tr>',
+        fila: (r, max) => `<tr class="clic" data-filtro="legajo" data-valor="${esc(r.legajo)}">
+          <td>${esc(r.legajo)}</td><td>${txt(r.nombre, 34)}</td>
+          <td class="text-center">${r.usa_app ? '<span class="opd-pill info">Con PIN</span>' : '<span style="color:#64748b">—</span>'}</td>
+          <td class="text-right">${n0.format(r.partes)}</td><td class="text-right">${hbar(r.hs, max)}</td><td class="text-right">${r.dias}</td>
+          <td class="text-right">${r.equipos}</td><td class="text-center">${pendPill(r.pendientes)}</td><td>${fFecha(r.ultima_fecha)}</td>
+          <td>${fUtc(r.ultima_carga)}</td><td>${fUtc(r.ultimo_acceso)}</td></tr>`,
+      },
+    };
+
+    function renderDesglose() {
+      if (!pd.datos) return;
+      const def = DESGLOSES[pd.desglose];
+      Object.keys(DESGLOSES).forEach((k) => { el(`opd-cnt-${k}`).textContent = `(${DESGLOSES[k].filas(pd.datos).length})`; });
+      el('opd-desglose-titulo').textContent = def.titulo;
+      el('opd-desglose-head').innerHTML = def.head;
+      const q = el('opd-busca').value.trim().toLowerCase();
+      const todas = def.filas(pd.datos);
+      const filas = q ? todas.filter((r) => def.texto(r).toLowerCase().includes(q)) : todas;
+      const max = Math.max(0, ...todas.map((r) => r.hs || 0));
+      const cols = (def.head.match(/<th/g) || []).length;
+      el('opd-desglose-body').innerHTML = filas.length
+        ? filas.map((r) => def.fila(r, max)).join('')
+        : `<tr><td colspan="${cols}" class="opd-vacio">Sin datos para mostrar.</td></tr>`;
+    }
+
+    function renderRecientes(filas) {
+      el('opd-recientes').innerHTML = filas.length ? filas.map((r) => `<tr>
+          <td>${fUtc(r.created_at)}</td><td>${fFecha(r.fecha_parte)}</td>
+          <td><b>${esc(r.ci || '—')}</b></td><td>${txt(r.operador, 24)}</td><td>${txt(r.obra, 24)}</td>
+          <td class="text-right">${nf.format(r.total_hs || 0)}</td>
+          <td class="text-center">${String(r.control || '').trim() ? `<span class="opd-pill ok" title="Controlado por ${esc(r.control)}">Controlado</span>` : '<span class="opd-pill warn">Pendiente</span>'}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="opd-vacio">Sin partes en la selección.</td></tr>';
+    }
+
+    function renderSinPartes(filas) {
+      el('opd-sinpartes').innerHTML = filas.length ? filas.map((r) => `<tr>
+          <td>${esc(r.legajo)}</td><td>${txt(r.nombre, 40)}</td><td>${fUtc(r.ultimo_acceso)}</td>
+        </tr>`).join('') : '<tr><td colspan="3" class="opd-vacio">Todos los operadores con PIN tienen partes en la selección.</td></tr>';
+    }
+
+    // ---- Eventos -----------------------------------------------------------
+    function accion(a) {
+      if (a === 'pendientes' || a === 'controlados') aplicar({ estado: a });
+      else if (a === 'todos') aplicar({ estado: '' });
+      else if (a.startsWith('ver:')) {
+        pd.desglose = a.slice(4);
+        guardar(); pintarFiltros(); renderDesglose();
+        el('opd-desglose').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function iniciar() {
+      restaurar();
+      pintarFiltros();
+      el('opd-presets').addEventListener('click', (ev) => {
+        const b = ev.target.closest('button[data-p]');
+        if (!b) return;
+        pd.preset = b.dataset.p;
+        const [desde, hasta] = rangoPreset(pd.preset);
+        aplicar({ desde, hasta });
+      });
+      ['opd-desde', 'opd-hasta'].forEach((id) => el(id).addEventListener('change', () => {
+        if (!el('opd-desde').value || !el('opd-hasta').value) return;
+        pd.preset = '';
+        aplicar({ desde: el('opd-desde').value, hasta: el('opd-hasta').value });
+      }));
+      el('opd-origen').addEventListener('change', (e) => aplicar({ origen: e.target.value, obra: '', legajo: '', ci: '' }));
+      el('opd-estado').addEventListener('change', (e) => aplicar({ estado: e.target.value }));
+      el('opd-obra').addEventListener('change', (e) => aplicar({ obra: e.target.value }));
+      el('opd-operador').addEventListener('change', (e) => aplicar({ legajo: e.target.value }));
+      el('opd-equipo').addEventListener('change', (e) => aplicar({ ci: e.target.value }));
+      el('opd-refrescar').addEventListener('click', cargar);
+      el('opd-limpiar').addEventListener('click', () => {
+        pd.preset = '30d';
+        const [desde, hasta] = rangoPreset('30d');
+        el('opd-busca').value = '';
+        aplicar({ desde, hasta, origen: 'app', estado: '', obra: '', legajo: '', ci: '' });
+      });
+      el('opd-desglose').addEventListener('click', (ev) => {
+        const b = ev.target.closest('button[data-d]');
+        if (!b) return;
+        pd.desglose = b.dataset.d;
+        el('opd-busca').value = '';
+        guardar(); pintarFiltros(); renderDesglose();
+      });
+      el('opd-busca').addEventListener('input', renderDesglose);
+      el('opd-desglose-body').addEventListener('click', (ev) => {
+        const tr = ev.target.closest('tr[data-filtro]');
+        if (tr) aplicar({ [tr.dataset.filtro]: tr.dataset.valor });
+      });
+      el('panel-dashboard').addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-accion]');
+        if (b) accion(b.dataset.accion);
+      });
+      let espera;
+      window.addEventListener('resize', () => {
+        clearTimeout(espera);
+        espera = setTimeout(() => { if (pd.datos && visible()) renderSerie(pd.datos.serie); }, 150);
+      });
+      // Refresco automático cada 2 minutos mientras el tablero está a la vista.
+      setInterval(() => { if (!document.hidden && visible() && !pd.cargando) cargar(); }, 120000);
+    }
+
+    const visible = () => !el('panel-dashboard').classList.contains('hidden');
+
+    // Controlar desde el tablero: mismo flujo que el historial (confirmación y guardado de la foto).
+    // Editar desde el tablero: se abre el formulario de Carga de Partes Diarios con el parte cargado.
+    window.opdEditar = function (id) {
+      document.getElementById('btn-sidebar-carga-partes').click();
+      editarParte(id);
+    };
+
+    // Tras eliminar un parte (el modal de borrado es el mismo del historial) se refresca el tablero.
+    window.opdTrasCambio = function () {
+      if (pd.iniciado && visible()) cargar();
+    };
+
+    window.opdControlar = async function (id, nro) {
+      await controlarParte(id, nro);
+      cargar();
+    };
+
+    window.opdAbrir = function () {
+      if (!el('opd-kpis')) return; // panel reemplazado por el aviso de "sin permisos"
+      if (!pd.iniciado) { pd.iniciado = true; iniciar(); }
+      cargar();
+    };
+  })();
 </script>
 </body>
 </html>
