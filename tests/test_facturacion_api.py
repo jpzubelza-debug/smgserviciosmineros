@@ -223,7 +223,8 @@ class Base(unittest.TestCase):
 class T01Migracion(Base):
     def test_solo_agrega_tablas_fac_y_no_cambia_lo_existente(self):
         # Crea solo las tablas fac_ que faltan (sobre la base real, la v1 ya trae la mayoría).
-        nuevas = set(HUELLAS_INIT) - set(HUELLAS_ANTES)
+        # Las tablas am_ (Actas de Medición) las crea otro módulo en el mismo arranque.
+        nuevas = {t for t in set(HUELLAS_INIT) - set(HUELLAS_ANTES) if not t.startswith("am_")}
         self.assertEqual(nuevas, set(main.fac.FAC_TABLAS) - set(HUELLAS_ANTES))
         for t, h in HUELLAS_ANTES.items():
             if not t.startswith("fac_"):
@@ -241,7 +242,8 @@ class T01Migracion(Base):
                 continue  # los triggers se recrean por diseño; las tablas con columnas nuevas se controlan arriba
             self.assertEqual(ESQUEMA_INIT.get(nombre), sql, f"cambió la definición de {nombre}")
         agregados = set(ESQUEMA_INIT) - set(ESQUEMA_ANTES)
-        self.assertTrue(all(n.startswith(("fac_", "ux_fac_", "ix_fac_", "trg_fac_", "sqlite_autoindex_fac_")) for n in agregados), agregados)
+        self.assertTrue(all(n.startswith(("fac_", "ux_fac_", "ix_fac_", "trg_fac_", "sqlite_autoindex_fac_",
+                                          "am_", "idx_am_", "trg_am_", "sqlite_autoindex_am_")) for n in agregados), agregados)
 
     def test_init_repetido_es_idempotente(self):
         antes_esquema, antes = _esquema(DB_COPIA), _huellas(DB_COPIA)

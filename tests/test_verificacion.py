@@ -194,7 +194,8 @@ class A_Migracion(Base):
                 self.assertEqual(cols_despues[:len(columnas)], columnas, f"cambiaron las columnas previas de {t}")
                 self.assertTrue(set(cols_despues[len(columnas):]) <= {c for c, _ in main.fac.FAC_COLUMNAS.get(t, ())}, t)
                 self.assertEqual([f[:len(columnas)] for f in filas_despues], filas, f"cambiaron filas de {t}")
-        self.assertTrue(all(t.startswith("fac_") for t in set(HUELLAS_DESPUES) - set(HUELLAS_ANTES)))
+        # Tablas nuevas permitidas: Facturación (fac_*) y Actas de Medición (am_*).
+        self.assertTrue(all(t.startswith(("fac_", "am_")) for t in set(HUELLAS_DESPUES) - set(HUELLAS_ANTES)))
         with _db() as conn:
             esquema = sorted(map(tuple, conn.execute("SELECT type, name, sql FROM sqlite_master")))
             main.migrar_verificacion_certificados(conn)

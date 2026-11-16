@@ -126,7 +126,7 @@ with sync_playwright() as p:
     pagina = ingresar(navegador, "ui.admin@test.local")
     ok("tema claro en Seguimiento", pagina.evaluate("document.body.classList.contains('tema-claro')"))
     ok("barra lateral sin entradas nuevas", pagina.evaluate("[...document.querySelectorAll('.sidebar .menu-label')].map(e => e.textContent.trim()).join('|')")
-       == "Dashboard|Carga de Partes Diarios|Centro de Costos|Seguimiento de Cliente|Menú Principal")
+       == "Dashboard|Carga de Partes Diarios|Centro de Costos|Seguimiento de Cliente|Actas de Medición|Menú Principal")
     boton = pagina.locator("#btn-certificados-cliente")
     ok("botón Certificados visible y habilitado", boton.is_visible() and boton.is_enabled())
     captura(pagina, "01_seguimiento", completa=False)

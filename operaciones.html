@@ -1823,6 +1823,13 @@
         <span class="menu-label">Seguimiento de Cliente</span>
       </button>
 
+      <button class="menu-btn" id="btn-sidebar-actas-medicion" type="button">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path><path d="M14 4h6v6"></path></svg>
+        </span>
+        <span class="menu-label">Actas de Medición</span>
+      </button>
+
       <a class="menu-btn" href="/" style="margin-top: auto;">
         <span class="menu-icon">
           <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -2291,6 +2298,9 @@
         </div>
       </div>
     </section>
+
+    <!-- Actas de Medición (pantalla en /operaciones/actas-medicion.js) -->
+    <section class="card form-card hidden cert-panel seguimiento-panel" id="panel-actas-medicion"><div id="am-root"></div></section>
 
     <!-- Panel Principal Carga de Partes Diarios -->
     <section id="panel-carga-partes" style="display: flex; flex-direction: column; gap: 14px;">
@@ -5094,6 +5104,8 @@
     const btnPartes = document.getElementById('btn-sidebar-carga-partes');
     const btnCentrosCostos = document.getElementById('btn-sidebar-centros-costos');
     const btnSeguimientoCliente = document.getElementById('btn-sidebar-seguimiento-cliente');
+    const btnActasMedicion = document.getElementById('btn-sidebar-actas-medicion');
+    const panelActasMedicion = document.getElementById('panel-actas-medicion');
     const panelDash = document.getElementById('panel-dashboard');
     const panelPartes = document.getElementById('panel-carga-partes');
     const panelCentrosCostos = document.getElementById('panel-centros-costos');
@@ -5101,12 +5113,12 @@
     const panelCertificadosCliente = document.getElementById('panel-certificados-cliente');
 
     function activarPanel(panelActivo, botonActivo) {
-      [btnDash, btnPartes, btnCentrosCostos, btnSeguimientoCliente].forEach(boton => boton.classList.remove('active'));
-      [panelDash, panelPartes, panelCentrosCostos, panelSeguimientoCliente, panelCertificadosCliente].forEach(panel => panel.classList.add('hidden'));
+      [btnDash, btnPartes, btnCentrosCostos, btnSeguimientoCliente, btnActasMedicion].forEach(boton => boton.classList.remove('active'));
+      [panelDash, panelPartes, panelCentrosCostos, panelSeguimientoCliente, panelCertificadosCliente, panelActasMedicion].forEach(panel => panel.classList.add('hidden'));
       botonActivo.classList.add('active');
       panelActivo.classList.remove('hidden');
       // Seguimiento de Cliente y Certificados usan el diseño claro aprobado; los demás paneles conservan el tema actual.
-      document.body.classList.toggle('tema-claro', panelActivo === panelSeguimientoCliente || panelActivo === panelCertificadosCliente);
+      document.body.classList.toggle('tema-claro', panelActivo === panelSeguimientoCliente || panelActivo === panelCertificadosCliente || panelActivo === panelActasMedicion);
       window.scrollTo(0, 0);
     }
     // Certificados es una pantalla del Seguimiento: la barra lateral mantiene activo "Seguimiento de Cliente".
@@ -5132,12 +5144,18 @@
       cargarSeguimientoCliente();
     });
 
+    btnActasMedicion.addEventListener('click', () => {
+      activarPanel(panelActasMedicion, btnActasMedicion);
+      if (window.amAbrir) window.amAbrir();
+    });
+
     // Solo se muestran los paneles habilitados en Administración; se abre el primero disponible.
     const panelesHabilitados = [
       ['carga_partes_diarios', btnPartes, opTienePanel('carga_partes_diarios')],
       ['dashboard', btnDash, opPuede('dashboard', 'ver')],
       ['centros_costos', btnCentrosCostos, opTienePanel('centros_costos')],
       ['seguimiento_cliente', btnSeguimientoCliente, opTienePanel('seguimiento_cliente')],
+      ['actas_medicion', btnActasMedicion, opTienePanel('actas_medicion')],
     ];
     panelesHabilitados.forEach(([, boton, habilitado]) => boton.classList.toggle('hidden', !habilitado));
     opActualizarBotonParte();
@@ -5471,7 +5489,8 @@
             <button type="button" data-cert-mod="ITEMS" class="${ed.modalidad === 'ITEMS' ? 'on' : ''}" ${fija ? 'disabled' : ''}>Por ítems</button>
             <button type="button" data-cert-mod="GLOBAL" class="${ed.modalidad === 'GLOBAL' ? 'on' : ''}" ${fija ? 'disabled' : ''}>Global</button></span>
             <span class="cert-muted">${fija ? 'Modalidad fija del seguimiento' : 'La modalidad queda fija al emitir el primer certificado'}</span>
-            <button type="button" class="cert-btn sm" id="btn-cert-ed-recargar">Cargar desde OC</button></span></div>
+            <button type="button" class="cert-btn sm" id="btn-cert-ed-recargar">Cargar desde OC</button>
+            <button type="button" class="cert-btn sm primary" id="btn-cert-ed-acta" title="Toma las cantidades del período de un acta de medición aprobada">Precargar desde acta de medición</button></span></div>
         <div class="cert-card-b"><div class="cert-wrap"><table class="cert-t" id="cert-ed-tabla">${certTablaDetalle()}</table></div>
           ${ed.modalidad === 'GLOBAL' && ed.alcance === 'SEG' && ed.tipo === 'PARCIAL' ? `<div class="cert-alert info" style="margin-top:10px"><span class="ic">i</span><div>
             <b>Repartir un total entre las OC (proporcional al saldo)</b><span class="cert-actions" style="margin-top:6px">
@@ -5743,7 +5762,8 @@
         ed.descuentos.push({ concepto: 'RECUPERO_ANTICIPO', descripcion: '', base: regla ? regla.base : 'MANUAL', porcentaje: regla?.porcentaje ?? '', importe: '' });
         certRenderDescuentos();
       }
-      else if (t.id === 'btn-cert-ed-recargar') { ed.carga = {}; certEl('cert-ed-tabla').innerHTML = certTablaDetalle(); certCalcular(); }
+      else if (t.id === 'btn-cert-ed-acta') { if (window.amPrecargarCertificado) await window.amPrecargarCertificado(); }
+      else if (t.id === 'btn-cert-ed-recargar') { ed.carga = {}; ed.amActaId = null; certEl('cert-ed-tabla').innerHTML = certTablaDetalle(); certCalcular(); }
       else if (t.id === 'btn-cert-ed-repartir') { ed.total = certEl('cert-ed-total').value; ed.carga = {}; certCalcular(); }
       else if (t.id === 'btn-cert-ed-calcular') { await certCalcular(); showToast(ed.error ? 'Hay datos por corregir.' : 'Cálculo actualizado por el servidor.', ed.error ? 'error' : 'info'); }
       else if (t.id === 'btn-cert-ed-guardar') { if (await certGuardarBorrador()) { certCerrar('cert-m-editor'); certState.ed = null; await certCargar(); } }
@@ -5761,6 +5781,7 @@
       ed.id = data.certificado_id;
       ed.calculo = data.calculo;
       ed.error = null;
+      if (ed.amActaId && window.amVincularCertificado) await window.amVincularCertificado(ed.amActaId, ed.id);
       ok = true;
       if (!silencioso) showToast(segEsc(data.mensaje), 'success');
     });
@@ -6837,6 +6858,7 @@
     };
   })();
 </script>
+<script src="/operaciones/actas-medicion.js"></script>
 </body>
 </html>
 
