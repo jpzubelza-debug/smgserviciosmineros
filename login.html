@@ -1,1007 +1,551 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMG Servicios Mineros | Plataforma Operativa</title>
-  <style>
-    @import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap");
-
-    :root {
-      --bg-1: #eaf1f8;
-      --bg-2: #cfdbea;
-      --ink: #102235;
-      --ink-soft: #4a5e75;
-      --brand: #0d4f8c;
-      --brand-strong: #083a68;
-      --accent: #1f7cc5;
-      --accent-green: #7ac142;
-      --accent-green-dark: #5a9c2c;
-      --smg-navy: #101c2c;
-      --smg-dark: #0b1422;
-      --smg-green: #8ed63f;
-      --smg-blue: #1684d8;
-      --smg-white: #ffffff;
-      --smg-gray: #b8c0c8;
-      --line: rgba(18, 54, 88, 0.18);
-      --card: rgba(255, 255, 255, 0.64);
-      --glass: rgba(255, 255, 255, 0.52);
-      --shadow: 0 22px 48px rgba(8, 34, 58, 0.16);
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      font-family: "Barlow", "Segoe UI", sans-serif;
-      color: var(--ink);
-      min-height: 100vh;
-      background: url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat fixed;
-    }
-
-    .overlay {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background: linear-gradient(180deg, rgba(2, 10, 20, 0.25), rgba(2, 10, 20, 0.4));
-      z-index: 0;
-    }
-
-    .site {
-      position: relative;
-      z-index: 1;
-      width: min(1240px, calc(100% - 40px));
-      margin: 22px auto 38px;
-    }
-
-    .top-nav {
-      position: sticky;
-      top: 10px;
-      z-index: 20;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: var(--glass);
-      backdrop-filter: blur(10px);
-      box-shadow: var(--shadow);
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      animation: slide-down 0.65s ease-out;
-    }
-
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-
-    .logo-main {
-      height: 56px;
-      width: auto;
-      object-fit: contain;
-      display: block;
-      filter: drop-shadow(0 8px 18px rgba(8, 34, 58, 0.16));
-    }
-
-    .nav-links {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      list-style: none;
-    }
-
-    .nav-links a {
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 600;
-      padding: 8px 10px;
-      border-radius: 10px;
-      transition: background 0.2s ease, color 0.2s ease;
-      font-size: 14px;
-    }
-
-    .nav-links a:hover {
-      background: rgba(122, 193, 66, 0.16);
-      color: var(--accent-green-dark);
-    }
-
-    .login-container {
-      position: relative;
-      min-width: 180px;
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .login-trigger {
-      border: 1px solid rgba(142, 214, 63, 0.55);
-      background: var(--smg-green);
-      color: var(--smg-dark);
-      padding: 11px 20px;
-      border-radius: 8px;
-      font-weight: 800;
-      font-family: "Rajdhani", sans-serif;
-      letter-spacing: 0.05em;
-      font-size: 15px;
-      cursor: pointer;
-      transition: transform 0.18s ease, background 0.18s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .login-trigger:hover {
-      transform: translateY(-1px);
-      background: #9fe35d;
-    }
-
-    .login-panel {
-      position: absolute;
-      top: calc(100% + 12px);
-      right: 0;
-      width: min(320px, calc(100vw - 26px));
-      overflow: hidden;
-      border: 1px solid rgba(142, 214, 63, 0.22);
-      border-top: 3px solid var(--smg-green);
-      background: linear-gradient(180deg, var(--smg-navy), var(--smg-dark));
-      border-radius: 10px;
-      box-shadow: 0 20px 40px rgba(2, 8, 16, 0.45);
-      padding: 18px;
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(-10px);
-      transition: opacity 0.24s ease, transform 0.24s ease, visibility 0.24s ease;
-    }
-
-    .login-panel::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 46px;
-      height: 3px;
-      background: var(--smg-blue);
-    }
-
-    .login-container:hover .login-panel,
-    .login-container:focus-within .login-panel,
-    .login-container.is-open .login-panel {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-      animation: fade-up 0.28s ease both;
-    }
-
-    .login-panel h3 {
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--smg-white);
-      font-weight: 700;
-      margin-bottom: 3px;
-    }
-
-    .login-panel .login-subtitle {
-      font-size: 12px;
-      color: var(--smg-gray);
-      margin-bottom: 14px;
-    }
-
-    .login-panel form {
-      display: grid;
-      gap: 12px;
-    }
-
-    .login-panel label {
-      display: grid;
-      gap: 6px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--smg-gray);
-      font-weight: 700;
-    }
-
-    .login-panel .input-wrap {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .login-panel .input-icon {
-      position: absolute;
-      left: 11px;
-      color: var(--smg-gray);
-      opacity: 0.8;
-      pointer-events: none;
-      display: inline-flex;
-    }
-
-    .login-panel input {
-      width: 100%;
-      border: 1px solid rgba(184, 192, 200, 0.28);
-      border-radius: 8px;
-      padding: 10px 12px 10px 34px;
-      font-size: 14px;
-      font-family: "Barlow", sans-serif;
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--smg-white);
-      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-    }
-
-    .login-panel input::placeholder {
-      color: rgba(184, 192, 200, 0.55);
-    }
-
-    .login-panel input:focus {
-      outline: none;
-      background: rgba(255, 255, 255, 0.1);
-      border-color: var(--smg-green);
-      box-shadow: 0 0 0 3px rgba(142, 214, 63, 0.18);
-    }
-
-    .login-panel button {
-      border: none;
-      border-radius: 8px;
-      padding: 11px;
-      margin-top: 2px;
-      background: var(--smg-green);
-      color: var(--smg-dark);
-      font-family: "Rajdhani", sans-serif;
-      font-size: 15px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.18s ease, transform 0.18s ease;
-    }
-
-    .login-panel button:hover {
-      background: #9fe35d;
-      transform: translateY(-1px);
-    }
-
-    .login-panel button:focus-visible,
-    .login-trigger:focus-visible {
-      outline: 2px solid var(--smg-blue);
-      outline-offset: 2px;
-    }
-
-    .error {
-      display: none;
-      margin-top: 4px;
-      background: rgba(219, 68, 68, 0.14);
-      color: #ff9c9c;
-      border: 1px solid rgba(219, 68, 68, 0.4);
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .hero {
-      margin-top: 20px;
-      border-radius: 24px;
-      overflow: hidden;
-      min-height: 74vh;
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      box-shadow: var(--shadow);
-      position: relative;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 42px 26px;
-      background:
-        linear-gradient(135deg, rgba(8, 37, 66, 0.82), rgba(13, 79, 140, 0.45), rgba(233, 241, 250, 0.24)),
-        url("/Imagenes/fondo_de_pantalla_dashboard.PNG") center/cover no-repeat;
-      animation: fade-up 0.8s ease-out;
-    }
-
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.22), transparent 32%),
-        linear-gradient(0deg, rgba(3, 24, 42, 0.35), rgba(3, 24, 42, 0.35));
-    }
-
-    .hero-content {
-      position: relative;
-      max-width: 900px;
-      color: #f6fbff;
-    }
-
-    .hero-content h1 {
-      font-family: "Rajdhani", sans-serif;
-      font-size: clamp(35px, 7vw, 72px);
-      line-height: 0.95;
-      letter-spacing: 0.01em;
-      margin-bottom: 20px;
-      text-transform: uppercase;
-    }
-
-    .hero-content p {
-      font-size: clamp(17px, 2.35vw, 30px);
-      line-height: 1.2;
-      color: #e8f3ff;
-      font-weight: 500;
-      margin-bottom: 20px;
-    }
-
-    .hero-content .minor {
-      font-size: clamp(14px, 1.8vw, 20px);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: #d0e8ff;
-      margin-bottom: 28px;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 999px;
-      color: #ffffff;
-      text-decoration: none;
-      padding: 12px 24px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, rgba(8, 58, 104, 0.78), rgba(31, 124, 197, 0.65));
-      transition: transform 0.2s ease, background 0.2s ease;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      background: linear-gradient(135deg, rgba(8, 58, 104, 0.9), rgba(31, 124, 197, 0.78));
-    }
-
-    .section {
-      margin-top: 22px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: var(--card);
-      backdrop-filter: blur(10px);
-      box-shadow: var(--shadow);
-      padding: 28px;
-      animation: fade-up 0.7s ease both;
-    }
-
-    .showcase {
-      margin-top: 22px;
-      width: 100vw;
-      margin-left: calc(50% - 50vw);
-      margin-right: calc(50% - 50vw);
-      padding: 0;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-
-    .carousel {
-      position: relative;
-      border-radius: 0;
-      overflow: hidden;
-      border-top: 1px solid rgba(8, 58, 104, 0.22);
-      border-bottom: 1px solid rgba(8, 58, 104, 0.22);
-      min-height: clamp(320px, 62vh, 760px);
-      background: rgba(10, 34, 59, 0.65);
-    }
-    .carousel-copy { position:absolute; inset:0; z-index:2; display:grid; place-items:center; text-align:center; padding:22px; pointer-events:none; }
-    .carousel-copy .hero-content { max-width: 980px; }
-    .carousel-copy .btn-primary { pointer-events: auto; }
-    .carousel-track { position: relative; height: clamp(320px, 62vh, 760px); }
-    .slide { position:absolute; inset:0; opacity:0; transition:opacity .5s ease; background-position:center; background-size:cover; background-repeat:no-repeat; display:flex; align-items:flex-end; padding:14px; }
-    .slide.active { opacity: 1; }
-    .slide::before { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,6,23,.08), rgba(2,6,23,.62)); }
-    .carousel-controls { position:absolute; inset:auto 16px 14px auto; z-index:3; display:flex; gap:6px; align-items:center; }
-    .dot { width:10px; height:10px; border-radius:999px; border:1px solid rgba(226,232,240,.8); background:rgba(15,23,42,.55); cursor:pointer; padding:0; }
-    .dot.active { background:#38bdf8; border-color:#7dd3fc; }
-    .ctrl-btn { width:32px; height:32px; border-radius:999px; border:1px solid rgba(226,232,240,.75); background:rgba(8,58,104,.6); color:#f0f9ff; cursor:pointer; line-height:1; padding:0; font-size:14px; font-weight:700; }
-
-    .section h2 {
-      font-family: "Rajdhani", sans-serif;
-      color: var(--brand-strong);
-      font-size: clamp(30px, 4vw, 44px);
-      margin-bottom: 15px;
-      padding-bottom: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      position: relative;
-    }
-
-    .section h2::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 86px;
-      height: 4px;
-      border-radius: 4px;
-      background: linear-gradient(90deg, var(--brand), var(--accent-green));
-    }
-
-    .section-intro {
-      color: var(--ink-soft);
-      font-size: 17px;
-      margin-bottom: 18px;
-      max-width: 980px;
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .card {
-      background: rgba(255, 255, 255, 0.76);
-      border: 1px solid rgba(18, 54, 88, 0.14);
-      border-radius: var(--radius-md);
-      padding: 16px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 15px 28px rgba(8, 34, 58, 0.12);
-    }
-
-    .card h3 {
-      font-size: 20px;
-      color: var(--brand);
-      margin-bottom: 9px;
-      font-family: "Rajdhani", sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    .card p,
-    .card li {
-      color: var(--ink-soft);
-      line-height: 1.5;
-      font-size: 15px;
-    }
-
-    .card ul {
-      padding-left: 18px;
-      display: grid;
-      gap: 4px;
-    }
-
-    .logistics-panel {
-      border-radius: var(--radius-md);
-      border: 1px solid rgba(8, 58, 104, 0.2);
-      background:
-        linear-gradient(120deg, rgba(13, 79, 140, 0.1), rgba(255, 255, 255, 0.4)),
-        rgba(255, 255, 255, 0.8);
-      padding: 20px;
-      display: grid;
-      gap: 14px;
-    }
-
-    .logistics-list {
-      list-style: none;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-
-    .logistics-list li {
-      background: rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(8, 58, 104, 0.16);
-      border-radius: 10px;
-      padding: 10px;
-      font-weight: 600;
-      color: var(--ink-soft);
-    }
-
-    .btn-secondary {
-      width: fit-content;
-      border: 1px solid rgba(90, 156, 44, 0.4);
-      border-radius: 999px;
-      padding: 11px 18px;
-      text-decoration: none;
-      color: #ffffff;
-      background: linear-gradient(135deg, var(--accent-green-dark), var(--accent-green));
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      transition: transform 0.2s ease;
-    }
-
-    .btn-secondary:hover {
-      transform: translateY(-2px);
-    }
-
-    footer {
-      margin-top: 22px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: rgba(8, 35, 60, 0.86);
-      color: #e7f3ff;
-      padding: 26px;
-      box-shadow: var(--shadow);
-    }
-
-    footer h2 {
-      font-family: "Rajdhani", sans-serif;
-      letter-spacing: 0.04em;
-      font-size: 30px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-
-    .footer-slogan {
-      font-family: "Rajdhani", sans-serif;
-      color: var(--accent-green);
-      font-size: clamp(20px, 3vw, 28px);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      margin-bottom: 10px;
-    }
-
-    .footer-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
-
-    .footer-block p,
-    .footer-block a {
-      display: block;
-      color: #cfe4f7;
-      text-decoration: none;
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
-
-    .footer-block a:hover {
-      color: #ffffff;
-    }
-
-    @keyframes fade-up {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes slide-down {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (max-width: 1120px) {
-      .top-nav {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .login-container {
-        width: 100%;
-        justify-content: flex-start;
-      }
-
-      .login-panel {
-        right: auto;
-        left: 0;
-      }
-    }
-
-    @media (max-width: 880px) {
-      .site {
-        width: calc(100% - 24px);
-      }
-
-      .hero {
-        min-height: 62vh;
-      }
-
-      .grid-3,
-      .grid-2,
-      .grid-4,
-      .logistics-list,
-      .footer-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .section {
-        padding: 22px;
-      }
-
-      .carousel,
-      .carousel-track {
-        min-height: clamp(320px, 62vh, 700px);
-        height: clamp(320px, 62vh, 700px);
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMG Servicios Mineros | Plataforma Operativa</title>
+<link rel="icon" href="/Imagenes/image001.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Paleta SMG (se mantiene) */
+  --smg-dark:#0b1422;
+  --smg-navy:#101c2c;
+  --smg-navy-2:#13233a;
+  --smg-navy-3:#182b45;
+  --smg-green:#8ed63f;
+  --smg-green-dark:#7ac142;
+  --smg-blue:#1684d8;
+  --smg-white:#ffffff;
+  --smg-gray:#b8c0c8;
+
+  /* Roles al estilo Nodo Andino */
+  --bg:var(--smg-dark);
+  --surface:var(--smg-navy);
+  --surface-2:var(--smg-navy-2);
+  --surface-3:var(--smg-navy-3);
+  --border:rgba(184,192,200,.12);
+  --border-light:rgba(184,192,200,.2);
+  --text:#eef3f8;
+  --text-muted:var(--smg-gray);
+  --text-faint:#5f6d7d;
+  --primary:var(--smg-green);
+  --primary-hover:#a3e35e;
+
+  --font-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --font-body:'Barlow',system-ui,sans-serif;
+
+  --text-xs:clamp(.75rem,.7rem + .25vw,.875rem);
+  --text-sm:clamp(.875rem,.8rem + .35vw,1rem);
+  --text-base:clamp(1rem,.95rem + .25vw,1.125rem);
+  --text-lg:clamp(1.125rem,1rem + .75vw,1.5rem);
+  --text-xl:clamp(1.5rem,1.2rem + 1.25vw,2.25rem);
+  --text-2xl:clamp(2rem,1.2rem + 2.5vw,3.5rem);
+  --text-hero:clamp(3rem,1.5rem + 6vw,7rem);
+
+  --radius:10px;
+  --container:1200px;
+  --nav-h:80px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;scroll-padding-top:var(--nav-h)}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--text-base);line-height:1.65;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+.container{width:min(var(--container),100% - 3rem);margin-inline:auto}
+
+/* ---------- Tipografía común ---------- */
+.eyebrow{display:inline-flex;align-items:center;gap:.9rem;font-family:var(--font-display);font-size:var(--text-xs);font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--primary)}
+.eyebrow.lined::before{content:"";width:2.5rem;height:1px;background:var(--primary)}
+.section-title{font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;line-height:1.05;color:var(--text);margin-top:.75rem}
+.section-lead{color:var(--text-muted);max-width:62ch;margin-top:1.25rem}
+
+/* ---------- Botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.95rem 1.6rem;font-family:var(--font-display);font-size:var(--text-xs);font-weight:700;letter-spacing:.16em;text-transform:uppercase;border:1px solid transparent;border-radius:2px;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.btn-primary{background:var(--primary);color:var(--smg-dark)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{border-color:var(--border-light);color:var(--text);background:rgba(11,20,34,.35)}
+.btn-ghost:hover{border-color:var(--text)}
+.btn-outline{border-color:var(--primary);color:var(--primary);background:transparent;padding:.6rem 1.1rem;white-space:nowrap}
+.btn-outline:hover{background:var(--primary);color:var(--smg-dark)}
+
+/* ---------- Barra superior ---------- */
+.top-nav{position:fixed;inset:0 0 auto 0;z-index:50;height:var(--nav-h);transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+.top-nav.scrolled{background:rgba(11,20,34,.92);backdrop-filter:blur(10px);border-color:var(--border)}
+.nav-inner{height:100%;display:flex;align-items:center;justify-content:space-between;gap:2rem}
+.brand{display:flex;align-items:center;gap:.8rem}
+.brand img{height:58px;width:auto}
+.nav-links{display:flex;gap:1.8rem;list-style:none}
+.nav-links a{font-family:var(--font-display);font-size:.8rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-toggle{display:none;background:none;border:0;color:var(--text);font-size:1.6rem;cursor:pointer}
+
+/* ---------- Acceso Usuarios (panel desplegable por CSS) ---------- */
+.login-wrap{position:relative}
+.login-panel{position:absolute;right:0;top:calc(100% + 12px);width:260px;padding:1.1rem 1.2rem 1.2rem;background:var(--surface);border:1px solid var(--border-light);border-top:2px solid var(--primary);border-radius:var(--radius);box-shadow:0 24px 60px rgba(0,0,0,.5);opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .2s,transform .2s,visibility .2s}
+.login-wrap::after{content:"";position:absolute;left:0;right:0;top:100%;height:16px}
+.login-wrap:hover .login-panel,.login-wrap:focus-within .login-panel,.login-wrap.has-error .login-panel,.login-wrap.is-open .login-panel{opacity:1;visibility:visible;transform:none}
+.login-panel h3{font-family:var(--font-display);font-size:.95rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.75rem}
+.field{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.65rem}
+.field label{font-family:var(--font-display);font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted)}
+.field input{background:var(--bg);border:1px solid var(--border-light);border-radius:4px;padding:.5rem .7rem;color:var(--text);font:inherit;font-size:.9rem}
+.field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(142,214,63,.15)}
+.login-panel .btn{width:100%;margin-top:.3rem;padding:.7rem 1rem}
+.error{display:none;margin-bottom:.75rem;padding:.45rem .7rem;font-size:.8rem;color:#ffb4a8;background:rgba(220,70,50,.12);border:1px solid rgba(220,70,50,.35);border-radius:4px}
+.error.show{display:block}
+
+/* ---------- Hero / carrusel ---------- */
+.hero{position:relative;min-height:100svh;display:flex;align-items:center;overflow:hidden;background:var(--bg)}
+.slides{position:absolute;inset:0}
+.slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transform:scale(1.06);transition:opacity 1.2s ease,transform 7s ease}
+.slide.active{opacity:1;transform:scale(1)}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,20,34,.92) 0%,rgba(11,20,34,.7) 45%,rgba(11,20,34,.35) 100%),linear-gradient(0deg,var(--bg) 0%,transparent 30%)}
+.hero-content{position:relative;z-index:2;padding-top:var(--nav-h)}
+.hero .hero-content{width:min(1600px,100% - 6rem)}
+@media (max-width:620px){.hero .hero-content{width:min(1600px,100% - 3rem)}}
+.hero h1{font-family:var(--font-display);font-size:var(--text-hero);font-weight:800;line-height:.92;text-transform:uppercase;margin:1.5rem 0 1.75rem;letter-spacing:-.005em}
+.hero h1 em{font-style:normal;color:var(--primary)}
+.hero p{max-width:46ch;color:var(--text-muted);font-size:var(--text-lg);line-height:1.5}
+.hero-tags{margin-top:1rem;font-family:var(--font-display);letter-spacing:.24em;font-size:var(--text-xs);color:var(--text);text-transform:uppercase}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;margin-top:2.5rem}
+.hero-empty{position:absolute;right:2rem;bottom:2rem;z-index:3;font-size:.8rem;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border-light);padding:.6rem .9rem;border-radius:4px;display:none}
+.hero-controls{position:absolute;right:max(1.5rem,calc((100% - var(--container))/2));bottom:2.5rem;z-index:3;display:flex;align-items:center;gap:1rem}
+.hero-controls button.arrow{width:42px;height:42px;border-radius:50%;border:1px solid var(--border-light);background:rgba(11,20,34,.5);color:var(--text);cursor:pointer;font-size:1.1rem}
+.hero-controls button.arrow:hover{border-color:var(--primary);color:var(--primary)}
+.dots{display:flex;gap:.4rem}
+.dots button{width:18px;height:3px;border:0;background:var(--border-light);cursor:pointer;transition:background .2s,width .2s}
+.dots button.active{background:var(--primary);width:32px}
+.scroll-cue{position:absolute;left:50%;bottom:2rem;transform:translateX(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:.4rem;font-family:var(--font-display);font-size:.65rem;letter-spacing:.3em;color:var(--text-faint)}
+.scroll-cue span{animation:bob 2s infinite}
+@keyframes bob{50%{transform:translateY(5px)}}
+
+/* ---------- Franja de cifras ---------- */
+.stats{background:var(--surface);border-block:1px solid var(--border)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.stat{text-align:center;padding:2.25rem 1rem;border-left:1px solid var(--border)}
+.stat:first-child{border-left:0}
+.stat strong{display:block;font-family:var(--font-display);font-size:var(--text-2xl);font-weight:800;color:var(--primary);line-height:1}
+.stat span{display:block;margin-top:.5rem;font-family:var(--font-display);font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted)}
+
+/* ---------- Secciones ---------- */
+.section{padding:clamp(5rem,4rem + 4vw,8rem) 0}
+.section.alt{background:var(--surface)}
+.section-head{margin-bottom:3.5rem}
+
+/* Nosotros */
+.about{display:grid;grid-template-columns:1.1fr .9fr;gap:4rem;align-items:center}
+.about-text p{color:var(--text-muted);text-align:justify;margin-top:1.25rem}
+.check-list{list-style:none;margin-top:1.75rem;display:grid;gap:.7rem}
+.check-list li{display:flex;gap:.75rem;color:var(--text-muted);font-size:var(--text-sm)}
+.check-list li::before{content:"✓";color:var(--primary);font-weight:700}
+.about-media{position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--surface-2) center/cover;border:1px solid var(--border);box-shadow:0 30px 60px rgba(0,0,0,.4)}
+.badge{position:absolute;left:1.25rem;bottom:1.25rem;background:var(--primary);color:var(--smg-dark);padding:.7rem 1rem;border-radius:4px;text-align:center;font-family:var(--font-display);line-height:1}
+.badge small{display:block;font-size:.65rem;letter-spacing:.24em;font-weight:700}
+.badge b{display:block;font-size:1.5rem;font-weight:800;margin-top:.25rem}
+.mvv{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-top:4rem}
+.mvv article{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem}
+.mvv h3{font-family:var(--font-display);font-size:1rem;letter-spacing:.2em;color:var(--primary);margin-bottom:.75rem}
+.mvv p,.mvv li{color:var(--text-muted);font-size:var(--text-sm)}
+.mvv ul{list-style:none;display:flex;flex-wrap:wrap;gap:.5rem}
+.mvv li{border:1px solid var(--border-light);border-radius:999px;padding:.25rem .8rem}
+
+/* Tarjetas numeradas */
+.cards{display:grid;gap:1.25rem}
+.cards.c3{grid-template-columns:repeat(3,1fr)}
+.card{position:relative;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.75rem;transition:border-color .25s,transform .25s}
+.card:hover{border-color:rgba(142,214,63,.45);transform:translateY(-3px)}
+.num{width:44px;height:44px;border-radius:50%;border:1px solid var(--primary);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:.9rem;color:var(--primary);margin-bottom:1.25rem}
+.card h3{font-family:var(--font-display);font-size:1.15rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.6rem}
+.card p{color:var(--text-muted);font-size:var(--text-sm)}
+.card ul{list-style:none;display:grid;gap:.45rem;margin-top:.25rem}
+.card ul li{display:flex;gap:.6rem;font-size:var(--text-sm);color:var(--text-muted)}
+.card ul li::before{content:"";width:6px;height:6px;margin-top:.55em;flex:none;background:var(--smg-blue);transform:rotate(45deg)}
+
+/* Experiencia */
+.projects{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.project{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.project-img{padding:1.75rem 1.6rem 0}
+.project-tag{font-family:var(--font-display);font-size:2.4rem;font-weight:800;color:var(--primary);line-height:1}
+.project-tag small{display:block;font-size:.7rem;letter-spacing:.2em;color:var(--text);font-weight:600;margin-top:.25rem}
+.project-body{padding:1.5rem 1.6rem 1.75rem}
+.project-body .eyebrow{font-size:.7rem}
+.project-body h3{font-family:var(--font-display);font-size:1.4rem;font-weight:700;text-transform:uppercase;margin:.35rem 0 .9rem}
+
+/* Contacto */
+.contact{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:3rem;align-items:start}
+.contact-block h3{font-family:var(--font-display);font-size:.8rem;letter-spacing:.24em;color:var(--primary);margin-bottom:.8rem}
+.contact-block p,.contact-block a{display:block;color:var(--text-muted)}
+.contact-block a:hover{color:var(--text)}
+
+/* Footer */
+footer{background:var(--smg-dark);border-top:1px solid var(--border);padding:3.5rem 0 2rem}
+.foot{display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;flex-wrap:wrap}
+.foot-claim{font-family:var(--font-display);font-size:var(--text-xl);font-weight:800;text-transform:uppercase;line-height:1}
+.foot-claim em{font-style:normal;color:var(--primary)}
+.foot-social{display:flex;gap:1.5rem;font-family:var(--font-display);font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted)}
+.foot-social a:hover{color:var(--primary)}
+.foot-bottom{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--text-faint);display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+
+/* Animación de entrada */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1320px){
+  .nav-links{gap:1rem}
+  .nav-links a{font-size:.74rem;letter-spacing:.12em}
+  .nav-inner{gap:1.25rem}
+}
+@media (max-width:1240px){
+  .nav-toggle{display:block}
+  .nav-links{position:fixed;top:var(--nav-h);left:0;right:0;flex-direction:column;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:.5rem 1.5rem 1rem;display:none}
+  .nav-links.open{display:flex}
+  .nav-links a{display:block;padding:.8rem 0;border-bottom:1px solid var(--border)}
+}
+@media (max-width:1100px){
+  .nav-links{gap:.8rem}
+  .cards.c3,.projects{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:900px){
+  .about,.contact{grid-template-columns:1fr}
+  .mvv{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(3){border-left:0}
+  .stat:nth-child(n+3){border-top:1px solid var(--border)}
+}
+@media (max-width:620px){
+  .cards.c3,.projects{grid-template-columns:1fr}
+  .brand img{height:46px}
+  .btn-outline{padding:.55rem .8rem;letter-spacing:.1em}
+  .login-panel{position:fixed;left:1rem;right:1rem;top:calc(var(--nav-h) + 4px);width:auto}
+  .hero-controls{left:1.5rem;right:1.5rem}
+  .dots{flex:1;min-width:0;flex-wrap:wrap;justify-content:center}
+  .dots button{width:10px}
+  .dots button.active{width:20px}
+  .scroll-cue{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
 </head>
 <body>
-  <div class="overlay"></div>
 
-  <main class="site">
-    <header class="top-nav" id="inicio">
-      <a class="logo" href="#inicio">
-        <img class="logo-main" src="/Imagenes/image001.png" alt="Logo SMG" />
-      </a>
+<!-- ===== Barra superior ===== -->
+<header class="top-nav" id="top">
+  <div class="container nav-inner">
+    <a href="#inicio" class="brand" aria-label="SMG Servicios Mineros">
+      <img src="/Imagenes/image001.png" alt="SMG Servicios Mineros">
+    </a>
 
-      <nav aria-label="Navegacion principal">
-        <ul class="nav-links">
-          <li><a href="#inicio">Inicio</a></li>
-          <li><a href="#nosotros">Nosotros</a></li>
-          <li><a href="#diferenciales">Diferenciales</a></li>
-          <li><a href="#servicios">Servicios</a></li>
-          <li><a href="#experiencia">Proyectos</a></li>
-          <li><a href="#servicios">Campamentos</a></li>
-          <li><a href="#servicios">I+D</a></li>
-          <li><a href="#contacto">Contacto</a></li>
-        </ul>
-      </nav>
+    <nav aria-label="Secciones">
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#inicio">Inicio</a></li>
+        <li><a href="#nosotros">Nosotros</a></li>
+        <li><a href="#diferenciales">Diferenciales</a></li>
+        <li><a href="#servicios">Servicios</a></li>
+        <li><a href="#experiencia">Proyectos</a></li>
+        <li><a href="#servicios">Campamentos</a></li>
+        <li><a href="#servicios">I+D</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ul>
+    </nav>
 
-      <div class="login-container" id="acceso-plataforma">
-        <a class="login-trigger" href="#acceso-plataforma" aria-haspopup="true" aria-expanded="false">Acceso Usuarios</a>
-
-        <div class="login-panel" role="dialog" aria-label="Formulario de acceso">
-          <h3>Acceso al Sistema</h3>
-          <p class="login-subtitle">SMG Servicios Mineros</p>
-          <form method="post" action="/login">
-            <label for="username">
-              Usuario
-              <span class="input-wrap">
-                <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>
-                <input id="username" type="text" name="username" autocomplete="username" required>
-              </span>
-            </label>
-
-            <label for="password">
-              Contrasena
-              <span class="input-wrap">
-                <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                <input id="password" type="password" name="password" autocomplete="current-password" required>
-              </span>
-            </label>
-
-            <button type="submit">Ingresar</button>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <div class="login-wrap" id="login-wrap">
+        <button type="button" class="btn btn-outline" id="login-trigger" aria-haspopup="true" aria-expanded="false">Acceso Usuarios</button>
+        <div class="login-panel" role="dialog" aria-label="Acceso a la plataforma">
+          <h3>Plataforma operativa</h3>
+          <div class="error" id="error-msg" role="alert">Usuario o contraseña incorrectos.</div>
+          <form method="post" action="/login" autocomplete="on">
+            <div class="field">
+              <label for="username">Usuario</label>
+              <input type="text" id="username" name="username" autocomplete="username" required>
+            </div>
+            <div class="field">
+              <label for="password">Contraseña</label>
+              <input type="password" id="password" name="password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Ingresar</button>
           </form>
-          <div id="error-msg" class="error">Usuario o contrasena incorrectos.</div>
         </div>
       </div>
-    </header>
+      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>
+    </div>
+  </div>
+</header>
 
-    <section class="showcase" id="galeria" aria-label="Galeria Operativa">
-      <div class="carousel" aria-label="Carrusel de imagenes">
-        <div class="carousel-track" id="carousel-track"></div>
-        <div class="carousel-copy">
-          <div class="hero-content">
-            <h1>Experiencia que Construye Resultados</h1>
-            <p>Soluciones Integrales para la<br>Industria Minera e Industrial</p>
-            <p class="minor">Construccion • Logistica • Rental • Campamentos</p>
-            <a class="btn-primary" href="#servicios">Conocer Servicios</a>
-          </div>
-        </div>
-        <div class="carousel-controls" id="carousel-controls">
-          <button class="ctrl-btn" id="prev-slide" type="button" aria-label="Anterior">&lt;</button>
-          <div id="carousel-dots" style="display:flex; gap:6px;"></div>
-          <button class="ctrl-btn" id="next-slide" type="button" aria-label="Siguiente">&gt;</button>
-        </div>
+<!-- ===== Hero con carrusel ===== -->
+<section class="hero" id="inicio">
+  <div class="slides" id="slides"></div>
+  <div class="container hero-content">
+    <span class="eyebrow lined">Palpalá · Jujuy · Noroeste argentino</span>
+    <h1>Experiencia<br>que <em>construye</em><br>resultados</h1>
+    <p>Soluciones integrales para la industria minera e industrial.</p>
+    <div class="hero-tags">Construcción · Logística · Rental · Campamentos</div>
+    <div class="hero-actions">
+      <a href="#servicios" class="btn btn-primary">Conocer servicios</a>
+      <a href="#contacto" class="btn btn-ghost">Contactanos</a>
+    </div>
+  </div>
+  <div class="hero-controls" id="hero-controls" hidden>
+    <button type="button" class="arrow" id="prev" aria-label="Imagen anterior">‹</button>
+    <div class="dots" id="dots"></div>
+    <button type="button" class="arrow" id="next" aria-label="Imagen siguiente">›</button>
+  </div>
+  <div class="hero-empty" id="hero-empty">No hay imágenes en /Imagenes/Editadas.</div>
+  <a href="#nosotros" class="scroll-cue">EXPLORAR<span>↓</span></a>
+</section>
+
+<!-- ===== Cifras ===== -->
+<div class="stats">
+  <div class="container stats-grid">
+    <div class="stat"><strong>500 Ha</strong><span>Pozas en Salar de Olaroz</span></div>
+    <div class="stat"><strong>120 Ha</strong><span>Pozas en Salar del Rincón</span></div>
+    <div class="stat"><strong>200</strong><span>Plazas de campamento</span></div>
+    <div class="stat"><strong>6</strong><span>Líneas de servicio</span></div>
+  </div>
+</div>
+
+<!-- ===== Nosotros ===== -->
+<section class="section" id="nosotros">
+  <div class="container">
+    <div class="about">
+      <div class="about-text reveal">
+        <span class="eyebrow">Nosotros</span>
+        <h2 class="section-title">Soluciones integrales<br>para minería e industria</h2>
+        <p>SMG Servicios Mineros es una empresa argentina especializada en brindar servicios y soluciones integrales para proyectos mineros e industriales. Contamos con un equipo humano altamente calificado, flota propia de equipos y tecnología para garantizar operaciones seguras, eficientes y sostenibles.</p>
+        <ul class="check-list">
+          <li>Flota propia de equipos en constante renovación</li>
+          <li>Operadores y técnicos capacitados</li>
+          <li>Logística, mantenimiento y soporte operativo</li>
+          <li>Operaciones en todo el noroeste argentino</li>
+        </ul>
       </div>
-    </section>
-
-    <section class="section" id="nosotros">
-      <h2>Nosotros</h2>
-      <p class="section-intro">SMG Servicios Mineros es una empresa argentina especializada en brindar servicios y soluciones integrales para proyectos mineros e industriales. Contamos con un equipo humano altamente calificado, flota propia de equipos y tecnologia para garantizar operaciones seguras, eficientes y sostenibles.</p>
-      <div class="grid-3">
-        <article class="card">
-          <h3>Mision</h3>
-          <p>Brindar soluciones integrales para el desarrollo de proyectos mineros e industriales, aportando equipos, conocimiento y equipo humano comprometidos con la seguridad y la calidad.</p>
-        </article>
-        <article class="card">
-          <h3>Vision</h3>
-          <p>Ser una empresa referente del norte argentino en servicios mineros e industriales, distinguiendonos por nuestra excelencia operativa, innovacion, confiabilidad, infraestructura y el compromiso permanente con los stakeholders.</p>
-        </article>
-        <article class="card">
-          <h3>Valores</h3>
-          <ul>
-            <li>Integridad</li>
-            <li>Trabajo en equipo</li>
-            <li>Compromiso</li>
-            <li>Solidaridad</li>
-            <li>Confianza</li>
-          </ul>
-        </article>
+      <div class="about-media reveal" id="about-media">
+        <div class="badge"><small>NOA</small><b>SMG</b></div>
       </div>
-    </section>
+    </div>
 
-    <section class="section" id="diferenciales">
-      <h2>Diferenciales</h2>
-      <p class="section-intro">Brindamos servicios integrales para la mineria, infraestructura y movimiento de suelos, con compromiso, tecnologia y un equipo altamente capacitado. Operaciones en todo el noroeste argentino.</p>
-      <div class="grid-4">
-        <article class="card">
-          <h3>Flota Propia</h3>
-          <p>Equipos modernos y en constante renovacion.</p>
-        </article>
-        <article class="card">
-          <h3>Personal Calificado</h3>
-          <p>Operadores y tecnicos capacitados.</p>
-        </article>
-        <article class="card">
-          <h3>Gestion Integral</h3>
-          <p>Logistica, mantenimiento y soporte operativo.</p>
-        </article>
-        <article class="card">
-          <h3>Sustentabilidad</h3>
-          <p>Cuidado del medioambiente y comunidades.</p>
-        </article>
+    <div class="mvv">
+      <article class="reveal">
+        <h3>MISIÓN</h3>
+        <p>Brindar soluciones integrales para el desarrollo de proyectos mineros e industriales, aportando equipos, conocimiento y equipo humano comprometidos con la seguridad y la calidad.</p>
+      </article>
+      <article class="reveal">
+        <h3>VISIÓN</h3>
+        <p>Ser una empresa referente del norte argentino en servicios mineros e industriales, distinguiéndonos por nuestra excelencia operativa, innovación, confiabilidad, infraestructura y el compromiso permanente con los stakeholders.</p>
+      </article>
+      <article class="reveal">
+        <h3>VALORES</h3>
+        <ul><li>Integridad</li><li>Trabajo en equipo</li><li>Compromiso</li><li>Solidaridad</li><li>Confianza</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Diferenciales ===== -->
+<section class="section alt" id="diferenciales">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Diferenciales</span>
+      <h2 class="section-title">Por qué trabajar<br>con SMG</h2>
+      <p class="section-lead">Brindamos servicios integrales para la minería, infraestructura y movimiento de suelos, con compromiso, tecnología y un equipo altamente capacitado. Operaciones en todo el noroeste argentino.</p>
+    </div>
+    <div class="cards c3">
+      <article class="card reveal"><div class="num">01</div><h3>Flota propia</h3><p>Equipos modernos y en constante renovación.</p></article>
+      <article class="card reveal"><div class="num">02</div><h3>Personal calificado</h3><p>Operadores y técnicos capacitados.</p></article>
+      <article class="card reveal"><div class="num">03</div><h3>Gestión integral</h3><p>Logística, mantenimiento y soporte operativo.</p></article>
+      <article class="card reveal"><div class="num">04</div><h3>Sustentabilidad</h3><p>Cuidado del medioambiente y comunidades.</p></article>
+      <article class="card reveal"><div class="num">05</div><h3>Seguridad</h3><p>Comprometidos con las personas y el entorno.</p></article>
+      <article class="card reveal"><div class="num">06</div><h3>Eficiencia</h3><p>Optimizamos recursos y tiempos.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Servicios ===== -->
+<section class="section" id="servicios">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Capacidades</span>
+      <h2 class="section-title">Áreas de servicio</h2>
+      <p class="section-lead">Portafolio integral basado en capacidades de construcción, logística, rental, campamentos y desarrollo técnico aplicado a operaciones mineras.</p>
+    </div>
+    <div class="cards c3">
+      <article class="card reveal"><div class="num">01</div><h3>Construcción</h3>
+        <ul><li>Movimiento de suelo</li><li>Obras civiles</li><li>Topografía</li><li>Galpones</li></ul></article>
+      <article class="card reveal"><div class="num">02</div><h3>Rental</h3>
+        <ul><li>Excavadoras</li><li>Topadoras</li><li>Cargadoras</li><li>Camiones</li><li>Hidrogrúas</li></ul></article>
+      <article class="card reveal"><div class="num">03</div><h3>Campamentos</h3>
+        <ul><li>Venta</li><li>Alquiler</li><li>Montaje</li><li>Mantenimiento</li></ul></article>
+      <article class="card reveal"><div class="num">04</div><h3>Logística y transporte</h3>
+        <ul><li>Personal</li><li>Equipos</li><li>Cargas generales</li><li>Cargas a granel</li></ul></article>
+      <article class="card reveal"><div class="num">05</div><h3>Investigación y desarrollo</h3>
+        <ul><li>Exploración</li><li>Evaluación de yacimientos</li><li>Química de procesos</li></ul></article>
+      <article class="card reveal"><div class="num">06</div><h3>Tratamiento de agua</h3>
+        <ul><li>Hipoclorito de calcio</li><li>Hipoclorito de sodio</li><li>Gas cloro</li><li>Sulfato de aluminio</li></ul></article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Experiencia ===== -->
+<section class="section alt" id="experiencia">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Experiencia</span>
+      <h2 class="section-title">Proyectos ejecutados</h2>
+      <p class="section-lead">Proyectos ejecutados con escala operativa, precisión técnica y resultados medibles en terreno.</p>
+    </div>
+    <div class="projects">
+      <article class="project reveal">
+        <div class="project-img" data-img="1"><div class="project-tag">120 Ha<small>POZAS SOLARES</small></div></div>
+        <div class="project-body"><span class="eyebrow">Jujuy</span><h3>Salar del Rincón</h3>
+          <ul class="check-list"><li>120 Ha de pozas solares</li><li>Terraplenes</li><li>Caminos</li><li>Consolidación de terrenos</li></ul></div>
+      </article>
+      <article class="project reveal">
+        <div class="project-img" data-img="2"><div class="project-tag">500 Ha<small>POZAS</small></div></div>
+        <div class="project-body"><span class="eyebrow">Jujuy</span><h3>Salar de Olaroz</h3>
+          <ul class="check-list"><li>500 Ha de pozas</li><li>Canales de guarda</li><li>Plataformas</li><li>Terraplenes</li></ul></div>
+      </article>
+      <article class="project reveal">
+        <div class="project-img" data-img="3"><div class="project-tag">200<small>PERSONAS</small></div></div>
+        <div class="project-body"><span class="eyebrow">Jujuy</span><h3>Sales de Jujuy</h3>
+          <ul class="check-list"><li>Campamento para 200 personas</li><li>Montaje integral</li><li>Servicios generales</li></ul></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Contacto ===== -->
+<section class="section" id="contacto">
+  <div class="container contact">
+    <div class="reveal">
+      <span class="eyebrow">Contacto</span>
+      <h2 class="section-title">Hablemos de<br>tu proyecto</h2>
+      <p class="section-lead">Estamos listos para acompañar tus operaciones mineras con soluciones a medida y soporte continuo.</p>
+      <div class="hero-actions"><a href="mailto:info@smgminera.com" class="btn btn-primary">Escribinos</a></div>
+    </div>
+    <div class="contact-block reveal">
+      <h3>UBICACIÓN</h3>
+      <p>Santa Catalina 551</p>
+      <p>Palpalá – Jujuy</p>
+    </div>
+    <div class="contact-block reveal">
+      <h3>CANALES</h3>
+      <a href="tel:+54XXX">+54 XXX</a>
+      <a href="mailto:info@smgminera.com">info@smgminera.com</a>
+      <a href="https://www.smgminera.com" target="_blank" rel="noopener">www.smgminera.com</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="foot">
+      <div class="foot-claim">Soluciones que<br><em>mueven</em> tu proyecto</div>
+      <div class="foot-social">
+        <a href="#">LinkedIn</a><a href="#">Instagram</a><a href="#">Facebook</a>
       </div>
-      <div class="grid-3" style="margin-top:14px;">
-        <article class="card">
-          <h3>Seguridad</h3>
-          <p>Comprometidos con las personas y el entorno.</p>
-        </article>
-        <article class="card">
-          <h3>Eficiencia</h3>
-          <p>Optimizamos recursos y tiempos.</p>
-        </article>
-        <article class="card">
-          <h3>Compromiso</h3>
-          <p>Construimos relaciones de confianza y largo plazo.</p>
-        </article>
-      </div>
-    </section>
+    </div>
+    <div class="foot-bottom">
+      <span>SMG Servicios Mineros · Santa Catalina 551, Palpalá – Jujuy</span>
+      <span>info@smgminera.com</span>
+    </div>
+  </div>
+</footer>
 
-    <section class="section" id="servicios">
-      <h2>Servicios</h2>
-      <p class="section-intro">Portafolio integral basado en capacidades de construccion, logistica, rental, campamentos y desarrollo tecnico aplicado a operaciones mineras.</p>
-      <div class="grid-3">
-        <article class="card">
-          <h3>Construccion</h3>
-          <ul>
-            <li>Movimiento de suelo</li>
-            <li>Obras civiles</li>
-            <li>Topografia</li>
-            <li>Galpones</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Rental</h3>
-          <ul>
-            <li>Excavadoras</li>
-            <li>Topadoras</li>
-            <li>Cargadoras</li>
-            <li>Camiones</li>
-            <li>Hidrogruas</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Campamentos</h3>
-          <ul>
-            <li>Venta</li>
-            <li>Alquiler</li>
-            <li>Montaje</li>
-            <li>Mantenimiento</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Logistica y Transporte</h3>
-          <ul>
-            <li>Personal</li>
-            <li>Equipos</li>
-            <li>Cargas generales</li>
-            <li>Cargas a granel</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Investigacion y Desarrollo</h3>
-          <ul>
-            <li>Exploracion</li>
-            <li>Evaluacion de yacimientos</li>
-            <li>Quimica de procesos</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Tratamiento de Agua</h3>
-          <ul>
-            <li>Hipoclorito de calcio</li>
-            <li>Hipoclorito de sodio</li>
-            <li>Gas cloro</li>
-            <li>Sulfato de aluminio</li>
-          </ul>
-        </article>
-      </div>
-    </section>
+<script>
+(function(){
+  const wrap = document.getElementById('login-wrap');
+  const trigger = document.getElementById('login-trigger');
 
-    <section class="section" id="experiencia">
-      <h2>Experiencia</h2>
-      <p class="section-intro">Proyectos ejecutados con escala operativa, precision tecnica y resultados medibles en terreno.</p>
-      <div class="grid-3">
-        <article class="card">
-          <h3>Salar del Rincon</h3>
-          <ul>
-            <li>120 Ha de pozas solares</li>
-            <li>Terraplenes</li>
-            <li>Caminos</li>
-            <li>Consolidacion de terrenos</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Salar de Olaroz</h3>
-          <ul>
-            <li>500 Ha de pozas</li>
-            <li>Canales de guarda</li>
-            <li>Plataformas</li>
-            <li>Terraplenes</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Sales de Jujuy</h3>
-          <ul>
-            <li>Campamento para 200 personas</li>
-            <li>Montaje integral</li>
-            <li>Servicios generales</li>
-          </ul>
-        </article>
-      </div>
-    </section>
+  // Error de login: /login?error=1
+  if (new URLSearchParams(location.search).has('error')) {
+    document.getElementById('error-msg').classList.add('show');
+    wrap.classList.add('has-error');
+    document.getElementById('username').focus();
+    wrap.addEventListener('mouseleave', () => wrap.classList.remove('has-error'), {once:true});
+  }
 
-    <section class="section" id="contacto">
-      <h2>Contacto</h2>
-      <p class="section-intro">Estamos listos para acompanar tus operaciones mineras con soluciones a medida y soporte continuo.</p>
-      <div class="grid-2">
-        <article class="card">
-          <h3>Ubicacion</h3>
-          <p>Santa Catalina 551</p>
-          <p>Palpala - Jujuy</p>
-        </article>
-        <article class="card">
-          <h3>Canales</h3>
-          <p>+54 XXX</p>
-          <p>info@smgminera.com</p>
-          <p>www.smgminera.com</p>
-          <p>LinkedIn • Instagram • Facebook</p>
-        </article>
-      </div>
-    </section>
+  // Panel de acceso: además de :hover/:focus-within (CSS), un toque en el botón
+  // lo abre/cierra; en celulares el foco sobre un <button> no es confiable.
+  const setOpen = open => {
+    wrap.classList.toggle('is-open', open);
+    trigger.setAttribute('aria-expanded', open);
+    if (!open) wrap.classList.remove('has-error');
+  };
+  trigger.addEventListener('click', () => {
+    const open = !wrap.classList.contains('is-open');
+    setOpen(open);
+    if (open) document.getElementById('username').focus();
+  });
+  document.addEventListener('click', e => { if (!wrap.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && wrap.contains(document.activeElement)) { setOpen(false); document.activeElement.blur(); }
+  });
 
-    <footer>
-      <p class="footer-slogan">Soluciones que Mueven tu Proyecto</p>
-      <h2>SMG Servicios Mineros</h2>
-      <div class="footer-grid">
-        <div class="footer-block">
-          <p>Santa Catalina 551</p>
-          <p>Palpala - Jujuy</p>
-          <p>+54 XXX</p>
-          <p>info@smgminera.com</p>
-          <p>www.smgminera.com</p>
-        </div>
-        <div class="footer-block">
-          <a href="#" aria-label="LinkedIn">LinkedIn</a>
-          <a href="#" aria-label="Instagram">Instagram</a>
-          <a href="#" aria-label="Facebook">Facebook</a>
-        </div>
-      </div>
-    </footer>
-  </main>
+  // Barra superior sólida al hacer scroll
+  const nav = document.getElementById('top');
+  const onScroll = () => nav.classList.toggle('scrolled', scrollY > 40);
+  addEventListener('scroll', onScroll, {passive:true}); onScroll();
 
-  <script>
-    const query = new URLSearchParams(window.location.search);
-    if (query.get("error") === "1") {
-      const error = document.getElementById("error-msg");
-      if (error) {
-        error.style.display = "block";
-      }
-    }
+  // Menú móvil
+  const toggle = document.getElementById('nav-toggle'), links = document.getElementById('nav-links');
+  toggle.addEventListener('click', () => {
+    const open = links.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open);
+  });
+  links.addEventListener('click', e => { if (e.target.tagName === 'A') links.classList.remove('open'); });
 
-    const opener = document.getElementById("open-login");
-    const container = document.getElementById("acceso-plataforma");
-    const userInput = document.getElementById("username");
-    const trigger = document.querySelector(".login-trigger");
+  // Animación de entrada
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), {threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-    if (opener && container && userInput && trigger) {
-      opener.addEventListener("click", function () {
-        container.classList.add("is-open");
-        trigger.setAttribute("aria-expanded", "true");
-        setTimeout(function () {
-          userInput.focus();
-        }, 120);
+  // Carrusel con /imagenes/editadas/listado
+  const slidesEl = document.getElementById('slides'), dotsEl = document.getElementById('dots');
+  let slides = [], dots = [], i = 0, timer;
+  const show = n => {
+    if (!slides.length) return;
+    slides[i].classList.remove('active'); dots[i].classList.remove('active');
+    i = (n + slides.length) % slides.length;
+    slides[i].classList.add('active'); dots[i].classList.add('active');
+  };
+  const restart = () => { clearInterval(timer); timer = setInterval(() => show(i + 1), 6000); };
+
+  fetch('/imagenes/editadas/listado', {credentials:'same-origin'})
+    .then(r => r.ok ? r.json() : {imagenes: []})
+    .catch(() => ({imagenes: []}))
+    .then(data => {
+      const urls = (data.imagenes || []).map(x => x.url).filter(Boolean);
+      if (!urls.length) { document.getElementById('hero-empty').style.display = 'block'; return; }
+      urls.forEach((u, k) => {
+        const s = document.createElement('div');
+        s.className = 'slide' + (k === 0 ? ' active' : '');
+        s.style.backgroundImage = 'url("' + encodeURI(u) + '")';
+        slidesEl.appendChild(s); slides.push(s);
+        const d = document.createElement('button');
+        d.type = 'button';
+        d.setAttribute('aria-label', 'Imagen ' + (k + 1));
+        if (k === 0) d.className = 'active';
+        d.addEventListener('click', () => { show(k); restart(); });
+        dotsEl.appendChild(d); dots.push(d);
       });
-
-      document.addEventListener("click", function (event) {
-        if (!container.contains(event.target)) {
-          container.classList.remove("is-open");
-          trigger.setAttribute("aria-expanded", "false");
-        }
-      });
-    }
-
-    (async function initCarousel() {
-      const track = document.getElementById("carousel-track");
-      const dotsWrap = document.getElementById("carousel-dots");
-      const prevBtn = document.getElementById("prev-slide");
-      const nextBtn = document.getElementById("next-slide");
-      const controls = document.getElementById("carousel-controls");
-      if (!track || !dotsWrap || !prevBtn || !nextBtn || !controls) return;
-
-      let fotos = [];
-      try {
-        const resp = await fetch("/imagenes/editadas/listado", { credentials: "same-origin" });
-        const data = await resp.json();
-        fotos = Array.isArray(data.imagenes) ? data.imagenes : [];
-      } catch (_) { /* Se muestra el estado vacío abajo. */ }
-
-      if (!fotos.length) {
-        const empty = document.createElement("div");
-        Object.assign(empty.style, { position: "absolute", inset: "0", display: "grid", placeItems: "center", color: "#e2e8f0", background: "rgba(2, 6, 23, 0.45)" });
-        empty.textContent = "No hay imagenes disponibles en /Imagenes/Editadas.";
-        track.appendChild(empty);
-        controls.style.display = "none";
-        return;
+      // Reutiliza una foto de obra para Nosotros
+      document.getElementById('about-media').style.backgroundImage = 'url("' + encodeURI(urls[1 % urls.length]) + '")';
+      if (urls.length > 1) {
+        document.getElementById('hero-controls').hidden = false;
+        document.getElementById('prev').onclick = () => { show(i - 1); restart(); };
+        document.getElementById('next').onclick = () => { show(i + 1); restart(); };
+        restart();
       }
-
-      const slides = fotos.map((img, i) => {
-        const slide = document.createElement("div");
-        slide.className = "slide" + (i === 0 ? " active" : "");
-        slide.style.backgroundImage = `url('${String(img.url || "").replace(/ /g, "%20")}')`;
-        track.appendChild(slide);
-        const dot = document.createElement("button");
-        dot.type = "button";
-        dot.className = "dot" + (i === 0 ? " active" : "");
-        dot.setAttribute("aria-label", `Ir a imagen ${i + 1}`);
-        dotsWrap.appendChild(dot);
-        return slide;
-      });
-      let idx = 0;
-      let timer;
-      function paint(i) {
-        idx = (i + slides.length) % slides.length;
-        slides.forEach((slide, pos) => slide.classList.toggle("active", pos === idx));
-        Array.from(dotsWrap.children).forEach((dot, pos) => dot.classList.toggle("active", pos === idx));
-      }
-      function restart() { clearInterval(timer); timer = setInterval(() => paint(idx + 1), 4300); }
-      Array.from(dotsWrap.children).forEach((dot, i) => dot.addEventListener("click", () => { paint(i); restart(); }));
-      nextBtn.addEventListener("click", () => { paint(idx + 1); restart(); });
-      prevBtn.addEventListener("click", () => { paint(idx - 1); restart(); });
-      restart();
-    })();
-  </script>
+    });
+})();
+</script>
 </body>
 </html>

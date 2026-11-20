@@ -2972,7 +2972,7 @@ def reconciliar_gestion_operativa_cerradas(conn):
 
 
 from facturacion import migrar_facturacion  # noqa: E402  (tablas fac_*; ver facturacion.py)
-from actas_medicion import migrar as migrar_actas_medicion  # noqa: E402  (tablas am_*; ver actas_medicion.py)
+from actas_medicion import migrar as migrar_actas_medicion  # noqa: E402  (tablas am_mediciones*; ver actas_medicion.py)
 
 init_sqlite()
 
@@ -17586,25 +17586,19 @@ def operaciones_dashboard_partes(
 
 
 # ============================================================================
-# Operaciones › Actas de Medición (fojas de medición configurables)
-# El motor, la configuración y la migración están en actas_medicion.py; acá solo
-# permisos, transacciones y forma de las respuestas.
+# Operaciones › Actas de Medición: partes diarios de los equipos elegidos en un período,
+# vinculados a los ítems de una OC del cliente para certificar. Lógica en actas_medicion.py.
 # ============================================================================
 import actas_medicion as am  # noqa: E402
 
 AM_API = "/api/actas-medicion"
 AM_JS_PATH = os.path.join(BASE_DIR, "actas_medicion.js")
-AM_ESTADO_HTTP = {"PERMISO": 403, "NO_EXISTE": 404, "DUPLICADO": 409, "INMUTABLE": 409, "PROTEGIDO": 409, "BLOQUEO": 409}
+AM_ESTADO_HTTP = {"PERMISO": 403, "NO_EXISTE": 404, "DUPLICADO": 409, "INMUTABLE": 409}
 AM_SEG_RUTA = "/operaciones/seguimiento-cliente/{seguimiento_id}"
 
 
 def _am_requiere(request: Request, accion: str):
     return _requiere_accion(request, "operaciones", am.PANEL, accion)
-
-
-def _am_puede(perfil):
-    acciones = (((perfil or {}).get("acciones") or {}).get("operaciones") or {}).get(am.PANEL, []) or []
-    return lambda accion: bool(perfil.get("es_desarrollador")) or accion in acciones
 
 
 def _am_ejecutar(operacion, escritura=True):
@@ -17622,21 +17616,17 @@ def _am_ejecutar(operacion, escritura=True):
     except HTTPException:
         conn.rollback()
         raise
-    except sqlite3.IntegrityError as exc:
-        conn.rollback()
-        mensaje = str(exc)
-        if "AM_INMUTABLE" in mensaje:
-            return JSONResponse({"detail": mensaje.split(": ", 1)[-1], "codigo": "INMUTABLE"}, status_code=409)
-        return JSONResponse({"detail": f"La operación viola una regla de integridad: {exc}", "codigo": "INTEGRIDAD"}, status_code=409)
-    except (KeyError, TypeError, ValueError, ArithmeticError) as exc:
-        conn.rollback()
-        return JSONResponse({"detail": f"Datos incompletos o inválidos ({exc})", "codigo": "DATOS"}, status_code=400)
     except sqlite3.Error as exc:
         conn.rollback()
         mensaje = str(exc)
         if "AM_INMUTABLE" in mensaje:
             return JSONResponse({"detail": mensaje.split(": ", 1)[-1], "codigo": "INMUTABLE"}, status_code=409)
+        if isinstance(exc, sqlite3.IntegrityError):
+            return JSONResponse({"detail": f"La operación viola una regla de integridad: {exc}", "codigo": "INTEGRIDAD"}, status_code=409)
         return JSONResponse({"detail": f"Error de base de datos: {exc}", "codigo": "BASE"}, status_code=500)
+    except (KeyError, TypeError, ValueError, ArithmeticError) as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Datos incompletos o inválidos ({exc})", "codigo": "DATOS"}, status_code=400)
     finally:
         conn.close()
 
@@ -17663,226 +17653,75 @@ def am_opciones(request: Request):
     return _am_ejecutar(am.opciones, escritura=False)
 
 
-@app.get(AM_API + "/campos")
-def am_campos(request: Request):
+@app.get(AM_API + "/equipos-con-partes")
+def am_equipos_con_partes(request: Request, desde: str, hasta: str):
     _am_requiere(request, "consultar")
-    return _am_ejecutar(am.campos_parte, escritura=False)
+    return _am_ejecutar(lambda conn: am.equipos_con_partes(conn, desde, hasta), escritura=False)
 
 
-@app.put(AM_API + "/campos/{campo}")
-async def am_guardar_campo(request: Request, campo: str):
-    _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.guardar_campo(conn, campo, datos.get("etiqueta"), datos.get("formato")))
-
-
-@app.get(AM_API + "/catalogo")
-def am_catalogo(request: Request, contrato_id: int = 0, plantilla_id: int = 0):
+@app.get(AM_API + "/sugerencia")
+def am_sugerencia(request: Request, oc: int):
     _am_requiere(request, "consultar")
-
-    def op(conn):
-        if contrato_id:
-            cfg = am.obtener_contrato(conn, contrato_id)["config_efectiva"]
-        else:
-            cfg = am.obtener_plantilla(conn, plantilla_id)["config"]
-        return am.catalogo_valores(conn, cfg)
-    return _am_ejecutar(op, escritura=False)
+    return _am_ejecutar(lambda conn: am.sugerencia(conn, oc), escritura=False)
 
 
-@app.post(AM_API + "/formula/validar")
-async def am_validar_formula(request: Request):
+@app.get(AM_API + "/actas")
+def am_listar(request: Request, seguimiento: int = 0):
     _am_requiere(request, "consultar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.validar_formula(datos.get("formula") or "0", datos.get("conocidos")), escritura=False)
+    return _am_ejecutar(lambda conn: am.listar(conn, seguimiento or None), escritura=False)
 
 
-# ---- Plantillas ----
-@app.get(AM_API + "/plantillas")
-def am_listar_plantillas(request: Request):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(am.listar_plantillas, escritura=False)
-
-
-@app.get(AM_API + "/plantillas/{plantilla_id}")
-def am_obtener_plantilla(request: Request, plantilla_id: int):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.obtener_plantilla(conn, plantilla_id), escritura=False)
-
-
-@app.post(AM_API + "/plantillas")
-async def am_crear_plantilla(request: Request):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.guardar_plantilla(conn, datos, perfil["usuario"]))
-
-
-@app.put(AM_API + "/plantillas/{plantilla_id}")
-async def am_actualizar_plantilla(request: Request, plantilla_id: int):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.guardar_plantilla(conn, datos, perfil["usuario"], plantilla_id))
-
-
-@app.post(AM_API + "/plantillas/{plantilla_id}/copiar")
-async def am_copiar_plantilla(request: Request, plantilla_id: int):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.copiar_plantilla(conn, plantilla_id, datos.get("nombre"), perfil["usuario"]))
-
-
-# ---- Contratos y su estructura ----
-@app.get(AM_API + "/contratos")
-def am_listar_contratos(request: Request):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(am.listar_contratos, escritura=False)
-
-
-@app.get(AM_API + "/contratos/{contrato_id}")
-def am_obtener_contrato(request: Request, contrato_id: int):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.obtener_contrato(conn, contrato_id), escritura=False)
-
-
-@app.post(AM_API + "/contratos")
-async def am_crear_contrato(request: Request):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.guardar_contrato(conn, datos, perfil["usuario"]))
-
-
-@app.put(AM_API + "/contratos/{contrato_id}")
-async def am_actualizar_contrato(request: Request, contrato_id: int):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.guardar_contrato(conn, datos, perfil["usuario"], contrato_id))
-
-
-@app.get(AM_API + "/contratos/{contrato_id}/sugerencia")
-def am_sugerencia(request: Request, contrato_id: int):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.sugerir_periodo(conn, contrato_id), escritura=False)
-
-
-@app.get(AM_API + "/contratos/{contrato_id}/actas")
-def am_listar_actas(request: Request, contrato_id: int):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.listar_actas(conn, contrato_id), escritura=False)
-
-
-@app.post(AM_API + "/contratos/{contrato_id}/actas")
-async def am_crear_acta(request: Request, contrato_id: int):
+@app.post(AM_API + "/actas")
+async def am_crear(request: Request):
     perfil = _am_requiere(request, "generar")
     datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.crear_acta(conn, contrato_id, datos, perfil["usuario"]))
+    return _am_ejecutar(lambda conn: am.crear(conn, datos, perfil["usuario"]))
 
 
-@app.post(AM_API + "/contratos/{contrato_id}/simular")
-async def am_simular(request: Request, contrato_id: int):
+@app.post(AM_API + "/vista-previa")
+async def am_vista_previa(request: Request):
+    """Calcula sin guardar, para ver el resultado mientras se arma el acta."""
     _am_requiere(request, "consultar")
     datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.calcular(conn, contrato_id, datos.get("periodo_desde"), datos.get("periodo_hasta"),
-                                                 int(datos["numero"]) if datos.get("numero") else None, datos.get("overrides") or {}),
-                        escritura=False)
+    return _am_ejecutar(lambda conn: am.vista_previa(conn, datos), escritura=False)
 
 
-@app.post(AM_API + "/contratos/{contrato_id}/asignaciones/{asignacion_id}/mover")
-async def am_mover_asignacion(request: Request, contrato_id: int, asignacion_id: int):
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.mover_asignacion(conn, contrato_id, asignacion_id, int(datos.get("item_id") or 0),
-                                                         datos.get("fecha"), perfil["usuario"]))
-
-
-_AM_SUBRECURSOS = {
-    "secciones": (am.guardar_seccion, am.eliminar_seccion),
-    "items": (am.guardar_item, am.eliminar_item),
-    "asignaciones": (am.guardar_asignacion, am.eliminar_asignacion),
-    "factores": (am.guardar_factor, am.eliminar_factor),
-    "precios": (am.guardar_precio, am.eliminar_precio),
-}
-
-
-def _am_subrecurso(tipo):
-    if tipo not in _AM_SUBRECURSOS:
-        raise HTTPException(status_code=404, detail="Recurso inexistente")
-    return _AM_SUBRECURSOS[tipo]
-
-
-@app.post(AM_API + "/contratos/{contrato_id}/{tipo}")
-async def am_crear_subrecurso(request: Request, contrato_id: int, tipo: str):
-    guardar, _ = _am_subrecurso(tipo)
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: guardar(conn, contrato_id, datos, perfil["usuario"]))
-
-
-@app.put(AM_API + "/contratos/{contrato_id}/{tipo}/{sub_id}")
-async def am_actualizar_subrecurso(request: Request, contrato_id: int, tipo: str, sub_id: int):
-    guardar, _ = _am_subrecurso(tipo)
-    perfil = _am_requiere(request, "configurar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: guardar(conn, contrato_id, datos, perfil["usuario"], sub_id))
-
-
-@app.delete(AM_API + "/contratos/{contrato_id}/{tipo}/{sub_id}")
-def am_eliminar_subrecurso(request: Request, contrato_id: int, tipo: str, sub_id: int):
-    _, eliminar = _am_subrecurso(tipo)
-    perfil = _am_requiere(request, "configurar")
-    return _am_ejecutar(lambda conn: eliminar(conn, contrato_id, sub_id, perfil["usuario"]))
-
-
-# ---- Actas ----
 @app.get(AM_API + "/actas/{acta_id}")
-def am_obtener_acta(request: Request, acta_id: int):
+def am_obtener(request: Request, acta_id: int):
     _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.obtener_acta(conn, acta_id), escritura=False)
+    return _am_ejecutar(lambda conn: am.obtener(conn, acta_id), escritura=False)
 
 
 @app.put(AM_API + "/actas/{acta_id}")
-async def am_actualizar_acta(request: Request, acta_id: int):
+async def am_actualizar(request: Request, acta_id: int):
     perfil = _am_requiere(request, "generar")
     datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.actualizar_acta(conn, acta_id, datos, perfil["usuario"]))
+    return _am_ejecutar(lambda conn: am.actualizar(conn, acta_id, datos, perfil["usuario"]))
 
 
 @app.delete(AM_API + "/actas/{acta_id}")
-def am_eliminar_acta(request: Request, acta_id: int):
+def am_eliminar(request: Request, acta_id: int):
     perfil = _am_requiere(request, "generar")
-    return _am_ejecutar(lambda conn: am.eliminar_acta(conn, acta_id, perfil["usuario"]))
+    return _am_ejecutar(lambda conn: am.eliminar(conn, acta_id, perfil["usuario"]))
 
 
-@app.post(AM_API + "/actas/{acta_id}/estado")
-async def am_cambiar_estado(request: Request, acta_id: int):
-    perfil = _am_requiere(request, "consultar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.cambiar_estado(conn, acta_id, str(datos.get("destino") or ""), perfil["usuario"], _am_puede(perfil)))
+@app.post(AM_API + "/actas/{acta_id}/cerrar")
+def am_cerrar(request: Request, acta_id: int):
+    perfil = _am_requiere(request, "aprobar")
+    return _am_ejecutar(lambda conn: am.cerrar(conn, acta_id, perfil["usuario"]))
 
 
-@app.post(AM_API + "/actas/{acta_id}/revision")
-async def am_revisar_acta(request: Request, acta_id: int):
-    perfil = _am_requiere(request, "generar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.revisar_acta(conn, acta_id, perfil["usuario"], datos.get("motivo") or ""))
+@app.post(AM_API + "/actas/{acta_id}/reabrir")
+def am_reabrir(request: Request, acta_id: int):
+    perfil = _am_requiere(request, "aprobar")
+    return _am_ejecutar(lambda conn: am.reabrir(conn, acta_id, perfil["usuario"]))
 
 
 @app.post(AM_API + "/actas/{acta_id}/anular")
-async def am_anular_acta(request: Request, acta_id: int):
+async def am_anular(request: Request, acta_id: int):
     perfil = _am_requiere(request, "anular")
     datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.anular_acta(conn, acta_id, datos.get("motivo"), perfil["usuario"]))
-
-
-@app.get(AM_API + "/actas/{acta_id}/reportes")
-def am_reportes(request: Request, acta_id: int):
-    _am_requiere(request, "consultar")
-    return _am_ejecutar(lambda conn: am.reportes_acta(conn, acta_id), escritura=False)
-
-
-@app.post(AM_API + "/actas/{acta_id}/partes")
-async def am_partes(request: Request, acta_id: int):
-    _am_requiere(request, "consultar")
-    datos = await _am_json(request)
-    return _am_ejecutar(lambda conn: am.partes_de(conn, acta_id, datos.get("ids") or []), escritura=False)
+    return _am_ejecutar(lambda conn: am.anular(conn, acta_id, datos.get("motivo"), perfil["usuario"]))
 
 
 @app.get(AM_API + "/actas/{acta_id}/excel")
@@ -17894,6 +17733,14 @@ def am_excel(request: Request, acta_id: int):
         return Response(contenido, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
     return _am_ejecutar(op, escritura=False)
+
+
+@app.put(AM_API + "/actas/{acta_id}/graficos")
+async def am_graficos(request: Request, acta_id: int):
+    """Elige y ordena los gráficos KPI del acta (también en una cerrada: no cambia el resultado)."""
+    perfil = _am_requiere(request, "generar")
+    datos = await _am_json(request)
+    return _am_ejecutar(lambda conn: am.guardar_graficos(conn, acta_id, datos.get("graficos"), perfil["usuario"]))
 
 
 # ---- Conexión con Certificados del Seguimiento de Cliente (precarga) ----
@@ -17909,7 +17756,7 @@ def am_cert_precarga(request: Request, seguimiento_id: int, acta_id: int):
 
     def op(conn):
         datos = am.precarga_certificado(conn, acta_id)
-        if datos["seguimiento_cc_id"] and datos["seguimiento_cc_id"] != seguimiento_id:
+        if datos["seguimiento_cc_id"] != seguimiento_id:
             raise am.AmError("DATOS", "el acta es de otro seguimiento")
         return datos
     return _am_ejecutar(op, escritura=False)
