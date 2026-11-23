@@ -17959,6 +17959,65 @@ async def tarja_preferencias_guardar(request: Request):
     return _tarja_ejecutar(lambda conn: tarja.guardar_preferencias(conn, perfil["usuario"], datos))
 
 
+TARJA_IMPORTAR_MAX_BYTES = 60 * 1024 * 1024
+
+
+def _tarja_importar(ruta, aplicar, usuario, nombre):
+    import base64
+    import collections
+    import importar_tarja_excel as itx
+
+    respaldo = None
+    if aplicar:  # copia consistente de la base antes de grabar
+        carpeta = os.path.join(DATA_DIR, "backups")
+        os.makedirs(carpeta, exist_ok=True)
+        respaldo = os.path.join(carpeta, f"dashboard_pre_import_tarja_{datetime.now():%Y%m%d_%H%M%S}.db")
+        origen, copia = sqlite3.connect(SQLITE_DB_PATH, timeout=20), sqlite3.connect(respaldo)
+        try:
+            origen.backup(copia)
+        finally:
+            copia.close()
+            origen.close()
+
+    def op(conn):
+        resumen, excepciones, mapeados, sin_mapear = itx.procesar(conn, ruta, aplicar, usuario=usuario, nombre_archivo=nombre)
+        buf = io.BytesIO()
+        itx.escribir_reporte(buf, resumen, excepciones, mapeados, sin_mapear)
+        return {
+            "resumen": resumen,
+            "mapeados": [{"destino": k, "dias": v} for k, v in mapeados.most_common()],
+            "sin_importar": [{"valor": v, "motivo": m, "celdas": n} for (v, m), n in sorted(sin_mapear.items(), key=lambda x: -x[1])],
+            "filas_excluidas": collections.Counter(e[6] for e in excepciones if not e[3]).most_common(),
+            "respaldo": os.path.relpath(respaldo, DATA_DIR) if respaldo else None,
+            "reporte_nombre": f"Reporte_importacion_tarja_{datetime.now():%Y%m%d_%H%M}.xlsx",
+            "reporte_b64": base64.b64encode(buf.getvalue()).decode(),
+        }
+    return _tarja_ejecutar(op, escritura=False)
+
+
+@app.post(TARJA_API + "/importar")
+async def tarja_importar(request: Request, archivo: UploadFile = File(...), aplicar: bool = Form(False)):
+    """Histórico desde la planilla «TARJA GENERAL»: aplicar=false simula y devuelve el reporte; aplicar=true graba
+    (antes respalda la base). Los días ya cargados no se pisan."""
+    perfil = _tarja_requiere(request, "configurar")
+    nombre = os.path.basename(archivo.filename or "")
+    if not nombre.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Elija la planilla Excel (.xlsx o .xlsm) con la hoja TARJA GENERAL")
+    contenido = await archivo.read(TARJA_IMPORTAR_MAX_BYTES + 1)
+    if len(contenido) > TARJA_IMPORTAR_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="El archivo supera los 60 MB")
+    temporal = tempfile.NamedTemporaryFile(prefix="import_tarja_", suffix=os.path.splitext(nombre)[1], dir=DATA_DIR, delete=False)
+    try:
+        with temporal:
+            temporal.write(contenido)
+        resultado = await run_in_threadpool(_tarja_importar, temporal.name, bool(aplicar), perfil["usuario"], nombre)
+    finally:
+        os.remove(temporal.name)
+    if isinstance(resultado, dict):
+        logger.info("Importación tarja por %s (%s): %s", perfil.get("usuario", ""), nombre, resultado["resumen"])
+    return resultado
+
+
 @app.post(TARJA_API + "/exportar")
 async def tarja_exportar(request: Request):
     """Exporta la grilla del período: legajos = lo filtrado en pantalla (en ese orden); sin legajos = todos los activos."""

@@ -832,7 +832,7 @@
   // ---------------------------------------------------------------- configuración
   function configuracion(tab) {
     const c = T.op.config;
-    const tabs = [['jornada', 'Jornada'], ['codigos', 'Códigos de estado'], ['feriados', 'Feriados']];
+    const tabs = [['jornada', 'Jornada'], ['codigos', 'Códigos de estado'], ['feriados', 'Feriados'], ['importar', 'Importar histórico']];
     let cuerpo = `<div class="cert-toggle" style="margin-bottom:14px">${tabs.map(([k, l]) => `<button type="button" data-tj-tab="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     if (tab === 'jornada') {
       cuerpo += `<div class="cert-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
@@ -854,6 +854,13 @@
       cuerpo += `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Categoría (totales)</th><th>Cuenta como trabajado</th><th>Activo</th><th></th></tr></thead>
         <tbody>${T.op.codigos.map(fila).join('')}${fila(null)}</tbody></table></div>
         <p class="cert-muted" style="margin-top:8px">Los números son siempre centros de costo, por eso los códigos empiezan con letra. Un código que cuenta como trabajado suma jornada y continúa el turno. Los códigos no se borran: se desactivan.</p>`;
+    } else if (tab === 'importar') {
+      cuerpo += `<div class="cert-alert info" style="margin-bottom:12px"><span class="ic">i</span><div><b>Histórico desde la planilla «TARJA GENERAL»</b>
+        Elija el Excel (Logistica SMG.xlsm). Primero se simula y se muestra qué entra y qué no; recién al confirmar se graba.
+        Se cruza por legajo; los centros de costo deben existir en el sistema; los días ya cargados no se pisan. Antes de grabar se respalda la base.</div></div>
+        <div class="cert-actions" style="margin-bottom:12px"><input type="file" id="tj-i-arch" accept=".xlsx,.xlsm" style="width:auto">
+          <button type="button" class="cert-btn primary" id="tj-i-sim">Simular</button></div>
+        <div id="tj-i-res"></div>`;
     } else {
       const fer = T.op.feriados || [];
       cuerpo += `<div class="cert-actions" style="margin-bottom:10px"><input type="date" id="tj-f-fecha"><input type="text" id="tj-f-desc" placeholder="Descripción" style="width:260px">
@@ -867,7 +874,9 @@
     const b = $('tj-modal-b');
     b.querySelectorAll('[data-tj-tab]').forEach((x) => x.addEventListener('click', () => configuracion(x.dataset.tjTab)));
     const recargar = async (pestana) => { T.op = await api(`${API}/opciones`); configuracion(pestana); leyenda(); await cargarMes(); };
-    if (tab === 'jornada') {
+    if (tab === 'importar') {
+      importarHistorico();
+    } else if (tab === 'jornada') {
       $('tj-c-ok').addEventListener('click', () => ejecutar(async () => {
         await api(`${API}/config`, 'PUT', { horas_efectivas: $('tj-c-1').value, horas_break: $('tj-c-2').value,
           horas_efectivas_cambio_turno: $('tj-c-3').value, horas_break_cambio_turno: $('tj-c-4').value });
@@ -893,6 +902,66 @@
         await recargar('feriados');
       }, 'Feriado quitado')));
     }
+  }
+
+  // ---------------------------------------------------------------- importar histórico (Configuración)
+  function importarHistorico() {
+    let ultimo = null;
+    const enviar = async (aplicar) => {
+      const arch = $('tj-i-arch').files[0];
+      if (!arch) { toast('Elija primero el archivo Excel.', 'error'); return; }
+      const fd = new FormData();
+      fd.append('archivo', arch);
+      fd.append('aplicar', aplicar ? 'true' : 'false');
+      $('tj-i-res').innerHTML = `<p class="cert-muted">${aplicar ? 'Importando' : 'Leyendo la planilla y simulando'}… puede tardar un minuto.</p>`;
+      ['tj-i-sim', 'tj-i-apl'].forEach((id) => { if ($(id)) $(id).disabled = true; });
+      let res; let data = null;
+      try {
+        res = await fetch(`${API}/importar`, { method: 'POST', body: fd });
+        try { data = await res.json(); } catch (err) { data = null; }
+      } catch (err) { data = { detail: 'No se pudo conectar con el servidor.' }; res = { ok: false }; }
+      if ($('tj-i-sim')) $('tj-i-sim').disabled = false;
+      if (!res.ok) { $('tj-i-res').innerHTML = ''; toast((data && data.detail) || 'Error al importar.', 'error'); return; }
+      ultimo = data;
+      mostrar(data, arch.name);
+      if (aplicar) { toast(`Importados ${data.resumen.dias_a_importar} días.`, 'success'); await cargarMes(); }
+    };
+    const descargar = () => {
+      const bin = atob(ultimo.reporte_b64); const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = ultimo.reporte_nombre; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    };
+    const mostrar = (d, nombre) => {
+      const r = d.resumen;
+      const kv = (k, v) => `<div class="cert-kv"><span>${k}</span><b>${v}</b></div>`;
+      const aplicado = r.aplicado;
+      $('tj-i-res').innerHTML = `
+        <div class="cert-alert ${aplicado ? '' : 'info'}" style="margin-bottom:10px;${aplicado ? 'border-color:#9bd5ae;background:var(--c-green-soft);color:#14532d' : ''}"><span class="ic" style="${aplicado ? 'background:var(--c-green)' : ''}">${aplicado ? '✓' : 'i'}</span>
+          <div><b>${aplicado ? 'Importación aplicada' : 'Simulación: todavía no se grabó nada'}</b>${e(nombre)} · días del ${fFecha(r.desde)} al ${fFecha(r.hasta)}${d.respaldo ? ` · respaldo: ${e(d.respaldo)}` : ''}</div></div>
+        <div class="cert-trio" style="grid-template-columns:1fr 1fr">
+          <div>${kv('Operadores que se importan', nf(r.filas_importables))}${kv(aplicado ? 'Días importados' : 'Días a importar', nf(r.dias_a_importar))}
+            ${kv('Días ya cargados (no se pisan)', nf(r.ya_cargados))}${kv('Excepciones (ver reporte)', nf(r.excepciones))}
+            ${d.filas_excluidas.length ? `<div class="cert-seccion">Filas excluidas</div>${d.filas_excluidas.map(([m, n]) => kv(e(m), n)).join('')}` : ''}</div>
+          <div><div class="cert-seccion" style="margin-top:0">Celdas sin importar</div>
+            <div class="cert-wrap" style="max-height:230px;overflow:auto"><table class="cert-t"><thead><tr><th>Valor</th><th>Motivo</th><th>Celdas</th></tr></thead><tbody>
+            ${d.sin_importar.map((x) => `<tr><td>${e(x.valor)}</td><td style="white-space:normal">${e(x.motivo)}</td><td class="r">${nf(x.celdas)}</td></tr>`).join('') || '<tr><td colspan="3" class="cert-muted">Ninguna.</td></tr>'}
+            </tbody></table></div></div>
+        </div>
+        <div class="cert-actions" style="justify-content:flex-end;margin-top:12px">
+          <button type="button" class="cert-btn" id="tj-i-rep">Descargar reporte de excepciones</button>
+          ${!aplicado && r.dias_a_importar > 0 ? `<button type="button" class="cert-btn primary" id="tj-i-apl">Importar ${nf(r.dias_a_importar)} días</button>` : ''}
+        </div>`;
+      $('tj-i-rep').addEventListener('click', descargar);
+      if ($('tj-i-apl')) $('tj-i-apl').addEventListener('click', () => {
+        if (!window.confirm(`Se van a grabar ${r.dias_a_importar} días en la tarja (antes se respalda la base). ¿Continuar?`)) return;
+        enviar(true);
+      });
+    };
+    $('tj-i-sim').addEventListener('click', () => enviar(false));
+    $('tj-i-arch').addEventListener('change', () => { $('tj-i-res').innerHTML = ''; ultimo = null; });
   }
 
   // ---------------------------------------------------------------- exportar

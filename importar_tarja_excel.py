@@ -41,10 +41,11 @@ def leer_planilla(ruta, hoja="TARJA GENERAL"):
     from openpyxl import load_workbook
     wb = load_workbook(ruta, read_only=True, data_only=True)
     if hoja not in wb.sheetnames:
-        raise SystemExit(f"La planilla no tiene la hoja «{hoja}»")
+        wb.close()
+        raise ValueError(f"La planilla no tiene la hoja «{hoja}»")
     ws = wb[hoja]
-    filas = ws.iter_rows(min_row=1, values_only=True)
-    cab = next(filas)
+    # La hoja declara miles de columnas vacías: se lee la fila de fechas y después solo hasta la última fecha.
+    cab = next(ws.iter_rows(min_row=FILA_FECHAS, max_row=FILA_FECHAS, values_only=True))
     fechas = {}
     for i, v in enumerate(cab):
         if i + 1 < COL_PRIMER_DIA:
@@ -53,14 +54,18 @@ def leer_planilla(ruta, hoja="TARJA GENERAL"):
             fechas[i] = v.date().isoformat()
         elif isinstance(v, date):
             fechas[i] = v.isoformat()
+    if not fechas:
+        wb.close()
+        raise ValueError(f"La fila {FILA_FECHAS} de la hoja «{hoja}» no tiene fechas desde la columna D")
+    ultima = max(fechas) + 1
     datos = []
-    for nro, fila in enumerate(ws.iter_rows(min_row=FILA_DATOS, values_only=True), FILA_DATOS):
+    for nro, fila in enumerate(ws.iter_rows(min_row=FILA_DATOS, max_col=ultima, values_only=True), FILA_DATOS):
         datos.append((nro, fila))
     wb.close()
     return fechas, datos
 
 
-def procesar(conn, ruta, aplicar=False):
+def procesar(conn, ruta, aplicar=False, usuario=USUARIO, nombre_archivo=None):
     fechas, datos = leer_planilla(ruta)
     centros = {f["id"] for f in conn.execute("SELECT id FROM centros_costos")}
     personal = {f["legajo"]: f["nombre"] for f in conn.execute("SELECT legajo, nombre FROM personal")}
@@ -129,11 +134,11 @@ def procesar(conn, ruta, aplicar=False):
         try:
             conn.executemany("""INSERT INTO tarja_registros (legajo, fecha, centro_costo_id, codigo_estado_id, observaciones,
                 creado_por, creado_en, actualizado_por, actualizado_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                             [(*r, USUARIO, ahora, USUARIO, ahora) for r in a_insertar])
+                             [(*r, usuario, ahora, usuario, ahora) for r in a_insertar])
             legajos = sorted({r[0] for r in a_insertar})
             tarja.recalcular_todo(conn, legajos)
             tarja.historial_evento(conn, None, None, "IMPORTACION_EXCEL", None,
-                                   {"archivo": os.path.basename(ruta), "dias": len(a_insertar), "operadores": len(legajos)}, USUARIO)
+                                   {"archivo": nombre_archivo or os.path.basename(ruta), "dias": len(a_insertar), "operadores": len(legajos)}, usuario)
             conn.commit()
             resumen["aplicado"] = True
         except Exception:

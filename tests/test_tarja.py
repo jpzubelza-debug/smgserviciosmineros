@@ -365,6 +365,77 @@ class TarjaTests(unittest.TestCase):
         self.assertEqual((ws.cell(4, 5).value, ws.cell(4, 6).value, ws.cell(4, 5 + 12).value), ("20/10", 21, "1/11"))
         self.assertEqual(ws.cell(6, 5 + 60).value, 211, "19/12 = 211")
 
+    # ------------------------------------------------------------------ importar histórico desde la pantalla
+    def test_18_importar_historico_desde_pantalla(self):
+        import base64
+        from openpyxl import load_workbook
+        with _db() as conn:
+            conn.execute("INSERT INTO personal (legajo, nombre, activo) VALUES ('T9020', 'PRUEBA IMPORTACION', 'ACTIVO')")
+            conn.execute("INSERT INTO personal (legajo, nombre, activo) VALUES ('T9021', 'PRUEBA REPETIDO', 'ACTIVO')")
+        contenido = planilla_prueba()
+        archivo = {"archivo": ("Logistica prueba.xlsm", contenido, "application/vnd.ms-excel.sheet.macroEnabled.12")}
+        r = _ok(self.c.post(f"{API}/importar", files=archivo, data={"aplicar": "false"}))
+        res = r["resumen"]
+        self.assertEqual((res["aplicado"], res["dias_a_importar"], res["desde"], res["hasta"]), (False, 4, "2025-03-01", "2025-03-06"))
+        self.assertIsNone(r["respaldo"])
+        motivos = {x["valor"]: x["motivo"] for x in r["sin_importar"]}
+        self.assertIn("107", motivos)
+        self.assertIn("basura", motivos["x"])
+        self.assertIn(["legajo repetido (2 filas)", 2], r["filas_excluidas"])
+        self.assertIn(["fila sin legajo", 1], r["filas_excluidas"])
+        with _db() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tarja_registros WHERE legajo = 'T9020'").fetchone()[0], 0, "simular no graba")
+        ws = load_workbook(io.BytesIO(base64.b64decode(r["reporte_b64"])))["Excepciones"]
+        self.assertGreater(ws.max_row, 3)
+
+        r = _ok(self.c.post(f"{API}/importar", files=archivo, data={"aplicar": "true"}))
+        self.assertTrue(r["resumen"]["aplicado"])
+        self.assertTrue(os.path.exists(os.path.join(TMP_DIR, r["respaldo"])), "se respalda la base antes de grabar")
+        with _db() as conn:
+            filas = {f["fecha"]: dict(f) for f in conn.execute("""SELECT r.fecha, r.centro_costo_id, e.codigo, r.observaciones, r.horas_efectivas, r.creado_por
+                FROM tarja_registros r LEFT JOIN tarja_codigos_estado e ON e.id = r.codigo_estado_id WHERE legajo = 'T9020'""")}
+            ev = conn.execute("SELECT * FROM tarja_historial WHERE accion = 'IMPORTACION_EXCEL' ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertEqual(sorted(filas), ["2025-03-01", "2025-03-02", "2025-03-03", "2025-03-04"])
+        self.assertEqual((filas["2025-03-01"]["centro_costo_id"], filas["2025-03-01"]["horas_efectivas"]), (106, 5), "se recalculan los turnos")
+        self.assertEqual((filas["2025-03-03"]["codigo"], filas["2025-03-03"]["observaciones"]), ("PER", "Ausente Justificado"))
+        self.assertEqual(filas["2025-03-01"]["creado_por"], "contingencia_test")
+        self.assertEqual(json.loads(ev["nuevo_json"])["archivo"], "Logistica prueba.xlsm")
+        r = _ok(self.c.post(f"{API}/importar", files=archivo, data={"aplicar": "true"}))
+        self.assertEqual((r["resumen"]["dias_a_importar"], r["resumen"]["ya_cargados"]), (0, 4), "repetir no pisa ni duplica")
+
+        _err(self.c.post(f"{API}/importar", files={"archivo": ("datos.csv", b"a,b", "text/csv")}, data={"aplicar": "false"}), 400)
+        _err(_cliente(*CONSULTA).post(f"{API}/importar", files=archivo, data={"aplicar": "false"}), 403)
+        sin_hoja = io.BytesIO()
+        from openpyxl import Workbook
+        Workbook().save(sin_hoja)
+        self.assertIn("TARJA GENERAL", _err(self.c.post(f"{API}/importar", files={"archivo": ("otra.xlsx", sin_hoja.getvalue(), "application/octet-stream")},
+                                                         data={"aplicar": "false"}), 400))
+
+
+def planilla_prueba():
+    """Planilla mínima con la estructura de «TARJA GENERAL»: fila 1 fechas desde D, datos desde la fila 7."""
+    from datetime import datetime as dt
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "TARJA GENERAL"
+    for i in range(6):
+        ws.cell(1, 4 + i, dt(2025, 3, 1 + i))
+        ws.cell(5, 4 + i, 1 + i)
+    ws.cell(6, 1, "LEGAJOS")
+    filas = [
+        ["T9020", "PRUEBA IMPORTACION", "Obra libre", 106, 106, "Ausente Justificado", "D", 107, "x"],
+        [None, "SIN LEGAJO", "Pirquitas", 106, 106],
+        ["T9021", "REPETIDO UNO", None, 209],
+        ["T9021", "REPETIDO DOS", None, 210],
+    ]
+    for j, f in enumerate(filas):
+        for k, v in enumerate(f):
+            ws.cell(7 + j, 1 + k, v)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
 
 class MapeoExcelTests(unittest.TestCase):
     def test_mapeo(self):
