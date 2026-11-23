@@ -582,7 +582,7 @@
         <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div><div class="compras-overdue-detail hidden" id="compras-solicitudes-detail"><h3 id="compras-solicitudes-detail-title">Solicitudes por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Destino</th><th>Prioridad</th></tr></thead><tbody id="compras-solicitudes-detail-body"></tbody></table></div></div></div>
         <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th><th>Precio Unit.</th><th>Total</th><th>N.º OC</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
       </div>
-      <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
+      <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Solicitante</th><th>Destino de compra</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
     </section>
     <section class="content-panel card form-card" id="compras-formulario">
       <div class="form-header">
@@ -1338,8 +1338,8 @@
         comprasOverdueDetailTitle.textContent = `Solicitudes vencidas: ${resumen.prioridad}`;
         const solicitudes = resumen.solicitudes || [];
         comprasOverdueDetailBody.innerHTML = solicitudes.length ? solicitudes.map((solicitud) => `
-          <tr><td>${escapeHtml(solicitud.numero_solicitud)}</td><td>${escapeHtml((solicitud.productos || []).join(' | '))}</td></tr>
-        `).join('') : '<tr><td colspan="2" class="empty-message">No hay solicitudes fuera de plazo para esta prioridad.</td></tr>';
+          <tr><td>${escapeHtml(solicitud.numero_solicitud)}</td><td>${escapeHtml(solicitud.solicitante || '-')}</td><td>${escapeHtml(solicitud.destino_compra || '-')}</td><td>${escapeHtml((solicitud.productos || []).join(' | '))}</td></tr>
+        `).join('') : '<tr><td colspan="4" class="empty-message">No hay solicitudes fuera de plazo para esta prioridad.</td></tr>';
         comprasOverdueDetail.classList.remove('hidden');
         comprasPrioridadesBody.querySelectorAll('.compras-deadline-row').forEach((row) => row.classList.toggle('selected', row.dataset.prioridad === prioridad));
       };

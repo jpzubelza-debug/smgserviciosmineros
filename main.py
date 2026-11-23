@@ -9106,10 +9106,14 @@ def compras_dashboard(
             f'''
             SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
                    COALESCE(pc.nombre, 'Sin prioridad') AS prioridad,
+                   COALESCE(sol.nombre, '') AS solicitante,
+                   COALESCE(proy.nombre, '') AS destino_compra,
                    d.id AS detalle_id, d.descripcion_articulo, d.estado_aprobacion,
                    vinculo.id AS vinculo_id
             FROM solicitud_compra sc
             LEFT JOIN prioridades_compra pc ON pc.id = sc.id_prioridad
+            LEFT JOIN personal sol ON sol.legajo = sc.id_solicitante
+            LEFT JOIN proyectos proy ON proy.id = sc.id_proyecto
             LEFT JOIN solicitud_compra_detalle d ON d.id_solicitud = sc.id
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
@@ -9135,7 +9139,7 @@ def compras_dashboard(
         nombre, dias = prioridad_config.get(clave, (nombre_original, None))
         solicitud = solicitudes_agrupadas.setdefault(
             solicitud_id,
-            {"prioridad": nombre, "dias": dias, "fecha": fila["fecha_solicitud"], "numero": fila["numero_solicitud"], "pendiente": False, "productos": []},
+            {"prioridad": nombre, "dias": dias, "fecha": fila["fecha_solicitud"], "numero": fila["numero_solicitud"], "solicitante": fila["solicitante"], "destino_compra": fila["destino_compra"], "pendiente": False, "productos": []},
         )
         if fila["detalle_id"] is not None and fila["vinculo_id"] is None and str(fila["estado_aprobacion"] or "Pendiente").upper() not in {"RECHAZADA", "GESTIONADO"}:
             solicitud["pendiente"] = True
@@ -9155,6 +9159,8 @@ def compras_dashboard(
                     resumen["fuera_plazo"] += 1
                     resumen.setdefault("solicitudes", []).append({
                         "numero_solicitud": solicitud["numero"],
+                        "solicitante": solicitud["solicitante"],
+                        "destino_compra": solicitud["destino_compra"],
                         "productos": solicitud["productos"],
                     })
             except ValueError:
