@@ -204,6 +204,40 @@
   .compras-deadline-row:hover { background: rgba(248, 113, 113, 0.12); }
   .compras-overdue-detail { margin-top: 12px; }
 
+  /* Ítems por estado / por departamento */
+  .compras-chart.wide { grid-column: 1 / -1; }
+  .compras-chart-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .compras-chart-head h3 { margin: 0; }
+  .compras-view-toggle { display: inline-flex; padding: 3px; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; background: rgba(2, 6, 23, 0.45); }
+  .compras-view-toggle button { padding: 5px 12px; border: 0; border-radius: 6px; background: transparent; color: #cbd5e1; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  .compras-view-toggle button.active { background: linear-gradient(90deg, #38bdf8, #22c55e); color: #0f172a; }
+  .compras-depto-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; color: #cbd5e1; font-size: 0.8rem; }
+  .compras-depto-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .compras-depto-legend i { width: 12px; height: 12px; border-radius: 3px; }
+  .compras-depto-bars { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+  .compras-depto-row { display: grid; grid-template-columns: minmax(150px, 1.3fr) 3fr 56px; gap: 10px; align-items: center; margin: 8px 0; }
+  .compras-depto-row .compras-chart-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .compras-depto-track { display: flex; height: 14px; overflow: hidden; border-radius: 7px; background: rgba(148, 163, 184, 0.18); }
+  .compras-depto-seg { height: 100%; padding: 0; border: 0; cursor: pointer; transition: filter 0.15s ease; }
+  .compras-depto-seg:hover, .compras-depto-seg:focus-visible { filter: brightness(1.25); outline: none; }
+  .compras-depto-seg + .compras-depto-seg { box-shadow: inset 1px 0 0 rgba(15, 23, 42, 0.7); }
+  .compras-depto-table-wrap { margin-top: 14px; max-height: 380px; overflow: auto; }
+  .compras-depto-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .compras-depto-table th, .compras-depto-table td { padding: 7px 8px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); text-align: right; white-space: nowrap; }
+  .compras-depto-table th:first-child, .compras-depto-table td:first-child { text-align: left; white-space: normal; min-width: 180px; }
+  .compras-depto-table thead th { position: sticky; top: 0; z-index: 1; background: #0f172a; }
+  .compras-depto-table thead button { padding: 0; border: 0; background: transparent; color: #bfdbfe; font: inherit; font-weight: 800; cursor: pointer; }
+  .compras-depto-table thead button::after { content: ''; margin-left: 4px; color: #38bdf8; }
+  .compras-depto-table thead button[data-dir="desc"]::after { content: '▼'; }
+  .compras-depto-table thead button[data-dir="asc"]::after { content: '▲'; }
+  .compras-depto-table tfoot td { position: sticky; bottom: 0; background: #0f172a; color: #f8fafc; font-weight: 800; border-top: 1px solid rgba(148, 163, 184, 0.4); }
+  .compras-depto-table td.celda-link { cursor: pointer; }
+  .compras-depto-table td.celda-link:hover { background: rgba(56, 189, 248, 0.12); color: #f8fafc; }
+  .compras-depto-table .pct { color: #94a3b8; }
+  .compras-depto-aviso { margin: 8px 0 0; color: #fca5a5; font-size: 0.8rem; }
+  .compras-depto-tooltip { position: fixed; z-index: 50; padding: 6px 9px; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 6px; background: #020617; color: #f8fafc; font-size: 0.78rem; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+  @media (max-width: 720px) { .compras-depto-row { grid-template-columns: 1fr 48px; } .compras-depto-row .compras-depto-track { grid-column: 1 / -1; grid-row: 2; } }
+
   #compras-items-detail .detail-table-wrap,
   #compras-solicitudes-detail .detail-table-wrap {
     max-height: 215px;
@@ -580,7 +614,28 @@
       <div class="compras-kpi-grid" id="compras-kpi-grid"></div>
       <div class="compras-charts-grid">
         <div class="compras-chart"><h3>Solicitudes por estado</h3><div id="compras-solicitudes-chart"></div><div class="compras-overdue-detail hidden" id="compras-solicitudes-detail"><h3 id="compras-solicitudes-detail-title">Solicitudes por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Destino</th><th>Prioridad</th></tr></thead><tbody id="compras-solicitudes-detail-body"></tbody></table></div></div></div>
-        <div class="compras-chart"><h3>Ítems por estado</h3><div id="compras-items-chart"></div><div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th><th>Precio Unit.</th><th>Total</th><th>N.º OC</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
+        <div class="compras-chart" id="compras-items-card">
+          <div class="compras-chart-head">
+            <h3>Ítems por estado</h3>
+            <div class="compras-view-toggle" role="group" aria-label="Vista de ítems">
+              <button type="button" class="active" data-vista-items="estado" aria-pressed="true">Por estado</button>
+              <button type="button" data-vista-items="departamento" aria-pressed="false">Por departamento</button>
+            </div>
+          </div>
+          <div id="compras-items-chart"></div>
+          <div class="hidden" id="compras-items-depto">
+            <div class="compras-depto-legend" id="compras-items-depto-legend"></div>
+            <div class="compras-depto-bars" id="compras-items-depto-bars"></div>
+            <div class="compras-depto-table-wrap">
+              <table class="compras-depto-table">
+                <thead><tr id="compras-items-depto-head"></tr></thead>
+                <tbody id="compras-items-depto-body"></tbody>
+                <tfoot><tr id="compras-items-depto-foot"></tr></tfoot>
+              </table>
+            </div>
+            <p class="compras-depto-aviso hidden" id="compras-items-depto-aviso"></p>
+          </div>
+          <div class="compras-overdue-detail hidden" id="compras-items-detail"><h3 id="compras-items-detail-title">Ítems por estado</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>Solicitud N.º</th><th>Fecha</th><th>Solicitante</th><th>Artículo</th><th>Cantidad</th><th>Unidad</th><th>Precio Unit.</th><th>Total</th><th>N.º OC</th></tr></thead><tbody id="compras-items-detail-body"></tbody></table></div></div></div>
       </div>
       <div class="compras-deadline-panel"><h3>Solicitudes fuera de plazo</h3><p class="empty-message">Seleccione una prioridad para ver sus solicitudes y productos pendientes.</p><div class="detail-table-wrap"><table class="detail-table compras-deadline-table"><thead><tr><th>Prioridad</th><th>Plazo</th><th>Total</th><th>Fuera de plazo</th></tr></thead><tbody id="compras-prioridades-body"></tbody></table></div><div class="compras-overdue-detail hidden" id="compras-overdue-detail"><h3 id="compras-overdue-detail-title">Solicitudes vencidas</h3><div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>N.º Solicitud</th><th>Solicitante</th><th>Destino de compra</th><th>Productos pendientes</th></tr></thead><tbody id="compras-overdue-detail-body"></tbody></table></div></div></div>
     </section>
@@ -603,8 +658,9 @@
           </div>
           <div class="field">
             <label for="destinoCompra">Destino de compra</label>
-            <input id="destinoCompra" list="lista-centros-costos" placeholder="Seleccione o escriba un centro de costos">
-            <datalist id="lista-centros-costos"></datalist>
+            <select id="destinoCompra">
+              <option value="">Seleccione un centro de costos</option>
+            </select>
           </div>
         </div>
 
@@ -922,7 +978,6 @@
       const numeroSolicitud = document.getElementById('numeroSolicitud');
       const solicitante = document.getElementById('solicitante');
       const destinoCompra = document.getElementById('destinoCompra');
-      const listaCentrosCostos = document.getElementById('lista-centros-costos');
       const listaProductos = document.getElementById('lista-productos');
       const listaUnidades = document.getElementById('lista-unidades');
       const centroCostoSelect = document.getElementById('centroCosto');
@@ -1289,19 +1344,23 @@
           comprasSolicitudesDetailBody.innerHTML = `<tr><td colspan="5" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
         }
       };
-      const mostrarDetalleItemsEstado = async (estado) => {
-        comprasItemsDetailTitle.textContent = `Ítems: ${estado}`;
+      // Detalle de ítems: por estado, por departamento, o ambos (celda/segmento de la vista por departamento).
+      const mostrarDetalleItems = async ({ estado = '', departamento = '', etiqueta = '' } = {}) => {
+        const partes = [etiqueta, estado].filter(Boolean);
+        comprasItemsDetailTitle.textContent = `Ítems: ${partes.join(' · ') || 'todos'}`;
         comprasItemsDetail.classList.remove('hidden');
-        comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', row.dataset.estado === estado));
+        comprasItemsChart.querySelectorAll('.compras-chart-row').forEach((row) => row.classList.toggle('selected', !departamento && row.dataset.estado === estado));
         comprasItemsDetailBody.innerHTML = '<tr><td colspan="9" class="empty-message">Cargando ítems...</td></tr>';
+        if (departamento) comprasItemsDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         try {
           const params = new URLSearchParams();
-          params.set('estado', estado);
+          if (estado) params.set('estado', estado);
+          if (departamento) params.set('departamento', departamento);
           if (comprasFiltroDesde && comprasFiltroDesde.value) params.set('desde', comprasFiltroDesde.value);
           if (comprasFiltroHasta && comprasFiltroHasta.value) params.set('hasta', comprasFiltroHasta.value);
           if (comprasFiltroCentroCosto && comprasFiltroCentroCosto.value) params.set('centro_costo_id', comprasFiltroCentroCosto.value);
           const response = await fetch(`/compras/dashboard/items?${params.toString()}`, { credentials: 'same-origin' });
-          if (!response.ok) throw new Error('No se pudieron cargar los ítems del estado seleccionado.');
+          if (!response.ok) throw new Error('No se pudieron cargar los ítems seleccionados.');
           const items = await response.json();
           comprasItemsDetailBody.innerHTML = items.length ? items.map((item) => `
             <tr>
@@ -1315,12 +1374,200 @@
               <td>${item.total != null ? formatCurrency(item.total) : '-'}</td>
               <td>${escapeHtml(item.numero_oc || '-')}</td>
             </tr>
-          `).join('') : '<tr><td colspan="9" class="empty-message">No hay ítems para este estado.</td></tr>';
+          `).join('') : '<tr><td colspan="9" class="empty-message">No hay ítems para esta selección.</td></tr>';
         } catch (error) {
           console.error(error);
           comprasItemsDetailBody.innerHTML = `<tr><td colspan="9" class="empty-message">${escapeHtml(error.message)}</td></tr>`;
         }
       };
+      const mostrarDetalleItemsEstado = (estado) => mostrarDetalleItems({ estado });
+
+      // ---- Vista "Por departamento" de la tarjeta Ítems ----
+      const comprasItemsCard = document.getElementById('compras-items-card');
+      const comprasItemsDepto = document.getElementById('compras-items-depto');
+      const comprasItemsDeptoLegend = document.getElementById('compras-items-depto-legend');
+      const comprasItemsDeptoBars = document.getElementById('compras-items-depto-bars');
+      const comprasItemsDeptoHead = document.getElementById('compras-items-depto-head');
+      const comprasItemsDeptoBody = document.getElementById('compras-items-depto-body');
+      const comprasItemsDeptoFoot = document.getElementById('compras-items-depto-foot');
+      const comprasItemsDeptoAviso = document.getElementById('compras-items-depto-aviso');
+      const ESTADO_ITEM_COLORES = {
+        'Gestionado': '#22c55e',
+        'Rechazado': '#f87171',
+        'Pendiente de gestionar': '#38bdf8',
+        'Pendiente': '#fbbf24',
+      };
+      const fmtEntero = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
+      const fmtPct = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      const pctDe = (cantidad, total) => (total ? (cantidad / total) * 100 : 0);
+      const textoPct = (cantidad, total) => `${fmtPct.format(pctDe(cantidad, total))}%`;
+      let vistaItems = 'estado';
+      let itemsDepto = null;
+      let itemsDeptoTotalesEstado = null;
+      let itemsDeptoOrden = { col: 'total', dir: 'desc' };
+      let itemsDeptoRequest = 0;
+      let deptoTooltip = null;
+
+      const ocultarTooltipDepto = () => { if (deptoTooltip) deptoTooltip.classList.add('hidden'); };
+      const mostrarTooltipDepto = (event, texto) => {
+        if (!deptoTooltip) {
+          deptoTooltip = document.createElement('div');
+          deptoTooltip.className = 'compras-depto-tooltip';
+          deptoTooltip.setAttribute('role', 'tooltip');
+          document.body.appendChild(deptoTooltip);
+        }
+        deptoTooltip.textContent = texto;
+        deptoTooltip.classList.remove('hidden');
+        const rect = event.target.getBoundingClientRect();
+        const x = event.clientX || (rect.left + rect.width / 2);
+        const y = event.clientY || rect.top;
+        const ancho = deptoTooltip.offsetWidth;
+        deptoTooltip.style.left = `${Math.max(8, Math.min(x + 12, window.innerWidth - ancho - 8))}px`;
+        deptoTooltip.style.top = `${Math.max(8, y - deptoTooltip.offsetHeight - 10)}px`;
+      };
+
+      const ordenarDepartamentos = (departamentos) => {
+        const { col, dir } = itemsDeptoOrden;
+        const signo = dir === 'asc' ? 1 : -1;
+        const valor = (d) => {
+          if (col === 'departamento') return d.departamento;
+          if (col === 'total') return d.total;
+          return pctDe(d.estados[col] || 0, d.total);  // columnas de estado: ordenan por %
+        };
+        return [...departamentos].sort((a, b) => {
+          const va = valor(a);
+          const vb = valor(b);
+          const cmp = typeof va === 'string' ? va.localeCompare(vb, 'es', { numeric: true }) : va - vb;
+          if (cmp) return cmp * signo;
+          if (col !== 'total' && col !== 'departamento') {
+            const porCantidad = (a.estados[col] || 0) - (b.estados[col] || 0);
+            if (porCantidad) return porCantidad * signo;
+          }
+          return b.total - a.total || a.departamento.localeCompare(b.departamento, 'es');
+        });
+      };
+
+      const verificarTotalesDepto = () => {
+        if (!itemsDepto || !itemsDeptoTotalesEstado) return;
+        const diferencias = itemsDepto.estados.filter((estado) => (itemsDepto.total.estados[estado] || 0) !== (itemsDeptoTotalesEstado[estado] || 0));
+        comprasItemsDeptoAviso.classList.toggle('hidden', !diferencias.length);
+        comprasItemsDeptoAviso.textContent = diferencias.length
+          ? `Atención: el total por departamento no coincide con "Por estado" en ${diferencias.join(', ')}. Pulse Actualizar.`
+          : '';
+      };
+
+      const renderItemsDepto = () => {
+        if (!itemsDepto) return;
+        const estados = itemsDepto.estados || [];
+        const departamentos = ordenarDepartamentos(itemsDepto.departamentos || []);
+        comprasItemsDeptoLegend.innerHTML = estados.map((estado) => `<span><i style="background:${ESTADO_ITEM_COLORES[estado] || '#94a3b8'}"></i>${escapeHtml(estado)}</span>`).join('');
+
+        if (!departamentos.length) {
+          comprasItemsDeptoBars.innerHTML = '<p class="empty-message">Sin datos para mostrar.</p>';
+        } else {
+          comprasItemsDeptoBars.innerHTML = departamentos.map((d) => {
+            const segmentos = estados.map((estado) => {
+              const cantidad = d.estados[estado] || 0;
+              if (!cantidad) return '';
+              const tip = `${d.departamento} · ${estado}: ${fmtEntero.format(cantidad)} (${textoPct(cantidad, d.total)})`;
+              return `<button type="button" class="compras-depto-seg" style="width:${pctDe(cantidad, d.total)}%;background:${ESTADO_ITEM_COLORES[estado] || '#94a3b8'}" data-depto="${escapeHtml(d.clave)}" data-estado="${escapeHtml(estado)}" data-tip="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}"></button>`;
+            }).join('');
+            return `<div class="compras-depto-row"><div class="compras-chart-label" title="${escapeHtml(d.departamento)}">${escapeHtml(d.departamento)}</div><div class="compras-depto-track">${segmentos}</div><div class="compras-chart-value">${fmtEntero.format(d.total)}</div></div>`;
+          }).join('');
+        }
+
+        const columnas = [['departamento', 'Departamento'], ['total', 'Total ítems'], ...estados.map((estado) => [estado, estado])];
+        comprasItemsDeptoHead.innerHTML = columnas.map(([col, titulo]) => {
+          const dir = itemsDeptoOrden.col === col ? itemsDeptoOrden.dir : '';
+          const ayuda = estados.includes(col) ? ' (ordena por %)' : '';
+          return `<th aria-sort="${dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}"><button type="button" data-col="${escapeHtml(col)}" data-dir="${dir}" title="Ordenar por ${escapeHtml(titulo)}${ayuda}">${escapeHtml(titulo)}</button></th>`;
+        }).join('');
+
+        const celdas = (fila, clave) => [
+          `<td${clave ? ` class="celda-link" data-depto="${escapeHtml(clave)}" data-estado=""` : ''}>${fmtEntero.format(fila.total)}</td>`,
+          ...estados.map((estado) => {
+            const cantidad = fila.estados[estado] || 0;
+            const link = clave && cantidad ? ` class="celda-link" data-depto="${escapeHtml(clave)}" data-estado="${escapeHtml(estado)}"` : '';
+            return `<td${link}>${fmtEntero.format(cantidad)} <span class="pct">(${textoPct(cantidad, fila.total)})</span></td>`;
+          }),
+        ].join('');
+        comprasItemsDeptoBody.innerHTML = departamentos.length
+          ? departamentos.map((d) => `<tr><td>${escapeHtml(d.departamento)}</td>${celdas(d, d.clave)}</tr>`).join('')
+          : `<tr><td colspan="${columnas.length}" class="empty-message">No hay ítems para los filtros seleccionados.</td></tr>`;
+        comprasItemsDeptoFoot.innerHTML = `<td>Total general</td>${celdas(itemsDepto.total, '')}`;
+        verificarTotalesDepto();
+      };
+
+      const cargarItemsDepto = async () => {
+        const request = ++itemsDeptoRequest;
+        if (!itemsDepto) comprasItemsDeptoBars.innerHTML = '<p class="empty-message">Cargando...</p>';
+        try {
+          const response = await fetch(`/compras/dashboard/items-por-departamento${construirQueryDashboard()}`, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('No se pudieron cargar los ítems por departamento.');
+          const data = await response.json();
+          if (request !== itemsDeptoRequest) return;  // llegó una respuesta más nueva
+          itemsDepto = data;
+          renderItemsDepto();
+        } catch (error) {
+          if (request !== itemsDeptoRequest) return;
+          console.error(error);
+          itemsDepto = null;
+          comprasItemsDeptoBars.innerHTML = `<p class="empty-message">${escapeHtml(error.message)}</p>`;
+          comprasItemsDeptoHead.innerHTML = '';
+          comprasItemsDeptoBody.innerHTML = '';
+          comprasItemsDeptoFoot.innerHTML = '';
+        }
+      };
+
+      const cambiarVistaItems = (vista) => {
+        vistaItems = vista;
+        comprasItemsCard.querySelectorAll('[data-vista-items]').forEach((boton) => {
+          const activo = boton.dataset.vistaItems === vista;
+          boton.classList.toggle('active', activo);
+          boton.setAttribute('aria-pressed', String(activo));
+        });
+        const porDepto = vista === 'departamento';
+        comprasItemsCard.querySelector('.compras-chart-head h3').textContent = porDepto ? 'Ítems por departamento' : 'Ítems por estado';
+        comprasItemsCard.classList.toggle('wide', porDepto);
+        comprasItemsChart.classList.toggle('hidden', porDepto);
+        comprasItemsDepto.classList.toggle('hidden', !porDepto);
+        comprasItemsDetail.classList.add('hidden');
+        ocultarTooltipDepto();
+        if (porDepto) cargarItemsDepto();
+      };
+
+      comprasItemsCard.querySelectorAll('[data-vista-items]').forEach((boton) => {
+        boton.addEventListener('click', () => cambiarVistaItems(boton.dataset.vistaItems));
+      });
+      comprasItemsDeptoHead.addEventListener('click', (event) => {
+        const boton = event.target.closest('button[data-col]');
+        if (!boton) return;
+        const col = boton.dataset.col;
+        itemsDeptoOrden = itemsDeptoOrden.col === col
+          ? { col, dir: itemsDeptoOrden.dir === 'desc' ? 'asc' : 'desc' }
+          : { col, dir: col === 'departamento' ? 'asc' : 'desc' };
+        renderItemsDepto();
+      });
+      const abrirDetalleDepto = (elemento) => {
+        const clave = elemento.dataset.depto;
+        const depto = (itemsDepto?.departamentos || []).find((d) => d.clave === clave);
+        mostrarDetalleItems({ estado: elemento.dataset.estado || '', departamento: clave, etiqueta: depto ? depto.departamento : '' });
+      };
+      comprasItemsDepto.addEventListener('click', (event) => {
+        const objetivo = event.target.closest('[data-depto]');
+        if (objetivo && objetivo.dataset.depto) abrirDetalleDepto(objetivo);
+      });
+      comprasItemsDeptoBars.addEventListener('mousemove', (event) => {
+        const seg = event.target.closest('.compras-depto-seg');
+        if (seg) mostrarTooltipDepto(event, seg.dataset.tip); else ocultarTooltipDepto();
+      });
+      comprasItemsDeptoBars.addEventListener('focusin', (event) => {
+        const seg = event.target.closest('.compras-depto-seg');
+        if (seg) mostrarTooltipDepto(event, seg.dataset.tip);
+      });
+      comprasItemsDeptoBars.addEventListener('mouseleave', ocultarTooltipDepto);
+      comprasItemsDeptoBars.addEventListener('focusout', ocultarTooltipDepto);
+      comprasItemsDeptoBars.addEventListener('scroll', ocultarTooltipDepto);
       document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
         if (!comprasItemsDetail.classList.contains('hidden')) {
@@ -1593,6 +1840,8 @@
           `).join('');
           renderComprasChart(comprasSolicitudesChart, data.estados_solicitudes || [], mostrarDetalleSolicitudesEstado);
           renderComprasChart(comprasItemsChart, data.estados_items || [], mostrarDetalleItemsEstado);
+          itemsDeptoTotalesEstado = Object.fromEntries((data.estados_items || []).map((row) => [row.estado, Number(row.total) || 0]));
+          if (vistaItems === 'departamento') cargarItemsDepto();
           comprasItemsDetail.classList.add('hidden');
           comprasSolicitudesDetail.classList.add('hidden');
           comprasPrioridades = data.prioridades || [];
@@ -2139,7 +2388,8 @@
 
           const destinoOption = document.createElement('option');
           destinoOption.value = `${item.id} ${item.nombre}`;
-          listaCentrosCostos.appendChild(destinoOption);
+          destinoOption.textContent = `${item.id} - ${item.nombre}`;
+          destinoCompra.appendChild(destinoOption);
 
           if (comprasFiltroCentroCosto) {
             const filtroOption = document.createElement('option');

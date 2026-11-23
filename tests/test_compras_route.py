@@ -71,9 +71,12 @@ class ComprasRouteTests(unittest.TestCase):
              patch.object(main, "_ensure_detalle_compra_cc_nullable"), \
              patch.object(main, "generar_numero_solicitud", return_value="SC-00001"), \
              patch.object(main, "_obtener_proyecto_id_por_nombre", return_value=5), \
+             patch.object(main.compras_departamentos, "destino_canonico", return_value="Proyecto Norte") as canonico, \
              patch.object(main, "generar_pdf_remito") as generar_pdf, \
              patch.object(main, "FileResponse", return_value="pdf-response"):
             response = asyncio.run(main.compras_emitir(DummyRequest()))
+
+        canonico.assert_called_once()
 
         self.assertEqual(response, "pdf-response")
         self.assertEqual(generar_pdf.call_args.args[1], "SOLICITUD DE COMPRAS")
@@ -159,14 +162,30 @@ class ComprasRouteTests(unittest.TestCase):
         fake_conn.__exit__.return_value = None
         fake_conn.execute.return_value = FakeResult(fake_rows)
 
+        estados = main.compras_departamentos.ESTADOS_ITEM
+        por_depto = {
+            "estados": estados,
+            "departamentos": [{"clave": "cc:10", "departamento": "10 Minera", "total": 1,
+                               "estados": {e: int(e == "Gestionado") for e in estados}}],
+            "total": {"total": 1, "estados": {e: int(e == "Gestionado") for e in estados}},
+        }
+
         with patch.object(main, "_requiere_accion_compras_por_tipo", return_value={"usuario": "admin"}), \
              patch.object(main, "get_sqlite_connection", return_value=fake_conn), \
-             patch.object(main, "_ensure_orden_compra_solicitudes"):
+             patch.object(main, "_ensure_orden_compra_solicitudes"), \
+             patch.object(main.compras_departamentos, "items_por_departamento", return_value=por_depto) as agregacion:
             response = main.compras_dashboard_excel(DummyRequest(), desde="2026-01-01", hasta="2026-12-31")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.media_type, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.assertTrue(len(response.body) > 0)
+        # La hoja por departamento usa los mismos filtros que el resto del Excel.
+        self.assertEqual(agregacion.call_args.args[1:], ("2026-01-01", "2026-12-31", None))
+        from openpyxl import load_workbook
+        import io
+        libro = load_workbook(io.BytesIO(response.body))
+        self.assertEqual(libro.sheetnames, ["Indicadores Compras", "Ítems por departamento"])
+        self.assertEqual(libro["Ítems por departamento"]["A3"].value, "Total general")
 
 
 if __name__ == "__main__":

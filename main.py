@@ -3594,6 +3594,7 @@ def administracion_view(request: Request):
 
 # Carga masiva de horas_maquinas desde un .db exportado de la base local (ver importar_horas_maquinas.py).
 import importar_horas_maquinas as ihm  # noqa: E402
+import compras_departamentos  # noqa: E402  (ítems por departamento del dashboard de compras)
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 IMPORTAR_HORAS_MAX_BYTES = 200 * 1024 * 1024
@@ -9197,15 +9198,19 @@ def compras_dashboard(
 
 @app.get("/compras/dashboard/items")
 def compras_dashboard_items(
-    estado: str,
     request: Request,
+    estado: str = Query(None),
     desde: str = Query(None),
     hasta: str = Query(None),
     centro_costo_id: str = Query(None),
+    departamento: str = Query(None),
 ):
     _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
     estados_validos = {"Gestionado", "Pendiente de gestionar", "Rechazado", "Pendiente"}
-    if estado not in estados_validos:
+    estado = (estado or "").strip() or None
+    departamento = (departamento or "").strip() or None
+    # Sin estado solo se permite al pedir todos los ítems de un departamento.
+    if (estado not in estados_validos) and not (estado is None and departamento):
         raise HTTPException(status_code=400, detail="Estado de ítems inválido.")
 
     desde_val = desde.strip() if desde and desde.strip() else None
@@ -9217,15 +9222,11 @@ def compras_dashboard_items(
         except ValueError:
             cc_id_val = None
 
-    d_where = [
-        """CASE
-            WHEN vinculo.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 'Gestionado'
-            WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'APROBADA' THEN 'Pendiente de gestionar'
-            WHEN UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) = 'RECHAZADA' THEN 'Rechazado'
-            ELSE 'Pendiente'
-        END = ?"""
-    ]
-    d_params = [estado]
+    d_where = []
+    d_params = []
+    if estado:
+        d_where.append(f"{compras_departamentos.SQL_ESTADO_ITEM} = ?")
+        d_params.append(estado)
     if desde_val:
         d_where.append("substr(sc.fecha_solicitud, 1, 10) >= ?")
         d_params.append(desde_val)
@@ -9238,6 +9239,11 @@ def compras_dashboard_items(
 
     with get_sqlite_connection() as conn:
         _ensure_orden_compra_solicitudes(conn)
+        if departamento:
+            cond_depto, params_depto = compras_departamentos.condicion_departamento(conn, departamento)
+            d_where.append(cond_depto)
+            d_params.extend(params_depto)
+        where_sql = ("WHERE " + " AND ".join(d_where)) if d_where else ""
         filas = conn.execute(
             f'''
             SELECT sc.numero_solicitud,
@@ -9251,6 +9257,7 @@ def compras_dashboard_items(
                    oc.numero_oc
             FROM solicitud_compra_detalle d
             INNER JOIN solicitud_compra sc ON sc.id = d.id_solicitud
+            LEFT JOIN proyectos pr ON pr.id = sc.id_proyecto
             LEFT JOIN personal p ON p.legajo = sc.id_solicitante
             LEFT JOIN OrdenCompraDetalleSolicitud vinculo
                    ON vinculo.solicitud_compra_detalle_id = d.id
@@ -9258,12 +9265,33 @@ def compras_dashboard_items(
                    ON ocd.id = vinculo.orden_compra_detalle_id
             LEFT JOIN OrdenCompra oc
                    ON oc.id = ocd.orden_compra_id
-            WHERE {' AND '.join(d_where)}
+            {where_sql}
             ORDER BY sc.id DESC, d.id
             ''',
             d_params,
         ).fetchall()
     return [dict(fila) for fila in filas]
+
+
+@app.get("/compras/dashboard/items-por-departamento")
+def compras_dashboard_items_por_departamento(
+    request: Request,
+    desde: str = Query(None),
+    hasta: str = Query(None),
+    centro_costo_id: str = Query(None),
+):
+    _requiere_accion_compras_por_tipo(request, "dashboard", "ver", {"ADMINISTRADOR", "SUPERVISOR", "ASISTENTE"})
+    desde_val = desde.strip() if desde and desde.strip() else None
+    hasta_val = hasta.strip() if hasta and hasta.strip() else None
+    cc_id_val = None
+    if centro_costo_id and str(centro_costo_id).strip():
+        try:
+            cc_id_val = int(str(centro_costo_id).strip())
+        except ValueError:
+            cc_id_val = None
+    with get_sqlite_connection() as conn:
+        _ensure_orden_compra_solicitudes(conn)
+        return compras_departamentos.items_por_departamento(conn, desde_val, hasta_val, cc_id_val)
 
 
 @app.get("/compras/dashboard/solicitudes")
@@ -9468,6 +9496,10 @@ def compras_dashboard_excel(
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = col[0].column_letter
         ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 45)
+
+    with get_sqlite_connection() as conn:
+        datos_departamentos = compras_departamentos.items_por_departamento(conn, desde_val, hasta_val, cc_id_val)
+    compras_departamentos.escribir_hoja_excel(wb, datos_departamentos)
 
     out = io.BytesIO()
     wb.save(out)
@@ -10805,6 +10837,9 @@ async def compras_emitir(request: Request):
         _ensure_prioridades_y_estados_compras(conn)
         _ensure_detalle_compra_cc_nullable(conn)
         _ensure_estado_detalle_compra(conn)
+        destino_compra = compras_departamentos.destino_canonico(conn, destino_compra)
+        if not destino_compra:
+            raise HTTPException(status_code=400, detail="El destino de compra debe ser un centro de costos de la lista.")
         numero_solicitud = generar_numero_solicitud(conn)
         id_proyecto = _obtener_proyecto_id_por_nombre(conn, destino_compra)
 
