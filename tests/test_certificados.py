@@ -256,7 +256,7 @@ class A_Migracion(Base):
         cambiadas = []
         for tabla, (cantidad, huella, columnas) in HUELLAS_ANTES.items():
             despues = HUELLAS_DESPUES_INIT[tabla]
-            if tabla in ("centros_costos", "seguimiento_cc"):
+            if tabla in ("centros_costos", "seguimiento_cc", "personal"):  # personal: + regimen_turno (Tarja General)
                 # Solo se agrega una columna: las columnas previas deben conservar exactamente sus valores.
                 conn = sqlite3.connect(f"file:{DB_COPIA}?mode=ro", uri=True)
                 try:

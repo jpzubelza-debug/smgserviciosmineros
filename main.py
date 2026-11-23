@@ -173,7 +173,7 @@ CONTINGENCY_PANELS = {
     "logistica": ["dashboard", "solicitud_viaje", "asignar_recursos", "vehiculos", "personal", "ordenes_salida", "gestion_operativa"],
     "almacen": ["dashboard", "catalogos", "productos", "ingresos_salidas", "documentos", "movimientos", "inventario"],
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
-    "operaciones": ["dashboard", "carga_partes_diarios", "centros_costos", "seguimiento_cliente", "actas_medicion"],
+    "operaciones": ["dashboard", "tarja_general", "carga_partes_diarios", "centros_costos", "seguimiento_cliente", "actas_medicion"],
     "rrhh": ["dashboard"],
     "mantenimiento": ["dashboard"],
     "dashboard_ejecutivo": ["dashboard"],
@@ -2329,6 +2329,7 @@ def init_sqlite():
                 migrar_verificacion_certificados(conn)
                 migrar_facturacion(conn)
                 migrar_actas_medicion(conn)
+                migrar_tarja(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -2973,6 +2974,7 @@ def reconciliar_gestion_operativa_cerradas(conn):
 
 from facturacion import migrar_facturacion  # noqa: E402  (tablas fac_*; ver facturacion.py)
 from actas_medicion import migrar as migrar_actas_medicion  # noqa: E402  (tablas am_mediciones*; ver actas_medicion.py)
+from tarja import migrar as migrar_tarja  # noqa: E402  (tablas tarja_*; ver tarja.py)
 
 init_sqlite()
 
@@ -11923,6 +11925,8 @@ _TABLAS_REFERENCIAN_LEGAJO = [
     ("documentos", "responsable"),
     ("movimientos", "id_personal"),
     ("auditoria", "usuario"),
+    ("tarja_registros", "legajo"),
+    ("tarja_historial", "legajo"),
 ]
 
 
@@ -17814,3 +17818,156 @@ async def am_cert_vincular(request: Request, seguimiento_id: int, acta_id: int):
 def am_cert_acta_de(request: Request, seguimiento_id: int, certificado_id: int):
     _cert_requiere(request, "consultar")
     return _am_ejecutar(lambda conn: am.acta_de_certificado(conn, certificado_id) or {}, escritura=False)
+
+
+# ============================================================================
+# Operaciones › Tarja General (Registro Diario): un día por operador activo con centro de costo o código de estado.
+# Lógica en tarja.py; pantalla en tarja.js.
+# ============================================================================
+import tarja  # noqa: E402
+
+TARJA_API = "/api/tarja"
+TARJA_JS_PATH = os.path.join(BASE_DIR, "tarja.js")
+TARJA_ESTADO_HTTP = {"PERMISO": 403, "NO_EXISTE": 404, "DUPLICADO": 409, "VALIDACION": 422}
+
+
+def _tarja_requiere(request: Request, accion: str):
+    return _requiere_accion(request, "operaciones", tarja.PANEL, accion)
+
+
+def _tarja_ejecutar(operacion, escritura=True):
+    conn = get_sqlite_connection()
+    try:
+        if escritura:
+            conn.execute("BEGIN IMMEDIATE")
+        resultado = operacion(conn)
+        if escritura:
+            conn.commit()
+        return resultado
+    except tarja.TarjaError as exc:
+        conn.rollback()
+        cuerpo = {"detail": exc.mensaje, "codigo": exc.codigo}
+        if exc.detalle:
+            cuerpo["errores"] = exc.detalle
+        return JSONResponse(cuerpo, status_code=TARJA_ESTADO_HTTP.get(exc.codigo, 400))
+    except HTTPException:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"La operación viola una regla de integridad: {exc}", "codigo": "INTEGRIDAD"}, status_code=409)
+    except sqlite3.Error as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Error de base de datos: {exc}", "codigo": "BASE"}, status_code=500)
+    except (KeyError, TypeError, ValueError) as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Datos incompletos o inválidos ({exc})", "codigo": "DATOS"}, status_code=400)
+    finally:
+        conn.close()
+
+
+@app.get("/operaciones/tarja.js")
+def tarja_script(request: Request):
+    _requiere_modulo(request, "operaciones")
+    return FileResponse(TARJA_JS_PATH, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get(TARJA_API + "/opciones")
+def tarja_opciones(request: Request):
+    _tarja_requiere(request, "consultar")
+    return _tarja_ejecutar(tarja.opciones, escritura=False)
+
+
+@app.get(TARJA_API + "/grilla")
+def tarja_grilla(request: Request, desde: str = "", hasta: str = "", anio: int = 0, mes: int = 0):
+    """Período desde/hasta (p. ej. 2026-10-20 a 2026-12-20) o un mes con anio/mes."""
+    _tarja_requiere(request, "consultar")
+    return _tarja_ejecutar(lambda conn: tarja.grilla(conn, *tarja.rango(desde, hasta, anio, mes)), escritura=False)
+
+
+@app.post(TARJA_API + "/celdas")
+async def tarja_celdas(request: Request):
+    perfil = _tarja_requiere(request, "cargar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.guardar_celdas(conn, datos.get("cambios"), perfil["usuario"], tarja.rango_de(datos)))
+
+
+@app.put(TARJA_API + "/registro")
+async def tarja_registro(request: Request):
+    perfil = _tarja_requiere(request, "editar_horas")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.editar_registro(conn, datos, perfil["usuario"], tarja.rango_de(datos)))
+
+
+@app.get(TARJA_API + "/historial")
+def tarja_historial(request: Request, legajo: str, fecha: str = ""):
+    _tarja_requiere(request, "consultar")
+    return _tarja_ejecutar(lambda conn: tarja.historial(conn, legajo, fecha or None), escritura=False)
+
+
+@app.put(TARJA_API + "/regimen")
+async def tarja_regimen(request: Request):
+    perfil = _tarja_requiere(request, "configurar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.cambiar_regimen(conn, datos.get("legajo"), datos.get("regimen"), perfil["usuario"]))
+
+
+@app.put(TARJA_API + "/config")
+async def tarja_config(request: Request):
+    perfil = _tarja_requiere(request, "configurar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.guardar_config(conn, datos, perfil["usuario"]))
+
+
+@app.post(TARJA_API + "/codigos")
+async def tarja_codigo_crear(request: Request):
+    perfil = _tarja_requiere(request, "configurar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.crear_codigo(conn, datos, perfil["usuario"]))
+
+
+@app.put(TARJA_API + "/codigos/{codigo_id}")
+async def tarja_codigo_actualizar(request: Request, codigo_id: int):
+    perfil = _tarja_requiere(request, "configurar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.actualizar_codigo(conn, codigo_id, datos, perfil["usuario"]))
+
+
+@app.post(TARJA_API + "/feriados")
+async def tarja_feriado_agregar(request: Request):
+    perfil = _tarja_requiere(request, "configurar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.agregar_feriado(conn, datos, perfil["usuario"]))
+
+
+@app.delete(TARJA_API + "/feriados/{fecha}")
+def tarja_feriado_borrar(request: Request, fecha: str):
+    perfil = _tarja_requiere(request, "configurar")
+    return _tarja_ejecutar(lambda conn: tarja.borrar_feriado(conn, fecha, perfil["usuario"]))
+
+
+@app.get(TARJA_API + "/preferencias")
+def tarja_preferencias(request: Request):
+    perfil = _tarja_requiere(request, "consultar")
+    return _tarja_ejecutar(lambda conn: tarja.preferencias(conn, perfil["usuario"]), escritura=False)
+
+
+@app.put(TARJA_API + "/preferencias")
+async def tarja_preferencias_guardar(request: Request):
+    perfil = _tarja_requiere(request, "consultar")
+    datos = await _am_json(request)
+    return _tarja_ejecutar(lambda conn: tarja.guardar_preferencias(conn, perfil["usuario"], datos))
+
+
+@app.post(TARJA_API + "/exportar")
+async def tarja_exportar(request: Request):
+    """Exporta la grilla del período: legajos = lo filtrado en pantalla (en ese orden); sin legajos = todos los activos."""
+    _tarja_requiere(request, "consultar")
+    datos = await _am_json(request)
+    legajos = datos.get("legajos")
+
+    def op(conn):
+        contenido, nombre = tarja.exportar_excel(conn, *tarja.rango_de(datos) or tarja.rango(), legajos if isinstance(legajos, list) else None)
+        return Response(contenido, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    return _tarja_ejecutar(op, escritura=False)

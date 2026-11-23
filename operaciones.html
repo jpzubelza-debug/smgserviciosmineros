@@ -1802,6 +1802,13 @@
         <span class="menu-label">Dashboard</span>
       </button>
 
+      <button class="menu-btn" id="btn-sidebar-tarja" type="button" title="Tarja General · Registro Diario">
+        <span class="menu-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18"></path><path d="M8 2v4"></path><path d="M16 2v4"></path><path d="M8 13h2"></path><path d="M14 13h2"></path><path d="M8 17h2"></path><path d="M14 17h2"></path></svg>
+        </span>
+        <span class="menu-label">Tarja General</span>
+      </button>
+
       <button class="menu-btn active" id="btn-sidebar-carga-partes" type="button">
         <span class="menu-icon">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -2299,6 +2306,8 @@
       </div>
     </section>
 
+    <!-- Tarja General · Registro Diario (pantalla en /operaciones/tarja.js) -->
+    <section class="card form-card hidden cert-panel seguimiento-panel" id="panel-tarja"><div id="tj-root"></div></section>
     <!-- Actas de Medición (pantalla en /operaciones/actas-medicion.js) -->
     <section class="card form-card hidden cert-panel seguimiento-panel" id="panel-actas-medicion"><div id="am-root"></div></section>
 
@@ -5105,6 +5114,8 @@
     const btnCentrosCostos = document.getElementById('btn-sidebar-centros-costos');
     const btnSeguimientoCliente = document.getElementById('btn-sidebar-seguimiento-cliente');
     const btnActasMedicion = document.getElementById('btn-sidebar-actas-medicion');
+    const btnTarja = document.getElementById('btn-sidebar-tarja');
+    const panelTarja = document.getElementById('panel-tarja');
     const panelActasMedicion = document.getElementById('panel-actas-medicion');
     const panelDash = document.getElementById('panel-dashboard');
     const panelPartes = document.getElementById('panel-carga-partes');
@@ -5113,12 +5124,12 @@
     const panelCertificadosCliente = document.getElementById('panel-certificados-cliente');
 
     function activarPanel(panelActivo, botonActivo) {
-      [btnDash, btnPartes, btnCentrosCostos, btnSeguimientoCliente, btnActasMedicion].forEach(boton => boton.classList.remove('active'));
-      [panelDash, panelPartes, panelCentrosCostos, panelSeguimientoCliente, panelCertificadosCliente, panelActasMedicion].forEach(panel => panel.classList.add('hidden'));
+      [btnDash, btnTarja, btnPartes, btnCentrosCostos, btnSeguimientoCliente, btnActasMedicion].forEach(boton => boton.classList.remove('active'));
+      [panelDash, panelTarja, panelPartes, panelCentrosCostos, panelSeguimientoCliente, panelCertificadosCliente, panelActasMedicion].forEach(panel => panel.classList.add('hidden'));
       botonActivo.classList.add('active');
       panelActivo.classList.remove('hidden');
       // Seguimiento de Cliente y Certificados usan el diseño claro aprobado; los demás paneles conservan el tema actual.
-      document.body.classList.toggle('tema-claro', panelActivo === panelSeguimientoCliente || panelActivo === panelCertificadosCliente || panelActivo === panelActasMedicion);
+      document.body.classList.toggle('tema-claro', panelActivo === panelSeguimientoCliente || panelActivo === panelCertificadosCliente || panelActivo === panelActasMedicion || panelActivo === panelTarja);
       window.scrollTo(0, 0);
     }
     // Certificados es una pantalla del Seguimiento: la barra lateral mantiene activo "Seguimiento de Cliente".
@@ -5132,6 +5143,11 @@
 
     btnPartes.addEventListener('click', () => {
       activarPanel(panelPartes, btnPartes);
+    });
+
+    btnTarja.addEventListener('click', () => {
+      activarPanel(panelTarja, btnTarja);
+      if (window.tjAbrir) window.tjAbrir();
     });
 
     btnCentrosCostos.addEventListener('click', () => {
@@ -5153,6 +5169,7 @@
     const panelesHabilitados = [
       ['carga_partes_diarios', btnPartes, opTienePanel('carga_partes_diarios')],
       ['dashboard', btnDash, opPuede('dashboard', 'ver')],
+      ['tarja_general', btnTarja, opTienePanel('tarja_general')],
       ['centros_costos', btnCentrosCostos, opTienePanel('centros_costos')],
       ['seguimiento_cliente', btnSeguimientoCliente, opTienePanel('seguimiento_cliente')],
       ['actas_medicion', btnActasMedicion, opTienePanel('actas_medicion')],
@@ -6859,6 +6876,7 @@
   })();
 </script>
 <script src="/operaciones/actas-medicion.js"></script>
+<script src="/operaciones/tarja.js"></script>
 </body>
 </html>
 
