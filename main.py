@@ -8296,6 +8296,60 @@ def _normalizar_maquinista_operaciones(conn, legajo, nombre):
     return str(fila["legajo"] or "").strip(), str(fila["nombre"] or "").strip()
 
 
+# Control de continuidad del horómetro / odómetro: solo se evalúan partes con fecha desde este día inclusive.
+# El primer parte de cada equipo desde la fecha de corte es el punto de partida (no se compara con los anteriores).
+FECHA_INICIO_CONTROL_HOROMETRO = os.getenv("FECHA_INICIO_CONTROL_HOROMETRO", "").strip() or "2026-01-01"
+# Orden cronológico del control: fecha, turno Día antes que Noche, N.º de parte.
+HM_ORDEN_CRONOLOGICO = (
+    "fecha_parte, CASE WHEN LOWER(COALESCE(turno, '')) LIKE '%noche%' THEN 1 ELSE 0 END, "
+    "CAST(TRIM(nro_parte) AS INTEGER), id"
+)
+
+
+def _hm_valor_sql(col: str) -> str:
+    """Valor numérico de hs/km guardado como texto o número; 0, vacío o texto = no informado (NULL)."""
+    v = f"CAST(REPLACE(TRIM(CAST({col} AS TEXT)), ',', '.') AS REAL)"
+    return f"CASE WHEN {v} > 0 THEN {v} END"
+
+
+def _hm_inconsistencias_cte(ci: str | None = None):
+    """CTE `inc` con una fila por parte inconsistente (columnas inc_*), y sus parámetros.
+    Compara cada parte con el anterior del mismo equipo (aunque haya días sin partes en el medio):
+    Hs inicio ≠ Hs final anterior, Km inicio ≠ Km final anterior, y Hs final < Hs inicio del mismo parte.
+    Los valores no informados (vacío o 0) no se comparan."""
+    # Las fechas futuras (errores de tipeo, p. ej. "5023-07-10") quedan fuera: romperían el orden cronológico.
+    condiciones = [OP_FECHA_VALIDA, "fecha_parte >= ?", "fecha_parte <= date('now', 'localtime', '+1 day')", "TRIM(COALESCE(ci, '')) <> ''"]
+    params: list = [FECHA_INICIO_CONTROL_HOROMETRO]
+    if ci and ci.strip():
+        condiciones.append("UPPER(TRIM(ci)) = UPPER(TRIM(?))")
+        params.append(ci.strip())
+    cte = f"""
+        inc_base AS (
+            SELECT id, UPPER(TRIM(ci)) AS ci_n, fecha_parte, turno, nro_parte,
+                   {_hm_valor_sql('hs_inicio')} AS hi, {_hm_valor_sql('hs_final')} AS hf,
+                   {_hm_valor_sql('km_inicio')} AS ki, {_hm_valor_sql('km_final')} AS kf
+            FROM horas_maquinas WHERE {' AND '.join(condiciones)}
+        ),
+        inc_lag AS (
+            SELECT id, hi, hf, ki,
+                   LAG(hf) OVER w AS p_hf, LAG(kf) OVER w AS p_kf,
+                   LAG(TRIM(nro_parte)) OVER w AS p_nro, LAG(fecha_parte) OVER w AS p_fecha
+            FROM inc_base WINDOW w AS (PARTITION BY ci_n ORDER BY {HM_ORDEN_CRONOLOGICO})
+        ),
+        inc_calc AS (
+            SELECT id AS inc_id, p_nro AS inc_prev_nro, p_fecha AS inc_prev_fecha,
+                   CASE WHEN hi IS NOT NULL AND p_hf IS NOT NULL AND ABS(hi - p_hf) > 0.05 THEN p_hf END AS inc_hs_esperado,
+                   CASE WHEN ki IS NOT NULL AND p_kf IS NOT NULL AND ABS(ki - p_kf) > 0.05 THEN p_kf END AS inc_km_esperado,
+                   CASE WHEN hi IS NOT NULL AND hf IS NOT NULL AND hf < hi THEN 1 ELSE 0 END AS inc_hs_invertido
+            FROM inc_lag
+        ),
+        inc AS (
+            SELECT * FROM inc_calc
+            WHERE inc_hs_esperado IS NOT NULL OR inc_km_esperado IS NOT NULL OR inc_hs_invertido = 1
+        )"""
+    return cte, params
+
+
 def _hm_orden_correlativo(alias: str = "", desc: bool = True) -> str:
     """ORDER BY de los partes: fecha, Hs inicio (horómetro), Km inicio y N.º de parte, para que los turnos
     de un mismo día queden seguidos y las horas correlativas. hs_inicio y nro_parte se guardan como texto
@@ -8356,26 +8410,33 @@ def listar_horas_maquinas(
     busqueda: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(30, ge=1, le=500),
+    solo_inconsistencias: bool = Query(False),
 ):
     _requiere_accion(request, "operaciones", "carga_partes_diarios", "consultar")
     search_term = q or busqueda
     with get_sqlite_connection() as conn:
         where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+        # El control se calcula sobre todos los partes del equipo (no solo la página) y se une a cada fila.
+        inc_cte, inc_params = _hm_inconsistencias_cte(ci)
+        desde_sql = f"FROM horas_maquinas LEFT JOIN inc ON inc.inc_id = horas_maquinas.id WHERE {where_clause}"
 
-        total_row = conn.execute(
-            f"SELECT COUNT(*) FROM horas_maquinas WHERE {where_clause}",
-            params,
+        conteo = conn.execute(
+            f"WITH {inc_cte} SELECT COUNT(*), COUNT(inc.inc_id) {desde_sql}",
+            inc_params + params,
         ).fetchone()
-        total = total_row[0] if total_row else 0
+        inconsistencias = conteo[1] if conteo else 0
+        if solo_inconsistencias:
+            desde_sql += " AND inc.inc_id IS NOT NULL"
+        total = inconsistencias if solo_inconsistencias else (conteo[0] if conteo else 0)
 
         offset = (page - 1) * limit
         query = f"""
-            SELECT * FROM horas_maquinas
-            WHERE {where_clause}
+            WITH {inc_cte}
+            SELECT horas_maquinas.*, inc.* {desde_sql}
             ORDER BY {_hm_orden_correlativo()}
             LIMIT ? OFFSET ?
         """
-        filas = conn.execute(query, params + [limit, offset]).fetchall()
+        filas = conn.execute(query, inc_params + params + [limit, offset]).fetchall()
         data = [dict(f) for f in filas]
 
         total_pages = max(1, math.ceil(total / limit)) if total > 0 else 1
@@ -8387,6 +8448,8 @@ def listar_horas_maquinas(
             "limit": limit,
             "total_pages": total_pages,
             "ci_seleccionado": ci or "",
+            "inconsistencias": inconsistencias,
+            "fecha_inicio_control": FECHA_INICIO_CONTROL_HOROMETRO,
             "data": data
         }
 
@@ -8396,13 +8459,15 @@ def obtener_ultimo_horometro(request: Request, ci: str = Query(..., min_length=1
     _requiere_panel(request, "operaciones", "carga_partes_diarios")
     with get_sqlite_connection() as conn:
         fila = conn.execute(
-            """
-            SELECT hs_final, fecha_parte, id
+            f"""
+            SELECT hs_final, fecha_parte, nro_parte, id
             FROM horas_maquinas
             WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))
               AND hs_final IS NOT NULL
               AND TRIM(CAST(hs_final AS TEXT)) != ''
-            ORDER BY id DESC
+            ORDER BY ({OP_FECHA_VALIDA}) DESC, fecha_parte DESC,
+                     CASE WHEN LOWER(COALESCE(turno, '')) LIKE '%noche%' THEN 1 ELSE 0 END DESC,
+                     CAST(TRIM(nro_parte) AS INTEGER) DESC, id DESC
             LIMIT 1
             """,
             (ci.strip(),),
@@ -8426,13 +8491,15 @@ def obtener_ultimo_kilometro(request: Request, ci: str = Query(..., min_length=1
     _requiere_panel(request, "operaciones", "carga_partes_diarios")
     with get_sqlite_connection() as conn:
         fila = conn.execute(
-            """
-            SELECT km_final, fecha_parte, id
+            f"""
+            SELECT km_final, fecha_parte, nro_parte, id
             FROM horas_maquinas
             WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))
               AND km_final IS NOT NULL
               AND TRIM(CAST(km_final AS TEXT)) != ''
-            ORDER BY id DESC
+            ORDER BY ({OP_FECHA_VALIDA}) DESC, fecha_parte DESC,
+                     CASE WHEN LOWER(COALESCE(turno, '')) LIKE '%noche%' THEN 1 ELSE 0 END DESC,
+                     CAST(TRIM(nro_parte) AS INTEGER) DESC, id DESC
             LIMIT 1
             """,
             (ci.strip(),),

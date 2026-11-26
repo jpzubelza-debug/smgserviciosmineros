@@ -46,6 +46,11 @@
     /* Columna Acciones fija a la izquierda: el encabezado por encima del resto de los encabezados y de las celdas */
     #op-content .table-wrap thead th.sticky-col { z-index: 4; left: 0; }
     #op-content .tbl td.sticky-col { z-index: 1; }
+    /* Control de continuidad del horómetro: celda con el valor que no coincide con el cierre del parte anterior */
+    #tabla-horas-maquinas td.inconsistente { color: #fca5a5; font-weight: 700; background: rgba(239, 68, 68, .16); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .55); cursor: help; }
+    #tabla-horas-maquinas td.pd-n .i { color: #f87171; width: 14px; height: 14px; vertical-align: -2px; margin-right: 2px; }
+    #btn-inconsistencias { border-color: rgba(239, 68, 68, .55); color: #fca5a5; }
+    #btn-inconsistencias[aria-pressed="true"] { background: rgba(239, 68, 68, .2); color: #fff; }
   </style>
 </head>
 
@@ -320,6 +325,7 @@
             <select class="chip-select" id="hf-operador" aria-label="Operador"><option value="">Todos los operadores</option></select>
             <select class="chip-select" id="hf-estado" aria-label="Estado"><option value="">Todos los estados</option><option value="pendientes">Pendientes</option><option value="controlados">Controlados</option></select>
             <button type="button" class="btn btn-ghost btn-sm" id="hf-limpiar">Borrar filtros</button>
+            <button type="button" class="btn btn-sm" id="btn-inconsistencias" aria-pressed="false" hidden title="Partes cuyo horómetro o kilometraje inicial no coincide con el cierre del parte anterior del equipo"></button>
             <span class="spacer"></span>
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input type="search" class="input" id="filtro-busqueda-texto" placeholder="Buscar en la tabla…" aria-label="Buscar en la tabla" autocomplete="off"></div>
             <button type="button" class="btn btn-primary btn-sm" id="btn-recargar-historial" title="Volver a consultar el historial"><svg class="i i-sm"><use href="#i-refresh"/></svg>Actualizar</button>
@@ -811,6 +817,7 @@
     fechaDesde: '',
     fechaHasta: '',
     busqueda: '',
+    soloInconsistencias: false,
     paginaActual: 1,
     limite: 30,
     totalRegistros: 0,
@@ -1590,6 +1597,7 @@
       if (state.ultimoHorometroCi !== ci) return;
       state.ultimoHorometro = data.encontrado ? Number(data.hs_final) : null;
       state.advertenciaHorometroMostrada = false;
+      opSugerirInicio('inp-hs-inicio', state.ultimoHorometro);
       compararHorometroInicial();
     } catch (err) {
       console.warn(err);
@@ -1608,10 +1616,19 @@
       if (state.ultimoKilometroCi !== ci) return;
       state.ultimoKilometro = data.encontrado ? Number(data.km_final) : null;
       state.advertenciaKilometroMostrada = false;
+      opSugerirInicio('inp-km-inicio', state.ultimoKilometro);
       compararKilometroInicial();
     } catch (err) {
       console.warn(err);
     }
+  }
+
+  // Parte nuevo: precarga Hs/Km inicio con el cierre del último parte del equipo (solo si el campo está vacío).
+  function opSugerirInicio(idInput, valor) {
+    const inp = document.getElementById(idInput);
+    if (!inp || document.getElementById('edit-id').value || !(valor > 0) || inp.value.trim() !== '') return;
+    inp.value = String(valor);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   function compararHorometroInicial() {
@@ -1740,6 +1757,15 @@
     editar: HM_SVG('<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>'),
     eliminar: HM_SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
   };
+  // Control de continuidad (lo calcula el servidor sobre todos los partes del equipo): campos inc_* de cada fila.
+  const hmNum = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const hmN = (v) => { const n = hmNum(v); return n.toLocaleString('es-AR', { maximumFractionDigits: 1 }); };
+  const hmInconsistente = (r) => r.inc_hs_esperado != null || r.inc_km_esperado != null || Number(r.inc_hs_invertido) === 1;
+  const hmTipSalto = (r, actual, esperado) => {
+    if (esperado == null) return '';
+    const dif = Math.round((hmNum(actual) - hmNum(esperado)) * 10) / 10;
+    return `Esperado ${hmN(esperado)} (cierre del parte N.º ${r.inc_prev_nro || 's/n'} del ${SMG.fmtDia(r.inc_prev_fecha)}). Diferencia: ${dif > 0 ? '+' : ''}${hmN(dif)}`;
+  };
   // Las 4 acciones visibles; usan las mismas funciones que el menú ⋯ (controlar, ver, editar, eliminar).
   const hmAcciones = (r) => {
     const ctrl = String(r.control || '').trim();
@@ -1756,7 +1782,7 @@
   // Acciones primero y fija a la izquierda (sticky-col) para que siga visible al desplazar la tabla.
   const HM_COLS = [
     { t: 'Acciones', w: 150, c: 'center sticky-col', v: hmAcciones },
-    { t: '#', w: 52, c: 'pd-n', v: (r, i) => String((state.paginaActual - 1) * state.limite + i + 1) },
+    { t: '#', w: 64, c: 'pd-n', v: (r, i) => `${hmInconsistente(r) ? `<span title="Parte con inconsistencias de horómetro o kilometraje">${SMG.icon('alert')}</span>` : ''}${(state.paginaActual - 1) * state.limite + i + 1}` },
     { t: 'CI', w: 80, c: 'pd-ci', v: (r) => hmTxt(r.ci) },
     { t: 'Fecha parte', w: 112, v: (r) => hmTxt(SMG.fmtDia(r.fecha_parte)) },
     { t: 'N.º parte', w: 90, c: 'mono', v: (r) => hmTxt(r.nro_parte) },
@@ -1769,10 +1795,14 @@
     { t: 'Acoplado', w: 90, v: (r) => hmTxt(r.acoplado) },
     { t: 'Cliente', w: 200, v: (r) => hmTit(r.cliente) },
     { t: 'Orden de compra', w: 130, c: 'mono', v: (r) => hmTxt(r.orden_compra) },
-    { t: 'Hs inicio', w: 90, n: 1, v: (r) => formatNum(r.hs_inicio, 0) },
-    { t: 'Hs final', w: 90, n: 1, v: (r) => formatNum(r.hs_final, 0) },
+    { t: 'Hs inicio', w: 90, n: 1, v: (r) => formatNum(r.hs_inicio, 0),
+      cf: (r) => (r.inc_hs_esperado != null ? 'inconsistente' : ''), tt: (r) => hmTipSalto(r, r.hs_inicio, r.inc_hs_esperado) },
+    { t: 'Hs final', w: 90, n: 1, v: (r) => formatNum(r.hs_final, 0),
+      cf: (r) => (Number(r.inc_hs_invertido) ? 'inconsistente' : ''),
+      tt: (r) => (Number(r.inc_hs_invertido) ? `Hs final (${hmN(r.hs_final)}) menor que Hs inicio (${hmN(r.hs_inicio)})` : '') },
     { t: 'Total hs', w: 80, n: 1, c: 'tot-hs', v: (r) => formatNum(r.total_hs, 0) },
-    { t: 'Km inicio', w: 90, n: 1, v: (r) => formatNum(r.km_inicio, 0) },
+    { t: 'Km inicio', w: 90, n: 1, v: (r) => formatNum(r.km_inicio, 0),
+      cf: (r) => (r.inc_km_esperado != null ? 'inconsistente' : ''), tt: (r) => hmTipSalto(r, r.km_inicio, r.inc_km_esperado) },
     { t: 'Km final', w: 90, n: 1, v: (r) => formatNum(r.km_final, 0) },
     { t: 'Km total', w: 80, n: 1, c: 'tot-km', v: (r) => formatNum(r.km_total, 0) },
     { t: 'Viajes', w: 70, n: 1, v: (r) => escHtml(r.viajes || 0) },
@@ -1806,7 +1836,7 @@
       ? (state.fechaDesde || state.fechaHasta ? partes[partes.length - 1] : 'Últimos registros del equipo. Seleccioná un período para filtrar.')
       : partes.join(' · ');
     const hayFiltros = ['hf-equipo', 'hf-obra', 'hf-operador', 'hf-estado'].some((id) => document.getElementById(id).value)
-      || state.busqueda || (state.filtroPeriodo && state.filtroPeriodo !== 'ultimos_30');
+      || state.busqueda || state.soloInconsistencias || (state.filtroPeriodo && state.filtroPeriodo !== 'ultimos_30');
     document.getElementById('hf-limpiar').hidden = !hayFiltros || opPartes.vista === 'cargar';
   }
 
@@ -1848,6 +1878,7 @@
       if (state.fechaDesde) params.append('fecha_desde', state.fechaDesde);
       if (state.fechaHasta) params.append('fecha_hasta', state.fechaHasta);
       if (state.busqueda) params.append('q', state.busqueda);
+      if (state.soloInconsistencias) params.append('solo_inconsistencias', 'true');
       params.append('page', state.paginaActual);
       params.append('limit', state.limite);
 
@@ -1859,6 +1890,7 @@
       state.totalPaginas = resData.total_pages || 1;
       state.paginaActual = resData.page || 1;
       state.ultimasFilas = resData.data || [];
+      opBotonInconsistencias(resData.inconsistencias || 0);
 
       renderTabla(state.ultimasFilas);
       renderPaginacion();
@@ -1886,8 +1918,20 @@
     }
     tbody.innerHTML = vistas.map((r) => {
       const i = filas.indexOf(r);
-      return `<tr data-parte-fila="${r.id}" tabindex="0">${cols.map((c) => `<td class="${c.n ? 'num' : ''} ${c.c || ''} ${c.cf ? c.cf(r) : ''}">${c.v(r, i)}</td>`).join('')}</tr>`;
+      return `<tr data-parte-fila="${r.id}" tabindex="0">${cols.map((c) => {
+        const tip = c.tt ? c.tt(r) : '';
+        return `<td class="${c.n ? 'num' : ''} ${c.c || ''} ${c.cf ? c.cf(r) : ''}"${tip ? ` title="${escHtml(tip)}"` : ''}>${c.v(r, i)}</td>`;
+      }).join('')}</tr>`;
     }).join('');
+  }
+
+  // Contador "N inconsistencias" sobre la tabla; al tocarlo filtra solo esas filas (otro toque vuelve a todas).
+  function opBotonInconsistencias(n) {
+    const b = document.getElementById('btn-inconsistencias');
+    const activo = !!state.soloInconsistencias;
+    b.hidden = !n && !activo;
+    b.setAttribute('aria-pressed', String(activo));
+    b.innerHTML = `${SMG.icon('alert', 'i-sm')}${SMG.fmtNum(n)} ${n === 1 ? 'inconsistencia' : 'inconsistencias'}${activo ? ' · ver todos' : ''}`;
   }
 
   function renderPaginacion() {
@@ -1996,6 +2040,15 @@
     if (kmFin > 0 && kmFin < kmIni) {
       showToast('Advertencia: El Kilómetro Final no puede ser menor al Inicial.', 'error');
       return;
+    }
+
+    // Parte nuevo con Hs/Km inicio distinto del cierre del último parte del equipo: avisar antes de guardar.
+    if (!editId) {
+      const n = (v) => Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 });
+      const saltos = [];
+      if (state.ultimoHorometro > 0 && hsIni > 0 && hsIni !== state.ultimoHorometro) saltos.push(`Hs inicio ${n(hsIni)}: el último parte del equipo cerró en ${n(state.ultimoHorometro)} (diferencia ${hsIni > state.ultimoHorometro ? '+' : ''}${n(hsIni - state.ultimoHorometro)}).`);
+      if (state.ultimoKilometro > 0 && kmIni > 0 && kmIni !== state.ultimoKilometro) saltos.push(`Km inicio ${n(kmIni)}: el último parte del equipo cerró en ${n(state.ultimoKilometro)} (diferencia ${kmIni > state.ultimoKilometro ? '+' : ''}${n(kmIni - state.ultimoKilometro)}).`);
+      if (saltos.length && !(await SMG.confirmar('El inicio no coincide con el último cierre', `${saltos.join(' ')} El parte quedará marcado como inconsistencia. ¿Guardar igual?`, { ok: 'Guardar igual' }))) return;
     }
 
     const payload = {
@@ -2321,8 +2374,7 @@
   // Quita la foto del servidor sin descargarla (mismo endpoint que tras guardarla).
   async function eliminarFotoParte(idParte) {
     if (!opExigir('carga_partes_diarios', 'controlar')) return false;
-    if (!confirm('¿Eliminar la foto del servidor sin guardarla en la PC?
-No se puede recuperar.')) return false;
+    if (!confirm('¿Eliminar la foto del servidor sin guardarla en la PC?\nNo se puede recuperar.')) return false;
     try {
       const res = await fetch(`/operaciones/horas-maquinas/${idParte}/foto/archivar`, { method: 'POST' });
       const datos = await res.json();
@@ -3265,6 +3317,7 @@ No se puede recuperar.')) return false;
       Object.entries(hfMapa).forEach(([id, clave]) => { document.getElementById(id).value = ''; state[clave] = ''; });
       document.getElementById('filtro-busqueda-texto').value = '';
       state.busqueda = '';
+      state.soloInconsistencias = false;
       document.getElementById('filtro-periodo-preset').value = 'ultimos_30';
       state.filtroPeriodo = 'ultimos_30';
       aplicarPresetPeriodo('ultimos_30');
@@ -3318,6 +3371,11 @@ No se puede recuperar.')) return false;
     });
 
     // Botón Actualizar
+    document.getElementById('btn-inconsistencias').addEventListener('click', () => {
+      state.soloInconsistencias = !state.soloInconsistencias;
+      state.paginaActual = 1;
+      cargarHistorial();
+    });
     document.getElementById('btn-recargar-historial').addEventListener('click', () => {
       cargarHistorial();
     });
