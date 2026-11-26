@@ -267,7 +267,8 @@
 
   // Asas para ensanchar o achicar columnas a mano: arrastrar el borde derecho del encabezado, o foco + flechas
   // (Shift = de a 64px); doble clic restablece el ancho original. Llamar después de pintar el thead.
-  function asasColumnas(tabla) {
+  function asasColumnas(tabla, { min = 48 } = {}) {
+    tabla._asasMin = min;
     const clave = tabla.dataset.anchos;
     if (!clave || !tabla._colsAnchos || !tabla.tHead || !tabla.tHead.rows[0]) return;
     const sinHtml = (t) => String(t || "").replace(/<[^>]+>/g, "");
@@ -279,14 +280,13 @@
     });
     if (tabla._asasListas) return;
     tabla._asasListas = true;
-    const MIN = 48;
     const colDe = (i) => tabla.querySelector("colgroup").children[i];
     const recalcular = () => {
       const cols = tabla._colsAnchos || [];
       tabla.style.minWidth = `${[...tabla.querySelector("colgroup").children].reduce((s, col, j) => s + (parseFloat(col.style.width) || (cols[j] && cols[j].w) || 0), 0)}px`;
     };
     const fijar = (i, px, guardar) => {
-      const c = tabla._colsAnchos[i], w = Math.max(MIN, Math.round(px));
+      const c = tabla._colsAnchos[i], w = Math.max(tabla._asasMin || 48, Math.round(px));
       colDe(i).style.width = `${w}px`;
       recalcular();
       if (guardar && c && c.k) prefs.set(`anchos.${tabla.dataset.anchos}`, { ...(prefs.get(`anchos.${tabla.dataset.anchos}`, null) || {}), [c.k]: w });

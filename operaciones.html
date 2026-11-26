@@ -43,6 +43,9 @@
     .btn-action.is-ok, .btn-action.is-ok:hover { background: rgba(34, 197, 94, .2); border-color: #22c55e; color: #4ade80; cursor: default; }
     .btn-action:disabled:not(.is-ok) { opacity: .4; cursor: not-allowed; }
     .btn-action svg { width: 14px; height: 14px; }
+    /* Columna Acciones fija a la izquierda: el encabezado por encima del resto de los encabezados y de las celdas */
+    #op-content .table-wrap thead th.sticky-col { z-index: 4; left: 0; }
+    #op-content .tbl td.sticky-col { z-index: 1; }
   </style>
 </head>
 
@@ -133,8 +136,8 @@
           <div class="table-wrap is-auto" style="margin-top: 12px">
             <table class="tbl" id="opd-pend-tabla"><colgroup></colgroup>
               <thead><tr>
-                <th>Fecha</th><th>N.º parte</th><th>Equipo</th><th>Operador</th><th>Obra</th><th>Turno</th>
-                <th class="num">Horas</th><th>Supervisor SMG</th><th>Foto</th><th>Origen</th><th class="num">Espera</th><th class="center"><span class="sr-only">Acciones</span></th>
+                <th class="center sticky-col">Acciones</th><th>Fecha</th><th>N.º parte</th><th>Equipo</th><th>Operador</th><th>Obra</th><th>Turno</th>
+                <th class="num">Horas</th><th>Supervisor SMG</th><th>Foto</th><th>Origen</th><th class="num">Espera</th>
               </tr></thead>
               <tbody id="opd-pend-body"></tbody>
             </table>
@@ -1750,7 +1753,9 @@
       <button type="button" class="btn-action btn-del" data-acc="eliminar" title="Eliminar parte" aria-label="Eliminar parte" ${dis('eliminar')}>${HM_ICO.eliminar}</button>
     </span>`;
   };
+  // Acciones primero y fija a la izquierda (sticky-col) para que siga visible al desplazar la tabla.
   const HM_COLS = [
+    { t: 'Acciones', w: 150, c: 'center sticky-col', v: hmAcciones },
     { t: '#', w: 52, c: 'pd-n', v: (r, i) => String((state.paginaActual - 1) * state.limite + i + 1) },
     { t: 'CI', w: 80, c: 'pd-ci', v: (r) => hmTxt(r.ci) },
     { t: 'Fecha parte', w: 112, v: (r) => hmTxt(SMG.fmtDia(r.fecha_parte)) },
@@ -1782,14 +1787,15 @@
     { t: 'Hs dispos.', w: 96, n: 1, v: (r) => formatNum(r.hs_disposicion, 1) },
     { t: 'Total hs control', w: 124, n: 1, v: (r) => formatNum(r.total_hs_control, 1) },
     { t: 'No programadas', w: 124, v: (r) => hmTxt(r.no_programadas) },
-    { t: 'Acciones', w: 150, c: 'center', v: hmAcciones },
   ];
   const hmColumnas = () => HM_COLS;
   function hmEncabezado() {
     const tabla = document.getElementById('tabla-horas-maquinas');
     const cols = hmColumnas();
-    SMG.columnasTabla(tabla, tabla.querySelector('colgroup'), cols);
-    tabla.querySelector('thead').innerHTML = `<tr>${cols.map((c) => `<th class="${c.n ? 'num' : ''} ${c.c === 'center' ? 'center' : ''}">${c.t}</th>`).join('')}</tr>`;
+    tabla.querySelector('thead').innerHTML = `<tr>${cols.map((c) => `<th class="${c.n ? 'num' : ''} ${(c.c || '').split(' ').filter((k) => k === 'center' || k === 'sticky-col').join(' ')}">${c.t}</th>`).join('')}</tr>`;
+    // Anchos editables arrastrando el borde del encabezado; se guardan por navegador (ui/tabla-filas.js)
+    if (window.SMGTabla) SMGTabla.anchosEditables(tabla, cols, 'operaciones.historial-partes');
+    else SMG.columnasTabla(tabla, tabla.querySelector('colgroup'), cols);
     return cols;
   }
   function opHistorialSubtitulo() {
@@ -5070,11 +5076,14 @@
       ].map(([t, v]) => `<div><dt>${t}</dt><dd class="num">${n0.format(v)}</dd></div>`).join('');
     }
 
-    const PEND_COLS = [{ w: 100 }, { w: 96 }, { w: 88 }, { w: 170, flex: true }, { w: 190, flex: true }, { w: 76 }, { w: 72 }, { w: 170 }, { w: 92 }, { w: 96 }, { w: 84 }, { w: 52 }];
+    // Mismo orden que el <thead> de #opd-pend-tabla: Acciones primero (fija a la izquierda).
+    const PEND_COLS = [{ t: 'Acciones', w: 72 }, { t: 'Fecha', w: 100 }, { t: 'N.º parte', w: 96 }, { t: 'Equipo', w: 88 }, { t: 'Operador', w: 170, flex: true },
+      { t: 'Obra', w: 190, flex: true }, { t: 'Turno', w: 76 }, { t: 'Horas', w: 72 }, { t: 'Supervisor SMG', w: 170 }, { t: 'Foto', w: 92 }, { t: 'Origen', w: 96 }, { t: 'Espera', w: 84 }];
     function renderPendientes(d) {
       const filas = d.pendientes;
       const tabla = el('opd-pend-tabla');
-      SMG.columnasTabla(tabla, tabla.querySelector('colgroup'), PEND_COLS);
+      if (window.SMGTabla) SMGTabla.anchosEditables(tabla, PEND_COLS, 'operaciones.pendientes-revision');
+      else SMG.columnasTabla(tabla, tabla.querySelector('colgroup'), PEND_COLS);
       pd.pendientes = filas;
       el('opd-pend-cnt').textContent = n0.format(d.kpis.pendientes);
       el('opd-pend-cnt').className = `chip ${d.kpis.pendientes ? 'chip-warn' : 'chip-muted'}`;
@@ -5082,6 +5091,7 @@
         const espera = p.dias_espera;
         const clase = espera > 7 ? 'chip-bad' : espera > 3 ? 'chip-warn' : 'chip-muted';
         return `<tr data-parte="${Number(p.id)}" tabindex="0">
+          <td class="center sticky-col">${opBotonMenu(`parte ${p.nro_parte || p.id}`)}</td>
           <td>${fFecha(p.fecha_parte)}</td>
           <td class="mono">${esc(p.nro_parte || '—')}</td>
           <td class="mono">${esc(p.ci || '—')}</td>
@@ -5093,7 +5103,6 @@
           <td>${p.tiene_foto ? '<span class="chip chip-muted">Con foto</span>' : '<span class="muted">—</span>'}</td>
           <td>${p.origen_carga === 'APP_OPERADOR' ? 'App' : '<span class="muted">Escritorio</span>'}</td>
           <td class="num"><span class="chip ${clase}">${espera === 0 ? 'Hoy' : `${espera} d`}</span></td>
-          <td class="center">${opBotonMenu(`parte ${p.nro_parte || p.id}`)}</td>
         </tr>`;
       }).join('') : opFilaVacia(12, 'No hay partes pendientes de revisión en la selección.');
       const nota = el('opd-pend-nota');

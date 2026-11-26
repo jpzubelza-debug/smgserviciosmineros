@@ -8296,6 +8296,20 @@ def _normalizar_maquinista_operaciones(conn, legajo, nombre):
     return str(fila["legajo"] or "").strip(), str(fila["nombre"] or "").strip()
 
 
+def _hm_orden_correlativo(alias: str = "", desc: bool = True) -> str:
+    """ORDER BY de los partes: fecha, Hs inicio (horómetro), Km inicio y N.º de parte, para que los turnos
+    de un mismo día queden seguidos y las horas correlativas. hs_inicio y nro_parte se guardan como texto
+    ("5404", "7463.2", "s/p"): se comparan como número (la coma decimal se toma como punto)."""
+    a = f"{alias}." if alias else ""
+    d = " DESC" if desc else ""
+    return (
+        f"{a}fecha_parte{d}, "
+        f"CAST(REPLACE(TRIM({a}hs_inicio), ',', '.') AS REAL){d}, "
+        f"CAST(REPLACE(TRIM({a}km_inicio), ',', '.') AS REAL){d}, "
+        f"CAST(TRIM({a}nro_parte) AS INTEGER){d}, {a}id{d}"
+    )
+
+
 def _consultar_horas_maquinas_filas(conn, ci: str | None, fecha_desde: str | None, fecha_hasta: str | None, q: str | None):
     condiciones = ["1=1"]
     params = []
@@ -8358,7 +8372,7 @@ def listar_horas_maquinas(
         query = f"""
             SELECT * FROM horas_maquinas
             WHERE {where_clause}
-            ORDER BY fecha_parte DESC, id DESC
+            ORDER BY {_hm_orden_correlativo()}
             LIMIT ? OFFSET ?
         """
         filas = conn.execute(query, params + [limit, offset]).fetchall()
@@ -8464,7 +8478,7 @@ def exportar_horas_maquinas_excel(
         query = f"""
             SELECT * FROM horas_maquinas
             WHERE {where_clause}
-            ORDER BY fecha_parte DESC, id DESC
+            ORDER BY {_hm_orden_correlativo()}
             LIMIT {int(limite_sql)}
         """
         filas = conn.execute(query, params).fetchall()
@@ -18157,13 +18171,13 @@ def operaciones_dashboard_partes(
                 WITH sel AS (
                     SELECT h.id, h.nro_parte, h.fecha_parte, h.created_at, UPPER(TRIM(h.ci)) AS ci,
                            h.maquinista, TRIM(h.legajo_empleado) AS legajo, {obra_sql} AS obra, h.turno,
-                           h.total_hs, h.control_supervisor, h.origen_carga
+                           h.total_hs, h.control_supervisor, h.origen_carga, h.hs_inicio, h.km_inicio
                     FROM horas_maquinas h WHERE {where} AND {ADM_PARTES_PENDIENTE}
-                    ORDER BY h.fecha_parte, h.id LIMIT 300
+                    ORDER BY {_hm_orden_correlativo("h", desc=False)} LIMIT 300
                 ), {ADM_PER_CTE}
                 SELECT s.*, COALESCE(per.nombre, s.maquinista) AS operador, f.parte_id IS NOT NULL AS tiene_foto
                 FROM sel s LEFT JOIN per ON per.leg = s.legajo LEFT JOIN partes_fotos f ON f.parte_id = s.id
-                ORDER BY s.fecha_parte, s.id
+                ORDER BY {_hm_orden_correlativo("s", desc=False)}
                 """,
                 params,
             )

@@ -1,3 +1,16 @@
+/* Anchos de columna editables: SMGTabla.anchosEditables(tabla, cols, clave).
+   cols = [{ t: 'Título', w: 90, flex?: true, k?: 'id' }, …] en el orden del <thead>.
+   Aplica los anchos (los guardados en localStorage con la clave "smg.anchos.<clave>" pisan a los de cols) y pone
+   en cada encabezado un asa para arrastrar el borde derecho (mínimo 40px, doble clic restablece).
+   Llamar cada vez que se dibuja el <thead>. Usa SMG.columnasTabla / SMG.asasColumnas de /ui/shell.js. */
+window.SMGTabla = window.SMGTabla || {};
+window.SMGTabla.anchosEditables = function (tabla, cols, clave) {
+  const sinHtml = (t) => String(t || '').replace(/<[^>]+>/g, '').trim();
+  const lista = cols.map((c, i) => ({ ...c, k: c.k || sinHtml(c.t || c.l) || `c${i}`, l: c.l || sinHtml(c.t) || `Columna ${i + 1}` }));
+  SMG.columnasTabla(tabla, tabla.querySelector('colgroup'), lista, { clave });
+  SMG.asasColumnas(tabla, { min: 40 });
+};
+
 /* Límite de filas visibles en los cuadros con tabla de Operaciones (#op-content).
    Agrega debajo de cada .table-wrap (salvo [data-sin-limite]) una barra "Mostrando X de Y · Filas: [n]".
    Oculta con .row-limit-hide las filas que pasan el límite, sin borrarlas del DOM, y respeta
