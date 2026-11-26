@@ -1170,8 +1170,25 @@
 
   // ---------- foto del parte ----------
   // Se comprime en el teléfono (máx. 1600 px, JPEG) para que suba rápido con poca señal.
-  // No se guarda en el borrador (no entra en el almacenamiento del navegador).
+  // Se guarda aparte del borrador (clave propia) para no reescribirla en cada tecla.
   state.foto = null;
+  const FOTO_KEY = 'smg_op_borrador_foto';
+  function guardarFotoBorrador(blob) {
+    const lector = new FileReader();
+    lector.onload = () => store.set(FOTO_KEY, { legajo: state.me && state.me.legajo, data: lector.result });
+    lector.readAsDataURL(blob);
+  }
+  function fotoDelBorrador() {
+    const g = store.get(FOTO_KEY);
+    if (!g || !g.data || !state.me || g.legajo !== state.me.legajo) return null;
+    try {
+      const [cab, b64] = g.data.split(',');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: (cab.match(/data:([^;]+)/) || [])[1] || 'image/jpeg' });
+    } catch { return null; }
+  }
   async function comprimirFoto(file) {
     const MAX = 1600;
     let fuente;
@@ -1230,6 +1247,7 @@
       quitarFoto();
       state.foto = { blob, url: URL.createObjectURL(blob) };
       pintarFoto();
+      guardarFotoBorrador(blob); guardarBorrador();
     } catch (err) { toast(err.message || 'No se pudo usar esa foto.', 'err'); }
     finally { botones.forEach((b) => { b.classList.remove('cargando'); b.disabled = false; }); }
   };
@@ -1247,8 +1265,11 @@
       Object.entries(borrador.campos || {}).forEach(([k, v]) => { if (form.elements[k]) form.elements[k].value = v; });
       Object.keys(state.picks).forEach((k) => { state.picks[k] = valido(k, borrador.picks?.[k]) ? borrador.picks[k] : ''; });
       state.turno = borrador.turno || '';
+      const blob = fotoDelBorrador();
+      if (blob) { state.foto = { blob, url: URL.createObjectURL(blob) }; pintarFoto(); }
       $('draft-note').hidden = false;
     } else {
+      store.del(FOTO_KEY);
       // Se recuerdan equipo, obra, cliente y turno del último parte enviado.
       Object.keys(state.picks).forEach((k) => { state.picks[k] = ''; });
       ['ci', 'obra', 'cliente', 'acoplado', 'control_supervisor'].forEach((k) => { if (valido(k, ultimos[k])) state.picks[k] = ultimos[k]; });
@@ -1460,7 +1481,7 @@
       envio.append('foto', state.foto.blob, 'parte.jpg');
       const r = await api('/operador/api/partes', { method: 'POST', body: envio });
       store.set(LAST_KEY, { ci: p.ci, obra: p.obra, cliente: p.cliente, acoplado: p.acoplado, turno: p.turno, control_supervisor: p.control_supervisor });
-      store.del(DRAFT_KEY);
+      store.del(DRAFT_KEY); store.del(FOTO_KEY);
       cerrarSheet();
       toast(r.mensaje || 'Parte enviado.', 'ok');
       resetFormulario(false);
