@@ -220,7 +220,11 @@ with sync_playwright() as pw:
     mec.wait_for_selector("#mto-crono:has-text('Pausar')")
     ok("mecánico: cronómetro iniciado", True)
     ok("mecánico: ve la foto de la novedad", mec.locator(".sheet img").count() == 1)
-    mec.set_input_files("#mto-foto", IMAGEN)
+    ok("mecánico: 'Agregar foto' separado de 'Cargar avance'",
+       mec.eval_on_selector("#mto-foto-btn", "b => getComputedStyle(b).marginTop") == "10px")
+    with mec.expect_file_chooser() as fc:
+        mec.click("#mto-foto-btn")
+    fc.value.set_files(IMAGEN)
     mec.wait_for_function("document.querySelectorAll('.sheet img').length === 2")
     ok("mecánico: agregó una foto a la OT", True)
     mec.fill("#mto-txt", "Cambio de retén de la transmisión")

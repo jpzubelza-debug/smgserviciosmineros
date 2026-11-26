@@ -1679,7 +1679,6 @@
           <div class="top"><span class="date">${esc(n.objetivo)}</span><span class="badge ${n.estado === 'CERRADA' ? 'ok' : 'pend'}">${esc(MT_ESTADO_NOV[n.estado])}${n.ot_numero ? ` · ${esc(n.ot_numero)} ${esc(MT_ESTADO_OT[n.ot_estado] || '')}` : ''}</span></div>
           <div class="meta">${esc(n.descripcion)}</div>
           <div class="meta">${n.estado === 'CERRADA' ? 'Cerrada' : `Abierta ${mtDias(n.dias)}`}${n.resolucion ? ` · ${esc(n.resolucion)}` : ''}</div>
-          ${n.informe_url || n.ot_estado === 'FINALIZADA' ? `<a href="${esc(n.informe_url || `/operador/api/mt/ordenes/${n.ot_id}/informe`)}" target="_blank" rel="noopener">Ver Informe ${esc(n.ot_numero || '')}${n.ci ? ` - ${esc(n.ci)}` : ''}</a>` : ''}
         </div>`).join('') : '<div class="empty" style="padding:16px">Todavía no reportaste novedades.</div>';
     } catch { $('mt-mias').innerHTML = ''; }
   }
@@ -1827,7 +1826,7 @@
         <button type="button" class="parte" data-ot="${o.id}">
           <div class="top"><span class="date">${esc(o.numero)} · ${esc(o.objetivo)}</span><span class="badge ${o.estado === 'EN_REVISION' ? 'ok' : 'pend'}">${esc(MT_ESTADO_OT[o.estado])}</span></div>
           <div class="meta">${esc(o.titulo)}</div>
-          <div class="nums"><span><b>${fmt(o.horas, 2)}</b> hs</span>${o.prioridad === 'URGENTE' ? '<span class="badge pend">Urgente</span>' : ''}${o.cronometro ? '<span class="badge app">Cronómetro en marcha</span>' : ''}</div>
+          <div class="nums">${o.prioridad === 'URGENTE' ? '<span class="badge pend">Urgente</span>' : ''}${o.cronometro ? '<span class="badge app">Cronómetro en marcha</span>' : ''}</div>
         </button>`).join('') : '<div class="empty">No tenés órdenes de trabajo asignadas.</div>';
     } catch (err) { $('mto-lista').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
     try {
@@ -1836,7 +1835,7 @@
         <button type="button" class="parte" data-ot="${o.id}">
           <div class="top"><span class="date">${esc(o.numero)} · ${esc(o.objetivo)}</span><span class="badge ${o.estado === 'FINALIZADA' ? 'ok' : 'pend'}">${esc(MT_ESTADO_OT[o.estado])}</span></div>
           <div class="meta">${esc(o.titulo)}</div>
-          <div class="nums"><span>Cerrada ${mtFecha(o.cerrada_en)}</span><span>Mis horas: <b>${fmt(o.mis_horas, 2)}</b></span></div>
+          <div class="nums"><span>Cerrada ${mtFecha(o.cerrada_en)}</span></div>
         </button>`).join('') : '<div class="empty">Todavía no tenés OT cerradas en los últimos 90 días.</div>';
     } catch { $('mto-hist').innerHTML = ''; }
   }
@@ -1856,18 +1855,18 @@
         ${o.tareas_estado.map((t) => `<label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px"><input type="checkbox" data-tarea="${t.orden}" ${t.hecha ? 'checked' : ''} ${editable ? '' : 'disabled'} style="width:22px;height:22px;flex:0 0 auto;margin:0"><span>${esc(t.texto)}</span></label>`).join('')}</div>` : ''}
       ${devuelta && o.estado === 'EN_CURSO' ? `<div class="alert err">Devuelta: ${esc(devuelta.texto)}</div>` : ''}
       ${o.estado === 'EN_REVISION' ? '<div class="alert info">La OT está en revisión. Solo el administrador de Mantenimiento la finaliza.</div>' : ''}
-      ${o.estado === 'FINALIZADA' ? `<div class="alert info">Finalizada ${mtFecha(o.finalizada_en)} por ${esc(o.finalizada_por || '')}. Mis horas: <b>${fmt(o.mis_horas, 2)}</b>.</div>` : ''}
+      ${o.estado === 'FINALIZADA' ? `<div class="alert info">Finalizada ${mtFecha(o.finalizada_en)} por ${esc(o.finalizada_por || '')}.</div>` : ''}
       ${o.estado === 'ANULADA' ? '<div class="alert err">OT anulada.</div>' : ''}
-      ${o.informe_url || o.estado === 'FINALIZADA' ? `<p class="alert info"><a href="/operador/api/mt/ordenes/${o.id}/informe" target="_blank" rel="noopener">Ver Informe ${esc(o.numero)}${o.ci ? ` - ${esc(o.ci)}` : ''}</a></p>` : mtFotos([...(o.novedad ? o.novedad.fotos : []), ...o.fotos])}
+      ${mtFotos([...(o.novedad ? o.novedad.fotos : []), ...o.fotos])}
       ${editable ? `<div class="section" style="text-align:center">
-        <div class="help">Mis horas en esta OT</div><div id="mto-reloj" style="font-size:1.8rem;font-weight:700">${fmt(o.mis_horas, 2)} h</div>
+        <div class="help" style="margin-bottom:8px">${o.cronometro ? 'Cronómetro en marcha' : 'Cronómetro detenido'}</div>
         <button type="button" class="btn ${o.cronometro ? 'ghost' : ''}" id="mto-crono">${o.cronometro ? 'Pausar' : 'Iniciar'}</button></div>
         <div class="field"><label for="mto-txt">Avance, motivo de espera o corrección final</label><textarea id="mto-txt" class="input" maxlength="2000" placeholder="¿Qué hiciste?"></textarea></div>
         <button type="button" class="btn ghost" data-acc="avance">Cargar avance</button>
-        <input type="file" id="mto-foto" accept="image/*" capture="environment" hidden>
         <button type="button" class="btn ghost" id="mto-foto-btn">Agregar foto</button>
         <button type="button" class="btn ghost" data-acc="espera">Poner en espera (repuestos, etc.)</button>
-        <button type="button" class="btn" data-acc="final">Corrección final: terminé</button>` : ''}
+        <button type="button" class="btn" data-acc="final">Corrección final: terminé</button>
+        <input type="file" id="mto-foto" accept="image/*" capture="environment" hidden>` : ''}
       <h3 style="margin:16px 0 6px;font-size:.78rem;text-transform:uppercase;color:var(--muted)">Historial</h3>
       ${o.eventos.map((e) => `<div class="meta" style="margin-bottom:6px"><b>${esc(MT_EVENTO[e.tipo] || e.tipo)}</b> · ${esc(e.autor)} · ${mtFecha(e.creado_en)}${e.texto ? `<br>${esc(e.texto)}` : ''}</div>`).join('')}`,
     '<button class="btn ghost" type="button" data-cancel>Cerrar</button>');
@@ -1880,10 +1879,6 @@
       } catch (err) { cb.checked = !cb.checked; cb.disabled = false; toast(err.message, 'err'); }
     }));
     if (!editable) return;
-    if (o.cronometro) {
-      const base = Date.now(); const horas = o.mis_horas;
-      state.mt.reloj = setInterval(() => { const el = $('mto-reloj'); if (!el) { clearInterval(state.mt.reloj); return; } el.textContent = `${fmt(horas + (Date.now() - base) / 3600000, 2)} h`; }, 15000);
-    }
     const hacer = async (accion, boton) => {
       const texto = $('mto-txt') ? $('mto-txt').value : '';
       const sinTildar = (o.tareas_estado || []).filter((t) => !t.hecha).length;

@@ -240,9 +240,10 @@ class MantenimientoTests(unittest.TestCase):
             conn.execute("UPDATE mt_ot_tiempos SET inicio = datetime(inicio, '-120 minutes') WHERE ot_id = ? AND fin IS NULL", (ot["id"],))
         d = _ok(self.mec.post(f"/operador/api/mt/ordenes/{ot['id']}/pausar", json={}))
         self.assertFalse(d["cronometro"])
-        self.assertAlmostEqual(d["mis_horas"], 2, delta=0.05)
-        self.assertNotIn("costo_mano_obra", d, "el mecánico no ve costos")
+        for clave in ("mis_horas", "horas", "tiempos", "costo_mano_obra"):
+            self.assertNotIn(clave, d, "la app no ve horas ni costos")
         w = _ok(self.c.get(f"{API}/ordenes/{ot['id']}"))
+        self.assertAlmostEqual(w["horas"], 2, delta=0.05)  # el cronómetro igual las registra
         self.assertAlmostEqual(w["costo_mano_obra"], 3000, delta=80)
         d = _ok(self.mec.post(f"/operador/api/mt/ordenes/{ot['id']}/espera", json={"texto": "Esperando repuesto"}))
         self.assertEqual(d["estado"], "EN_ESPERA")
@@ -687,13 +688,17 @@ class MantenimientoTests(unittest.TestCase):
         lista = {o["id"]: o for o in _ok(self.c.get(f"{API}/ordenes", params={"estado": "TODAS"}))}
         self.assertEqual(lista[ot["id"]]["costo_repuestos"], 300000)
         mec = _ok(self.mec.get(f"/operador/api/mt/ordenes/{ot['id']}"))
-        self.assertNotIn("costo_repuestos", mec)
-        self.assertEqual(mec["repuestos"][0], {"descripcion": "Cubierta 1100x20", "cantidad": 2, "unidad": None})
+        for clave in ("costo_repuestos", "repuestos", "cantidad_repuestos", "repuestos_sin_costo"):
+            self.assertNotIn(clave, mec, "la app no ve repuestos")
+        self.assertNotIn("REPUESTO", [e["tipo"] for e in mec["eventos"]])
         sin_costo = next(r for r in d["repuestos"] if r["costo_unitario"] is None)
         d = _ok(self.c.delete(f"{API}/ordenes/{ot['id']}/repuestos/{sin_costo['id']}"))
         self.assertEqual((len(d["repuestos"]), d["repuestos_sin_costo"]), (1, 0))
         _ok(self.c.post(f"{API}/ordenes/{ot['id']}/finalizar", json={}))
         _err(self.c.post(f"{API}/ordenes/{ot['id']}/repuestos", json={"descripcion": "Tarde", "cantidad": 1}), 422)
+        mia = next(n for n in _ok(self.op.get("/operador/api/mt/mis-novedades")) if n["id"] == nov["id"])
+        self.assertEqual(mia["ot_estado"], "FINALIZADA")
+        self.assertNotIn("informe_url", mia, "el operador no recibe el informe")
 
     def test_23_control_del_horometro(self):
         ci = "C-16"
@@ -760,8 +765,14 @@ class MantenimientoTests(unittest.TestCase):
         hist = {x["id"]: x for x in _ok(self.mec.get("/operador/api/mt/historial"))}
         self.assertEqual(hist[ot["id"]]["estado"], "FINALIZADA")
         self.assertNotIn("costo_total", hist[ot["id"]])
-        self.assertIn("mis_horas", hist[ot["id"]])
+        self.assertNotIn("mis_horas", hist[ot["id"]])
+        self.assertNotIn("horas", hist[ot["id"]])
         det = _ok(self.mec.get(f"/operador/api/mt/ordenes/{ot['id']}"))
+        self.assertNotIn("informe_url", det)
+        # El informe solo se abre desde el escritorio: la app lo rechaza (mecánico y operador)
+        _err(self.mec.get(f"/operador/api/mt/ordenes/{ot['id']}/informe"), 403)
+        _err(self.op.get(f"/operador/api/mt/ordenes/{ot['id']}/informe"), 403)
+        self.assertEqual(self.c.get(f"{API}/ordenes/{ot['id']}/informe").status_code, 200)
         self.assertEqual((det["estado"], next(e["texto"] for e in det["eventos"] if e["tipo"] == "FINALIZADA")), ("FINALIZADA", "Todo ok"))
         self.assertNotIn(ot["id"], [x["id"] for x in _ok(_app(MEC2).get("/operador/api/mt/historial"))])
 

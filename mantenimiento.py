@@ -839,15 +839,30 @@ def accion_mecanico(conn, ot_id, legajo, nombre, accion, texto=""):
     return orden_para_mecanico(conn, f["id"], legajo)
 
 
+# La app (operadores y mecánicos) no accede al informe ni a ningún valor de horas o de repuestos:
+# eso queda solo en el escritorio de Mantenimiento. El cronómetro se sigue usando (Iniciar / Pausar).
+_OCULTO_EN_APP = ("informe_archivo", "informe_url", "horas", "mis_horas", "tiempos", "lectura_hs", "config", "control_tarja",
+                  "costo_mano_obra", "costo_repuestos", "costo_total", "repuestos", "repuestos_sin_costo", "cantidad_repuestos")
+
+
+def para_app(d):
+    """Quita de una OT o novedad lo que la app no muestra. Devuelve el mismo dict."""
+    for clave in _OCULTO_EN_APP:
+        d.pop(clave, None)
+    if "eventos" in d:
+        d["eventos"] = [e for e in d["eventos"] if e["tipo"] != "REPUESTO"]
+    if isinstance(d.get("novedad"), dict):
+        para_app(d["novedad"])
+    for n in d.get("reporte") or []:
+        para_app(n)
+    return d
+
+
 def orden_para_mecanico(conn, ot_id, legajo):
     d = detalle_orden(conn, ot_id)
     d["cronometro"] = conn.execute(
         "SELECT inicio FROM mt_ot_tiempos WHERE ot_id = ? AND legajo = ? AND fin IS NULL", (d["id"], legajo)).fetchone() is not None
-    d["mis_horas"] = round(_minutos(conn, d["id"], legajo) / 60, 2)
-    for clave in ("config", "costo_mano_obra", "costo_repuestos", "costo_total", "control_tarja"):
-        d.pop(clave, None)
-    d["repuestos"] = [{k: r[k] for k in ("descripcion", "cantidad", "unidad")} for r in d["repuestos"]]
-    return d
+    return para_app(d)
 
 
 def ordenes_del_mecanico(conn, legajo):
@@ -855,13 +870,12 @@ def ordenes_del_mecanico(conn, legajo):
     for o in activas:
         o["cronometro"] = conn.execute(
             "SELECT 1 FROM mt_ot_tiempos WHERE ot_id = ? AND legajo = ? AND fin IS NULL", (o["id"], legajo)).fetchone() is not None
-        for clave in ("costo_mano_obra", "costo_repuestos", "costo_total"):
-            o.pop(clave, None)
+        para_app(o)
     return activas
 
 
 def historial_del_mecanico(conn, legajo, dias=90):
-    """OT del mecánico ya cerradas (finalizadas o anuladas) en los últimos días, con sus horas. Sin costos."""
+    """OT del mecánico ya cerradas (finalizadas o anuladas) en los últimos días. Sin horas ni costos."""
     filas = conn.execute(
         """SELECT o.* FROM mt_ordenes o WHERE o.estado IN ('FINALIZADA', 'ANULADA')
            AND EXISTS (SELECT 1 FROM mt_ot_mecanicos m WHERE m.ot_id = o.id AND m.legajo = ?)
@@ -871,11 +885,8 @@ def historial_del_mecanico(conn, legajo, dias=90):
     salida = []
     for f in filas:
         d = _resumen_orden(conn, f)
-        d["mis_horas"] = round(_minutos(conn, f["id"], legajo) / 60, 2)
         d["cerrada_en"] = f["finalizada_en"] or f["actualizada_en"]
-        for clave in ("costo_mano_obra", "costo_repuestos", "costo_total"):
-            d.pop(clave, None)
-        salida.append(d)
+        salida.append(para_app(d))
     return salida
 
 

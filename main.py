@@ -19444,7 +19444,8 @@ def op_mt_novedades(request: Request, ci: str = ""):
 
     def op(conn):
         if ci:
-            return {"equipo": mt.estado_equipo(conn, ci), "novedades": mt.listar_novedades(conn, "PENDIENTES", ci=ci)}
+            return {"equipo": mt.estado_equipo(conn, ci),
+                    "novedades": [mt.para_app(n) for n in mt.listar_novedades(conn, "PENDIENTES", ci=ci)]}
         return {"equipo": None, "novedades": []}
     return _mt_ejecutar(op, escritura=False)
 
@@ -19459,7 +19460,7 @@ def op_mt_mis_novedades(request: Request):
                OR id IN (SELECT novedad_id FROM mt_novedad_confirmaciones WHERE legajo = ?)
                ORDER BY CASE estado WHEN 'CERRADA' THEN 1 ELSE 0 END, id DESC LIMIT 50""",
             (o["legajo"], o["legajo"])).fetchall()
-        return [mt._novedad_dict(conn, f) for f in filas]
+        return [mt.para_app(mt._novedad_dict(conn, f)) for f in filas]
     return _mt_ejecutar(op, escritura=False)
 
 
@@ -19485,8 +19486,8 @@ async def op_mt_novedad_crear(request: Request, payload: dict = Body(...)):
 @app.post("/operador/api/mt/novedades/{novedad_id}/confirmar")
 async def op_mt_novedad_confirmar(request: Request, novedad_id: int, payload: dict = Body(default={})):
     o = _op_operador(request)
-    return _mt_ejecutar(lambda conn: mt.confirmar_novedad(conn, novedad_id, o["nombre"], legajo=o["legajo"],
-                                                          comentario=(payload or {}).get("comentario", "")))
+    return _mt_ejecutar(lambda conn: mt.para_app(mt.confirmar_novedad(conn, novedad_id, o["nombre"], legajo=o["legajo"],
+                                                                      comentario=(payload or {}).get("comentario", ""))))
 
 
 @app.get("/operador/api/mt/ordenes")
@@ -19515,16 +19516,9 @@ def op_mt_orden(request: Request, ot_id: int):
 
 @app.get("/operador/api/mt/ordenes/{ot_id}/informe")
 def op_mt_orden_informe(request: Request, ot_id: int):
-    o = _op_operador(request)
-    autorizado = _mt_ejecutar(lambda conn: bool(conn.execute(
-        """SELECT 1 FROM mt_ordenes o LEFT JOIN mt_novedades n ON n.id = o.novedad_id
-           WHERE o.id = ? AND (EXISTS (SELECT 1 FROM mt_ot_mecanicos m WHERE m.ot_id = o.id AND m.legajo = ?)
-             OR n.legajo_reporta = ? OR EXISTS (SELECT 1 FROM mt_novedad_confirmaciones c
-                                                WHERE c.novedad_id = n.id AND c.legajo = ?))""",
-        (ot_id, o["legajo"], o["legajo"], o["legajo"])).fetchone()), escritura=False)
-    if not autorizado:
-        raise HTTPException(status_code=404, detail="No se encontró el informe de esta OT.")
-    return _mt_informe_respuesta(ot_id)
+    """El informe (con horas y repuestos) no se abre desde la app: queda solo en el escritorio de Mantenimiento."""
+    _op_operador(request)
+    raise HTTPException(status_code=403, detail="El informe de la OT no está disponible en la aplicación.")
 
 
 @app.get("/operador/api/mt/fotos/{foto_id}")
