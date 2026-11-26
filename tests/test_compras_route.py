@@ -188,5 +188,60 @@ class ComprasRouteTests(unittest.TestCase):
         self.assertEqual(libro["Ítems por departamento"]["A3"].value, "Total general")
 
 
+class ComprasProveedoresYPlazosTests(unittest.TestCase):
+    """CUIT de proveedores y vencimiento de solicitudes (listado de /compras)."""
+
+    def _conn(self, proveedores):
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute('CREATE TABLE proveedores (id INTEGER PRIMARY KEY, "NOM_PROVEE" TEXT, "CUIT" TEXT)')
+        conn.executemany('INSERT INTO proveedores (id, "NOM_PROVEE", "CUIT") VALUES (?, ?, ?)', proveedores)
+        return conn
+
+    @staticmethod
+    def _valores(cuit):
+        return ("Proveedor", "", "", "", "", "", cuit, "", "")
+
+    def test_cuit_digito_verificador(self):
+        self.assertTrue(main._cuit_valido(main._cuit_digitos("30-71999888-3")))
+        self.assertTrue(main._cuit_valido("20299427421"))
+        self.assertFalse(main._cuit_valido("30123456780"))
+        self.assertFalse(main._cuit_valido("3012345678"))
+
+    def test_alta_valida_formato_y_duplicado(self):
+        conn = self._conn([(1, "EXISTENTE SA", "20-29942742-1")])
+        valores = main._validar_cuit_proveedor(conn, self._valores("30719998883"))
+        self.assertEqual(valores[6], "30-71999888-3")
+        with self.assertRaises(main.HTTPException) as e:
+            main._validar_cuit_proveedor(conn, self._valores("30-12345678-0"))
+        self.assertEqual(e.exception.status_code, 400)
+        with self.assertRaises(main.HTTPException) as e:
+            main._validar_cuit_proveedor(conn, self._valores("20299427421"))
+        self.assertEqual(e.exception.status_code, 409)
+        self.assertEqual(main._validar_cuit_proveedor(conn, self._valores(""))[6], "")
+
+    def test_edicion_no_bloquea_cuit_historico(self):
+        conn = self._conn([(1, "VIEJO SRL", "30-72496198-3"), (2, "OTRO SRL", "20-29942742-1")])
+        # El CUIT inválido que ya tenía se conserva al editar otros datos
+        self.assertEqual(main._validar_cuit_proveedor(conn, self._valores("30-72496198-3"), 1)[6], "30-72496198-3")
+        # Si lo cambia, se valida (y no puede tomar el de otro proveedor)
+        with self.assertRaises(main.HTTPException):
+            main._validar_cuit_proveedor(conn, self._valores("20-29942742-1"), 1)
+
+    def test_vencimiento_y_fuera_de_plazo(self):
+        vencida = main._resumen_plazo_solicitud(
+            {"prioridad": "Urgente", "fecha_solicitud": "2026-01-01"}, {"total": 2, "sin_resolver": 1, "por_gestionar": 0})
+        self.assertEqual(vencida["vencimiento"], "2026-01-08")
+        self.assertTrue(vencida["fuera_plazo"])
+        self.assertEqual(vencida["cantidad_items"], 2)
+        resuelta = main._resumen_plazo_solicitud(
+            {"prioridad": "Baja", "fecha_solicitud": "2026-01-01"}, {"total": 1, "gestionados": 1})
+        self.assertEqual(resuelta["vencimiento"], "2026-01-31")
+        self.assertFalse(resuelta["fuera_plazo"])
+        sin_prioridad = main._resumen_plazo_solicitud({"prioridad": "", "fecha_solicitud": "2026-01-01"}, {})
+        self.assertIsNone(sin_prioridad["vencimiento"])
+        self.assertEqual(sin_prioridad["cantidad_items"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

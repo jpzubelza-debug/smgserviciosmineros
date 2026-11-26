@@ -1,908 +1,170 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Dashboard de Operaciones</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-:root {
-  --bg-dark: #0f172a;
-  --bg-mid: #1e293b;
-  --bg-deep: #0b1120;
-  --text-main: #e2e8f0;
-  --text-soft: #93c5fd;
-  --line-soft: rgba(148, 163, 184, 0.35);
-  --blue-main: #1d4ed8;
-  --blue-main-hover: #0284c7;
-  --blue-subtle: #60a5fa;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  font-family: Arial;
-  background: linear-gradient(135deg, var(--bg-dark), var(--bg-mid), var(--bg-deep));
-  min-height: 100vh;
-  overflow-x: hidden;
-  color: var(--text-main);
-  position: relative;
-}
-
-.bg-photo {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  opacity: 0.66;
-  pointer-events: none;
-}
-
-.bg-blur {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-    radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-  pointer-events: none;
-}
-
-.app-shell {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 100vh;
-  gap: 16px;
-  padding: 16px;
-}
-
-.sidebar,
-.panel,
-.kpi-card,
-.chart-card,
-.solicitudes-panel {
-  background: rgba(15, 23, 42, 0.66);
-  border: 1px solid var(--line-soft);
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-  border-radius: 12px;
-}
-
-.sidebar {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card {
-  background: rgba(15, 23, 42, 0.66);
-  border-radius: 12px;
-  border: 1px solid var(--line-soft);
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-  transition: none;
-}
-
-.card:hover {
-  transform: none;
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-}
-
-.panel.card:hover,
-.detalle-modal-card.card:hover {
-  transform: none;
-}
-
-.brand {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 120px;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.brand-logo {
-  width: 100%;
-  max-width: 210px;
-  height: auto;
-  display: block;
-  object-fit: contain;
-}
-
-.logo-box img {
-  filter: none;
-}
-
-.logo-text {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-}
-
-.brand-slogan {
-  margin: 8px 0 0;
-  color: var(--text-soft);
-  font-size: 12px;
-  letter-spacing: 0.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.menu {
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-button,
-.estado-btn,
-.accion-btn,
-.menu button,
-.panel-top-actions button {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: #f4f8ff;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 700;
-  transition: 0.2s;
-}
-
-.menu button {
-  text-align: left;
-  padding: 10px;
-  font-size: 14px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-}
-
-.panel-top-actions button,
-.estado-btn,
-.accion-btn {
-  padding: 8px 12px;
-  font-size: 12px;
-}
-
-button:hover,
-.estado-btn:hover,
-.accion-btn:hover,
-.menu button:hover,
-.panel-top-actions button:hover {
-  box-shadow: 0 0 12px rgba(59,130,246,0.6);
-  transform: scale(1.05);
-}
-
-h1, h2, h3 {
-  color: #ffffff;
-}
-
-p {
-  color: #cbd5e1;
-}
-
-button:active,
-.estado-btn:active,
-.accion-btn:active,
-.menu button:active,
-.panel-top-actions button:active {
-  animation: clickPulse 0.25s ease-out;
-}
-
-.menu button.active {
-  background: linear-gradient(135deg, #1d4ed8, #0284c7);
-  border-color: rgba(147, 197, 253, 0.8);
-  box-shadow: none;
-}
-
-.sidebar button {
-  width: 100%;
-  margin: 0;
-  border-radius: 8px;
-  color: var(--text-main);
-}
-
-.sidebar button:hover {
-  transform: none;
-  background: rgba(15, 23, 42, 0.62);
-  box-shadow: none;
-}
-
-.sidebar button:active {
-  transform: none;
-  box-shadow: none;
-}
-
-.sidebar button.active {
-  background: linear-gradient(135deg, #1d4ed8, #0284c7);
-  border: 1px solid rgba(147, 197, 253, 0.8);
-  box-shadow: none;
-}
-
-.main {
-  display: flex;
-  justify-content: center;
-}
-
-.panel {
-  width: min(1380px, 100%);
-  padding: 18px;
-}
-
-.panel-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.panel-top h2 {
-  margin: 0;
-  font-size: 28px;
-  color: #eef5ff;
-}
-
-.panel-top h2 span {
-  font-weight: 400;
-  color: #d4e4ff;
-}
-
-.panel-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-input,
-select,
-textarea,
-.panel-top-actions select,
-.accion-select {
-  background: rgba(2, 6, 23, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  color: var(--text-main);
-  border-radius: 8px;
-  padding: 8px 12px;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-
-select option,
-select optgroup {
-  background: #0f2237;
-  color: #eef4ff;
-}
-
-select option:checked {
-  background: #2f6fca;
-  color: #ffffff;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #c3d4eb;
-}
-
-input:focus,
-select:focus,
-textarea:focus,
-.panel-top-actions select:focus,
-.accion-select:focus {
-  border: 1px solid rgba(147, 197, 253, 0.85);
-  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
-  transform: none;
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.kpi-card {
-  padding: 12px;
-}
-
-.kpi-card p {
-  margin: 0;
-  color: #d2e1f5;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.45px;
-}
-
-.kpi-card h3 {
-  margin: 10px 0 2px;
-  font-size: 30px;
-  color: #f2f7ff;
-}
-
-.kpi-card small {
-  color: #b8cce9;
-}
-
-.chart-grid,
-.chart-grid-bottom {
-  display: grid;
-  gap: 12px;
-}
-
-.chart-grid {
-  grid-template-columns: 2fr 1fr;
-}
-
-.chart-grid-bottom {
-  margin-top: 12px;
-  grid-template-columns: 1fr 1fr;
-}
-
-.chart-card {
-  padding: 12px;
-  min-height: 290px;
-}
-
-.chart-card h4,
-.solicitudes-head h4 {
-  margin: 0 0 10px;
-  color: #e6f0ff;
-}
-
-.solicitudes-panel {
-  margin-top: 14px;
-  padding: 12px;
-}
-
-.conclusion {
-  margin-top: 15px;
-  padding: 15px;
-  background: rgba(0,0,0,0.2);
-  border-left: 4px solid #3b82f6;
-  border-radius: 8px;
-  color: #eaf2ff;
-  max-height: 180px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.section-title {
-  margin: 16px 0 8px;
-  font-size: 18px;
-  color: #eaf2ff;
-  letter-spacing: 0.3px;
-}
-
-.solicitudes-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.estado-filtros,
-.fila-acciones {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.estado-btn {
-  background: rgba(255, 255, 255, 0.14);
-  color: #e8f1ff;
-}
-
-.estado-btn.active {
-  background: linear-gradient(180deg, #5c87c9 0%, #2d63af 100%);
-}
-
-.solicitudes-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.solicitudes-tools input {
-  min-width: 180px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.24);
-  background: rgba(255,255,255,0.1);
-  color: #eaf2ff;
-}
-
-.solicitudes-tools input::placeholder {
-  color: rgba(234, 242, 255, 0.72);
-}
-
-.tabla-wrapper {
-  overflow: auto;
-}
-
-.tabla-solicitudes {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 780px;
-}
-
-.tabla-solicitudes th,
-.tabla-solicitudes td {
-  text-align: left;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  font-size: 13px;
-  color: #e6f0ff;
-}
-
-.tabla-solicitudes tbody tr {
-  cursor: pointer;
-  transition: background 0.18s ease;
-}
-
-.tabla-solicitudes tbody tr:hover {
-  background: rgba(126, 171, 233, 0.14);
-}
-
-.tabla-solicitudes th {
-  background: rgba(255, 255, 255, 0.12);
-  position: sticky;
-  top: 0;
-}
-
-.badge-estado {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.badge-pendiente {
-  background: rgba(255, 208, 108, 0.23);
-  color: #ffe7af;
-}
-
-.badge-aprobado {
-  background: rgba(73, 196, 145, 0.25);
-  color: #cbf9df;
-}
-
-.badge-rechazado {
-  background: rgba(224, 106, 127, 0.25);
-  color: #ffd0d8;
-}
-
-.badge-anulado {
-  background: rgba(148, 163, 184, 0.25);
-  color: #cbd5e1;
-  border-color: rgba(148, 163, 184, 0.4);
-}
-
-.badge-cerrado {
-  background: rgba(116, 168, 217, 0.25);
-  color: #d9edff;
-}
-
-.accion-aprobar {
-  background: linear-gradient(180deg, #5ca58b 0%, #3a7c66 100%);
-}
-
-.accion-rechazar {
-  background: linear-gradient(180deg, #bc6f80 0%, #975263 100%);
-}
-
-.accion-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-canvas {
-  width: 100% !important;
-  height: 240px !important;
-}
-
-#statusMsg {
-  margin-top: 8px;
-  color: #d5e6ff;
-  font-size: 13px;
-  min-height: 18px;
-}
-
-.detalle-modal {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-  background: rgba(3, 10, 20, 0.72);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow-y: auto;
-  z-index: 999;
-}
-
-.detalle-modal.open {
-  display: flex;
-}
-
-.detalle-modal-card {
-  width: min(860px, 96vw);
-  max-height: 86vh;
-  overflow: auto;
-  padding: 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.2);
-  background: linear-gradient(180deg, rgba(18, 33, 58, 0.95) 0%, rgba(10, 22, 42, 0.95) 100%);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
-}
-
-@media (max-height: 760px) {
-  .detalle-modal {
-    align-items: flex-start;
-    padding-top: 12px;
-    padding-bottom: 12px;
-  }
-
-  .detalle-modal-card {
-    width: min(860px, 98vw);
-    max-height: none;
-  }
-}
-
-.detalle-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.detalle-head h4 {
-  margin: 0;
-  color: #eaf2ff;
-}
-
-.detalle-cerrar {
-  width: auto;
-  min-width: 44px;
-  padding: 6px 10px;
-}
-
-.detalle-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.detalle-item {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.detalle-item span {
-  display: block;
-  font-size: 11px;
-  color: #9ec4ff;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  margin-bottom: 5px;
-}
-
-.detalle-item strong {
-  display: block;
-  font-size: 13px;
-  color: #eef4ff;
-  line-height: 1.35;
-  font-weight: 600;
-}
-
-@keyframes clickPulse {
-  0% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  50% {
-    transform: scale(0.985);
-    filter: brightness(1.05);
-  }
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-}
-
-@media (max-width: 1100px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(150px, 1fr));
-  }
-
-  .chart-grid,
-  .chart-grid-bottom {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    padding: 10px;
-  }
-
-  .menu {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .detalle-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .panel-top {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-</style>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/ui/shell.js"></script>
 </head>
 
-<body>
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="app-shell">
-  <aside class="sidebar">
-    <div class="brand logo-box">
-      <img class="brand-logo" id="brandLogo" src="/Imagenes/09-smg.png" alt="Logo Servicios Mineros">
-    </div>
+<body data-titulo="Dashboard">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-    <div class="menu">
-      <button class="active" type="button" data-panel="dashboard">Dashboard</button>
-      <button type="button" data-panel="solicitud_viaje" onclick="ir('/form')">Solicitud de Viaje</button>
-      <button type="button" data-panel="asignar_recursos" onclick="ir('/recursos_form')">Asignar Recursos</button>
-      <button type="button" data-panel="vehiculos" onclick="ir('/vehiculos_form')">Vehiculos</button>
-      <button type="button" data-panel="personal" onclick="ir('/personal_form')">Personal</button>
-      <button type="button" data-panel="ordenes_salida" onclick="ir('/ordenes_view')">Ordenes de Salida</button>
-      <button type="button" data-panel="gestion_operativa" onclick="ir('/gestion_operativa')">Gestion Operativa</button>
-    </div>
-  </aside>
-
-  <main class="main">
-    <section class="panel card">
-      <div class="panel-top">
-        <h2>KPI <span>Dashboard Operativo</span></h2>
-        <div class="panel-top-actions">
-          <select id="filtroRango" onchange="aplicarFiltros()">
+    <main class="content" id="contenido">
+      <div class="page-head">
+        <div>
+          <h1>Panel operativo</h1>
+          <p class="page-sub">Resumen de viajes, órdenes y recursos de Logística <span id="statusMsg" class="help" role="status"></span></p>
+        </div>
+        <div class="head-actions">
+          <label class="sr-only" for="filtroRango">Período</label>
+          <select id="filtroRango" class="select" onchange="aplicarFiltros()">
             <option value="all">Todo el historial</option>
-            <option value="7">Ultimos 7 dias</option>
-            <option value="30" selected>Ultimos 30 dias</option>
-            <option value="90">Ultimos 90 dias</option>
-            <option value="365">Ultimo ano</option>
+            <option value="7">Últimos 7 días</option>
+            <option value="30" selected>Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="365">Último año</option>
           </select>
-          <select id="filtroDestino" onchange="aplicarFiltros()">
-            <option value="all">Todos los destinos</option>
+          <label class="sr-only" for="filtroDestino">Destino</label>
+          <select id="filtroDestino" class="select" onchange="aplicarFiltros()"><option value="all">Todos los destinos</option></select>
+          <label class="sr-only" for="modoGrafico">Tipo de gráfico</label>
+          <select id="modoGrafico" class="select" onchange="aplicarFiltros()">
+            <option value="bar" selected>Gráficos en barras</option>
+            <option value="line">Gráficos en línea</option>
+            <option value="auto">Transición automática</option>
           </select>
-          <select id="modoGrafico" onchange="aplicarFiltros()">
-            <option value="bar" selected>Graficos en barras</option>
-            <option value="line">Graficos en linea</option>
-            <option value="auto">Auto transicion</option>
-          </select>
-          <button type="button" onclick="resetFiltros()">Reset all filters</button>
+          <button type="button" class="btn btn-ghost" onclick="resetFiltros()">Limpiar filtros</button>
         </div>
       </div>
 
-      <div class="kpi-grid">
-        <article class="kpi-card card">
-          <p>Viajes Totales</p>
-          <h3 id="kpiViajes">0</h3>
-          <small>Solicitudes registradas</small>
+      <!-- ============================== Viajes ============================== -->
+      <section class="kpis" aria-label="Indicadores de viajes">
+        <article class="card kpi"><span class="kpi-label">Viajes totales</span><span id="kpiViajes" class="kpi-value">—</span><span class="kpi-sub">Solicitudes registradas</span></article>
+        <article class="card kpi"><span class="kpi-label">Viajes aprobados</span><span id="kpiAprobados" class="kpi-value">—</span><span class="kpi-sub">Estado aprobado</span></article>
+        <article class="card kpi"><span class="kpi-label">Órdenes emitidas</span><span id="kpiOrdenes" class="kpi-value">—</span><span class="kpi-sub">Órdenes de salida</span></article>
+        <article class="card kpi"><span class="kpi-label">Flota operativa</span><span id="kpiFlota" class="kpi-value">—</span><span class="kpi-sub">Vehículos operativos</span></article>
+      </section>
+      <section class="grid-cards grid-cards-4" aria-label="Gráficos de viajes">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Viajes por estado</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartEstados" role="img" aria-label="Viajes por estado"></canvas></div></div>
         </article>
-
-        <article class="kpi-card card">
-          <p>Viajes Aprobados</p>
-          <h3 id="kpiAprobados">0</h3>
-          <small>Estado APROBADO</small>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Flota operativa vs. no operativa</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartFlota" role="img" aria-label="Flota operativa vs. no operativa"></canvas></div></div>
         </article>
-
-        <article class="kpi-card card">
-          <p>Ordenes Emitidas</p>
-          <h3 id="kpiOrdenes">0</h3>
-          <small>Nro de Orden de Salida</small>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Destinos más solicitados</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartDestinos" role="img" aria-label="Destinos más solicitados"></canvas></div></div>
         </article>
-
-        <article class="kpi-card card">
-          <p>Flota Operativa</p>
-          <h3 id="kpiFlota">0%</h3>
-          <small>Vehiculos operativos SI</small>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Órdenes por fecha</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartOrdenesFecha" role="img" aria-label="Órdenes por fecha"></canvas></div></div>
         </article>
-      </div>
-
-      <div class="chart-grid">
-        <article class="chart-card card">
-          <h4>Viajes por Estado</h4>
-          <canvas id="chartEstados"></canvas>
+      </section>
+      <section class="grid-cards" aria-label="Observaciones de viajes">
+        <article class="card obs">
+          <div class="card-head"><h2 class="card-title"><span class="obs-icon"><svg class="i i-sm"><use href="#i-sparkles"/></svg></span>Observaciones</h2></div>
+          <div class="card-body"><p id="conclusion" class="obs-text muted">Analizando…</p></div>
         </article>
+      </section>
 
-        <article class="chart-card card">
-          <h4>Flota Operativa vs No Operativa</h4>
-          <canvas id="chartFlota"></canvas>
+      <!-- ============================== Vehículos ============================== -->
+      <div class="sec-head"><h2 class="card-title">Vehículos y equipos</h2></div>
+      <section class="kpis" id="vehiculos-kpi-grid" aria-label="Indicadores de vehículos">
+        <article class="card kpi"><span class="kpi-label">Total de equipos</span><span id="kpiVehTotal" class="kpi-value">—</span><span class="kpi-sub">Flota registrada</span></article>
+        <article class="card kpi"><span class="kpi-label">Operativos</span><span id="kpiVehOp" class="kpi-value">—</span><span class="kpi-sub">Estado operativo sí</span></article>
+        <article class="card kpi"><span class="kpi-label">No operativos</span><span id="kpiVehNoOp" class="kpi-value">—</span><span class="kpi-sub">Estado operativo no</span></article>
+        <article class="card kpi"><span class="kpi-label">Cobertura de habilitaciones</span><span id="kpiVehHab" class="kpi-value">—</span><span class="kpi-sub">Sí sobre checks de proyecto</span></article>
+      </section>
+      <section class="grid-cards" aria-label="Gráficos de vehículos">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Equipos por proyecto</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartVehProyecto" role="img" aria-label="Equipos por proyecto"></canvas></div></div>
         </article>
-      </div>
-
-      <div class="chart-grid-bottom">
-        <article class="chart-card card">
-          <h4>Top Destinos Solicitados</h4>
-          <canvas id="chartDestinos"></canvas>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Habilitaciones sí por proyecto</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartVehHabSI" role="img" aria-label="Habilitaciones sí por proyecto"></canvas></div></div>
         </article>
-
-        <article class="chart-card card">
-          <h4>Ordenes por Fecha</h4>
-          <canvas id="chartOrdenesFecha"></canvas>
+        <article class="card obs">
+          <div class="card-head"><h2 class="card-title"><span class="obs-icon"><svg class="i i-sm"><use href="#i-sparkles"/></svg></span>Observaciones</h2></div>
+          <div class="card-body"><p id="conclusionVehiculos" class="obs-text muted">Analizando…</p></div>
         </article>
-      </div>
+      </section>
 
-      <div id="conclusion" class="conclusion"></div>
-
-      <h3 class="section-title">Vehículos y Equipos</h3>
-
-      <div class="kpi-grid" id="vehiculos-kpi-grid">
-        <article class="kpi-card card">
-          <p>Total Equipos</p>
-          <h3 id="kpiVehTotal">0</h3>
-          <small>Flota registrada</small>
+      <!-- ============================== Personal ============================== -->
+      <div class="sec-head"><h2 class="card-title">Personal</h2></div>
+      <section class="kpis" id="personal-kpi-grid" aria-label="Indicadores de personal">
+        <article class="card kpi"><span class="kpi-label">Total de personal</span><span id="kpiPerTotal" class="kpi-value">—</span><span class="kpi-sub">Dotación registrada</span></article>
+        <article class="card kpi"><span class="kpi-label">Con habilitación</span><span id="kpiPerCon" class="kpi-value">—</span><span class="kpi-sub">Al menos una en sí</span></article>
+        <article class="card kpi"><span class="kpi-label">Sin habilitaciones</span><span id="kpiPerSin" class="kpi-value">—</span><span class="kpi-sub">Todas en no</span></article>
+        <article class="card kpi"><span class="kpi-label">Cobertura de habilitaciones</span><span id="kpiPerCobertura" class="kpi-value">—</span><span class="kpi-sub">Sí sobre checks totales</span></article>
+      </section>
+      <section class="grid-cards" aria-label="Gráficos de personal">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Habilitaciones sí por proyecto</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartPerSI" role="img" aria-label="Habilitaciones sí por proyecto"></canvas></div></div>
         </article>
-
-        <article class="kpi-card card">
-          <p>Operativos</p>
-          <h3 id="kpiVehOp">0</h3>
-          <small>Estado operativo SI</small>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Habilitaciones no por proyecto</h2></div>
+          <div class="card-body"><div class="chart-box"><canvas id="chartPerNO" role="img" aria-label="Habilitaciones no por proyecto"></canvas></div></div>
         </article>
-
-        <article class="kpi-card card">
-          <p>No Operativos</p>
-          <h3 id="kpiVehNoOp">0</h3>
-          <small>Estado operativo NO</small>
+        <article class="card obs">
+          <div class="card-head"><h2 class="card-title"><span class="obs-icon"><svg class="i i-sm"><use href="#i-sparkles"/></svg></span>Observaciones</h2></div>
+          <div class="card-body"><p id="conclusionPersonal" class="obs-text muted">Analizando…</p></div>
         </article>
+      </section>
 
-        <article class="kpi-card card">
-          <p>Cobertura Habilitaciones</p>
-          <h3 id="kpiVehHab">0%</h3>
-          <small>SI sobre checks de proyecto</small>
-        </article>
-      </div>
-
-      <div class="chart-grid-bottom">
-        <article class="chart-card card">
-          <h4>Equipos por Proyecto</h4>
-          <canvas id="chartVehProyecto"></canvas>
-        </article>
-
-        <article class="chart-card card">
-          <h4>Habilitaciones SI por Proyecto</h4>
-          <canvas id="chartVehHabSI"></canvas>
-        </article>
-      </div>
-
-      <div id="conclusionVehiculos" class="conclusion"></div>
-
-      <h3 class="section-title">Personal</h3>
-
-      <div class="kpi-grid" id="personal-kpi-grid">
-        <article class="kpi-card card">
-          <p>Total Personal</p>
-          <h3 id="kpiPerTotal">0</h3>
-          <small>Dotación registrada</small>
-        </article>
-
-        <article class="kpi-card card">
-          <p>Con Habilitación</p>
-          <h3 id="kpiPerCon">0</h3>
-          <small>Al menos una en SI</small>
-        </article>
-
-        <article class="kpi-card card">
-          <p>Sin Habilitaciones</p>
-          <h3 id="kpiPerSin">0</h3>
-          <small>Todas en NO</small>
-        </article>
-
-        <article class="kpi-card card">
-          <p>Cobertura Habilitaciones</p>
-          <h3 id="kpiPerCobertura">0%</h3>
-          <small>SI sobre checks totales</small>
-        </article>
-      </div>
-
-      <div class="chart-grid-bottom">
-        <article class="chart-card card">
-          <h4>Habilitaciones SI por Proyecto</h4>
-          <canvas id="chartPerSI"></canvas>
-        </article>
-
-        <article class="chart-card card">
-          <h4>Habilitaciones NO por Proyecto</h4>
-          <canvas id="chartPerNO"></canvas>
-        </article>
-      </div>
-
-      <div id="conclusionPersonal" class="conclusion"></div>
-
-      <section class="solicitudes-panel card">
-        <div class="solicitudes-head">
-          <h4>Solicitudes en fila y aprobacion</h4>
-          <div class="estado-filtros">
-            <button id="estado-all" class="estado-btn active" type="button" onclick="setFiltroEstadoSolicitudes('ALL')">Todas</button>
-            <button id="estado-pendiente" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('PENDIENTE')">Pendientes de Aprobar</button>
-            <button id="estado-aprobado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('APROBADO')">Aprobados</button>
-            <button id="estado-rechazado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('RECHAZADO')">Rechazados</button>
-            <button id="estado-anulado" class="estado-btn" type="button" onclick="setFiltroEstadoSolicitudes('ANULADO')">Anulados</button>
+      <!-- ============================== Solicitudes ============================== -->
+      <section class="card" aria-labelledby="sol-titulo">
+        <div class="card-head"><h2 class="card-title" id="sol-titulo">Solicitudes en fila y aprobación</h2><span class="help">Doble clic en una fila para ver el detalle</span></div>
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="Estado">
+            <button id="estado-all" class="estado-btn active" type="button" aria-pressed="true" onclick="setFiltroEstadoSolicitudes('ALL')">Todas</button>
+            <button id="estado-pendiente" class="estado-btn" type="button" aria-pressed="false" onclick="setFiltroEstadoSolicitudes('PENDIENTE')">Pendientes</button>
+            <button id="estado-aprobado" class="estado-btn" type="button" aria-pressed="false" onclick="setFiltroEstadoSolicitudes('APROBADO')">Aprobadas</button>
+            <button id="estado-rechazado" class="estado-btn" type="button" aria-pressed="false" onclick="setFiltroEstadoSolicitudes('RECHAZADO')">Rechazadas</button>
+            <button id="estado-anulado" class="estado-btn" type="button" aria-pressed="false" onclick="setFiltroEstadoSolicitudes('ANULADO')">Anuladas</button>
           </div>
-          <div class="solicitudes-tools">
-            <input id="buscarSolicitudId" type="number" min="1" step="1" placeholder="Buscar solicitud por ID" onkeydown="if(event.key==='Enter'){verSolicitudPorId();}">
-            <button type="button" onclick="verSolicitudPorId()">Ver por ID</button>
-          </div>
+          <span class="spacer"></span>
+          <div class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="buscarSolicitudId" class="input" type="number" min="1" step="1" placeholder="Buscar solicitud por ID" aria-label="Buscar solicitud por ID" onkeydown="if(event.key==='Enter'){verSolicitudPorId();}"></div>
+          <button type="button" class="btn btn-sm" onclick="verSolicitudPorId()">Ver por ID</button>
         </div>
-
-        <div class="tabla-wrapper">
-          <table class="tabla-solicitudes">
+        <div class="table-wrap">
+          <table class="tbl" id="tablaSolicitudes">
+            <colgroup><col style="width:80px"><col><col style="width:160px"><col><col style="width:116px"><col style="width:116px"><col style="width:320px"></colgroup>
             <thead>
-              <tr>
-                <th>ID</th>
-                <th>Solicitante</th>
-                <th>Area</th>
-                <th>Destino</th>
-                <th>Salida</th>
-                <th>Regreso</th>
-                <th>Estado / Accion</th>
-              </tr>
+              <tr><th>ID</th><th>Solicitante</th><th>Área</th><th>Destino</th><th>Salida</th><th>Regreso</th><th>Estado / acción</th></tr>
             </thead>
             <tbody id="tablaSolicitudesBody"></tbody>
           </table>
         </div>
-        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
-          <span id="solicitudesInfo"></span>
-          <button id="btnMasSolicitudes" type="button" style="display:none;" onclick="mostrarMasSolicitudes()">Mostrar 30 más</button>
+        <div class="tfoot">
+          <span id="solicitudesInfo" class="num">&nbsp;</span>
+          <button id="btnMasSolicitudes" type="button" class="btn btn-sm" hidden onclick="mostrarMasSolicitudes()">Mostrar 30 más</button>
         </div>
       </section>
-
-      <p id="statusMsg"></p>
-    </section>
-  </main>
-</div>
-
-<div id="detalleSolicitudModal" class="detalle-modal" onclick="cerrarDetalleSolicitud(event)">
-  <div class="detalle-modal-card card">
-    <div class="detalle-head">
-      <h4 id="detalleSolicitudTitulo">Detalle de solicitud</h4>
-      <button type="button" class="detalle-cerrar" onclick="cerrarDetalleSolicitud()">Cerrar</button>
-    </div>
-    <div id="detalleSolicitudContenido" class="detalle-grid"></div>
+    </main>
   </div>
 </div>
+
+<!-- ============================== Detalle de solicitud (drawer) ============================== -->
+<div class="scrim" id="detalleSolicitudModal" hidden onclick="cerrarDetalleSolicitud(event)"></div>
+<aside class="drawer" id="detalleSolicitudDrawer" role="dialog" aria-modal="true" aria-labelledby="detalleSolicitudTitulo" hidden>
+  <div class="drawer-head">
+    <div><h2 id="detalleSolicitudTitulo">Detalle de solicitud</h2><p>Datos de la solicitud y su asignación</p></div>
+    <button type="button" class="btn btn-ghost btn-icon" aria-label="Cerrar" onclick="cerrarDetalleSolicitud()"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body"><div id="detalleSolicitudContenido" class="grid2"></div></div>
+  <div class="drawer-foot"><button type="button" class="btn" onclick="cerrarDetalleSolicitud()">Cerrar</button></div>
+</aside>
 
 <script>
 let chartEstados;
@@ -934,8 +196,8 @@ Chart.defaults.animation = {
   duration: 1100,
   easing: "easeOutCubic"
 };
-Chart.defaults.font.family = "Trebuchet MS, Segoe UI, Tahoma, sans-serif";
-Chart.defaults.color = "#eef4ff";
+SMG.configurarChart();
+const COLOR_TXT = SMG.css("--text-muted"), COLOR_GRID = SMG.css("--border");
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 
 function ir(ruta) {
@@ -989,37 +251,6 @@ function configurarLogo() {
       logo.src = rutas[indiceRuta];
     }
   };
-}
-
-function configurarFondoDashboard() {
-  const capaFondo = document.querySelector(".bg-photo");
-  if (!capaFondo) {
-    return;
-  }
-
-  const rutas = [
-    "/Imagenes/fondo_de_pantalla_dashboard.PNG",
-    "Imagenes/fondo_de_pantalla_dashboard.PNG",
-    "./Imagenes/fondo_de_pantalla_dashboard.PNG",
-    "/Imagenes/fondo_de_pantalla_dashboard.PNG"
-  ];
-
-  const probar = (idx) => {
-    if (idx >= rutas.length) {
-      return;
-    }
-
-    const img = new Image();
-    img.onload = () => {
-      capaFondo.style.backgroundImage = `url('${rutas[idx]}')`;
-    };
-    img.onerror = () => {
-      probar(idx + 1);
-    };
-    img.src = rutas[idx];
-  };
-
-  probar(0);
 }
 
 let usuarioActual = null;
@@ -1140,18 +371,18 @@ function crearGradienteVertical(canvasId, colorTop, colorBottom) {
 function badgeEstado(estado) {
   const valor = (estado || "PENDIENTE").toUpperCase();
   if (valor === "CERRADO") {
-    return '<span class="badge-estado badge-cerrado">CERRADO</span>';
+    return '<span class="chip chip-muted"><span class="chip-dot"></span>Cerrado</span>';
   }
   if (valor === "APROBADO" || valor === "AUTORIZADO") {
-    return '<span class="badge-estado badge-aprobado">APROBADO</span>';
+    return '<span class="chip chip-accent"><span class="chip-dot"></span>Aprobado</span>';
   }
   if (valor === "RECHAZADO") {
-    return '<span class="badge-estado badge-rechazado">RECHAZADO</span>';
+    return '<span class="chip chip-bad"><span class="chip-dot"></span>Rechazado</span>';
   }
   if (valor === "ANULADO") {
-    return '<span class="badge-estado badge-anulado">ANULADO</span>';
+    return '<span class="chip chip-muted"><span class="chip-dot"></span>Anulado</span>';
   }
-  return '<span class="badge-estado badge-pendiente">PENDIENTE</span>';
+  return '<span class="chip chip-warn"><span class="chip-dot"></span>Pendiente</span>';
 }
 
 function obtenerEstadoViaje(viaje) {
@@ -1180,7 +411,7 @@ function renderEstadoAccion(viaje) {
   const badge = badgeEstado(estado);
 
   if (estado === "CERRADO") {
-    return `<div class="fila-acciones">${badge}</div>`;
+    return `<div class="cell-flex">${badge}</div>`;
   }
 
   const opciones = [];
@@ -1232,16 +463,16 @@ function renderEstadoAccion(viaje) {
   }
 
   if (opciones.length === 0) {
-    return `<div class="fila-acciones">${badge}</div>`;
+    return `<div class="cell-flex">${badge}</div>`;
   }
 
-  const placeholder = estado === "PENDIENTE" ? "Seleccionar..." : "Cambiar veredicto...";
+  const placeholder = estado === "PENDIENTE" ? "Seleccionar…" : "Cambiar veredicto…";
   const opcionesHtml = opciones.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
 
   return `
-    <div class="fila-acciones">
+    <div class="cell-flex">
       ${badge}
-      <select class="accion-select" onchange="manejarCambioEstado(this, ${viaje.id})">
+      <select class="select accion-select" aria-label="Cambiar estado" onchange="manejarCambioEstado(this, ${viaje.id})">
         <option value="">${placeholder}</option>
         ${opcionesHtml}
       </select>
@@ -1295,32 +526,30 @@ function abrirDetalleSolicitud(viaje) {
     ["ID", viaje.id],
     ["Estado", obtenerEstadoViaje(viaje)],
     ["Solicitante", viaje.solicitante],
-    ["Area", viaje.area],
+    ["Área", viaje.area],
     ["Origen", viaje.origen],
     ["Destino", viaje.destino],
     ["Motivo", viaje.motivo],
-    ["Fecha salida", viaje.fecha_salida],
-    ["Fecha regreso", viaje.fecha_regreso],
-    ["Fecha creacion", viaje.fecha_creacion],
-    ["Nro orden", viaje.nro_orden_salida],
+    ["Fecha de salida", viaje.fecha_salida],
+    ["Fecha de regreso", viaje.fecha_regreso],
+    ["Fecha de creación", viaje.fecha_creacion],
+    ["N.º de orden", viaje.nro_orden_salida],
     ["Chofer", chofer],
-    ["Vehiculo", vehiculo],
-    ["Acompanantes", acompanantes.join(", ")],
+    ["Vehículo", vehiculo],
+    ["Acompañantes", acompanantes.join(", ")],
     ["Requiere alojamiento", alojamiento],
     ["Medio de pago", recursos.medio_pago],
     ["Alojamiento en recursos", recursos.alojamiento]
   ];
 
   titulo.textContent = `Solicitud ID ${viaje.id ?? ""}`;
+  const largos = new Set(["Motivo", "Acompañantes", "Vehículo"]);
   contenido.innerHTML = campos.map(([label, value]) => `
-    <div class="detalle-item">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value || "-")}</strong>
-    </div>
+    <div class="field${largos.has(label) ? " span2" : ""}">${escapeHtml(label)}<span class="input is-static" title="${escapeHtml(value || "")}">${escapeHtml(value || "—")}</span></div>
   `).join("");
 
-  modal.classList.add("open");
-  document.body.style.overflow = "hidden";
+  modal.hidden = false;
+  document.getElementById("detalleSolicitudDrawer").hidden = false;
   status.textContent = `Mostrando detalle de solicitud ${viaje.id}`;
 }
 
@@ -1332,8 +561,8 @@ function cerrarDetalleSolicitud(event) {
   if (!modal) {
     return;
   }
-  modal.classList.remove("open");
-  document.body.style.overflow = "";
+  modal.hidden = true;
+  document.getElementById("detalleSolicitudDrawer").hidden = true;
 }
 
 function abrirDetalleSolicitudPorId(idViaje) {
@@ -1367,11 +596,11 @@ function renderSolicitudesFila(viajes) {
     : viajesOrdenados.filter(v => obtenerEstadoViaje(v) === filtroEstadoSolicitudes);
 
   if (filtrados.length === 0) {
-    body.innerHTML = '<tr><td colspan="7">No hay solicitudes para el estado seleccionado.</td></tr>';
+    body.innerHTML = '<tr><td class="empty" colspan="7"><b>Sin solicitudes</b>No hay solicitudes para el estado seleccionado.</td></tr>';
     const infoVacio = document.getElementById("solicitudesInfo");
     if (infoVacio) infoVacio.textContent = "";
     const btnVacio = document.getElementById("btnMasSolicitudes");
-    if (btnVacio) btnVacio.style.display = "none";
+    if (btnVacio) btnVacio.hidden = true;
     return;
   }
 
@@ -1380,17 +609,17 @@ function renderSolicitudesFila(viajes) {
   const info = document.getElementById("solicitudesInfo");
   if (info) info.textContent = `Mostrando ${mostrados.length} de ${total}`;
   const btnMas = document.getElementById("btnMasSolicitudes");
-  if (btnMas) btnMas.style.display = total > limiteSolicitudes ? "" : "none";
+  if (btnMas) btnMas.hidden = total <= limiteSolicitudes;
 
   body.innerHTML = mostrados.map(v => {
     return `
-      <tr ondblclick="abrirDetalleSolicitudPorId('${v.id ?? ""}')" title="Doble clic para ver el detalle completo">
-        <td>${v.id ?? ""}</td>
-        <td>${v.solicitante || ""}</td>
-        <td>${v.area || ""}</td>
-        <td>${v.destino || ""}</td>
-        <td>${v.fecha_salida || ""}</td>
-        <td>${v.fecha_regreso || ""}</td>
+      <tr ondblclick="abrirDetalleSolicitudPorId('${escapeHtml(v.id ?? "")}')" title="Doble clic para ver el detalle completo">
+        <td class="mono codigo">${escapeHtml(v.id ?? "")}</td>
+        <td title="${escapeHtml(v.solicitante || "")}"><span class="trunc">${escapeHtml(v.solicitante || "")}</span></td>
+        <td title="${escapeHtml(v.area || "")}">${escapeHtml(v.area || "")}</td>
+        <td title="${escapeHtml(v.destino || "")}"><span class="trunc">${escapeHtml(v.destino || "")}</span></td>
+        <td class="mono">${escapeHtml(v.fecha_salida || "")}</td>
+        <td class="mono">${escapeHtml(v.fecha_regreso || "")}</td>
         <td>${renderEstadoAccion(v)}</td>
       </tr>
     `;
@@ -1409,6 +638,7 @@ function setFiltroEstadoSolicitudes(estado) {
     const btn = document.getElementById(`estado-${key}`);
     if (btn) {
       btn.classList.remove("active");
+      btn.setAttribute("aria-pressed", "false");
     }
   });
 
@@ -1422,6 +652,7 @@ function setFiltroEstadoSolicitudes(estado) {
   const activo = document.getElementById(mapa[estado]);
   if (activo) {
     activo.classList.add("active");
+    activo.setAttribute("aria-pressed", "true");
   }
 
   renderSolicitudesFila(datosFiltrados.viajes);
@@ -1544,13 +775,13 @@ function crearGraficos(viajes, ordenes, vehiculos, modo = "bar") {
       },
       scales: {
         x: {
-          ticks: { color: "#eef4ff" },
+          ticks: { color: COLOR_TXT },
           grid: { display: false }
         },
         y: {
           beginAtZero: true,
-          ticks: { precision: 0, color: "#eef4ff" },
-          grid: { color: "rgba(238,244,255,0.2)" }
+          ticks: { precision: 0, color: COLOR_TXT },
+          grid: { color: COLOR_GRID }
         }
       }
     }
@@ -1579,7 +810,7 @@ function crearGraficos(viajes, ordenes, vehiculos, modo = "bar") {
       plugins: {
         legend: {
           position: "bottom",
-          labels: { color: "#eef4ff" }
+          labels: { color: COLOR_TXT }
         },
         tooltip: {
           backgroundColor: "rgba(16,36,63,0.94)",
@@ -1630,13 +861,13 @@ function crearGraficos(viajes, ordenes, vehiculos, modo = "bar") {
       },
       scales: {
         x: {
-          ticks: { color: "#eef4ff" },
+          ticks: { color: COLOR_TXT },
           grid: { display: false }
         },
         y: {
           beginAtZero: true,
-          ticks: { precision: 0, color: "#eef4ff" },
-          grid: { color: "rgba(238,244,255,0.2)" }
+          ticks: { precision: 0, color: COLOR_TXT },
+          grid: { color: COLOR_GRID }
         }
       }
     }
@@ -1656,7 +887,7 @@ function crearGraficos(viajes, ordenes, vehiculos, modo = "bar") {
     data: {
       labels: labelsOrdenes,
       datasets: [{
-        label: "Ordenes",
+        label: "Órdenes",
         data: seriesOrdenes,
         fill: true,
         tension: 0.42,
@@ -1684,13 +915,13 @@ function crearGraficos(viajes, ordenes, vehiculos, modo = "bar") {
       },
       scales: {
         x: {
-          ticks: { color: "#eef4ff" },
-          grid: { color: "rgba(238,244,255,0.14)" }
+          ticks: { color: COLOR_TXT },
+          grid: { color: COLOR_GRID }
         },
         y: {
           beginAtZero: true,
-          ticks: { precision: 0, color: "#eef4ff" },
-          grid: { color: "rgba(238,244,255,0.2)" }
+          ticks: { precision: 0, color: COLOR_TXT },
+          grid: { color: COLOR_GRID }
         }
       }
     }
@@ -1810,8 +1041,8 @@ function renderVehiculosModulo(vehiculos) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#eef4ff" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { precision: 0, color: "#eef4ff" }, grid: { color: "rgba(238,244,255,0.2)" } }
+        x: { ticks: { color: COLOR_TXT }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: COLOR_TXT }, grid: { color: COLOR_GRID } }
       }
     }
   });
@@ -1834,8 +1065,8 @@ function renderVehiculosModulo(vehiculos) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#eef4ff" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { precision: 0, color: "#eef4ff" }, grid: { color: "rgba(238,244,255,0.2)" } }
+        x: { ticks: { color: COLOR_TXT }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: COLOR_TXT }, grid: { color: COLOR_GRID } }
       }
     }
   });
@@ -1958,8 +1189,8 @@ function renderPersonalModulo(personal) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#eef4ff" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { precision: 0, color: "#eef4ff" }, grid: { color: "rgba(238,244,255,0.2)" } }
+        x: { ticks: { color: COLOR_TXT }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: COLOR_TXT }, grid: { color: COLOR_GRID } }
       }
     }
   });
@@ -1982,8 +1213,8 @@ function renderPersonalModulo(personal) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#eef4ff" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { precision: 0, color: "#eef4ff" }, grid: { color: "rgba(238,244,255,0.2)" } }
+        x: { ticks: { color: COLOR_TXT }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: COLOR_TXT }, grid: { color: COLOR_GRID } }
       }
     }
   });
@@ -2098,7 +1329,7 @@ function aplicarFiltros() {
       autoModeType = autoModeType === "bar" ? "line" : "bar";
       crearGraficos(datosFiltrados.viajes, datosFiltrados.ordenes, datosFiltrados.vehiculos, autoModeType);
     }, 3200);
-    status.textContent = "Filtros aplicados. Auto transicion activa.";
+    status.textContent = "Filtros aplicados. Transición automática activa.";
     return;
   }
 
@@ -2115,7 +1346,7 @@ function resetFiltros() {
 
 async function cargarDashboard() {
   const status = document.getElementById("statusMsg");
-  status.textContent = "Actualizando KPI y graficos...";
+  status.textContent = "Actualizando KPI y gráficos...";
 
   detenerAutoTransicion();
 
@@ -2142,14 +1373,14 @@ async function cargarDashboard() {
   }
 }
 
-configurarFondoDashboard();
 configurarLogo();
 aplicarPermisosPanelLogistica().finally(() => {
   cargarDashboard();
 });
-</script>
 
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !document.getElementById("detalleSolicitudModal").hidden) cerrarDetalleSolicitud();
+});
+</script>
 </body>
 </html>
-

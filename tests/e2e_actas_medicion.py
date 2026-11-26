@@ -78,6 +78,11 @@ with sync_playwright() as p:
     # ---- Equipos con partes en el período
     pagina.click("#am-eq-partes")
     pagina.wait_for_selector("#am-modal.open [data-am-ci='M-25']")
+    ok("filtro de centro de costos en el modal", pagina.locator("#am-eq-cc").count() == 1
+       and "Centro de costos" in pagina.locator("#am-modal thead").inner_text())
+    pagina.select_option("#am-eq-cc", "sin")
+    ok("filtro 'sin centro de costos' muestra los partes históricos", pagina.locator("#am-modal [data-am-ci='M-25']").is_visible())
+    pagina.select_option("#am-eq-cc", "")
     pagina.fill("#am-eq-buscar", "c-")
     captura(pagina, "02_equipos_con_partes", completa=False)
     pagina.fill("#am-eq-buscar", "")
@@ -88,6 +93,10 @@ with sync_playwright() as p:
     pagina.fill("#am-eq-ci", "V-32")
     pagina.click("#am-eq-add")
     pagina.wait_for_selector("[data-am-eq-item='3']")
+    ok("CI escrito toma el centro de costos del seguimiento", pagina.input_value("[data-am-eq-cc='3']") == "209", pagina.input_value("[data-am-eq-cc='3']"))
+    ok("equipo del modal sin centro de costos = todos", pagina.input_value("[data-am-eq-cc='0']") == "")
+    pagina.select_option("[data-am-eq-cc='3']", "")
+    esperar_calculo(pagina)
     filas = pagina.locator("#am-equipos tbody tr b").all_inner_texts()
     ok("equipos agregados (modal + CI escrito)", sorted(f for f in filas if "-" in f) == ["C-16", "C-28", "M-25", "V-32"], str(filas))
     cis = [x for x in filas if "-" in x]

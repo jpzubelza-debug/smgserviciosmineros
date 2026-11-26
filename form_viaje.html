@@ -1,304 +1,71 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Solicitud de Viaje</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    .bg-photo {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-      opacity: 0.66;
-      pointer-events: none;
-    }
-
-    .bg-blur {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-        radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-    }
-
-    .card {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      max-width: 560px;
-      padding: 25px;
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.66);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      transition: none;
-    }
-
-    .card:hover {
-      transform: none;
-    }
-
-    .logo-corner {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 3;
-      padding: 0;
-    }
-
-    .logo-corner img {
-      display: block;
-      width: 195px;
-      max-width: 38vw;
-      height: auto;
-    }
-
-    .logo-box img { filter: none; }
-
-    .logo-text {
-      color: #ffffff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-    }
-
-    h2 {
-      text-align: center;
-      color: #ffffff;
-      margin-bottom: 20px;
-    }
-
-    form {
-      width: 100%;
-    }
-
-    label {
-      color: #ddd;
-      font-size: 13px;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0 15px 0;
-      border-radius: 8px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(2, 6, 23, 0.55);
-      color: white;
-      outline: none;
-      font-size: 14px;
-      transition: border-color 0.2s ease;
-    }
-
-    select option,
-    select optgroup {
-      background: #0f2237;
-      color: #eef4ff;
-    }
-
-    select option:checked {
-      background: #2f6fca;
-      color: #ffffff;
-    }
-
-    select[multiple] {
-      min-height: 120px;
-    }
-
-    .helper-text {
-      margin-top: -10px;
-      margin-bottom: 12px;
-      color: #d6e7ff;
-      font-size: 12px;
-      opacity: 0.9;
-    }
-
-    .acompanantes-selector {
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    .acompanantes-selector select {
-      margin: 8px 0 0 0;
-    }
-
-    .acompanantes-selector button {
-      width: auto;
-      white-space: nowrap;
-      margin: 8px 0 0 0;
-      padding: 12px 16px;
-    }
-
-    .lista-acompanantes {
-      list-style: none;
-      margin: 0 0 15px 0;
-      padding: 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .lista-acompanantes:empty::after {
-      content: "Sin acompañantes agregados";
-      color: #9fb3c8;
-      font-size: 13px;
-      font-style: italic;
-    }
-
-    .lista-acompanantes li {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(59, 130, 246, 0.18);
-      border: 1px solid rgba(147, 197, 253, 0.45);
-      border-radius: 999px;
-      padding: 6px 8px 6px 14px;
-      color: #eef4ff;
-      font-size: 13px;
-    }
-
-    .lista-acompanantes .quitar-acompanante {
-      width: auto;
-      padding: 2px 9px;
-      border-radius: 999px;
-      background: rgba(239, 68, 68, 0.85);
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: rgba(147, 197, 253, 0.85);
-      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
-    }
-
-    input::placeholder,
-    textarea::placeholder {
-      color: #bbb;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    button:hover {
-      transform: none;
-      box-shadow: none;
-    }
-
-    #mensaje {
-      color: #dff5ff;
-      text-align: center;
-      margin-top: 10px;
-    }
-
-    @media (max-width: 768px) {
-      .card {
-        margin: 10px;
-        padding: 20px;
-      }
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitud de viaje · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
 </head>
 
-<body>
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="logo-corner logo-box">
-  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
-</div>
-<div class="card">
-  <h2>Solicitud de Viaje</h2>
+<body data-titulo="Solicitud de viaje">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-<form id="form">
-  <label>Solicitante</label>
-  <input type="text" id="solicitante" placeholder="Solicitante" required>
+    <main class="content" id="contenido">
+      <div class="page-head">
+        <div>
+          <h1>Solicitud de viaje</h1>
+          <p class="page-sub">Completá los datos del viaje para enviarlo a aprobación</p>
+        </div>
+      </div>
 
-  <label>Área</label>
-  <input type="text" id="area" list="areas" required>
-  <datalist id="areas">
-    <option value="Mantenimiento">
-    <option value="Operaciones">
-    <option value="Logística">
-  </datalist>
-
-  <label>Origen</label>
-  <input type="text" id="origen" placeholder="Origen" required>
-
-  <label>Destino</label>
-  <input type="text" id="destino" list="destinos" required>
-  <datalist id="destinos">
-    <option value="Pirquitas">
-    <option value="Exar">
-    <option value="SDJ">
-    <option value="Rincón">
-    <option value="ARLI">
-  </datalist>
-
-  <label>Motivo</label>
-  <textarea id="motivo" placeholder="Motivo" required rows="3" style="resize: vertical;"></textarea>
-
-  <label>Fecha salida</label>
-  <input type="date" id="fecha_salida" required>
-
-  <label>Fecha regreso</label>
-  <input type="date" id="fecha_regreso" required>
-
-  <label>Chofer</label>
-  <select id="chofer" required>
-    <option value="">Seleccione un chofer</option>
-  </select>
-
-  <label>Vehiculo</label>
-  <select id="vehiculo" required>
-    <option value="">Seleccione un vehiculo</option>
-  </select>
-
-  <label>Acompanantes</label>
-  <div class="acompanantes-selector">
-    <select id="acompanante-agregar">
-      <option value="">Seleccione...</option>
-    </select>
-    <button type="button" id="btn-agregar-acompanante">Agregar</button>
+      <form id="form" class="card form-narrow form" novalidate autocomplete="off">
+        <div class="card-head"><h2 class="card-title">Datos del viaje</h2></div>
+        <div class="card-body">
+          <fieldset>
+            <legend>Solicitud</legend>
+            <div class="form-grid">
+              <label class="field">Solicitante<input type="text" id="solicitante" class="input" placeholder="Nombre y apellido" required></label>
+              <label class="field">Área<input type="text" id="area" class="input" list="areas" required></label>
+              <label class="field">Origen<input type="text" id="origen" class="input" required></label>
+              <label class="field">Destino<input type="text" id="destino" class="input" list="destinos" required></label>
+              <label class="field span-all">Motivo<textarea id="motivo" class="textarea" rows="3" required></textarea></label>
+              <label class="field">Fecha de salida<input type="date" id="fecha_salida" class="input" required></label>
+              <label class="field">Fecha de regreso<input type="date" id="fecha_regreso" class="input" required></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Recursos</legend>
+            <div class="form-grid">
+              <label class="field">Chofer<select id="chofer" class="select" required><option value="">Seleccione un chofer</option></select></label>
+              <label class="field">Vehículo<select id="vehiculo" class="select" required><option value="">Seleccione un vehículo</option></select></label>
+              <div class="field span-all">
+                <label for="acompanante-agregar">Acompañantes</label>
+                <div class="cell-flex">
+                  <select id="acompanante-agregar" class="select"><option value="">Seleccione…</option></select>
+                  <button type="button" class="btn" id="btn-agregar-acompanante"><svg class="i i-sm"><use href="#i-plus"/></svg>Agregar</button>
+                </div>
+                <div id="lista-acompanantes" class="chip-list" aria-live="polite"></div>
+              </div>
+              <label class="field">Requiere alojamiento<select id="alojamiento" class="select" required><option value="NO" selected>No</option><option value="SI">Sí</option></select></label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="card-foot">
+          <span id="mensaje" class="help" role="status"></span>
+          <span class="spacer"></span>
+          <button type="submit" class="btn btn-primary">Enviar solicitud</button>
+        </div>
+      </form>
+      <datalist id="areas"><option value="Mantenimiento"><option value="Operaciones"><option value="Logística"></datalist>
+      <datalist id="destinos"><option value="Pirquitas"><option value="Exar"><option value="SDJ"><option value="Rincón"><option value="ARLI"></datalist>
+    </main>
   </div>
-  <ul id="lista-acompanantes" class="lista-acompanantes"></ul>
-
-  <label>Requiere alojamiento</label>
-  <select id="alojamiento" required>
-    <option value="NO" selected>NO</option>
-    <option value="SI">SI</option>
-  </select>
-
-  <button type="submit">Enviar</button>
-
-  <p id="mensaje"></p>
-</form>
+</div>
 
 <script>
 let personalBase = [];
@@ -345,14 +112,12 @@ let acompanantesSeleccionados = [];
 
 function renderListaAcompanantes() {
   const lista = document.getElementById("lista-acompanantes");
-  lista.innerHTML = "";
+  lista.innerHTML = acompanantesSeleccionados.length ? "" : '<span class="help">Sin acompañantes agregados</span>';
   acompanantesSeleccionados.forEach(nombre => {
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <span>${nombre}</span>
-      <button type="button" class="quitar-acompanante" title="Quitar">&times;</button>
-    `;
-    li.querySelector(".quitar-acompanante").addEventListener("click", () => {
+    const li = document.createElement("span");
+    li.className = "chip";
+    li.innerHTML = `<span>${SMG.escapeHtml(nombre)}</span><button type="button" class="chip-x" aria-label="Quitar ${SMG.escapeHtml(nombre)}">${SMG.icon("x", "i-sm")}</button>`;
+    li.querySelector(".chip-x").addEventListener("click", () => {
       acompanantesSeleccionados = acompanantesSeleccionados.filter(n => n !== nombre);
       renderListaAcompanantes();
       actualizarOpcionesAcompanantes();
@@ -376,7 +141,7 @@ function actualizarOpcionesAcompanantes() {
   selectAgregar.innerHTML = "";
   const opcionVacia = document.createElement("option");
   opcionVacia.value = "";
-  opcionVacia.textContent = "Seleccione...";
+  opcionVacia.textContent = "Seleccione…";
   selectAgregar.appendChild(opcionVacia);
 
   personalBase
@@ -461,6 +226,7 @@ document.getElementById("btn-agregar-acompanante").addEventListener("click", agr
 
 document.getElementById("form").addEventListener("submit", async function(e) {
   e.preventDefault();
+  if (!this.reportValidity()) return;
 
   try {
     const fechaSalida = document.getElementById("fecha_salida").value;
@@ -468,12 +234,12 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     const hoy = obtenerHoyLocal();
 
     if (fechaSalida < hoy) {
-      alert("La fecha de salida debe ser hoy o posterior");
+      SMG.toast("La fecha de salida debe ser hoy o posterior", "error");
       return;
     }
 
     if (fechaRegreso < fechaSalida) {
-      alert("La fecha de regreso no puede ser menor que la de salida");
+      SMG.toast("La fecha de regreso no puede ser menor que la de salida", "error");
       return;
     }
 
@@ -500,9 +266,10 @@ document.getElementById("form").addEventListener("submit", async function(e) {
     });
 
     const result = await res.json();
+    if (!res.ok || result.error) throw new Error(result.error || result.detail || `Error ${res.status}`);
 
-    document.getElementById("mensaje").innerText =
-      "Viaje creado correctamente (ID: " + result.id + ")";
+    document.getElementById("mensaje").innerText = "Viaje creado correctamente (ID: " + result.id + ")";
+    SMG.toast("Viaje creado correctamente (ID: " + result.id + ")");
 
     document.getElementById("form").reset();
     acompanantesSeleccionados = [];
@@ -511,9 +278,11 @@ document.getElementById("form").addEventListener("submit", async function(e) {
 
   } catch (error) {
     console.error("ERROR:", error);
-    alert("Error al enviar");
+    SMG.toast("Error al enviar la solicitud", "error");
   }
 });
+
+renderListaAcompanantes();
 
 // Auto-resize textarea motivo
 document.getElementById("motivo").addEventListener("input", function() {
@@ -524,12 +293,8 @@ document.getElementById("motivo").addEventListener("input", function() {
 configurarRestriccionesFechas();
 cargarPersonalYVehiculos().catch(error => {
   console.error("No se pudieron cargar Personal/Vehiculos:", error);
-  document.getElementById("mensaje").innerText = "No se pudieron cargar opciones de chofer y vehiculo";
+  document.getElementById("mensaje").innerText = "No se pudieron cargar opciones de chofer y vehículo";
 });
 </script>
-
-</div>
-
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

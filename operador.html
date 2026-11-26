@@ -121,7 +121,7 @@
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
     background: var(--surface); border-top: 1px solid var(--line);
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
     padding-bottom: var(--safe-b);
   }
   .tabbar button { background: none; border: 0; padding: 9px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: .78rem; font-weight: 600; }
@@ -206,6 +206,8 @@
   .submit-bar .btn { max-width: 612px; margin: 0 auto; display: block; box-shadow: 0 6px 18px rgba(29, 78, 216, .35); }
 
   .alert { border-radius: 11px; padding: 10px 12px; font-size: .92rem; margin-bottom: 12px; }
+  .mt-item { border: 1px solid var(--line); border-radius: 11px; padding: 8px 10px 10px; margin-bottom: 10px; }
+  .mt-aviso { background: var(--warn-soft); color: var(--warn); border-radius: 9px; padding: 8px 10px; margin-top: 6px; font-size: .85rem; }
   .alert.err { background: var(--danger-soft); color: var(--danger); }
   .alert.info { background: var(--brand-soft); color: var(--text); }
 
@@ -467,6 +469,7 @@
           <label>Equipo (CI) <span class="req">*</span></label>
           <button type="button" class="picker-btn" data-picker="ci"><span class="val ph">Elegir equipo</span></button>
         </div>
+        <div id="mt-aviso-eq" class="alert info" hidden></div>
         <div class="field">
           <label>Acoplado <small>(opcional)</small></label>
           <button type="button" class="picker-btn" data-picker="acoplado"><span class="val ph">Sin acoplado</span></button>
@@ -582,6 +585,7 @@
         <div class="field">
           <label for="f-nov">Novedades <small>(opcional)</small></label>
           <textarea id="f-nov" name="novedades" class="input" maxlength="1000" placeholder="Fallas, demoras, observaciones…"></textarea>
+          <p class="help" style="margin:6px 0 0">¿Es una falla del equipo o un problema de la obra? <button type="button" class="link" id="mt-desde-parte" style="padding:0">Reportala en Novedades</button> para que tenga seguimiento.</p>
         </div>
         <div class="field">
           <label>Firma del parte <small>(supervisor del cliente)</small></label>
@@ -623,6 +627,32 @@
         <button class="btn ghost" type="button" id="pg-next">Siguiente ›</button>
       </div>
     </div>
+
+    <!-- Novedades: de un equipo o de una obra; sin repetir las que ya están abiertas -->
+    <div id="view-novedades" hidden>
+      <div class="list-head"><h2>Novedades</h2></div>
+      <div class="section">
+        <button type="button" class="picker-btn" id="mt-obj"><span class="val ph">Elegir equipo</span></button>
+      </div>
+      <div id="mt-pend"></div>
+      <div class="section" id="mt-nueva" hidden>
+        <h3>Novedades nuevas de este equipo</h3>
+        <p class="help" style="margin:0 0 8px">Una falla por ítem; podés cargar varias y enviarlas juntas. Si pegás un texto con varios renglones, cada renglón queda como un ítem.</p>
+        <div id="mt-items"></div>
+        <button type="button" class="btn ghost" id="mt-mas">+ Agregar otro ítem</button>
+        <button type="button" class="btn" id="mt-enviar">Enviar novedad</button>
+      </div>
+      <div class="list-head"><h2>Mis novedades</h2></div>
+      <div id="mt-mias"></div>
+    </div>
+
+    <!-- Mantenimiento: OT asignadas al mecánico -->
+    <div id="view-mto" hidden>
+      <div class="list-head"><h2>Mis órdenes de trabajo</h2></div>
+      <div id="mto-lista"></div>
+      <div class="list-head"><h2>Historial <small style="font-weight:400;color:var(--muted)">(últimos 90 días)</small></h2></div>
+      <div id="mto-hist"></div>
+    </div>
   </main>
 
   <nav class="tabbar">
@@ -634,6 +664,12 @@
     </button>
     <button type="button" data-tab="lista">
       <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Mis partes
+    </button>
+    <button type="button" data-tab="novedades">
+      <svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Novedades
+    </button>
+    <button type="button" data-tab="mto" hidden>
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg>Mantenimiento
     </button>
   </nav>
 </section>
@@ -813,17 +849,28 @@
     $('me-legajo').textContent = me.legajo;
     $('boot').hidden = true; $('auth').hidden = true; $('app').hidden = false;
     if (!state.meta) state.meta = await api('/operador/api/metadata');
+    const visibles = state.meta.pestanas_visibles || {};
+    document.querySelectorAll('.tabbar button').forEach((b) => {
+      b.hidden = b.dataset.tab === 'mto' ? true : visibles[b.dataset.tab] === false;
+    });
     armarFormulario();
-    cambiarTab('inicio');
+    cambiarTab(['inicio', 'nuevo', 'lista', 'novedades'].find((tab) => visibles[tab] !== false) || 'inicio');
+    mtRevisarMecanico();
   }
 
   function cambiarTab(tab) {
+    const boton = document.querySelector(`.tabbar button[data-tab="${tab}"]`);
+    if (!boton || boton.hidden) return;
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     $('view-inicio').hidden = tab !== 'inicio';
     $('view-nuevo').hidden = tab !== 'nuevo';
     $('view-lista').hidden = tab !== 'lista';
+    $('view-novedades').hidden = tab !== 'novedades';
+    $('view-mto').hidden = tab !== 'mto';
     window.scrollTo(0, 0);
     if (tab === 'lista') cargarLista(true);
+    if (tab === 'novedades') mtCargarNovedades();
+    if (tab === 'mto') mtCargarOrdenes();
     if (tab === 'inicio') cargarResumen();
   }
 
@@ -1190,6 +1237,7 @@
   $('f-foto-galeria').addEventListener('change', () => usarFoto($('f-foto-galeria')));
 
   function resetFormulario(intentarBorrador) {
+    $('mt-aviso-eq').hidden = true;
     form.reset();
     quitarFoto();
     const borrador = intentarBorrador ? store.get(DRAFT_KEY) : null;
@@ -1227,6 +1275,7 @@
   // Trae el último horómetro/km final del equipo. Completa los iniciales solo si están
   // vacíos (no pisa lo que el operador ya escribió o lo recuperado del borrador).
   async function precargarIniciales(ci) {
+    mtAvisoEquipo(ci);
     $('hs-hint').textContent = ''; $('km-hint').textContent = '';
     state.ultimos = { ci, hs: null, km: null };
     try {
@@ -1333,7 +1382,7 @@
         state.ultimos = { ci: '', hs: null, km: null };
         $('hs-hint').textContent = ''; $('km-hint').textContent = '';
         recalcular();
-        if (b.dataset.v) precargarIniciales(b.dataset.v);
+        if (b.dataset.v) precargarIniciales(b.dataset.v); else mtAvisoEquipo('');
       }
     });
     root.querySelector('[data-close]').addEventListener('click', (e) => { if (e.target.dataset.close !== undefined) cerrarSheet(); });
@@ -1540,6 +1589,331 @@
       '<button class="btn ghost" type="button" data-cancel>Cerrar</button>');
     } catch (err) { toast(err.message, 'err'); }
   });
+
+
+  // ---------- mantenimiento: novedades (todos) y OT (mecánicos) ----------
+  const MT_ESTADO_EQ = { OPERATIVO: 'Operativo', FUNCIONAL: 'Funcional', FUERA_DE_SERVICIO: 'Fuera de servicio' };
+  const MT_ESTADO_OT = { ASIGNADA: 'Asignada', EN_CURSO: 'En curso', EN_ESPERA: 'En espera', EN_REVISION: 'En revisión', FINALIZADA: 'Finalizada', ANULADA: 'Anulada' };
+  const MT_ESTADO_NOV = { ABIERTA: 'Abierta', EN_OT: 'En OT', CERRADA: 'Cerrada' };
+  const MT_EVENTO = { CREADA: 'OT creada', ASIGNACION: 'Asignación', INICIO: 'Inicio', AVANCE: 'Avance', ESPERA: 'En espera',
+    CORRECCION_FINAL: 'Corrección final', DEVOLUCION: 'Devuelta por el administrador', FINALIZADA: 'Finalizada', ANULADA: 'Anulada', COMENTARIO: 'Comentario', FOTO: 'Foto', REPUESTO: 'Repuesto' };
+  const mtFotos = (lista) => (lista || []).length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">${lista.map((f) => `<a href="/operador/api/mt/fotos/${f.id}" target="_blank" rel="noopener"><img src="/operador/api/mt/fotos/${f.id}" alt="Foto" loading="lazy" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></a>`).join('')}</div>` : '';
+  async function mtSubirFoto(url, archivo) {
+    const envio = new FormData();
+    envio.append('foto', await comprimirFoto(archivo), 'foto.jpg');
+    return api(url, { method: 'POST', body: envio });
+  }
+  const mtFecha = (t) => (t ? `${t.slice(8, 10)}/${t.slice(5, 7)} ${t.slice(11, 16)}` : '');
+  const mtDias = (d) => (d === 0 ? 'hoy' : d === 1 ? 'hace 1 día' : `hace ${d} días`);
+  state.mt = { tipo: 'EQUIPO', ci: '', cc: '', mecanico: false, reloj: null };
+
+  // Aviso en «Nuevo parte»: estado del equipo (Fuera de servicio no bloquea) y novedades pendientes.
+  async function mtAvisoEquipo(ci) {
+    const box = $('mt-aviso-eq');
+    box.hidden = true; box.innerHTML = '';
+    if (!ci) return;
+    try {
+      const r = await api(`/operador/api/mt/novedades?ci=${encodeURIComponent(ci)}`);
+      if (state.picks.ci !== ci) return;
+      const partes = [];
+      if (r.equipo && r.equipo.estado === 'FUERA_DE_SERVICIO') partes.push(`<b>Este equipo figura Fuera de servicio.</b> Podés cargar el parte igual.${r.equipo.estado_motivo ? `<br><small>${esc(r.equipo.estado_motivo)}</small>` : ''}`);
+      else if (r.equipo && r.equipo.estado === 'FUNCIONAL') partes.push('<b>Equipo funcional:</b> trabaja con una novedad abierta o una restricción.');
+      if (r.novedades.length) partes.push(`${r.novedades.length === 1 ? 'Tiene 1 novedad pendiente' : `Tiene ${r.novedades.length} novedades pendientes`}.`);
+      partes.push(`<button type="button" class="link" id="mt-ir-nov">${r.novedades.length ? 'Ver o confirmar novedades' : 'Reportar una novedad'}</button>`);
+      box.className = `alert ${r.equipo && r.equipo.estado === 'FUERA_DE_SERVICIO' ? 'err' : 'info'}`;
+      box.innerHTML = partes.join(' ');
+      box.hidden = false;
+      $('mt-ir-nov').addEventListener('click', () => { state.mt.tipo = 'EQUIPO'; state.mt.ci = ci; cambiarTab('novedades'); });
+    } catch { /* el parte se carga igual */ }
+  }
+
+  function mtElegir(titulo, opciones, alElegir) {
+    abrirHoja(titulo, `<input class="input" id="mt-q" type="search" placeholder="Buscar…" autocomplete="off" style="margin-bottom:8px"><div id="mt-opts"></div>`);
+    const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const pintar = () => {
+      const f = norm($('mt-q').value.trim());
+      const vis = opciones.filter((o) => !f || norm(o.t).includes(f)).slice(0, 200);
+      $('mt-opts').innerHTML = vis.map((o) => `<button type="button" class="opt" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('') || '<div class="empty">Sin resultados</div>';
+    };
+    pintar();
+    $('mt-q').addEventListener('input', pintar);
+    $('mt-opts').addEventListener('click', (e) => { const b = e.target.closest('.opt'); if (b) { cerrarSheet(); alElegir(b.dataset.v); } });
+  }
+
+  function mtPintarObjetivo() {
+    const m = state.mt;
+    const eq = state.meta.equipos.find((e) => e.ci === m.ci);
+    const txt = eq ? eq.display : '';
+    $('mt-obj').innerHTML = `<span class="val ${txt ? '' : 'ph'}">${esc(txt || 'Elegir equipo')}</span>`;
+  }
+
+  async function mtCargarNovedades() {
+    mtPintarObjetivo();
+    const m = state.mt;
+    const q = m.ci && `ci=${encodeURIComponent(m.ci)}`;
+    $('mt-pend').innerHTML = q ? '<div class="empty">Cargando…</div>' : '';
+    $('mt-nueva').hidden = !q;
+    if (q) { mtPintarItems(); state.mt.items.forEach((x) => { if (x.desc.trim()) mtRevisar(x); }); }
+    if (q) {
+      try {
+        const r = await api(`/operador/api/mt/novedades?${q}`);
+        const estado = r.equipo ? `<div class="alert ${r.equipo.estado === 'FUERA_DE_SERVICIO' ? 'err' : 'info'}">Estado del equipo: <b>${esc(MT_ESTADO_EQ[r.equipo.estado])}</b>${r.equipo.ubicacion ? ` · ${esc(r.equipo.ubicacion)}` : ''}</div>` : '';
+        $('mt-pend').innerHTML = estado + (r.novedades.length
+          ? `<p class="help" style="margin:0 0 8px">Si es el mismo problema, tocá <b>Sigue igual</b> en lugar de cargarlo de nuevo.</p>${r.novedades.map((n) => `
+            <div class="parte" style="cursor:default">
+              <div class="top"><span class="date">${esc(n.descripcion)}</span><span class="badge ${n.estado === 'EN_OT' ? 'ok' : 'pend'}">${esc(MT_ESTADO_NOV[n.estado])}${n.ot_numero ? ` · ${esc(n.ot_numero)}` : ''}</span></div>
+              <div class="meta">Reportada ${mtDias(n.dias)} por ${esc(n.reportada_por)} · ${n.confirmaciones || 0} confirmación(es)</div>
+              <button type="button" class="btn ghost" data-conf="${n.id}" style="margin-top:8px">Sigue igual</button>
+            </div>`).join('')}`
+          : '<div class="empty" style="padding:16px">No hay novedades pendientes.</div>');
+        $('mt-pend').querySelectorAll('[data-conf]').forEach((b) => b.addEventListener('click', async () => {
+          b.disabled = true;
+          try { await api(`/operador/api/mt/novedades/${b.dataset.conf}/confirmar`, { method: 'POST', body: JSON.stringify({}) }); toast('Gracias, quedó confirmada.', 'ok'); mtCargarNovedades(); } catch (err) { b.disabled = false; toast(err.message, 'err'); }
+        }));
+      } catch (err) { $('mt-pend').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+    }
+    try {
+      const mias = await api('/operador/api/mt/mis-novedades');
+      $('mt-mias').innerHTML = mias.length ? mias.map((n) => `
+        <div class="parte" style="cursor:default">
+          <div class="top"><span class="date">${esc(n.objetivo)}</span><span class="badge ${n.estado === 'CERRADA' ? 'ok' : 'pend'}">${esc(MT_ESTADO_NOV[n.estado])}${n.ot_numero ? ` · ${esc(n.ot_numero)} ${esc(MT_ESTADO_OT[n.ot_estado] || '')}` : ''}</span></div>
+          <div class="meta">${esc(n.descripcion)}</div>
+          <div class="meta">${n.estado === 'CERRADA' ? 'Cerrada' : `Abierta ${mtDias(n.dias)}`}${n.resolucion ? ` · ${esc(n.resolucion)}` : ''}</div>
+          ${n.informe_url || n.ot_estado === 'FINALIZADA' ? `<a href="${esc(n.informe_url || `/operador/api/mt/ordenes/${n.ot_id}/informe`)}" target="_blank" rel="noopener">Ver Informe ${esc(n.ot_numero || '')}${n.ci ? ` - ${esc(n.ci)}` : ''}</a>` : ''}
+        </div>`).join('') : '<div class="empty" style="padding:16px">Todavía no reportaste novedades.</div>';
+    } catch { $('mt-mias').innerHTML = ''; }
+  }
+
+  // Varios ítems por envío (un reporte del equipo elegido). Si se pega un texto con renglones, cada renglón es un ítem.
+  // Mientras se escribe avisa si se parece a otra novedad del equipo: no bloquea (puede ser otra pieza, p. ej. otra cubierta).
+  const MT_RELLENO = /^(buen[oa]s|sin m[aá]s|saludos?|atte\b|atentamente|p\/?\s?d\b|se env[ií]a)/i;
+  function mtParsear(texto) {
+    const bloques = [{ encabezado: '', items: [] }];
+    let anterior = '';
+    for (const cruda of String(texto).split(/\r?\n/)) {
+      const linea = cruda.replace(/^[\s\-–—•*·>]+/, '').trim();
+      if (!linea || MT_RELLENO.test(linea)) { anterior = ''; continue; }
+      if (/:$/.test(linea)) { bloques.push({ encabezado: linea, items: [] }); anterior = ''; continue; }
+      const actual = bloques[bloques.length - 1];
+      const limpio = linea.replace(/[,;]+$/, '').trim();
+      if (actual.items.length && anterior && !/[.,;:]$/.test(anterior) && /^[a-zñáéíóú]/.test(limpio)) actual.items[actual.items.length - 1] += ` ${limpio}`;
+      else actual.items.push(limpio);
+      anterior = linea;
+    }
+    return bloques.filter((b) => b.items.length);
+  }
+  const mtItem = (desc = '') => ({ desc, urg: false, foto: null, parecidas: [] });
+  state.mt.items = [mtItem()];
+
+  function mtParHtml(it) {
+    if (!it.parecidas.length) return '';
+    return `<div class="mt-aviso">Se parece a ${it.parecidas.length === 1 ? 'otra novedad' : 'otras novedades'} de este equipo. Si es la misma, tocá <b>Es la misma</b>; si es otra pieza o lugar, dejala: se envía igual.
+      ${it.parecidas.map((p) => `<div style="margin-top:6px"><b>${esc(p.descripcion)}</b><br><small>${esc(MT_ESTADO_NOV[p.estado])} · reportada ${mtDias(p.dias)}</small>
+        ${p.estado !== 'CERRADA' ? `<br><button type="button" class="link" data-misma="${p.id}">Es la misma (sigue igual)</button>` : ''}</div>`).join('')}</div>`;
+  }
+  function mtCuenta() {
+    const n = state.mt.items.filter((it) => it.desc.trim()).length;
+    $('mt-enviar').textContent = n > 1 ? `Enviar ${n} novedades` : 'Enviar novedad';
+  }
+  function mtPintarItems() {
+    const m = state.mt;
+    if (!m.items.length) m.items.push(mtItem());
+    $('mt-items').innerHTML = m.items.map((it, i) => `<div class="mt-item" data-i="${i}">
+        <div style="display:flex;justify-content:space-between;align-items:center"><small class="help" style="margin:0">Ítem ${i + 1}</small>${m.items.length > 1 ? '<button type="button" class="link" data-quitar>Quitar</button>' : ''}</div>
+        <textarea class="input" data-desc maxlength="2000" placeholder="Describí la falla (una por ítem)">${esc(it.desc)}</textarea>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:4px">
+          <label><input type="checkbox" data-urg ${it.urg ? 'checked' : ''}> Es urgente</label>
+          <button type="button" class="link" data-foto>${it.foto ? 'Foto lista (cambiar)' : 'Agregar foto (opcional)'}</button>
+          <input type="file" accept="image/*" capture="environment" hidden data-foto-in>
+        </div>
+        <div data-par>${mtParHtml(it)}</div>
+      </div>`).join('');
+    mtCuenta();
+  }
+  async function mtRevisar(it) {
+    const texto = it.desc; const ci = state.mt.ci;
+    let lista = [];
+    if (ci && texto.trim().length >= 4) {
+      try { lista = await api(`/operador/api/mt/novedades/parecidas?ci=${encodeURIComponent(ci)}&descripcion=${encodeURIComponent(texto)}`); } catch { lista = []; }
+    }
+    if (it.desc !== texto || state.mt.ci !== ci) return;
+    it.parecidas = lista;
+    const i = state.mt.items.indexOf(it);
+    const el = i >= 0 && $('mt-items').querySelector(`[data-i="${i}"] [data-par]`);
+    if (el) el.innerHTML = mtParHtml(it);
+  }
+  const mtItemDe = (el) => state.mt.items[Number(el.closest('[data-i]').dataset.i)];
+  const mtTimers = new Map();
+  $('mt-items').addEventListener('input', (e) => {
+    const ta = e.target.closest('[data-desc]'); if (!ta) return;
+    const it = mtItemDe(ta);
+    it.desc = ta.value; mtCuenta();
+    clearTimeout(mtTimers.get(it));
+    mtTimers.set(it, setTimeout(() => mtRevisar(it), 700));
+  });
+  $('mt-items').addEventListener('change', (e) => {
+    if (e.target.matches('[data-urg]')) mtItemDe(e.target).urg = e.target.checked;
+    if (e.target.matches('[data-foto-in]')) { mtItemDe(e.target).foto = e.target.files[0] || null; mtPintarItems(); }
+  });
+  $('mt-items').addEventListener('paste', (e) => {
+    const ta = e.target.closest('[data-desc]'); if (!ta) return;
+    const texto = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/\n/.test(texto.trim())) return;
+    e.preventDefault();
+    const partes = mtParsear(texto);
+    if (partes.filter((p) => p.encabezado).length > 1) { toast('El texto trae varios equipos. Pegá solo los ítems de este equipo (o cargalo desde la web).', 'err'); return; }
+    const lineas = partes.flatMap((p) => p.items);
+    if (!lineas.length) return;
+    const it = mtItemDe(ta); const i = state.mt.items.indexOf(it);
+    state.mt.items.splice(it.desc.trim() ? i + 1 : i, it.desc.trim() ? 0 : 1, ...lineas.map(mtItem));
+    mtPintarItems();
+    state.mt.items.forEach((x) => { if (x.desc.trim()) mtRevisar(x); });
+    toast(`Se agregaron ${lineas.length} ítems.`, 'ok');
+  });
+  $('mt-items').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.matches('[data-quitar]')) { state.mt.items.splice(state.mt.items.indexOf(mtItemDe(b)), 1); mtPintarItems(); }
+    else if (b.matches('[data-foto]')) b.closest('[data-i]').querySelector('[data-foto-in]').click();
+    else if (b.matches('[data-misma]')) {
+      const it = mtItemDe(b);
+      b.disabled = true;
+      try {
+        await api(`/operador/api/mt/novedades/${b.dataset.misma}/confirmar`, { method: 'POST', body: JSON.stringify({ comentario: it.desc.trim().slice(0, 500) }) });
+        state.mt.items.splice(state.mt.items.indexOf(it), 1);
+        toast('Gracias, quedó confirmada la que ya estaba.', 'ok');
+        mtCargarNovedades();
+      } catch (err) { b.disabled = false; toast(err.message, 'err'); }
+    }
+  });
+  $('mt-mas').addEventListener('click', () => {
+    state.mt.items.push(mtItem()); mtPintarItems();
+    const tas = $('mt-items').querySelectorAll('[data-desc]'); tas[tas.length - 1].focus();
+  });
+
+  $('mt-obj').addEventListener('click', () => {
+    mtElegir('Equipo', state.meta.equipos.map((e) => ({ v: e.ci, t: e.display })), (v) => { state.mt.ci = v; mtCargarNovedades(); });
+  });
+  $('mt-enviar').addEventListener('click', async (e) => {
+    const m = state.mt;
+    const llenos = m.items.filter((it) => it.desc.trim());
+    if (!m.ci) { toast('Elegí el equipo.', 'err'); return; }
+    if (!llenos.length) { toast('Describí al menos una falla.', 'err'); return; }
+    e.target.disabled = true;
+    try {
+      const items = llenos.map((it) => ({ tipo: 'EQUIPO', ci: m.ci, descripcion: it.desc.trim(), prioridad: it.urg ? 'URGENTE' : 'NORMAL' }));
+      const r = await api('/operador/api/mt/novedades/reporte', { method: 'POST', body: JSON.stringify({ items }) });
+      let fallas = 0;
+      for (const [i, n] of r.novedades.entries()) {
+        if (llenos[i].foto) { try { await mtSubirFoto(`/operador/api/mt/novedades/${n.id}/fotos`, llenos[i].foto); } catch { fallas += 1; } }
+      }
+      m.items = [mtItem()];
+      if (fallas) toast(`Se enviaron, pero ${fallas} foto(s) no se pudieron subir.`, 'err');
+      else toast(llenos.length > 1 ? `Se enviaron ${llenos.length} novedades.` : 'Novedad enviada.', 'ok');
+      mtCargarNovedades();
+    } catch (err) { toast(err.message, 'err'); }
+    e.target.disabled = false;
+  });
+  $('mt-desde-parte').addEventListener('click', () => {
+    if (state.picks.ci) { state.mt.tipo = 'EQUIPO'; state.mt.ci = state.picks.ci; }
+    cambiarTab('novedades');
+  });
+
+  // --- OT del mecánico ---
+  async function mtCargarOrdenes() {
+    $('mto-lista').innerHTML = '<div class="empty">Cargando…</div>';
+    try {
+      const ots = await api('/operador/api/mt/ordenes');
+      $('mto-lista').innerHTML = ots.length ? ots.map((o) => `
+        <button type="button" class="parte" data-ot="${o.id}">
+          <div class="top"><span class="date">${esc(o.numero)} · ${esc(o.objetivo)}</span><span class="badge ${o.estado === 'EN_REVISION' ? 'ok' : 'pend'}">${esc(MT_ESTADO_OT[o.estado])}</span></div>
+          <div class="meta">${esc(o.titulo)}</div>
+          <div class="nums"><span><b>${fmt(o.horas, 2)}</b> hs</span>${o.prioridad === 'URGENTE' ? '<span class="badge pend">Urgente</span>' : ''}${o.cronometro ? '<span class="badge app">Cronómetro en marcha</span>' : ''}</div>
+        </button>`).join('') : '<div class="empty">No tenés órdenes de trabajo asignadas.</div>';
+    } catch (err) { $('mto-lista').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+    try {
+      const hist = await api('/operador/api/mt/historial');
+      $('mto-hist').innerHTML = hist.length ? hist.map((o) => `
+        <button type="button" class="parte" data-ot="${o.id}">
+          <div class="top"><span class="date">${esc(o.numero)} · ${esc(o.objetivo)}</span><span class="badge ${o.estado === 'FINALIZADA' ? 'ok' : 'pend'}">${esc(MT_ESTADO_OT[o.estado])}</span></div>
+          <div class="meta">${esc(o.titulo)}</div>
+          <div class="nums"><span>Cerrada ${mtFecha(o.cerrada_en)}</span><span>Mis horas: <b>${fmt(o.mis_horas, 2)}</b></span></div>
+        </button>`).join('') : '<div class="empty">Todavía no tenés OT cerradas en los últimos 90 días.</div>';
+    } catch { $('mto-hist').innerHTML = ''; }
+  }
+  $('mto-lista').addEventListener('click', (e) => { const b = e.target.closest('[data-ot]'); if (b) mtAbrirOrden(b.dataset.ot); });
+  $('mto-hist').addEventListener('click', (e) => { const b = e.target.closest('[data-ot]'); if (b) mtAbrirOrden(b.dataset.ot); });
+
+  async function mtAbrirOrden(id) {
+    clearInterval(state.mt.reloj);
+    let o;
+    try { o = await api(`/operador/api/mt/ordenes/${id}`); } catch (err) { toast(err.message, 'err'); return; }
+    const editable = !['EN_REVISION', 'FINALIZADA', 'ANULADA'].includes(o.estado);
+    const devuelta = o.eventos.find((e) => e.tipo === 'DEVOLUCION');
+    abrirHoja(`${o.numero} · ${MT_ESTADO_OT[o.estado]}`, `
+      <p style="margin:0 0 4px"><b>${esc(o.objetivo)}</b></p>
+      <p style="margin:0 0 10px">${esc(o.titulo)}${!(o.tareas || []).length && o.descripcion && o.descripcion !== o.titulo ? `<br><small>${esc(o.descripcion)}</small>` : ''}</p>
+      ${(o.tareas_estado || []).length ? `<div class="alert info"><b>Tareas del preventivo</b> <small>(${o.tareas_estado.filter((t) => t.hecha).length} de ${o.tareas_estado.length} hechas)</small>
+        ${o.tareas_estado.map((t) => `<label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px"><input type="checkbox" data-tarea="${t.orden}" ${t.hecha ? 'checked' : ''} ${editable ? '' : 'disabled'} style="width:22px;height:22px;flex:0 0 auto;margin:0"><span>${esc(t.texto)}</span></label>`).join('')}</div>` : ''}
+      ${devuelta && o.estado === 'EN_CURSO' ? `<div class="alert err">Devuelta: ${esc(devuelta.texto)}</div>` : ''}
+      ${o.estado === 'EN_REVISION' ? '<div class="alert info">La OT está en revisión. Solo el administrador de Mantenimiento la finaliza.</div>' : ''}
+      ${o.estado === 'FINALIZADA' ? `<div class="alert info">Finalizada ${mtFecha(o.finalizada_en)} por ${esc(o.finalizada_por || '')}. Mis horas: <b>${fmt(o.mis_horas, 2)}</b>.</div>` : ''}
+      ${o.estado === 'ANULADA' ? '<div class="alert err">OT anulada.</div>' : ''}
+      ${o.informe_url || o.estado === 'FINALIZADA' ? `<p class="alert info"><a href="/operador/api/mt/ordenes/${o.id}/informe" target="_blank" rel="noopener">Ver Informe ${esc(o.numero)}${o.ci ? ` - ${esc(o.ci)}` : ''}</a></p>` : mtFotos([...(o.novedad ? o.novedad.fotos : []), ...o.fotos])}
+      ${editable ? `<div class="section" style="text-align:center">
+        <div class="help">Mis horas en esta OT</div><div id="mto-reloj" style="font-size:1.8rem;font-weight:700">${fmt(o.mis_horas, 2)} h</div>
+        <button type="button" class="btn ${o.cronometro ? 'ghost' : ''}" id="mto-crono">${o.cronometro ? 'Pausar' : 'Iniciar'}</button></div>
+        <div class="field"><label for="mto-txt">Avance, motivo de espera o corrección final</label><textarea id="mto-txt" class="input" maxlength="2000" placeholder="¿Qué hiciste?"></textarea></div>
+        <button type="button" class="btn ghost" data-acc="avance">Cargar avance</button>
+        <input type="file" id="mto-foto" accept="image/*" capture="environment" hidden>
+        <button type="button" class="btn ghost" id="mto-foto-btn">Agregar foto</button>
+        <button type="button" class="btn ghost" data-acc="espera">Poner en espera (repuestos, etc.)</button>
+        <button type="button" class="btn" data-acc="final">Corrección final: terminé</button>` : ''}
+      <h3 style="margin:16px 0 6px;font-size:.78rem;text-transform:uppercase;color:var(--muted)">Historial</h3>
+      ${o.eventos.map((e) => `<div class="meta" style="margin-bottom:6px"><b>${esc(MT_EVENTO[e.tipo] || e.tipo)}</b> · ${esc(e.autor)} · ${mtFecha(e.creado_en)}${e.texto ? `<br>${esc(e.texto)}` : ''}</div>`).join('')}`,
+    '<button class="btn ghost" type="button" data-cancel>Cerrar</button>');
+    $('sheet-root').querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', () => clearInterval(state.mt.reloj)));
+    $('sheet-root').querySelectorAll('[data-tarea]').forEach((cb) => cb.addEventListener('change', async () => {
+      cb.disabled = true;
+      try {
+        await api(`/operador/api/mt/ordenes/${o.id}/tareas/${cb.dataset.tarea}`, { method: 'POST', body: JSON.stringify({ hecha: cb.checked }) });
+        mtAbrirOrden(o.id);
+      } catch (err) { cb.checked = !cb.checked; cb.disabled = false; toast(err.message, 'err'); }
+    }));
+    if (!editable) return;
+    if (o.cronometro) {
+      const base = Date.now(); const horas = o.mis_horas;
+      state.mt.reloj = setInterval(() => { const el = $('mto-reloj'); if (!el) { clearInterval(state.mt.reloj); return; } el.textContent = `${fmt(horas + (Date.now() - base) / 3600000, 2)} h`; }, 15000);
+    }
+    const hacer = async (accion, boton) => {
+      const texto = $('mto-txt') ? $('mto-txt').value : '';
+      const sinTildar = (o.tareas_estado || []).filter((t) => !t.hecha).length;
+      if (accion === 'final' && !confirm(`${sinTildar ? `Quedan ${sinTildar} tarea(s) del preventivo sin tildar. ` : ''}¿Terminaste el trabajo? La OT pasa a revisión y ya no se puede modificar desde la app.`)) return;
+      boton.disabled = true;
+      try {
+        await api(`/operador/api/mt/ordenes/${o.id}/${accion}`, { method: 'POST', body: JSON.stringify({ texto }) });
+        toast({ iniciar: 'Cronómetro en marcha.', pausar: 'Cronómetro pausado.', avance: 'Avance cargado.', espera: 'OT en espera.', final: 'Enviada a revisión.' }[accion], 'ok');
+        mtCargarOrdenes();
+        mtAbrirOrden(o.id);
+      } catch (err) { boton.disabled = false; toast(err.message, 'err'); }
+    };
+    $('mto-crono').addEventListener('click', (e) => hacer(o.cronometro ? 'pausar' : 'iniciar', e.target));
+    $('mto-foto-btn').addEventListener('click', () => $('mto-foto').click());
+    $('mto-foto').addEventListener('change', async () => {
+      const f = $('mto-foto').files[0]; if (!f) return;
+      const b = $('mto-foto-btn'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
+      try { await mtSubirFoto(`/operador/api/mt/ordenes/${o.id}/fotos`, f); toast('Foto agregada.', 'ok'); mtAbrirOrden(o.id); } catch (err) { b.disabled = false; b.textContent = 'Agregar foto'; toast(err.message, 'err'); }
+    });
+    $('sheet-root').querySelectorAll('[data-acc]').forEach((b) => b.addEventListener('click', () => hacer(b.dataset.acc, b)));
+  }
+
+  async function mtRevisarMecanico() {
+    try {
+      const r = await api('/operador/api/mt/yo');
+      state.mt.mecanico = !!r.es_mecanico;
+      const pestana = document.querySelector('.tabbar [data-tab="mto"]');
+      pestana.hidden = !state.mt.mecanico || state.meta?.pestanas_visibles?.mto === false;
+    } catch { /* sin sección de mantenimiento */ }
+  }
 
   // ---------- arranque ----------
   (async () => {

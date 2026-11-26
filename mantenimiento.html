@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mantenimiento · SMG</title>
+<link rel="stylesheet" href="/ui/app.css">
+<script src="/ui/shell.js"></script>
+<style>
+  /* Mantenimiento sobre el design system (/ui/app.css): acá va solo lo propio del módulo */
+  #vista { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }
+  .small { font-size: 12px; }
+  .faint { color: var(--text-faint); }
+  textarea.input { height: auto; min-height: 64px; padding: var(--s2) var(--s3); resize: vertical; line-height: 1.45; }
+  select.input { appearance: none; -webkit-appearance: none; padding-right: 28px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  .input:disabled { opacity: .6; cursor: not-allowed; }
+  input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+  details > summary { cursor: pointer; }
+  .toolbar .search { flex: 1 1 240px; max-width: 380px; width: auto; }
+  .mt-lista { max-height: calc(100vh - 260px); }
+  /* tablas */
+  table.mt-tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .mt-tbl th { position: sticky; top: 0; z-index: 1; height: 36px; padding: 0 var(--s3); background: var(--surface); border-bottom: 1px solid var(--border-strong);
+    text-align: left; font-size: var(--fs-label); font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+  .mt-tbl td { height: 40px; padding: 8px var(--s3); border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .mt-tbl tbody tr:last-child td { border-bottom: 0; }
+  .mt-tbl tbody tr[data-id], .mt-tbl tbody tr[data-ci] { cursor: pointer; }
+  .mt-tbl tbody tr:hover td { background: var(--surface-2); }
+  .mt-tbl td.num, .mt-tbl th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .drawer .mt-tbl th { position: static; }
+  .drawer .mt-tbl td { height: 36px; padding: 6px 10px; }
+  .mt-scroll { overflow-x: auto; }
+  .empty { cursor: default; }
+  .dias { font-weight: 600; }
+  .dias.alto { color: var(--danger-text); }
+  .dias.medio { color: var(--warning-text); }
+  /* panel lateral */
+  .drawer.mt-drawer { width: min(680px, 100vw); }
+  .drawer-head h2 { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: 18px; }
+  .drawer-body h3 { margin: var(--s5) 0 var(--s2); font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .drawer-body > h3:first-child, .drawer-body > p:first-child { margin-top: 0; }
+  .mt-kv { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--s2) var(--s3); margin: 0; }
+  .mt-kv dt { color: var(--text-faint); }
+  .mt-kv dd { margin: 0; overflow-wrap: anywhere; }
+  .mt-tl { list-style: none; margin: 0 0 0 6px; padding: 0; border-left: 1px solid var(--border-strong); }
+  .mt-tl li { position: relative; padding: 0 0 var(--s3) var(--s4); }
+  .mt-tl li:last-child { padding-bottom: 0; }
+  .mt-tl li::before { content: ""; position: absolute; left: -5px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--accent); }
+  .mt-tl li.DEVOLUCION::before, .mt-tl li.ANULADA::before { border-color: var(--danger); }
+  .mt-tl li.CORRECCION_FINAL::before, .mt-tl li.FINALIZADA::before { border-color: var(--success); }
+  .mt-tl li.ESPERA::before { border-color: var(--warning); }
+  .box { border: 1px solid var(--border); border-radius: var(--r-card); padding: var(--s3); margin-top: var(--s3); background: var(--surface-2); }
+  .box .input, .box .checks { background: var(--surface); }
+  .actions { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; margin-top: var(--s3); }
+  .radio-row { display: flex; gap: var(--s4); flex-wrap: wrap; }
+  .radio-row label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .field > label { color: var(--text-muted); font-size: var(--fs-label); font-weight: 500; }
+  .checks { max-height: 190px; overflow-y: auto; border: 1px solid var(--border-strong); border-radius: var(--r-ctl); padding: 6px 10px; background: var(--bg); }
+  .checks label { display: flex; gap: 8px; align-items: center; padding: 3px 0; cursor: pointer; color: var(--text); font-weight: 400; font-size: 13px; }
+  .checks label[hidden] { display: none; }
+  .tarea { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; cursor: pointer; }
+  .rep-anulado td { color: var(--text-faint); text-decoration: line-through; }
+  .msg { margin-top: 8px; color: var(--danger-text); font-weight: 600; }
+  /* fotos */
+  .fotos { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .fotos img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-ctl); border: 1px solid var(--border); display: block; }
+  /* check list */
+  .ck-row { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 6px 12px; align-items: center; padding: 10px var(--s4); border-bottom: 1px solid var(--border); }
+  .ck-row:last-child { border-bottom: 0; }
+  .ck-row[data-valor] { background: var(--surface-2); }
+  .ck-vals { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ck-vals .chip { height: 28px; padding: 0 12px; cursor: pointer; color: var(--text-muted); background: var(--surface); }
+  .ck-vals .chip:hover { color: var(--text); border-color: var(--text-faint); }
+  .ck-vals .chip.on { border-color: transparent; }
+  .ck-vals .chip.on[data-v=BUENO], .ck-vals .chip.on[data-v=VIGENTE] { background: var(--success-soft); color: var(--success-text); }
+  .ck-vals .chip.on[data-v=REGULAR] { background: var(--warning-soft); color: var(--warning-text); }
+  .ck-vals .chip.on[data-v=MALO], .ck-vals .chip.on[data-v=VENCIDA] { background: var(--danger-soft); color: var(--danger-text); }
+  .ck-vals .chip.on[data-v=NA] { background: var(--surface-3); color: var(--text); }
+  .ck-extra { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .ck-extra[hidden] { display: none; }
+  .ck-sec { margin: var(--s5) 0 var(--s2); font-size: var(--fs-section); font-weight: 600; }
+  /* carga de novedades */
+  .rep-bloque { margin-top: 12px; }
+  .rep-cab { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .rep-cab select { flex: 1; }
+  .rep-item { margin-top: 8px; }
+  .rep-fila { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 6px; align-items: start; }
+  .rep-fila > span { padding-top: 7px; }
+  .rep-fila textarea.input { min-height: 32px; overflow: hidden; }
+  .rep-urg { white-space: nowrap; padding-top: 7px; display: inline-flex; gap: 6px; align-items: center; }
+  .rep-aviso { background: var(--warning-soft); color: var(--warning-text); border-radius: var(--r-ctl); padding: 6px 8px; margin: 4px 0 0; font-size: 12px; }
+  .rep-par { margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .rep-par .btn { height: 26px; padding: 0 var(--s2); font-size: 12px; }
+  .rep-pie { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 14px; }
+  /* panel (indicadores) */
+  .kpi-value small { font-size: 14px; color: var(--text-muted); font-weight: 500; margin-left: 3px; letter-spacing: 0; }
+  .ind-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: var(--s4); }
+  .ind-card, .ind-obs { padding: var(--s4); }
+  .ind-card h3, .ind-obs h3 { margin: 0 0 var(--s3); font-size: var(--fs-section); font-weight: 600; }
+  .ind-card tbody tr { cursor: default; }
+  .ind-eq { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ind-eq a { color: var(--text); text-decoration: none; }
+  .ind-eq a:hover { color: var(--accent); }
+  .ind-barras { display: flex; gap: 6px; align-items: flex-end; height: 168px; margin-bottom: var(--s2); padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .ind-mes { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+  .ind-mes span { font-size: 11px; color: var(--text-faint); }
+  .ind-col { height: 140px; width: 100%; max-width: 34px; display: flex; flex-direction: column-reverse; background: var(--surface-2); border-radius: 4px 4px 0 0; overflow: hidden; }
+  .ind-col i, .ind-barra i { display: block; }
+  .ind-barra { display: flex; height: 8px; min-width: 90px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
+  i.corr { background: var(--warning); } i.prev { background: var(--accent); }
+  i.op { background: var(--success); } i.fu { background: #EAB308; } i.fs { background: var(--danger); }
+  i.ley { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  @media (max-width: 720px) {
+    .grid2, .mt-kv, .ck-row, .ck-extra { grid-template-columns: 1fr; }
+    .rep-fila { grid-template-columns: auto 1fr; }
+    .rep-fila > label, .rep-fila > button { grid-column: 2; justify-self: start; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content" id="mt-root"><section id="vista"></section></main>
+  </div>
+</div>
+<div id="drawer-root"></div>
+
+<script>
+(() => {
+  'use strict';
+  const API = '/api/mantenimiento';
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const fecha = (t) => (t ? `${t.slice(8, 10)}/${t.slice(5, 7)}/${t.slice(2, 4)}` : '—');
+  const fechaHora = (t) => (t ? `${fecha(t)} ${t.slice(11, 16)}` : '—');
+  const num = (n, d = 1) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: d });
+  const ESTADO_EQ = { OPERATIVO: ['Operativo', 'b-ok'], FUNCIONAL: ['Funcional', 'b-warn'], FUERA_DE_SERVICIO: ['Fuera de servicio', 'b-bad'] };
+  const ESTADO_OT = { ASIGNADA: ['Asignada', 'b-info'], EN_CURSO: ['En curso', 'b-info'], EN_ESPERA: ['En espera', 'b-warn'],
+    EN_REVISION: ['En revisión', 'b-warn'], FINALIZADA: ['Finalizada', 'b-ok'], ANULADA: ['Anulada', 'b-mut'] };
+  const ESTADO_NOV = { ABIERTA: ['Abierta', 'b-bad'], EN_OT: ['En OT', 'b-info'], CERRADA: ['Cerrada', 'b-mut'] };
+  const EVENTO = { CREADA: 'OT creada', ASIGNACION: 'Asignación', INICIO: 'Inicio', AVANCE: 'Avance', ESPERA: 'En espera',
+    CORRECCION_FINAL: 'Corrección final', DEVOLUCION: 'Devuelta', FINALIZADA: 'Finalizada', ANULADA: 'Anulada', COMENTARIO: 'Comentario', FOTO: 'Foto', REPUESTO: 'Repuesto' };
+  const ALERTA_TARJA = { SIN_TARJA: ['Sin el día en la Tarja', 'b-warn'], NO_TRABAJADO: ['No trabajado según la Tarja', 'b-bad'], EXCEDE: ['Más horas que la jornada', 'b-warn'] };
+  const CHIP = { 'b-ok': 'chip-ok', 'b-warn': 'chip-warn', 'b-bad': 'chip-bad', 'b-info': 'chip-accent', 'b-mut': 'chip-muted' };
+  const badge = (mapa, k) => { const [t, c] = mapa[k] || [k, 'b-mut']; return `<span class="chip ${CHIP[c] || 'chip-muted'}"><span class="chip-dot"></span>${esc(t)}</span>`; };
+  const dias = (d) => (d === null || d === undefined ? '—' : `<span class="dias ${d >= 7 ? 'alto' : d >= 3 ? 'medio' : ''}">${d} d</span>`);
+
+  const st = { perfil: null, op: null, tab: null, filtros: { nov: 'ABIERTA', ot: 'ACTIVAS', eq: '', cfg: 'general', prev: 'estado', prevest: '', ind: '90' }, buscar: { nov: '', ot: '', eq: '', prev: '' } };
+
+  const toast = (m, err = false) => SMG.toast(m, err ? 'error' : 'ok');
+  async function api(path, opts = {}) {
+    const r = await fetch(path, { credentials: 'same-origin', headers: opts.body ? { 'Content-Type': 'application/json' } : {}, ...opts });
+    let d = null; try { d = await r.json(); } catch { /* sin JSON */ }
+    if (r.status === 401) { location.href = '/login'; throw new Error('Sesión vencida'); }
+    if (!r.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || `Error ${r.status}`);
+    return d;
+  }
+  const post = (p, body, method = 'POST') => api(p, { method, body: JSON.stringify(body || {}) });
+
+  const tienePanel = (p) => !!st.perfil && (st.perfil.es_desarrollador || ((st.perfil.paneles || {}).mantenimiento || []).includes(p));
+  const puede = (p, a) => tienePanel(p) && (st.perfil.es_desarrollador || ((((st.perfil.acciones || {}).mantenimiento || {})[p]) || []).includes(a));
+
+  // Vistas del módulo. La sidebar del shell (/ui/shell.js) navega por hash: /mantenimiento#novedades
+  const TABS = [
+    ['indicadores', 'Panel', pintarIndicadores, 'panel'],
+    ['novedades', 'Novedades', pintarNovedades, 'novedades'],
+    ['ordenes', 'Órdenes de trabajo', pintarOrdenes, 'ordenes'],
+    ['checklist', 'Check list', pintarChecklist, 'checklist'],
+    ['equipos', 'Equipos', pintarEquipos, 'equipos'],
+    ['preventivo', 'Preventivo', pintarPreventivo, 'preventivo'],
+    ['configuracion', 'Configuración', pintarConfig, 'configuracion'],
+  ];
+  const vistaDeHash = () => {
+    const h = location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
+    const t = TABS.find((x) => x[3] === h || x[0] === h);
+    return t ? t[0] : '';
+  };
+  const cabecera = (titulo, sub = '', acciones = '') => `<div class="page-head"><div><h1>${titulo}</h1>${sub ? `<p class="page-sub">${sub}</p>` : ''}</div>${acciones ? `<div class="head-actions">${acciones}</div>` : ''}</div>`;
+  const buscador = (grupo, ph) => `<label class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><input class="input" type="search" data-q placeholder="${ph}" value="${esc(st.buscar[grupo] || '')}"></label>`;
+  const conIcono = (icono, texto) => `<svg class="i" aria-hidden="true"><use href="#i-${icono}"/></svg>${texto}`;
+  const listaHtml = () => '<div class="table-wrap mt-lista" id="tabla"><div class="empty">Cargando…</div></div><div class="tfoot"><span id="tabla-pie"></span></div>';
+  const pie = (n, total) => { const el = $('tabla-pie'); if (el) el.textContent = !total ? '' : n === total ? `${total} registro${total === 1 ? '' : 's'}` : `Mostrando ${n} de ${total}`; };
+
+  async function iniciar() {
+    st.perfil = await api('/me');
+    const visibles = TABS.filter(([k]) => tienePanel(k));
+    if (!visibles.length) { $('vista').innerHTML = '<div class="card empty">No tenés paneles de Mantenimiento habilitados. Pedilos en Administración.</div>'; return; }
+    st.op = await api(`${API}/opciones`);
+    st.visibles = visibles;
+    // El buscador de la topbar filtra la vista abierta
+    SMG.registrarBuscador('Buscar en esta vista…', (q) => { const i = $('vista').querySelector('[data-q]'); if (i) { i.value = q; i.dispatchEvent(new Event('input')); } });
+    window.addEventListener('hashchange', () => { const v = vistaDeHash(); if (v && v !== st.tab) ir(v); });
+    pintarKpis();
+    // Enlace directo a una OT: /mantenimiento/ot/OT-00012 (lo usan el informe y los avisos)
+    const directa = location.pathname.match(/^\/mantenimiento\/ot\/([^/]+)/);
+    let inicial = directa && tienePanel('ordenes') ? 'ordenes' : vistaDeHash();
+    if (!visibles.some(([k]) => k === inicial)) {
+      inicial = visibles[0][0];
+      try { const guardada = localStorage.getItem('mt_tab'); if (visibles.some(([k]) => k === guardada)) inicial = guardada; } catch { /* sin almacenamiento */ }
+    }
+    ir(inicial);
+    if (directa && tienePanel('ordenes')) {
+      try {
+        const ot = (await api(`${API}/ordenes?estado=TODAS`)).find((x) => x.numero === decodeURIComponent(directa[1]));
+        if (ot) abrirOrden(ot.id); else toast(`No se encontró la ${decodeURIComponent(directa[1])}`, true);
+      } catch (e) { toast(e.message, true); }
+    }
+  }
+
+  // Contadores de la sidebar (el GET /resumen también dispara los avisos de preventivo)
+  async function pintarKpis() {
+    try {
+      const r = await api(`${API}/resumen`);
+      SMG.contador('mantenimiento', 'novedades', r.novedades_abiertas);
+      SMG.contador('mantenimiento', 'ordenes', r.ot_activas);
+      SMG.contador('mantenimiento', 'preventivo', r.preventivo ? (r.preventivo.vencidos || 0) + (r.preventivo.proximos || 0) : 0);
+    } catch { /* los contadores son orientativos */ }
+  }
+
+  function ir(tab) {
+    if (!st.visibles.some(([k]) => k === tab)) tab = st.visibles[0][0];
+    st.tab = tab;
+    try { localStorage.setItem('mt_tab', tab); } catch { /* sin almacenamiento */ }
+    const t = TABS.find(([k]) => k === tab);
+    if (location.pathname !== '/mantenimiento' || location.hash.slice(1) !== t[3]) {
+      history.replaceState(null, '', `/mantenimiento#${t[3]}`);
+      SMG.navegacion();
+    }
+    window.scrollTo(0, 0);
+    t[2]();
+  }
+  const refrescar = () => { pintarKpis(); ir(st.tab); };
+
+  function chips(grupo, opciones) {
+    return `<div class="seg" role="group">${opciones.map(([v, t]) => `<button type="button" data-f="${grupo}" data-v="${v}" aria-pressed="${st.filtros[grupo] === v}">${t}</button>`).join('')}</div>`;
+  }
+  function enlazarBarra(grupo, fn) {
+    $('vista').querySelectorAll(`[data-f="${grupo}"]`).forEach((b) => b.addEventListener('click', () => { st.filtros[grupo] = b.dataset.v; fn(); }));
+    const q = $('vista').querySelector('[data-q]');
+    if (q) q.addEventListener('input', () => { st.buscar[grupo] = q.value; fn(true); });
+  }
+  const coincide = (obj, q) => !q || JSON.stringify(obj).toLowerCase().includes(q.toLowerCase());
+
+  // ---------------------------------------------------------------- novedades
+  async function pintarNovedades(soloFiltro) {
+    if (!soloFiltro) {
+      $('vista').innerHTML = `${cabecera('Novedades', 'Reportes de fallas desde la web y la app de operadores',
+          puede('novedades', 'cargar') ? `<button class="btn btn-primary" id="btn-nueva-nov">${conIcono('plus', 'Cargar novedades')}</button>` : '')}
+        <div class="card"><div class="toolbar">${chips('nov', [['ABIERTA', 'Abiertas'], ['EN_OT', 'En OT'], ['CERRADA', 'Cerradas'], ['TODAS', 'Todas']])}
+          ${buscador('nov', 'Buscar equipo, descripción, quién reportó…')}</div>${listaHtml()}</div>`;
+      enlazarBarra('nov', pintarNovedades);
+      const b = $('btn-nueva-nov'); if (b) b.addEventListener('click', formNovedad);
+      st.novedades = await api(`${API}/novedades?estado=${st.filtros.nov}`);
+    }
+    const filas = st.novedades.filter((n) => coincide([n.objetivo, n.descripcion, n.reportada_por, n.ot_numero, n.reporte_id ? `reporte #${n.reporte_id}` : ''], st.buscar.nov));
+    if (!$('tabla')) return; // se cambió de pestaña mientras cargaba
+    $('tabla').innerHTML = filas.length ? `<table class="mt-tbl"><thead><tr><th>#</th><th>Equipo</th><th>Descripción</th><th>Reportó</th><th>Fecha</th>
+      <th>Días</th><th>Confirm.</th><th>Prioridad</th><th>Estado</th></tr></thead><tbody>${filas.map((n) => `
+      <tr data-id="${n.id}"><td class="muted">${n.id}</td><td><b>${esc(n.objetivo)}</b><div class="small muted">${n.origen === 'APP' ? 'Desde la app' : 'Desde la web'}</div></td>
+      <td>${esc(n.descripcion)}</td><td>${esc(n.reportada_por)}${n.reporte_id ? `<div class="small muted">Reporte #${n.reporte_id}</div>` : ''}</td><td class="num">${fecha(n.creada_en)}</td><td class="num">${dias(n.dias)}</td>
+      <td class="num">${n.confirmaciones || 0}</td><td>${n.prioridad === 'URGENTE' ? '<span class="chip chip-bad">Urgente</span>' : '<span class="chip">Normal</span>'}</td>
+      <td>${badge(ESTADO_NOV, n.estado)}${n.ot_numero ? ` <span class="small">${esc(n.ot_numero)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No hay novedades con este filtro.</div>';
+    pie(filas.length, st.novedades.length);
+    $('tabla').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => abrirNovedad(tr.dataset.id)));
+  }
+
+  function opcionesEquipos(sel = '') { return st.op.equipos.map((e) => `<option value="${esc(e.ci)}" ${e.ci === sel ? 'selected' : ''}>${esc(e.display)}</option>`).join(''); }
+  function opcionesCC(sel = '') { return st.op.centros_costos.map((c) => `<option value="${c.id}" ${String(c.id) === String(sel) ? 'selected' : ''}>${esc(c.texto)}${c.proyecto ? ` · ${esc(c.proyecto)}` : ''}</option>`).join(''); }
+  function selectorEstadoEquipo(id, actual = '', conMantener = true) {
+    return `<select class="input" id="${id}">${conMantener ? '<option value="">No cambiar</option>' : ''}${Object.entries(ESTADO_EQ).map(([k, [t]]) => `<option value="${k}" ${k === actual ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  }
+  function checksMecanicos(seleccion = []) {
+    return `<input class="input" style="width:100%;margin-bottom:6px" placeholder="Buscar mecánico por nombre o legajo" data-buscar-mec>
+      <div class="checks" data-mecs>${st.op.personal.map((p) => `<label data-txt="${esc((p.nombre + ' ' + p.legajo).toLowerCase())}"><input type="checkbox" value="${esc(p.legajo)}" ${seleccion.includes(p.legajo) ? 'checked' : ''}> ${esc(p.nombre)} <span class="muted small">${esc(p.legajo)}</span></label>`).join('')}</div>`;
+  }
+  function enlazarMecanicos(root) {
+    const q = root.querySelector('[data-buscar-mec]');
+    if (q) q.addEventListener('input', () => { const t = q.value.toLowerCase(); root.querySelectorAll('[data-mecs] label').forEach((l) => { l.hidden = t && !l.dataset.txt.includes(t); }); });
+  }
+  const mecanicosElegidos = (root) => [...root.querySelectorAll('[data-mecs] input:checked')].map((i) => i.value);
+
+  function fotosHtml(lista, urlSubir) {
+    const imgs = (lista || []).map((f) => `<a href="${API}/fotos/${f.id}" target="_blank" rel="noopener" title="${esc(f.subida_por)} · ${fechaHora(f.subida_en)}"><img src="${API}/fotos/${f.id}" alt="Foto" loading="lazy"></a>`).join('');
+    return `<div class="fotos">${imgs || '<span class="muted">Sin fotos.</span>'}${urlSubir ? `<label class="btn subir">Agregar foto<input type="file" accept="image/jpeg,image/png" hidden data-subir="${urlSubir}"></label>` : ''}</div>`;
+  }
+  function enlazarFotos(root, alTerminar) {
+    root.querySelectorAll('[data-subir]').forEach((inp) => inp.addEventListener('change', async () => {
+      const archivo = inp.files[0]; if (!archivo) return;
+      const fd = new FormData(); fd.append('foto', archivo);
+      try {
+        const r = await fetch(inp.dataset.subir, { method: 'POST', body: fd, credentials: 'same-origin' });
+        let d = null; try { d = await r.json(); } catch { /* sin JSON */ }
+        if (!r.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || `Error ${r.status}`);
+        toast('Foto agregada'); alTerminar();
+      } catch (e) { toast(e.message, true); }
+    }));
+  }
+
+  // Panel lateral del design system: el primer <h2> (y la línea gris que lo sigue) van a la cabecera fija
+  function drawer(html, alAbrir) {
+    st.alCerrar = null; // el formulario puede pedir confirmación antes de cerrarse con datos sin enviar
+    const m = html.match(/^\s*<h2>([\s\S]*?)<\/h2>\s*(?:<div class="muted">([^<]*)<\/div>)?/);
+    const cuerpo = m ? html.slice(m[0].length) : html;
+    $('drawer-root').innerHTML = `<div class="scrim" data-bg></div><aside class="drawer mt-drawer" role="dialog" aria-modal="true">
+      <div class="drawer-head"><div style="min-width:0"><h2>${m ? m[1] : ''}</h2>${m && m[2] ? `<p>${m[2]}</p>` : ''}</div>
+        <button type="button" class="btn btn-ghost btn-icon" data-cerrar title="Cerrar" aria-label="Cerrar"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+      <div class="drawer-body">${cuerpo}</div></aside>`;
+    const root = $('drawer-root');
+    root.querySelector('[data-bg]').addEventListener('click', intentarCerrar);
+    root.querySelector('[data-cerrar]').addEventListener('click', intentarCerrar);
+    if (alAbrir) alAbrir(root.querySelector('.drawer'));
+  }
+  function intentarCerrar() { if (st.alCerrar && !st.alCerrar()) return; cerrarDrawer(); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('drawer-root').firstChild && !SMG.hayDialogoAbierto()) intentarCerrar(); });
+  const cerrarDrawer = () => { st.alCerrar = null; $('drawer-root').innerHTML = ''; };
+  async function accion(boton, fn, okMsg) {
+    boton.disabled = true;
+    try { const r = await fn(); toast(okMsg); return r; } catch (e) { toast(e.message, true); boton.disabled = false; return null; }
+  }
+
+  // ---- carga de novedades: un reporte con uno o más equipos y varios ítems por equipo (cada ítem = una novedad) ----
+  // Texto pegado (mail o WhatsApp del supervisor): cada renglón es un ítem; un renglón que termina en «:» abre un
+  // equipo nuevo y, si trae el código (C28, M 34, M-24), lo elige solo. Saludos y despedidas se descartan.
+  const RE_RELLENO = /^(buen[oa]s|sin m[aá]s|saludos?|atte\b|atentamente|p\/?\s?d\b|se env[ií]a)/i;
+  function codigoEquipo(texto, equipos) {
+    const clave = (letras, num) => `${letras}${Number(num)}`;
+    const mapa = new Map();
+    equipos.forEach((e) => { const m = String(e.ci).toUpperCase().match(/^([A-Z]{1,3})[\s-]*(\d{1,4})$/); if (m) mapa.set(clave(m[1], m[2]), e.ci); });
+    for (const m of String(texto).toUpperCase().matchAll(/\b([A-Z]{1,3})[\s-]?(\d{1,4})\b/g)) {
+      const ci = mapa.get(clave(m[1], m[2]));
+      if (ci) return ci;
+    }
+    return '';
+  }
+  function parsearReporte(texto, equipos) {
+    const bloques = [{ ci: '', encabezado: '', items: [] }];
+    let anterior = '';
+    for (const cruda of String(texto).split(/\r?\n/)) {
+      const linea = cruda.replace(/^[\s\-–—•*·>]+/, '').trim();
+      if (!linea || RE_RELLENO.test(linea)) { anterior = ''; continue; }
+      if (/:$/.test(linea)) {
+        bloques.push({ ci: codigoEquipo(linea, equipos), encabezado: linea.replace(/:$/, '').trim(), items: [] });
+        anterior = '';
+        continue;
+      }
+      const actual = bloques[bloques.length - 1];
+      const limpio = linea.replace(/[,;]+$/, '').trim();
+      // Renglón cortado: sigue en minúscula y el anterior no terminó en puntuación → mismo ítem
+      if (actual.items.length && anterior && !/[.,;:]$/.test(anterior) && /^[a-zñáéíóú]/.test(limpio)) actual.items[actual.items.length - 1] += ` ${limpio}`;
+      else actual.items.push(limpio);
+      anterior = linea;
+    }
+    return bloques.filter((b) => b.items.length);
+  }
+
+  const nuevoItem = (desc = '') => ({ desc, urg: false, fotos: [], parecidas: [] });
+  const nuevoBloque = (ci = '', items = [''], encabezado = '') => ({ ci, encabezado, items: items.map(nuevoItem), pendientes: null });
+  async function subirFoto(url, archivo) {
+    const fd = new FormData(); fd.append('foto', archivo);
+    const r = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
+    let d = null; try { d = await r.json(); } catch { /* sin JSON */ }
+    if (!r.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || `Error ${r.status}`);
+    return d;
+  }
+
+  function formNovedad() {
+    const rep = [nuevoBloque()];
+    drawer(`<h2>Cargar novedades</h2>
+      <p class="muted small">Un reporte puede tener varios equipos y varios ítems por equipo: cada ítem queda como una novedad y se aprueba por separado.
+      Podés pegar el mail del supervisor: cada renglón es un ítem y los renglones que terminan en «:» con el código del equipo (C28, M 34) arman el equipo.</p>
+      <div id="r-bloques"></div>
+      <div class="actions"><button class="btn" id="r-otro">+ Otro equipo</button></div>
+      <div class="actions rep-pie"><button class="btn btn-primary" id="r-enviar">Enviar</button><span class="muted small" id="r-cuenta"></span></div>`, (d) => {
+      const cont = d.querySelector('#r-bloques');
+      st.alCerrar = () => !rep.some((b) => b.items.some((it) => it.desc.trim())) || confirm('Hay ítems sin enviar. ¿Descartarlos?');
+      const pos = (el) => {
+        const b = rep[Number(el.closest('[data-b]').dataset.b)];
+        const fila = el.closest('[data-i]');
+        return [b, fila ? b.items[Number(fila.dataset.i)] : null];
+      };
+      const parHtml = (it) => (it.parecidas.length ? `<div class="rep-aviso">Se parece a ${it.parecidas.length === 1 ? 'otra novedad' : 'otras novedades'} de este equipo. Si es la misma, tocá «Es la misma»; si es otra pieza o lugar, dejala: se carga igual.
+        ${it.parecidas.map((p) => `<div class="rep-par">#${p.id} · ${esc(p.descripcion)} ${badge(ESTADO_NOV, p.estado)} ${p.estado === 'CERRADA' ? `<span class="small">cerrada el ${fecha(p.resuelta_en)}</span>` : dias(p.dias)}
+          ${p.estado !== 'CERRADA' ? `<button class="btn" data-misma="${p.id}">Es la misma (sigue igual)</button>` : ''}</div>`).join('')}</div>` : '');
+      const pendHtml = (b) => {
+        if (!b.ci || !b.pendientes) return '';
+        if (!b.pendientes.length) return '<div class="small muted">Este equipo no tiene novedades pendientes.</div>';
+        return `<details class="small"><summary>${b.pendientes.length} novedad(es) pendiente(s) de este equipo</summary>${b.pendientes.map((n) => `
+          <div class="rep-par">#${n.id} · ${esc(n.descripcion)} ${badge(ESTADO_NOV, n.estado)} ${dias(n.dias)} <button class="btn" data-conf="${n.id}">Sigue igual</button></div>`).join('')}</details>`;
+      };
+      const cuenta = () => {
+        const items = rep.flatMap((b) => b.items.filter((it) => it.desc.trim()));
+        const eqs = rep.filter((b) => b.items.some((it) => it.desc.trim())).length;
+        d.querySelector('#r-cuenta').textContent = items.length ? `${items.length} ítem(s) en ${eqs} equipo(s)` : '';
+      };
+      const ajustarAlto = (ta) => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight + 2}px`; };
+      const pintar = () => {
+        rep.forEach((b) => { if (!b.items.length) b.items.push(nuevoItem()); });
+        cont.innerHTML = rep.map((b, bi) => `<div class="box rep-bloque" data-b="${bi}">
+          <div class="rep-cab"><select class="input" data-ci><option value="">Elegir equipo…</option>${opcionesEquipos(b.ci)}</select>
+            ${rep.length > 1 ? '<button class="btn" data-quitar-b>Quitar equipo</button>' : ''}</div>
+          ${b.encabezado && !b.ci ? `<div class="small rep-aviso">Del texto: «${esc(b.encabezado)}». Elegí el equipo.</div>` : ''}
+          <div data-pend>${pendHtml(b)}</div>
+          ${b.items.map((it, ii) => `<div class="rep-item" data-i="${ii}">
+            <div class="rep-fila"><span class="muted">${ii + 1}.</span>
+              <textarea class="input" rows="1" data-desc maxlength="2000" placeholder="Describí la falla (podés pegar varios renglones)">${esc(it.desc)}</textarea>
+              <label class="small rep-urg"><input type="checkbox" data-urg ${it.urg ? 'checked' : ''}> Urgente</label>
+              <label class="btn">Fotos${it.fotos.length ? ` (${it.fotos.length})` : ''}<input type="file" accept="image/jpeg,image/png" multiple hidden data-fotos></label>
+              <button class="btn" data-quitar-i title="Quitar ítem">×</button></div>
+            <div data-par>${parHtml(it)}</div></div>`).join('')}
+          <div class="actions"><button class="btn" data-mas>+ Ítem</button></div></div>`).join('');
+        cont.querySelectorAll('[data-desc]').forEach(ajustarAlto);
+        cuenta();
+      };
+      const pintarPar = (b, it) => {
+        const bi = rep.indexOf(b); const ii = b.items.indexOf(it);
+        const el = bi >= 0 && ii >= 0 && cont.querySelector(`[data-b="${bi}"] [data-i="${ii}"] [data-par]`);
+        if (el) el.innerHTML = parHtml(it);
+      };
+      const revisar = async (b, it) => {
+        const texto = it.desc;
+        let lista = [];
+        if (b.ci && texto.trim().length >= 4) {
+          try { lista = await api(`${API}/novedades/parecidas?ci=${encodeURIComponent(b.ci)}&descripcion=${encodeURIComponent(texto)}`); } catch { lista = []; }
+        }
+        if (it.desc !== texto) return; // se siguió escribiendo
+        it.parecidas = lista;
+        pintarPar(b, it);
+      };
+      const refrescarBloque = async (b) => {
+        b.pendientes = null;
+        if (b.ci) {
+          try { b.pendientes = await api(`${API}/novedades?estado=PENDIENTES&ci=${encodeURIComponent(b.ci)}`); } catch { b.pendientes = null; }
+        }
+        const bi = rep.indexOf(b);
+        const el = bi >= 0 && cont.querySelector(`[data-b="${bi}"] [data-pend]`);
+        if (el) el.innerHTML = pendHtml(b);
+        for (const it of b.items) await revisar(b, it);
+      };
+      const timers = new Map();
+      cont.addEventListener('input', (e) => {
+        const ta = e.target.closest('[data-desc]'); if (!ta) return;
+        const [b, it] = pos(ta);
+        it.desc = ta.value; ajustarAlto(ta); cuenta();
+        clearTimeout(timers.get(it));
+        timers.set(it, setTimeout(() => revisar(b, it), 600));
+      });
+      cont.addEventListener('change', (e) => {
+        const el = e.target;
+        if (el.matches('[data-ci]')) {
+          const b = rep[Number(el.closest('[data-b]').dataset.b)];
+          b.ci = el.value; pintar(); refrescarBloque(b);
+        } else if (el.matches('[data-urg]')) { pos(el)[1].urg = el.checked; }
+        else if (el.matches('[data-fotos]')) {
+          const it = pos(el)[1];
+          it.fotos = [...el.files].slice(0, 6);
+          if (el.files.length > 6) toast('Hasta 6 fotos por ítem.', true);
+          pintar();
+        }
+      });
+      cont.addEventListener('paste', (e) => {
+        const ta = e.target.closest('[data-desc]'); if (!ta) return;
+        const texto = (e.clipboardData || window.clipboardData).getData('text');
+        if (!/\n/.test(texto.trim())) return;
+        const partes = parsearReporte(texto, st.op.equipos);
+        if (!partes.length) return;
+        e.preventDefault();
+        const [b, it] = pos(ta);
+        const ii = b.items.indexOf(it);
+        let resto = partes;
+        const sueltos = partes[0].encabezado ? [] : partes[0].items;
+        if (!partes[0].encabezado) resto = partes.slice(1);
+        if (it.desc.trim()) b.items.splice(ii + 1, 0, ...sueltos.map(nuevoItem));
+        else b.items.splice(ii, 1, ...sueltos.map(nuevoItem));
+        const tocados = new Set([b]);
+        let agregados = sueltos.length;
+        let bi = rep.indexOf(b);
+        for (const p of resto) {
+          agregados += p.items.length;
+          const existente = p.ci && rep.find((x) => x.ci === p.ci);
+          if (existente) { existente.items = existente.items.filter((x) => x.desc.trim()).concat(p.items.map(nuevoItem)); tocados.add(existente); continue; }
+          const vacio = !b.ci && !b.items.some((x) => x.desc.trim());
+          const nuevo = nuevoBloque(p.ci, p.items, p.encabezado);
+          if (vacio && rep.includes(b)) { rep.splice(bi, 1, nuevo); tocados.delete(b); } else { bi += 1; rep.splice(bi, 0, nuevo); }
+          tocados.add(nuevo);
+        }
+        pintar();
+        tocados.forEach((x) => { if (rep.includes(x)) refrescarBloque(x); });
+        const equipos = resto.length;
+        toast(`Se agregaron ${agregados} ítem(s)${equipos ? ` de ${equipos} equipo(s)` : ''}. Revisá que cada equipo esté bien elegido.`);
+      });
+      cont.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button'); if (!btn) return;
+        if (btn.matches('[data-mas]')) {
+          const b = pos(btn)[0]; b.items.push(nuevoItem()); pintar();
+          const tas = cont.querySelectorAll(`[data-b="${rep.indexOf(b)}"] [data-desc]`); tas[tas.length - 1].focus();
+        } else if (btn.matches('[data-quitar-i]')) {
+          const [b, it] = pos(btn); b.items.splice(b.items.indexOf(it), 1); pintar();
+        } else if (btn.matches('[data-quitar-b]')) {
+          rep.splice(rep.indexOf(pos(btn)[0]), 1); pintar();
+        } else if (btn.matches('[data-conf]')) {
+          const b = pos(btn)[0];
+          if (await accion(btn, () => post(`${API}/novedades/${btn.dataset.conf}/confirmar`, {}), 'Novedad confirmada')) refrescarBloque(b);
+        } else if (btn.matches('[data-misma]')) {
+          const [b, it] = pos(btn);
+          if (await accion(btn, () => post(`${API}/novedades/${btn.dataset.misma}/confirmar`, { comentario: it.desc.trim().slice(0, 500) }), `Novedad #${btn.dataset.misma} confirmada; se quitó el ítem`)) {
+            b.items.splice(b.items.indexOf(it), 1); pintar(); refrescarBloque(b);
+          }
+        }
+      });
+      d.querySelector('#r-otro').addEventListener('click', () => { rep.push(nuevoBloque()); pintar(); });
+      d.querySelector('#r-enviar').addEventListener('click', async (e) => {
+        const items = []; const fotos = [];
+        for (const b of rep) {
+          const llenos = b.items.filter((it) => it.desc.trim());
+          if (!llenos.length) continue;
+          if (!b.ci) { toast('Elegí el equipo de cada grupo de ítems.', true); return; }
+          llenos.forEach((it) => { items.push({ tipo: 'EQUIPO', ci: b.ci, descripcion: it.desc.trim(), prioridad: it.urg ? 'URGENTE' : 'NORMAL' }); fotos.push(it.fotos); });
+        }
+        if (!items.length) { toast('Escribí al menos un ítem.', true); return; }
+        const r = await accion(e.target, () => post(`${API}/novedades/reporte`, { items }), items.length === 1 ? 'Novedad cargada' : `Reporte cargado: ${items.length} novedades`);
+        if (!r) return;
+        let fallas = 0;
+        for (const [i, n] of r.novedades.entries()) {
+          for (const f of fotos[i]) { try { await subirFoto(`${API}/novedades/${n.id}/fotos`, f); } catch { fallas += 1; } }
+        }
+        if (fallas) toast(`Las novedades se cargaron, pero ${fallas} foto(s) no se pudieron subir.`, true);
+        cerrarDrawer(); refrescar();
+      });
+      pintar();
+    });
+  }
+
+  async function abrirNovedad(id) {
+    const n = await api(`${API}/novedades/${id}`);
+    const resolver = n.estado === 'ABIERTA' && puede('novedades', 'aprobar');
+    drawer(`<h2>Novedad #${n.id} ${badge(ESTADO_NOV, n.estado)}</h2><div class="muted">${esc(n.objetivo)}</div>
+      <h3>Detalle</h3><dl class="mt-kv"><dt>Descripción</dt><dd>${esc(n.descripcion)}</dd><dt>Reportó</dt><dd>${esc(n.reportada_por)} · ${n.origen === 'APP' ? 'App' : 'Web'}</dd>
+      <dt>Fecha</dt><dd>${fechaHora(n.creada_en)} · ${dias(n.dias)}</dd><dt>Prioridad</dt><dd>${n.prioridad === 'URGENTE' ? 'Urgente' : 'Normal'}</dd>
+      ${n.resuelta_por ? `<dt>Resolvió</dt><dd>${esc(n.resuelta_por)} · ${fechaHora(n.resuelta_en)}</dd><dt>Resolución</dt><dd>${esc(n.resolucion || '')}</dd>` : ''}
+      ${n.ot_numero ? `<dt>OT</dt><dd><a href="#" data-ot="${n.ot_id}">${esc(n.ot_numero)}</a> ${badge(ESTADO_OT, n.ot_estado)}</dd>` : ''}</dl>
+      ${n.reporte.length ? `<h3>Mismo reporte #${n.reporte_id} (${n.reporte.length + 1} ítems)</h3><ul class="mt-tl">${n.reporte.map((o) => `<li><a href="#" data-nov="${o.id}">#${o.id}</a> · <b>${esc(o.objetivo)}</b> · ${esc(o.descripcion)} ${badge(ESTADO_NOV, o.estado)}</li>`).join('')}</ul>` : ''}
+      <h3>Fotos</h3>${fotosHtml(n.fotos, n.estado !== 'CERRADA' && puede('novedades', 'cargar') ? `${API}/novedades/${n.id}/fotos` : '')}
+      <h3>Confirmaciones (${n.confirmaciones || 0})</h3>${n.confirmaciones_detalle.length ? `<ul class="mt-tl">${n.confirmaciones_detalle.map((c) => `<li><b>${esc(c.autor)}</b> <span class="muted small">${fechaHora(c.creada_en)}</span>${c.comentario ? `<div>${esc(c.comentario)}</div>` : ''}</li>`).join('')}</ul>` : '<div class="muted">Nadie la volvió a confirmar.</div>'}
+      ${resolver ? `<h3>Resolver</h3><div class="box">
+        <div class="radio-row"><label><input type="radio" name="dec" value="OT" checked> Pasa a OT</label><label><input type="radio" name="dec" value="CERRAR"> Cerrar sin OT</label></div>
+        <div id="r-ot"><div class="field" style="margin-top:8px"><label>Mecánicos (al menos uno)</label>${checksMecanicos()}</div>
+          <div class="grid2" style="margin-top:8px"><div class="field"><label>Prioridad</label><select class="input" id="r-prio"><option value="NORMAL" ${n.prioridad === 'NORMAL' ? 'selected' : ''}>Normal</option><option value="URGENTE" ${n.prioridad === 'URGENTE' ? 'selected' : ''}>Urgente</option></select></div>
+          ${n.tipo === 'EQUIPO' ? `<div class="field"><label>Estado del equipo</label>${selectorEstadoEquipo('r-est', '', true)}</div>` : ''}</div></div>
+        <div class="field" style="margin-top:8px"><label id="r-lbl">Observación (opcional)</label><textarea class="input" id="r-txt"></textarea></div>
+        <div class="actions"><button class="btn btn-primary" id="r-ok">Confirmar</button></div></div>` : ''}`, (d) => {
+      d.querySelectorAll('[data-ot]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); abrirOrden(a.dataset.ot); }));
+      d.querySelectorAll('[data-nov]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); abrirNovedad(a.dataset.nov); }));
+      enlazarFotos(d, () => abrirNovedad(n.id));
+      if (!resolver) return;
+      enlazarMecanicos(d);
+      const dec = () => d.querySelector('input[name=dec]:checked').value;
+      d.querySelectorAll('input[name=dec]').forEach((r) => r.addEventListener('change', () => { $('r-ot').hidden = dec() !== 'OT'; $('r-lbl').textContent = dec() === 'OT' ? 'Observación (opcional)' : 'Motivo del cierre'; }));
+      $('r-ok').addEventListener('click', async (e) => {
+        const body = { decision: dec(), resolucion: $('r-txt').value };
+        if (dec() === 'OT') {
+          body.mecanicos = mecanicosElegidos(d); body.prioridad = $('r-prio').value;
+          if (!body.mecanicos.length) { toast('Elegí al menos un mecánico para la OT.', true); return; }
+        }
+        const est = $('r-est'); if (est && est.value) body.estado_equipo = est.value;
+        const r = await accion(e.target, () => post(`${API}/novedades/${n.id}/resolver`, body), dec() === 'OT' ? 'OT creada' : 'Novedad cerrada');
+        if (r) { refrescar(); if (r.ot) abrirOrden(r.ot.id); else cerrarDrawer(); }
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------- órdenes
+  async function pintarOrdenes(soloFiltro) {
+    if (!soloFiltro) {
+      $('vista').innerHTML = `${cabecera('Órdenes de trabajo', 'Hacé clic en una fila para ver el detalle',
+          puede('ordenes', 'gestionar') ? `<button class="btn btn-primary" id="btn-nueva-ot">${conIcono('plus', 'Nueva OT')}</button>` : '')}
+        <div class="card"><div class="toolbar">${chips('ot', [['ACTIVAS', 'Activas'], ['EN_REVISION', 'En revisión'], ['EN_ESPERA', 'En espera'], ['FINALIZADA', 'Finalizadas'], ['TODAS', 'Todas']])}
+          ${buscador('ot', 'Buscar OT, equipo, mecánico…')}</div>${listaHtml()}</div>`;
+      enlazarBarra('ot', pintarOrdenes);
+      const b = $('btn-nueva-ot'); if (b) b.addEventListener('click', formOrden);
+      st.ordenes = await api(`${API}/ordenes?estado=${st.filtros.ot}`);
+    }
+    const filas = st.ordenes.filter((o) => coincide([o.numero, o.objetivo, o.titulo, o.mecanicos], st.buscar.ot));
+    if (!$('tabla')) return; // se cambió de pestaña mientras cargaba
+    $('tabla').innerHTML = filas.length ? `<table class="mt-tbl"><thead><tr><th>OT</th><th>Equipo</th><th>Trabajo</th><th>Mecánicos</th><th>Estado</th>
+      <th>Prioridad</th><th>Días</th><th>Horas</th></tr></thead><tbody>${filas.map((o) => `
+      <tr data-id="${o.id}"><td><b>${esc(o.numero)}</b></td><td>${esc(o.objetivo)}</td><td>${esc(o.titulo)}</td>
+      <td>${o.mecanicos.map((m) => esc(m.nombre)).join(', ') || '<span class="muted">Sin asignar</span>'}</td><td>${badge(ESTADO_OT, o.estado)}</td>
+      <td>${o.prioridad === 'URGENTE' ? '<span class="chip chip-bad">Urgente</span>' : '<span class="chip">Normal</span>'}</td>
+      <td class="num">${dias(o.dias)}</td><td class="num">${num(o.horas)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No hay órdenes con este filtro.</div>';
+    pie(filas.length, st.ordenes.length);
+    $('tabla').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => abrirOrden(tr.dataset.id)));
+  }
+
+  function formOrden() {
+    drawer(`<h2>Nueva OT</h2><p class="muted small">Para trabajos que no vienen de una novedad. Las novedades se pasan a OT desde su ficha.</p>
+      <div class="field"><label>Equipo</label><select class="input" id="o-ci"><option value="">Elegir equipo…</option>${opcionesEquipos()}</select></div>
+      <div class="field" style="margin-top:8px"><label>Trabajo</label><input class="input" id="o-tit" maxlength="200"></div>
+      <div class="field" style="margin-top:8px"><label>Descripción</label><textarea class="input" id="o-desc"></textarea></div>
+      <div class="field" style="margin-top:8px"><label>Prioridad</label><select class="input" id="o-prio"><option value="NORMAL">Normal</option><option value="URGENTE">Urgente</option></select></div>
+      <div class="field" style="margin-top:8px"><label>Mecánicos (al menos uno)</label>${checksMecanicos()}</div>
+      <div class="actions"><button class="btn btn-primary" id="o-ok">Crear OT</button></div>`, (d) => {
+      enlazarMecanicos(d);
+      $('o-ok').addEventListener('click', async (e) => {
+        const body = { ci: $('o-ci').value, titulo: $('o-tit').value, descripcion: $('o-desc').value, prioridad: $('o-prio').value, mecanicos: mecanicosElegidos(d) };
+        if (!body.ci) { toast('Elegí el equipo de la OT.', true); return; }
+        if (!body.mecanicos.length) { toast('Elegí al menos un mecánico para la OT.', true); return; }
+        const r = await accion(e.target, () => post(`${API}/ordenes`, body), 'OT creada');
+        if (r) { refrescar(); abrirOrden(r.id); }
+      });
+    });
+  }
+
+  async function abrirOrden(id) {
+    const o = await api(`${API}/ordenes/${id}`);
+    const abierta = !['FINALIZADA', 'ANULADA'].includes(o.estado);
+    const gestionar = abierta && puede('ordenes', 'gestionar');
+    const finalizar = abierta && puede('ordenes', 'finalizar');
+    const moneda = esc((o.config || {}).moneda || '');
+    drawer(`<h2>${esc(o.numero)} ${badge(ESTADO_OT, o.estado)} ${o.prioridad === 'URGENTE' ? '<span class="chip chip-bad">Urgente</span>' : ''} ${o.tipo === 'PREVENTIVA' ? '<span class="chip chip-accent">Preventiva</span>' : ''}</h2>
+      <div class="muted">${esc(o.objetivo)}</div>
+      <h3>Trabajo</h3><dl class="mt-kv"><dt>Título</dt><dd>${esc(o.titulo)}</dd>${o.tareas_estado.length ? `<dt>Tareas</dt><dd>${o.tareas_estado.map((t) => `<label class="tarea"><input type="checkbox" data-tarea="${t.orden}" ${t.hecha ? 'checked' : ''} ${gestionar ? '' : 'disabled'}>
+          <span>${esc(t.texto)}${t.hecha ? ` <span class="muted small">· ${esc(t.hecha_por || '')} ${fechaHora(t.hecha_en)}</span>` : ''}</span></label>`).join('')}
+          <div class="small muted">${o.tareas_estado.filter((t) => t.hecha).length} de ${o.tareas_estado.length} hechas</div></dd>`
+        : o.descripcion ? `<dt>Descripción</dt><dd>${esc(o.descripcion)}</dd>` : ''}
+      ${o.tipo === 'PREVENTIVA' ? `<dt>Lectura</dt><dd>${esc(lecturaTxt(o.lectura_hs, o.lectura_km))} <span class="muted small">(${o.estado === 'FINALIZADA' ? 'del service' : 'al crear la OT'})</span></dd>` : ''}
+      <dt>Creada</dt><dd>${fechaHora(o.creada_en)} · ${esc(o.creada_por)} · ${dias(o.dias)}</dd>
+      ${o.novedad ? `<dt>Novedad</dt><dd>#${o.novedad.id} · ${esc(o.novedad.descripcion)} <span class="muted small">(${esc(o.novedad.reportada_por)})</span></dd>` : ''}
+      ${o.finalizada_en ? `<dt>Finalizada</dt><dd>${fechaHora(o.finalizada_en)} · ${esc(o.finalizada_por)}</dd>` : ''}
+      ${o.informe_url ? `<dt>Informe</dt><dd><a href="${esc(o.informe_url)}" target="_blank" rel="noopener">Ver informe ${esc(o.numero)}${o.ci ? ` - ${esc(o.ci)}` : ''}</a></dd>` : ''}
+      <dt>Horas</dt><dd><b>${num(o.horas, 2)} h</b></dd>
+      <dt>Costo</dt><dd>Mano de obra ${moneda} ${num(o.costo_mano_obra, 2)} · repuestos ${moneda} ${num(o.costo_repuestos, 2)}${o.repuestos_sin_costo ? ` <span class="muted small">(${o.repuestos_sin_costo} sin costo)</span>` : ''} · <b>total ${moneda} ${num(o.costo_total, 2)}</b></dd></dl>
+      <h3>Mecánicos</h3><div>${o.mecanicos.map((m) => esc(m.nombre)).join(', ') || '<span class="muted">Sin asignar</span>'}</div>
+      ${gestionar ? `<details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--accent)">Cambiar mecánicos</summary>${checksMecanicos(o.mecanicos.map((m) => m.legajo))}<div class="actions"><button class="btn" id="ot-mec">Guardar mecánicos</button></div></details>` : ''}
+      <h3>Repuestos</h3>${repuestosHtml(o, gestionar, moneda)}
+      ${finalizar && o.estado === 'EN_REVISION' ? `<h3>Revisión del administrador</h3><div class="box">
+        <div class="grid2"><div class="field"><label>Estado del equipo al finalizar</label>${o.ci ? selectorEstadoEquipo('ot-est', 'OPERATIVO', false) : '<div class="muted">OT de obra</div>'}</div>
+          ${o.tipo === 'PREVENTIVA' ? `<div class="field"><label>Horómetro del service</label><input class="input" id="ot-lhs" inputmode="numeric" value="${o.lectura_hs ?? ''}"></div>
+          <div class="field"><label>Km del service</label><input class="input" id="ot-lkm" inputmode="numeric" value="${o.lectura_km ?? ''}"></div>` : ''}</div>
+        ${o.tipo === 'PREVENTIVA' ? '<p class="muted small">Al finalizar, el plan vuelve a contar desde esta lectura.</p>' : ''}
+        <div class="field" style="margin-top:8px"><label>Observación</label><textarea class="input" id="ot-obs" placeholder="Obligatoria para devolver"></textarea></div>
+        <div class="actions"><button class="btn btn-primary" id="ot-fin">Finalizar OT</button><button class="btn" id="ot-dev">Devolver al mecánico</button></div></div>` : ''}
+      ${finalizar && o.estado !== 'EN_REVISION' ? `<div class="actions"><button class="btn" id="ot-fin-dir">Finalizar sin esperar la corrección final</button></div>` : ''}
+      <h3>Fotos</h3>${fotosHtml([...(o.novedad ? o.novedad.fotos : []), ...o.fotos], gestionar ? `${API}/ordenes/${o.id}/fotos` : '')}
+      <h3>Historial</h3><ul class="mt-tl">${o.eventos.map((e) => `<li class="${e.tipo}"><b>${esc(EVENTO[e.tipo] || e.tipo)}</b> · ${esc(e.autor)} <span class="muted small">${fechaHora(e.creado_en)}</span>${e.texto ? `<div>${esc(e.texto)}</div>` : ''}</li>`).join('')}</ul>
+      ${gestionar ? `<div class="field"><textarea class="input" id="ot-com" placeholder="Agregar un comentario"></textarea></div><div class="actions"><button class="btn" id="ot-com-ok">Comentar</button><button class="btn" id="ot-anular" style="margin-left:auto;color:var(--danger-text);border-color:var(--danger-text)">Anular OT</button></div>` : ''}
+      <h3>Control contra la Tarja</h3>${(o.control_tarja || []).length ? `<table class="mt-tbl"><thead><tr><th>Día</th><th>Mecánico</th><th>Cronómetro</th><th>Tarja</th><th></th></tr></thead><tbody>${o.control_tarja.map((c) => `<tr><td>${fecha(c.fecha)}</td><td>${esc(c.nombre)}</td><td class="num">${num(c.horas_cronometro, 2)} h</td><td>${c.tarja ? `${esc(c.tarja)} <span class="muted small">(${num(c.horas_tarja, 1)} h)</span>` : '<span class="muted">—</span>'}</td><td>${c.alerta ? badge(ALERTA_TARJA, c.alerta) : '<span class="chip chip-ok">OK</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="muted">Todavía no hay horas del cronómetro.</div>'}
+      <h3>Tiempos del cronómetro</h3>${o.tiempos.length ? `<table class="mt-tbl"><thead><tr><th>Mecánico</th><th>Inicio</th><th>Fin</th><th>Horas</th></tr></thead><tbody>${o.tiempos.map((t) => `<tr><td>${esc(t.nombre)}</td><td>${fechaHora(t.inicio)}</td><td>${t.fin ? fechaHora(t.fin) : '<span class="chip chip-accent">corriendo</span>'}</td><td class="num">${t.fin ? num(t.minutos / 60, 2) : '—'}</td></tr>`).join('')}</tbody></table>` : '<div class="muted">Todavía no hay tiempos.</div>'}`, (d) => {
+      enlazarMecanicos(d);
+      enlazarFotos(d, () => abrirOrden(o.id));
+      enlazarRepuestos(d, o);
+      d.querySelectorAll('[data-tarea]').forEach((cb) => cb.addEventListener('change', async () => {
+        cb.disabled = true;
+        try { await post(`${API}/ordenes/${o.id}/tareas/${cb.dataset.tarea}`, { hecha: cb.checked }, 'PUT'); abrirOrden(o.id); }
+        catch (e) { cb.checked = !cb.checked; cb.disabled = false; toast(e.message, true); }
+      }));
+      const on = (sel, fn) => { const b = d.querySelector(sel); if (b) b.addEventListener('click', fn); };
+      const tras = (r) => { if (r) { refrescar(); abrirOrden(o.id); } };
+      on('#ot-mec', async (e) => {
+        if (!mecanicosElegidos(d).length) { toast('La OT tiene que quedar con al menos un mecánico.', true); return; }
+        tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/mecanicos`, { mecanicos: mecanicosElegidos(d) }, 'PUT'), 'Mecánicos actualizados'));
+      });
+      on('#ot-fin', async (e) => tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/finalizar`, { observacion: $('ot-obs').value, estado_equipo: ($('ot-est') || {}).value, lectura_hs: ($('ot-lhs') || {}).value, lectura_km: ($('ot-lkm') || {}).value }), 'OT finalizada')));
+      on('#ot-dev', async (e) => tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/devolver`, { observacion: $('ot-obs').value }), 'OT devuelta')));
+      on('#ot-fin-dir', async (e) => { if (confirm('¿Finalizar la OT? El equipo vuelve a Operativo.')) tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/finalizar`, {}), 'OT finalizada')); });
+      on('#ot-com-ok', async (e) => tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/comentario`, { texto: $('ot-com').value }), 'Comentario agregado')));
+      on('#ot-anular', async (e) => { const m = prompt('Motivo de la anulación'); if (m) tras(await accion(e.target, () => post(`${API}/ordenes/${o.id}/anular`, { motivo: m }), 'OT anulada')); });
+    });
+  }
+
+  // ---------------------------------------------------------------- preventivo
+  // Planes por horas / km / días (vence lo que ocurra primero), equipos asignados con su último service y
+  // lecturas del horómetro a revisar (retrocesos y saltos detectados al cargar partes).
+  const ESTADO_PREV = { VENCIDO: ['Vencido', 'b-bad'], PROXIMO: ['Próximo', 'b-warn'], REVISAR: ['Revisar lectura', 'b-warn'],
+    SIN_LECTURA: ['Sin lectura', 'b-mut'], AL_DIA: ['Al día', 'b-ok'] };
+  const UNI = { hs: 'h', km: 'km', dias: 'd' };
+  const compTxt = (c) => (c.restante === null ? `cada ${num(c.intervalo, 0)} ${UNI[c.clave]}: sin lectura`
+    : c.restante <= 0 ? `pasado ${num(-c.restante, 0)} ${UNI[c.clave]}` : `faltan ${num(c.restante, 0)} ${UNI[c.clave]}`);
+  const lecturaTxt = (hs, km) => [hs != null ? `${num(hs, 0)} h` : '', km != null ? `${num(km, 0)} km` : ''].filter(Boolean).join(' · ') || '—';
+  const intervaloTxt = (p) => [p.intervalo_hs ? `${num(p.intervalo_hs, 0)} h` : '', p.intervalo_km ? `${num(p.intervalo_km, 0)} km` : '',
+    p.intervalo_dias ? `${p.intervalo_dias} días` : ''].filter(Boolean).join(' / ');
+
+  async function pintarPreventivo(soloFiltro) {
+    const vista = st.filtros.prev;
+    if (!soloFiltro) {
+      $('vista').innerHTML = `${cabecera('Preventivo', 'Vencimientos por horas, km o días: vence lo que ocurra primero',
+          `${chips('prev', [['estado', 'Vencimientos'], ['planes', 'Planes'], ['lecturas', 'Lecturas a revisar']])}
+          ${vista === 'planes' && puede('preventivo', 'gestionar') ? `<button class="btn btn-primary" id="btn-nuevo-plan">${conIcono('plus', 'Nuevo plan')}</button>` : ''}`)}
+        <div class="card"><div class="toolbar">${vista === 'estado' ? chips('prevest', [['', 'Todos'], ['VENCIDO', 'Vencidos'], ['PROXIMO', 'Próximos'], ['REVISAR', 'Revisar lectura']]) : ''}
+          ${buscador('prev', 'Buscar equipo, plan…')}</div>${listaHtml()}</div>`;
+      enlazarBarra('prev', pintarPreventivo);
+      $('vista').querySelectorAll('[data-f="prevest"]').forEach((b) => b.addEventListener('click', () => { st.filtros.prevest = b.dataset.v; pintarPreventivo(); }));
+      const b = $('btn-nuevo-plan'); if (b) b.addEventListener('click', () => formPlan());
+      const url = vista === 'planes' ? `${API}/preventivo/planes` : vista === 'lecturas' ? `${API}/preventivo/lecturas` : `${API}/preventivo`;
+      st.prev = await api(url);
+    }
+    if (!$('tabla') || st.tab !== 'preventivo' || st.filtros.prev !== vista) return; // se cambió de pestaña o de vista mientras cargaba
+    const q = st.buscar.prev;
+    if (vista === 'planes') {
+      const lista = st.prev.filter((p) => coincide([p.nombre, p.descripcion, p.tareas], q));
+      $('tabla').innerHTML = lista.length ? `<table class="mt-tbl"><thead><tr><th>Plan</th><th>Cada (lo que ocurra primero)</th><th>Aviso</th><th>Tareas</th><th>Equipos</th><th></th></tr></thead><tbody>${lista.map((p) => `
+        <tr data-id="${p.id}"><td><b>${esc(p.nombre)}</b>${p.activo ? '' : ' <span class="chip chip-muted">Inactivo</span>'}${p.descripcion ? `<div class="small muted">${esc(p.descripcion)}</div>` : ''}</td>
+        <td>${esc(intervaloTxt(p))}</td><td class="num">${num(p.aviso_pct, 0)}%</td>
+        <td class="small">${p.tareas.map(esc).join(' · ') || '<span class="muted">Sin tareas</span>'}</td><td class="num">${p.equipos}</td>
+        <td>${puede('preventivo', 'gestionar') && p.activo ? `<button class="btn" data-asignar="${p.id}">Asignar equipos</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+        : '<div class="empty">Todavía no hay planes. Creá el primero con «Nuevo plan» (p. ej. Programado simple: aceite y filtros cada 250 h).</div>';
+      pie(lista.length, st.prev.length);
+      $('tabla').querySelectorAll('[data-asignar]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); formAsignar(st.prev.find((p) => String(p.id) === b.dataset.asignar)); }));
+      if (puede('preventivo', 'gestionar')) $('tabla').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => formPlan(st.prev.find((p) => String(p.id) === tr.dataset.id))));
+      return;
+    }
+    if (vista === 'lecturas') {
+      const lista = st.prev.filter((l) => coincide([l.ci, l.mensaje], q));
+      $('tabla').innerHTML = lista.length ? `<table class="mt-tbl"><thead><tr><th>Parte</th><th>Equipo</th><th>Qué se detectó</th><th>Cargado</th><th></th></tr></thead><tbody>${lista.map((l) => `
+        <tr><td class="num">${fecha(l.fecha_parte)}</td><td><b>${esc(l.ci)}</b></td><td>${esc(l.mensaje)}</td>
+        <td class="small muted">${l.origen === 'APP_OPERADOR' ? 'App' : 'Escritorio'} · ${fechaHora(l.creada_en)}</td>
+        <td>${puede('preventivo', 'gestionar') ? `<button class="btn" data-rev="${l.id}">Revisada</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+        : '<div class="empty">No hay lecturas para revisar. Acá aparecen los partes con el horómetro o el km menor que el parte anterior, o con un salto grande.</div>';
+      pie(lista.length, st.prev.length);
+      $('tabla').querySelectorAll('[data-rev]').forEach((b) => b.addEventListener('click', async () => {
+        const nota = prompt('Nota (opcional): qué se corrigió o por qué está bien');
+        if (nota === null) return;
+        if (await accion(b, () => post(`${API}/preventivo/lecturas/${b.dataset.rev}/revisada`, { nota }), 'Lectura revisada')) refrescar();
+      }));
+      return;
+    }
+    const lista = st.prev.filter((r) => (!st.filtros.prevest || r.estado === st.filtros.prevest) && coincide([r.display, r.plan], q));
+    $('tabla').innerHTML = lista.length ? `<table class="mt-tbl"><thead><tr><th>Equipo</th><th>Plan</th><th>Último service</th><th>Lectura actual</th><th>Vence</th><th>Estado</th><th>OT</th></tr></thead><tbody>${lista.map((r) => `
+      <tr data-id="${r.id}"><td><b>${esc(r.display)}</b></td><td>${esc(r.plan)}</td>
+      <td>${fecha(r.base_fecha)}<div class="small muted">${esc(lecturaTxt(r.base_hs, r.base_km))}</div></td>
+      <td>${esc(lecturaTxt(r.lectura.hs, r.lectura.km))}<div class="small muted">${r.lectura.hs_fecha || r.lectura.km_fecha ? `parte del ${fecha(r.lectura.hs_fecha || r.lectura.km_fecha)}` : 'sin partes con horómetro'}</div></td>
+      <td class="small">${r.componentes.map((c) => `<div class="${c.clave === r.vence_por ? '' : 'muted'}">${esc(compTxt(c))}</div>`).join('')}</td>
+      <td>${badge(ESTADO_PREV, r.estado)}</td><td>${r.ot ? `<span class="small">${esc(r.ot.numero)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`
+      : `<div class="empty">${st.prev.length ? 'Nada con este filtro.' : 'Todavía no hay equipos en planes de preventivo. Creá un plan y asignale equipos en «Planes».'}</div>`;
+    pie(lista.length, st.prev.length);
+    $('tabla').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => abrirAsignacion(tr.dataset.id)));
+  }
+
+  function formPlan(p = null) {
+    drawer(`<h2>${p ? 'Editar plan' : 'Nuevo plan de preventivo'}</h2>
+      <p class="muted small">Vence lo que ocurra primero entre horas, km y días: completá solo los intervalos que correspondan.</p>
+      <div class="field"><label>Nombre</label><input class="input" id="p-nom" maxlength="120" value="${esc(p ? p.nombre : '')}" placeholder="Programado simple"></div>
+      <div class="field" style="margin-top:8px"><label>Descripción (opcional)</label><input class="input" id="p-desc" maxlength="500" value="${esc(p ? p.descripcion || '' : '')}"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label>Cada (horas de motor)</label><input class="input" id="p-hs" inputmode="numeric" value="${p && p.intervalo_hs ? p.intervalo_hs : ''}"></div>
+        <div class="field"><label>Cada (km)</label><input class="input" id="p-km" inputmode="numeric" value="${p && p.intervalo_km ? p.intervalo_km : ''}"></div>
+        <div class="field"><label>Cada (días)</label><input class="input" id="p-dias" inputmode="numeric" value="${p && p.intervalo_dias ? p.intervalo_dias : ''}"></div>
+        <div class="field"><label>Avisar antes (% del intervalo)</label><input class="input" id="p-aviso" inputmode="numeric" value="${p ? p.aviso_pct : 10}"></div></div>
+      <div class="field" style="margin-top:8px"><label>Tareas (una por renglón)</label><textarea class="input" id="p-tareas" rows="7" placeholder="Cambio de aceite de motor&#10;Filtro de aceite&#10;Filtro de aire">${esc(p ? p.tareas.join('\n') : '')}</textarea></div>
+      ${p ? `<label style="display:block;margin-top:8px"><input type="checkbox" id="p-activo" ${p.activo ? 'checked' : ''}> Activo (si lo desactivás, sus equipos dejan de figurar en los vencimientos)</label>` : ''}
+      <div class="actions"><button class="btn btn-primary" id="p-ok">${p ? 'Guardar' : 'Crear plan'}</button></div>`, () => {
+      $('p-ok').addEventListener('click', async (e) => {
+        const body = { nombre: $('p-nom').value, descripcion: $('p-desc').value, intervalo_hs: $('p-hs').value, intervalo_km: $('p-km').value,
+          intervalo_dias: $('p-dias').value, aviso_pct: $('p-aviso').value, tareas: $('p-tareas').value.split('\n'), activo: p ? $('p-activo').checked : true };
+        const r = await accion(e.target, () => (p ? post(`${API}/preventivo/planes/${p.id}`, body, 'PUT') : post(`${API}/preventivo/planes`, body)), p ? 'Plan guardado' : 'Plan creado');
+        if (!r) return;
+        refrescar();
+        if (p) cerrarDrawer(); else formAsignar(r.planes.find((x) => x.id === r.plan_id));
+      });
+    });
+  }
+
+  function formAsignar(p) {
+    drawer(`<h2>Asignar equipos</h2><div class="muted">${esc(p.nombre)} · cada ${esc(intervaloTxt(p))}</div>
+      <div class="field" style="margin-top:10px"><label>Equipos</label>
+        <input class="input" style="width:100%;margin-bottom:6px" placeholder="Filtrar por código, marca o tipo (p. ej. motoniveladora)" data-buscar-eq>
+        <div class="checks" data-eqs style="max-height:260px">${st.op.equipos.map((e) => `<label data-txt="${esc(`${e.display} ${e.tipo}`.toLowerCase())}"><input type="checkbox" value="${esc(e.ci)}"> ${esc(e.display)} <span class="muted small">${esc(e.tipo)}</span></label>`).join('')}</div>
+        <div class="actions"><button class="btn" data-todos>Marcar los filtrados</button><span class="small muted" data-cuenta>0 elegidos</span></div></div>
+      <h3>Desde cuándo cuenta</h3>
+      <div class="radio-row"><label><input type="radio" name="base" value="ACTUAL" checked> Desde hoy, con la lectura del último parte</label>
+        <label><input type="radio" name="base" value="MANUAL"> Desde el último service</label></div>
+      <div id="a-manual" hidden><div class="grid2" style="margin-top:8px"><div class="field"><label>Fecha del último service</label><input class="input" type="date" id="a-fecha"></div>
+        <div class="field"><label>Horómetro</label><input class="input" id="a-hs" inputmode="numeric"></div><div class="field"><label>Km</label><input class="input" id="a-km" inputmode="numeric"></div></div>
+        <p class="muted small">Se usa la misma lectura para todos los equipos elegidos: si cada uno tuvo su service, asignalos de a uno.</p></div>
+      <div class="actions"><button class="btn btn-primary" id="a-ok">Asignar</button></div>`, (d) => {
+      const q = d.querySelector('[data-buscar-eq]');
+      const cuenta = () => { d.querySelector('[data-cuenta]').textContent = `${d.querySelectorAll('[data-eqs] input:checked').length} elegidos`; };
+      q.addEventListener('input', () => { const t = q.value.toLowerCase().trim(); d.querySelectorAll('[data-eqs] label').forEach((l) => { l.hidden = !!t && !l.dataset.txt.includes(t); }); });
+      d.querySelector('[data-todos]').addEventListener('click', () => { d.querySelectorAll('[data-eqs] label:not([hidden]) input').forEach((i) => { i.checked = true; }); cuenta(); });
+      d.querySelector('[data-eqs]').addEventListener('change', cuenta);
+      d.querySelectorAll('input[name=base]').forEach((r) => r.addEventListener('change', () => { $('a-manual').hidden = d.querySelector('input[name=base]:checked').value !== 'MANUAL'; }));
+      $('a-ok').addEventListener('click', async (e) => {
+        const cis = [...d.querySelectorAll('[data-eqs] input:checked')].map((i) => i.value);
+        if (!cis.length) { toast('Elegí al menos un equipo.', true); return; }
+        const body = { cis, base: d.querySelector('input[name=base]:checked').value, fecha: $('a-fecha').value, hs: $('a-hs').value, km: $('a-km').value };
+        if (await accion(e.target, () => post(`${API}/preventivo/planes/${p.id}/equipos`, body), `${cis.length} equipo(s) en el plan`)) {
+          cerrarDrawer(); st.filtros.prev = 'estado'; refrescar();
+        }
+      });
+    });
+  }
+
+  async function abrirAsignacion(id) {
+    const r = await api(`${API}/preventivo/asignaciones/${id}`);
+    const gestionar = puede('preventivo', 'gestionar');
+    const crearOt = !r.ot && puede('ordenes', 'gestionar');
+    const NOMBRE = { hs: 'Horas', km: 'Kilómetros', dias: 'Días' };
+    drawer(`<h2>${esc(r.display)} ${badge(ESTADO_PREV, r.estado)}</h2><div class="muted">${esc(r.plan)}</div>
+      <h3>Vencimiento (lo que ocurra primero)</h3><table class="mt-tbl"><thead><tr><th>Por</th><th>Cada</th><th>Desde el service</th><th>Resta</th></tr></thead><tbody>
+        ${r.componentes.map((c) => `<tr><td>${NOMBRE[c.clave]}</td><td class="num">${num(c.intervalo, 0)} ${UNI[c.clave]}</td>
+        <td class="num">${c.usado === null ? '—' : `${num(c.usado, 0)} ${UNI[c.clave]}`}</td>
+        <td class="num">${c.restante === null ? 'sin lectura' : `<b class="${c.restante <= 0 ? 'dias alto' : ''}">${num(c.restante, 0)} ${UNI[c.clave]}</b>`}</td></tr>`).join('')}</tbody></table>
+      ${r.estado === 'REVISAR' ? '<div class="box small">La lectura actual es menor que la del último service: revisá los partes del equipo (horómetro cambiado o mal cargado) o registrá el service con la lectura correcta.</div>' : ''}
+      <dl class="mt-kv" style="margin-top:8px"><dt>Último service</dt><dd>${fecha(r.base_fecha)} · ${esc(lecturaTxt(r.base_hs, r.base_km))} <span class="muted small">(${esc(r.base_origen === 'ALTA' ? 'alta en el plan' : r.base_origen === 'MANUAL' ? 'registrado a mano' : r.base_origen || '')})</span></dd>
+        <dt>Lectura actual</dt><dd>${esc(lecturaTxt(r.lectura.hs, r.lectura.km))}${r.lectura.hs_fecha ? ` <span class="muted small">(parte del ${fecha(r.lectura.hs_fecha)})</span>` : ''}</dd>
+        ${r.ot ? `<dt>OT</dt><dd><a href="#" data-ot="${r.ot.id}">${esc(r.ot.numero)}</a> ${badge(ESTADO_OT, r.ot.estado)}</dd>` : ''}</dl>
+      <h3>Tareas</h3>${r.tareas.length ? `<ul style="margin:0;padding-left:18px">${r.tareas.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '<div class="muted">El plan no tiene tareas cargadas.</div>'}
+      ${crearOt ? `<h3>Crear OT preventiva</h3><div class="box"><div class="field"><label>Mecánicos (al menos uno)</label>${checksMecanicos()}</div>
+        <div class="actions"><button class="btn btn-primary" id="pv-ot">Crear OT</button></div></div>` : ''}
+      ${gestionar ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--accent)">Registrar un service hecho fuera del sistema</summary><div class="box">
+        <div class="grid2"><div class="field"><label>Fecha</label><input class="input" type="date" id="pv-fecha"></div><div class="field"><label>Horómetro</label><input class="input" id="pv-hs" inputmode="numeric"></div>
+        <div class="field"><label>Km</label><input class="input" id="pv-km" inputmode="numeric"></div><div class="field"><label>Nota</label><input class="input" id="pv-nota" maxlength="500" placeholder="Taller, factura…"></div></div>
+        <div class="actions"><button class="btn" id="pv-real">Registrar service</button></div></div></details>` : ''}
+      ${r.observadas.length ? `<h3>Lecturas a revisar del equipo</h3><ul class="mt-tl">${r.observadas.map((l) => `<li><b>${fecha(l.fecha_parte)}</b> · ${esc(l.mensaje)}</li>`).join('')}</ul>` : ''}
+      <h3>Historial de services</h3>${r.historial.length ? `<ul class="mt-tl">${r.historial.map((h) => `<li><b>${fecha(h.fecha)}</b> · ${esc(lecturaTxt(h.hs, h.km))} · ${esc(h.ot_numero || (h.origen === 'ALTA' ? 'Alta en el plan' : h.origen === 'MANUAL' ? 'Registrado a mano' : h.origen))} <span class="muted small">${esc(h.usuario)}</span>${h.nota ? `<div class="small">${esc(h.nota)}</div>` : ''}</li>`).join('')}</ul>` : '<div class="muted">Sin services registrados.</div>'}
+      ${gestionar && !r.ot ? '<div class="actions"><button class="btn" id="pv-quitar" style="color:var(--danger-text);border-color:var(--danger-text)">Quitar el equipo del plan</button></div>' : ''}`, (d) => {
+      enlazarMecanicos(d);
+      d.querySelectorAll('[data-ot]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); abrirOrden(a.dataset.ot); }));
+      const on = (sel, fn) => { const b = d.querySelector(sel); if (b) b.addEventListener('click', fn); };
+      on('#pv-ot', async (e) => {
+        const mecanicos = mecanicosElegidos(d);
+        if (!mecanicos.length) { toast('Elegí al menos un mecánico para la OT.', true); return; }
+        const o = await accion(e.target, () => post(`${API}/preventivo/asignaciones/${r.id}/ot`, { mecanicos }), 'OT preventiva creada');
+        if (o) { refrescar(); abrirOrden(o.id); }
+      });
+      on('#pv-real', async (e) => {
+        const body = { fecha: $('pv-fecha').value, hs: $('pv-hs').value, km: $('pv-km').value, nota: $('pv-nota').value };
+        if (await accion(e.target, () => post(`${API}/preventivo/asignaciones/${r.id}/realizado`, body), 'Service registrado')) { refrescar(); abrirAsignacion(r.id); }
+      });
+      on('#pv-quitar', async (e) => {
+        if (!confirm('¿Quitar el equipo de este plan?')) return;
+        if (await accion(e.target, () => api(`${API}/preventivo/asignaciones/${r.id}`, { method: 'DELETE' }), 'Equipo quitado del plan')) { cerrarDrawer(); refrescar(); }
+      });
+    });
+  }
+
+  // --- repuestos de la OT: de Almacén (artículo o entrega al equipo), de una solicitud de Compras o a mano ---
+  const ORIGEN_REP = { ALMACEN: 'Almacén', COMPRA: 'Compras', OTRO: 'Otro' };
+  const ESTADO_RE = { PENDIENTE: ['Pendiente en Almacén', 'b-warn'], AUTORIZADO: ['Entregado', 'b-ok'], NO_AUTORIZADO: ['Rechazado por Almacén', 'b-bad'] };
+  function repuestosHtml(o, gestionar, moneda) {
+    const filas = o.repuestos.map((r) => `<tr class="${String(r.remito_estado || '').toUpperCase() === 'NO_AUTORIZADO' ? 'rep-anulado' : ''}"><td>${esc(ORIGEN_REP[r.origen] || r.origen)}${r.remito_numero ? `<div class="small" style="text-decoration:none">${esc(r.remito_numero)} ${badge(ESTADO_RE, String(r.remito_estado || '').toUpperCase())}</div>` : ''}</td>
+      <td>${r.codigo ? `<span class="muted small">${esc(r.codigo)}</span> ` : ''}${esc(r.descripcion)}${r.referencia ? `<div class="small muted">${esc(r.referencia)}</div>` : ''}</td>
+      <td class="num">${num(r.cantidad, 2)} ${esc(r.unidad || '')}</td>
+      <td class="num">${r.costo_unitario == null ? '<span class="muted">—</span>' : `${moneda} ${num(r.costo_unitario, 2)}`}</td>
+      <td class="num">${r.costo_unitario == null ? '' : `${moneda} ${num(r.cantidad * r.costo_unitario, 2)}`}</td>
+      <td>${gestionar ? `<button class="btn" data-quitar-rep="${r.id}" title="Quitar">×</button>` : ''}</td></tr>`).join('');
+    return `${filas ? `<table class="mt-tbl"><thead><tr><th>Origen</th><th>Repuesto</th><th>Cant.</th><th>Costo unit.</th><th>Subtotal</th><th></th></tr></thead><tbody>${filas}</tbody></table>` : '<div class="muted">Sin repuestos cargados.</div>'}
+      ${gestionar ? `<details style="margin-top:6px" id="rep-form"><summary class="small" style="cursor:pointer;color:var(--accent)">Agregar repuesto</summary><div class="box">
+        <div class="radio-row">${Object.entries(ORIGEN_REP).map(([k, t], i) => `<label><input type="radio" name="rep-or" value="${k}" ${i === 0 ? 'checked' : ''}> ${t}</label>`).join('')}</div>
+        <div id="rep-sug" class="small" style="margin-top:6px"></div>
+        <div class="grid2" style="margin-top:8px"><div class="field" style="grid-column:1/-1"><label>Descripción</label><input class="input" id="rep-desc" maxlength="300"></div>
+          <div class="field"><label>Código</label><input class="input" id="rep-cod" maxlength="60"></div>
+          <div class="field"><label>Referencia (remito, OC, factura)</label><input class="input" id="rep-ref" maxlength="120"></div>
+          <div class="field"><label>Cantidad</label><input class="input" id="rep-cant" inputmode="decimal" value="1"></div>
+          <div class="field"><label>Unidad</label><input class="input" id="rep-uni" maxlength="30"></div>
+          <div class="field"><label>Costo unitario${moneda ? ` (${moneda})` : ''}</label><input class="input" id="rep-costo" inputmode="decimal" placeholder="opcional"></div></div>
+        <input type="hidden" id="rep-prod"><input type="hidden" id="rep-sol"><input type="hidden" id="rep-rem">
+        <div id="rep-pedir-box" hidden style="margin-top:8px"><div class="small" id="rep-disp"></div>
+          <label style="display:block;margin-top:4px"><input type="checkbox" id="rep-pedir" checked> Pedir a Almacén: genera un remito de entrega pendiente para este equipo; el stock se descuenta cuando Almacén lo autoriza.</label>
+          <div class="field" id="rep-series-box" hidden style="margin-top:6px"><label>N.º de serie (uno por renglón)</label><textarea class="input" id="rep-series" rows="2"></textarea></div></div>
+        <p class="muted small" id="rep-nota">Sin pedido a Almacén, el repuesto solo se registra en la OT y suma a su costo.</p>
+        <div class="actions"><button class="btn" id="rep-ok">Agregar repuesto</button></div></div></details>` : ''}`;
+  }
+
+  function enlazarRepuestos(d, o) {
+    d.querySelectorAll('[data-quitar-rep]').forEach((b) => b.addEventListener('click', async () => {
+      if (await accion(b, () => api(`${API}/ordenes/${o.id}/repuestos/${b.dataset.quitarRep}`, { method: 'DELETE' }), 'Repuesto quitado')) { refrescar(); abrirOrden(o.id); }
+    }));
+    const form = d.querySelector('#rep-form');
+    if (!form) return;
+    let sug = null;
+    const llenar = (x) => {
+      $('rep-desc').value = x.descripcion || ''; $('rep-cod').value = x.codigo || ''; $('rep-cant').value = x.cantidad ?? 1;
+      $('rep-uni').value = x.unidad || ''; $('rep-costo').value = x.precio_unitario ?? ''; $('rep-ref').value = x.ref || '';
+      $('rep-prod').value = x.producto_id || ''; $('rep-sol').value = x.solicitud_detalle_id || ''; $('rep-rem').value = x.remito_detalle_id || '';
+      // Artículo del catálogo (no una entrega ya hecha): se puede pedir a Almacén
+      const pedible = !!x.producto_id && !x.remito_detalle_id && origen() === 'ALMACEN';
+      $('rep-pedir-box').hidden = !pedible;
+      $('rep-series-box').hidden = !(pedible && x.serializado);
+      $('rep-series').value = '';
+      $('rep-disp').innerHTML = pedible ? `Disponible en Almacén: <b>${num(x.disponible, 2)}</b>${x.serializado ? ' · serializado' : ''}` : '';
+    };
+    const origen = () => form.querySelector('input[name=rep-or]:checked').value;
+    const pintarSug = async (q = '') => {
+      const box = $('rep-sug');
+      if (origen() === 'OTRO') { box.innerHTML = ''; return; }
+      try { sug = await api(`${API}/ordenes/${o.id}/repuestos/sugerencias?q=${encodeURIComponent(q)}`); } catch (e) { box.textContent = e.message; return; }
+      if (origen() === 'COMPRA') {
+        box.innerHTML = sug.compras.length ? `<div class="muted">Solicitudes de compra con este equipo como destino:</div>${sug.compras.map((c, i) => `<div class="rep-par">
+            ${c.vinculado ? '<span class="chip chip-muted">ya cargado</span>' : `<button class="btn" data-sug-c="${i}">Usar</button>`}
+            ${esc(c.numero_solicitud || '')} · ${esc(c.descripcion)} · ${num(c.cantidad, 2)} ${esc(c.unidad || '')}${c.numero_oc ? ` · OC ${esc(c.numero_oc)}` : ''} <span class="muted">${esc(c.estado_aprobacion || '')}</span></div>`).join('')}`
+          : '<div class="muted">No hay solicitudes de compra con este equipo como destino: cargalo a mano con la referencia.</div>';
+      } else {
+        box.innerHTML = `<input class="input" id="rep-q" placeholder="Buscar artículo en Almacén (código o descripción)" value="${esc(q)}" style="width:100%">
+          ${sug.articulos.map((a, i) => `<div class="rep-par"><button class="btn" data-sug-a="${i}">Usar</button> ${esc(a.codigo || '')} · ${esc(a.descripcion)} <span class="muted">· disponible ${num(a.disponible, 2)}</span></div>`).join('')}
+          ${sug.entregas.length ? `<div class="muted" style="margin-top:6px">Entregas de Almacén a este equipo:</div>${sug.entregas.map((x, i) => `<div class="rep-par">
+            ${x.vinculado ? '<span class="chip chip-muted">ya cargado</span>' : `<button class="btn" data-sug-e="${i}">Usar</button>`}
+            ${fecha(x.fecha)} · ${esc(x.remito || '')} · ${esc(x.descripcion || '')} · ${num(x.cantidad, 2)}</div>`).join('')}`
+          : '<div class="muted" style="margin-top:6px">No hay entregas de Almacén a este equipo.</div>'}`;
+        const qi = $('rep-q');
+        let t;
+        qi.addEventListener('input', () => {
+          clearTimeout(t);
+          t = setTimeout(async () => { await pintarSug(qi.value); const n = $('rep-q'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 400);
+        });
+      }
+      box.querySelectorAll('[data-sug-c]').forEach((b) => b.addEventListener('click', () => {
+        const c = sug.compras[b.dataset.sugC];
+        llenar({ ...c, ref: [c.numero_solicitud && `Solicitud ${c.numero_solicitud}`, c.numero_oc && `OC ${c.numero_oc}`].filter(Boolean).join(' · ') });
+      }));
+      box.querySelectorAll('[data-sug-a]').forEach((b) => b.addEventListener('click', () => llenar({ ...sug.articulos[b.dataset.sugA], cantidad: $('rep-cant').value || 1 })));
+      box.querySelectorAll('[data-sug-e]').forEach((b) => b.addEventListener('click', () => {
+        const x = sug.entregas[b.dataset.sugE];
+        llenar({ ...x, ref: x.remito ? `Remito ${x.remito}` : '' });
+      }));
+    };
+    form.addEventListener('toggle', () => { if (form.open && sug === null) pintarSug(); });
+    form.querySelectorAll('input[name=rep-or]').forEach((r) => r.addEventListener('change', () => { llenar({}); pintarSug(); }));
+    $('rep-ok').addEventListener('click', async (e) => {
+      const body = { origen: origen(), descripcion: $('rep-desc').value, codigo: $('rep-cod').value, cantidad: $('rep-cant').value, unidad: $('rep-uni').value,
+        costo_unitario: $('rep-costo').value, referencia: $('rep-ref').value, producto_id: $('rep-prod').value,
+        solicitud_detalle_id: $('rep-sol').value, remito_detalle_id: $('rep-rem').value };
+      const pedir = !$('rep-pedir-box').hidden && $('rep-pedir').checked;
+      if (pedir) body.series = $('rep-series').value.split('\n').map((x) => x.trim()).filter(Boolean);
+      const r = await accion(e.target, () => post(`${API}/ordenes/${o.id}/repuestos${pedir ? '/almacen' : ''}`, body),
+        pedir ? 'Pedido a Almacén: remito de entrega pendiente de autorización' : 'Repuesto agregado');
+      if (r) { refrescar(); abrirOrden(o.id); }
+    });
+  }
+
+  // ---------------------------------------------------------------- indicadores (etapa 3)
+  const PERIODOS = [['30', 'Últimos 30 días'], ['90', '90 días'], ['365', '12 meses'], ['anio', 'Este año']];
+  const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function rangoPeriodo(p) {
+    const hasta = new Date();
+    const desde = p === 'anio' ? new Date(hasta.getFullYear(), 0, 1) : new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate() - (Number(p) - 1));
+    return [isoLocal(desde), isoLocal(hasta)];
+  }
+  const tablaInd = (cols, filas, vacio) => (filas.length
+    ? `<div class="mt-scroll"><table class="mt-tbl"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${filas.join('')}</tbody></table></div>`
+    : `<div class="muted small">${vacio}</div>`);
+
+  async function pintarIndicadores() {
+    const p = st.filtros.ind;
+    $('vista').innerHTML = `${cabecera('Panel de mantenimiento', '<span id="ind-rango">Cargando…</span>',
+        `${chips('ind', PERIODOS)}<button type="button" class="btn btn-icon" id="ind-act" title="Actualizar" aria-label="Actualizar"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg></button>`)}
+      <div id="ind" class="stack"><div class="card empty">Cargando…</div></div>`;
+    enlazarBarra('ind', pintarIndicadores);
+    $('ind-act').addEventListener('click', () => { pintarKpis(); pintarIndicadores(); });
+    const [desde, hasta] = rangoPeriodo(p);
+    let r;
+    try { r = await api(`${API}/indicadores?desde=${desde}&hasta=${hasta}`); } catch (e) { if ($('ind')) $('ind').innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
+    if (!$('ind') || st.tab !== 'indicadores' || st.filtros.ind !== p) return; // cambió de pestaña o de período mientras cargaba
+    const s = r.resumen;
+    const plata = (n) => `${esc(r.moneda)} ${num(n, 0)}`;
+    const tarjeta = (valor, titulo, sub = '', nivel = '') => `<div class="card kpi ind-kpi ${nivel}"><div class="kpi-label">${titulo}</div><div class="kpi-value">${valor}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+    const unidad = (v, u) => `${v}<small>${u}</small>`;
+    const max = Math.max(1, ...r.costo_mensual.map((x) => x.correctivo + x.preventivo));
+    const verEq = tienePanel('equipos');
+    const eqCelda = (ci, display) => `<td class="ind-eq" title="${esc(display)}">${verEq ? `<a href="#" data-eq="${esc(ci)}">${esc(display)}</a>` : esc(display)}</td>`;
+    const total = (x) => x.OPERATIVO + x.FUNCIONAL + x.FUERA_DE_SERVICIO || 1;
+    // Observaciones: lo que conviene mirar del período, armado con los mismos datos
+    const obs = [];
+    if (s.preventivos_vencidos) obs.push(['bad', 'alert', `${s.preventivos_vencidos} preventivo(s) vencido(s) hoy: generá la OT desde Preventivo.`]);
+    if (s.preventivos_proximos) obs.push(['warn', 'clock', `${s.preventivos_proximos} preventivo(s) próximo(s) a vencer.`]);
+    r.equipos_fallas.filter((e) => e.novedades >= 2).slice(0, 3).forEach((e) => obs.push(['warn', 'alert',
+      `${esc(e.display)} acumula ${e.novedades} novedades en el período${e.pendientes ? ` (${e.pendientes} pendiente${e.pendientes > 1 ? 's' : ''})` : ''}.`]));
+    r.mecanicos.filter((m) => m.alertas).slice(0, 3).forEach((m) => obs.push(['warn', 'users', `${esc(m.nombre)}: ${m.alertas} alerta(s) contra la Tarja.`]));
+    if (s.ot_finalizadas && !s.horas_mecanicos) obs.push(['warn', 'info', 'Las OT finalizadas no tienen horas de cronómetro, así que la mano de obra queda en cero: revisá que los mecánicos usen Iniciar / Pausar en la app.']);
+    if (s.disponibilidad_flota != null && s.disponibilidad_flota >= 95) obs.push(['ok', 'check', `Disponibilidad de la flota del ${num(s.disponibilidad_flota, 1)} % en el período.`]);
+    if (!obs.length) obs.push(['ok', 'check', 'Sin observaciones para el período.']);
+    const observaciones = `<div class="card ind-obs"><h3>Observaciones</h3><ul class="obs-list">${obs.map(([n, i, t]) => `<li class="obs-${n}"><svg class="i" aria-hidden="true"><use href="#i-${i}"/></svg><span>${t}</span></li>`).join('')}</ul></div>`;
+    $('ind-rango').textContent = `Del ${fecha(r.desde)} al ${fecha(r.hasta)}`;
+    $('ind').innerHTML = `
+      <div class="kpis ind-kpis">
+        ${tarjeta(s.disponibilidad_flota == null ? '—' : unidad(num(s.disponibilidad_flota, 1), '%'), 'Disponibilidad de la flota',
+          `${s.disponibilidad_flota == null ? '' : `<div class="meter" style="margin-bottom:6px"><span style="width:${s.disponibilidad_flota}%;background:var(--success)"></span></div>`}Tiempo sin estar fuera de servicio`)}
+        ${tarjeta(s.novedades, 'Novedades reportadas', `${s.novedades_cerradas_sin_ot} cerradas sin OT`)}
+        ${tarjeta(s.ot_finalizadas, 'OT finalizadas', `${s.ot_correctivas} correctivas · ${s.ot_preventivas} preventivas`)}
+        ${tarjeta(s.dias_medio_resolucion == null ? '—' : unidad(num(s.dias_medio_resolucion, 1), 'días'), 'Resolución media', 'de la novedad al cierre')}
+        ${tarjeta(s.dias_medio_ot == null ? '—' : unidad(num(s.dias_medio_ot, 1), 'días'), 'Duración media de la OT', 'de creada a finalizada')}
+        ${tarjeta(unidad(num(s.horas_mecanicos, 1), 'h'), 'Horas de mecánicos', 'cronómetro de las OT')}
+        ${tarjeta(plata(s.costo_total), 'Costo de mantenimiento', `mano de obra ${plata(s.costo_mano_obra)} · repuestos ${plata(s.costo_repuestos)}`)}
+        ${tarjeta(s.services ? `${s.services_a_tiempo} de ${s.services}` : '—', 'Services a tiempo', `hoy: ${s.preventivos_vencidos} vencidos · ${s.preventivos_proximos} próximos`, s.preventivos_vencidos ? 'is-danger' : '')}
+      </div>
+      <div class="ind-grid">
+        <div class="card ind-card"><h3>Costo por mes (OT finalizadas)</h3>
+          <div class="ind-barras">${r.costo_mensual.map((x) => `<div class="ind-mes" title="${x.mes}: correctivo ${plata(x.correctivo)} · preventivo ${plata(x.preventivo)}">
+            <div class="ind-col"><i class="corr" style="height:${(100 * x.correctivo) / max}%"></i><i class="prev" style="height:${(100 * x.preventivo) / max}%"></i></div>
+            <span>${x.mes.slice(5)}/${x.mes.slice(2, 4)}</span></div>`).join('')}</div>
+          <div class="small muted"><i class="ley corr"></i> Correctivo ${plata(s.costo_correctivo)} &nbsp; <i class="ley prev"></i> Preventivo ${plata(s.costo_preventivo)}</div></div>
+        ${observaciones}
+        <div class="card ind-card"><h3>Costo por equipo</h3>${tablaInd(['Equipo', 'OT', 'Horas', 'Mano de obra', 'Repuestos', 'Total'],
+          r.costo_por_equipo.map((e) => `<tr>${eqCelda(e.ci, e.display)}<td class="num">${e.ots}</td><td class="num">${num(e.horas, 1)}</td>
+            <td class="num">${plata(e.mano_obra)}</td><td class="num">${plata(e.repuestos)}</td><td class="num"><b>${plata(e.total)}</b></td></tr>`),
+          'Sin OT finalizadas en el período.')}</div>
+        <div class="card ind-card"><h3>Disponibilidad (equipos con días fuera de servicio o funcionales)</h3>${tablaInd(['Equipo', 'Disponible', 'Días', 'Fuera de servicio'],
+          r.disponibilidad.map((e) => `<tr>${eqCelda(e.ci, e.display)}<td class="num"><b>${num(e.disponibilidad, 1)}%</b></td>
+            <td><div class="ind-barra" title="Operativo ${num(e.dias.OPERATIVO, 1)} d · Funcional ${num(e.dias.FUNCIONAL, 1)} d · Fuera de servicio ${num(e.dias.FUERA_DE_SERVICIO, 1)} d">
+              <i class="op" style="width:${(100 * e.dias.OPERATIVO) / total(e.dias)}%"></i><i class="fu" style="width:${(100 * e.dias.FUNCIONAL) / total(e.dias)}%"></i><i class="fs" style="width:${(100 * e.dias.FUERA_DE_SERVICIO) / total(e.dias)}%"></i></div></td>
+            <td class="num">${num(e.dias.FUERA_DE_SERVICIO, 1)} d</td></tr>`),
+          'Todos los equipos estuvieron operativos en el período.')}
+          <div class="small muted" style="margin-top:6px"><i class="ley op"></i> Operativo &nbsp; <i class="ley fu"></i> Funcional &nbsp; <i class="ley fs"></i> Fuera de servicio</div></div>
+        <div class="card ind-card"><h3>Fallas que se repiten</h3>${tablaInd(['Equipo', 'Novedades', 'Pendientes'],
+          r.equipos_fallas.map((e) => `<tr>${eqCelda(e.ci, e.display)}<td class="num"><b>${e.novedades}</b></td><td class="num">${e.pendientes}</td></tr>`),
+          'Sin novedades en el período.')}
+          ${r.temas.length ? `<div class="small" style="margin-top:10px"><b>Temas más frecuentes:</b> ${r.temas.map((t) => `<span class="chip chip-accent" title="${t.equipos} equipo(s)">${esc(t.tema)} · ${t.novedades}</span>`).join(' ')}</div>` : ''}</div>
+        <div class="card ind-card"><h3>Preventivo: services del período</h3>${tablaInd(['Fecha', 'Equipo', 'Plan', 'A tiempo'],
+          r.services.map((v) => `<tr><td class="num">${fecha(v.fecha)}</td><td>${esc(v.ci)}</td><td>${esc(v.plan)}</td>
+            <td>${v.a_tiempo ? '<span class="chip chip-ok">Sí</span>' : `<span class="chip chip-bad">Tarde</span> <span class="small muted">${esc(v.exceso)}</span>`}</td></tr>`),
+          'Sin services registrados en el período.')}</div>
+        <div class="card ind-card"><h3>Mecánicos</h3>${tablaInd(['Mecánico', 'Horas', 'OT', 'Alertas Tarja'],
+          r.mecanicos.map((m) => `<tr><td>${esc(m.nombre)} <span class="muted small">${esc(m.legajo)}</span></td><td class="num">${num(m.horas, 1)}</td><td class="num">${m.ots}</td>
+            <td class="num">${m.alertas ? `<span class="chip chip-warn">${m.alertas}</span>` : '0'}</td></tr>`),
+          'Sin horas de cronómetro en el período.')}</div>
+      </div>`;
+    $('ind').querySelectorAll('[data-eq]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); abrirEquipo(a.dataset.eq); }));
+  }
+
+  // ---------------------------------------------------------------- equipos
+  async function pintarEquipos(soloFiltro) {
+    if (!soloFiltro) {
+      $('vista').innerHTML = `${cabecera('Equipos', 'Estado, ubicación y actividad de la flota')}
+        <div class="kpis" id="eq-kpis"></div>
+        <div class="card"><div class="toolbar">${chips('eq', [['', 'Todos'], ['OPERATIVO', 'Operativos'], ['FUNCIONAL', 'Funcionales'], ['FUERA_DE_SERVICIO', 'Fuera de servicio']])}
+          ${buscador('eq', 'Buscar equipo, tipo, ubicación…')}</div>${listaHtml()}</div>`;
+      enlazarBarra('eq', () => pintarEquipos(true));
+      st.equipos = await api(`${API}/equipos`);
+      kpisEquipos();
+    } else {
+      $('vista').querySelectorAll('[data-f="eq"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === st.filtros.eq)));
+    }
+    const filas = st.equipos.filter((e) => (!st.filtros.eq || e.estado === st.filtros.eq) && coincide([e.display, e.tipo, e.ubicacion], st.buscar.eq));
+    const origen = (e) => (e.ubicacion_origen === 'PARTE' ? `Parte ${fecha(e.ubicacion_desde)}` : e.ubicacion_origen === 'MANUAL' ? `Manual ${fecha(e.ubicacion_desde)}` : '<span class="muted">Sin partes</span>');
+    if (!$('tabla')) return; // se cambió de pestaña mientras cargaba
+    $('tabla').innerHTML = filas.length ? `<table class="mt-tbl"><thead><tr><th>Equipo</th><th>Tipo</th><th>Ubicación</th><th>Fuente</th><th>Estado</th><th>Desde</th>
+      <th>Novedades</th><th>OT</th></tr></thead><tbody>${filas.map((e) => `
+      <tr data-ci="${esc(e.ci)}"><td><b>${esc(e.display)}</b></td><td class="small">${esc(e.tipo)}</td><td>${esc(e.ubicacion) || '<span class="muted">—</span>'}</td>
+      <td class="small">${origen(e)}</td><td>${badge(ESTADO_EQ, e.estado)}</td><td class="num">${e.dias_estado === null ? '—' : dias(e.dias_estado)}</td>
+      <td class="num">${e.novedades_abiertas || ''}</td><td class="num">${e.ot_activas || ''}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No hay equipos con este filtro.</div>';
+    pie(filas.length, st.equipos.length);
+    $('tabla').querySelectorAll('tr[data-ci]').forEach((tr) => tr.addEventListener('click', () => abrirEquipo(tr.dataset.ci)));
+  }
+
+  function kpisEquipos() {
+    const el = $('eq-kpis');
+    if (!el) return;
+    const total = st.equipos.length || 1;
+    const de = (k) => st.equipos.filter((e) => e.estado === k);
+    const op = de('OPERATIVO').length; const fu = de('FUNCIONAL').length; const fs = de('FUERA_DE_SERVICIO');
+    el.innerHTML = `<div class="card kpi"><div class="kpi-label">Operativos</div><div class="kpi-value">${op}</div>
+        <div class="meter"><span style="width:${(100 * op) / total}%;background:var(--success)"></span></div><div class="kpi-sub">${num((100 * op) / total, 1)} % de la flota</div></div>
+      <div class="card kpi ${fu ? 'is-warning' : ''}"><div class="kpi-label">Funcionales</div><div class="kpi-value">${fu}</div><div class="kpi-sub">Trabajan con una novedad abierta o una restricción</div></div>
+      <div class="card kpi ${fs.length ? 'is-danger' : ''}"><div class="kpi-label">Fuera de servicio</div><div class="kpi-value">${fs.length}</div>
+        <div class="kpi-sub">${fs.length ? `${fs.slice(0, 5).map((e) => esc(e.ci)).join(' · ')}${fs.length > 5 ? ' …' : ''}` : 'Ninguno'}</div></div>`;
+  }
+
+  async function abrirEquipo(ci) {
+    const h = await api(`${API}/equipos/${encodeURIComponent(ci)}`);
+    const e = h.equipo;
+    const editar = puede('equipos', 'cambiar_estado');
+    const proyectos = [...new Set(st.op.centros_costos.map((c) => c.proyecto).filter(Boolean))].sort();
+    drawer(`<h2>${esc(e.display)} ${badge(ESTADO_EQ, e.estado)}</h2><div class="muted">${esc(e.tipo)}</div>
+      <h3>Estado y ubicación</h3><dl class="mt-kv">
+      <dt>Estado</dt><dd>${badge(ESTADO_EQ, e.estado)} ${e.estado_desde ? `desde ${fecha(e.estado_desde)} (${dias(e.dias_estado)})` : ''}${e.estado_motivo ? `<div class="small muted">${esc(e.estado_motivo)}</div>` : ''}</dd>
+      <dt>Ubicación</dt><dd>${esc(e.ubicacion) || '—'} <div class="small muted">${e.ubicacion_origen === 'PARTE' ? `Del último parte (${fecha(e.ubicacion_desde)})` : e.ubicacion_origen === 'MANUAL' ? `Manual desde ${fecha(e.ubicacion_desde)}: ${esc(e.ubicacion_motivo || '')}. Un parte posterior la reemplaza.` : 'Sin partes con fecha válida'}</div></dd>
+      <dt>Último parte</dt><dd>${e.dias_sin_parte === null ? '—' : `hace ${e.dias_sin_parte} días`}</dd></dl>
+      ${editar ? `<div class="box"><div class="grid2"><div class="field"><label>Nuevo estado</label>${selectorEstadoEquipo('e-est', e.estado, false)}</div>
+        <div class="field"><label>Motivo</label><input class="input" id="e-mot"></div></div><div class="actions"><button class="btn" id="e-est-ok">Cambiar estado</button></div></div>
+        <div class="box"><div class="grid2"><div class="field"><label>Proyecto</label><select class="input" id="e-proy"><option value="">Todos</option>${proyectos.map((p) => `<option>${esc(p)}</option>`).join('')}</select></div>
+        <div class="field"><label>Centro de costo</label><select class="input" id="e-cc"><option value="">Elegir…</option>${opcionesCC()}</select></div></div>
+        <div class="field" style="margin-top:8px"><label>Motivo</label><input class="input" id="e-umot" placeholder="p. ej. trasladado en carretón"></div>
+        <div class="actions"><button class="btn" id="e-ubi-ok">Ubicar a mano</button></div></div>` : ''}
+      <h3>Novedades</h3>${h.novedades.length ? `<ul class="mt-tl">${h.novedades.map((n) => `<li><b>#${n.id}</b> ${badge(ESTADO_NOV, n.estado)} ${esc(n.descripcion)} <span class="muted small">${fecha(n.creada_en)} · ${esc(n.reportada_por)}</span></li>`).join('')}</ul>` : '<div class="muted">Sin novedades.</div>'}
+      <h3>Órdenes de trabajo</h3>${h.ordenes.length ? `<ul class="mt-tl">${h.ordenes.map((o) => `<li><a href="#" data-ot="${o.id}"><b>${esc(o.numero)}</b></a> ${badge(ESTADO_OT, o.estado)} ${esc(o.titulo)} <span class="muted small">${fecha(o.creada_en)} · ${num(o.horas)} h</span></li>`).join('')}</ul>` : '<div class="muted">Sin OT.</div>'}
+      <h3>Cambios de estado y ubicación</h3>${h.cambios.length ? `<ul class="mt-tl">${h.cambios.map((c) => `<li><b>${c.campo === 'ESTADO' ? 'Estado' : 'Ubicación'}</b>: ${esc(ESTADO_EQ[c.anterior] ? ESTADO_EQ[c.anterior][0] : c.anterior || '—')} → ${esc(ESTADO_EQ[c.nuevo] ? ESTADO_EQ[c.nuevo][0] : c.nuevo)} <span class="muted small">${fechaHora(c.creado_en)} · ${esc(c.usuario)}</span><div class="small">${esc(c.motivo || '')}</div></li>`).join('')}</ul>` : '<div class="muted">Sin cambios registrados.</div>'}`, (d) => {
+      d.querySelectorAll('[data-ot]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); abrirOrden(a.dataset.ot); }));
+      if (!editar) return;
+      $('e-proy').addEventListener('change', () => {
+        const p = $('e-proy').value;
+        $('e-cc').innerHTML = '<option value="">Elegir…</option>' + st.op.centros_costos.filter((c) => !p || c.proyecto === p).map((c) => `<option value="${c.id}">${esc(c.texto)}</option>`).join('');
+      });
+      const tras = (r) => { if (r) { pintarKpis(); pintarEquipos(); abrirEquipo(ci); } };
+      $('e-est-ok').addEventListener('click', async (ev) => tras(await accion(ev.target, () => post(`${API}/equipos/${encodeURIComponent(ci)}/estado`, { estado: $('e-est').value, motivo: $('e-mot').value }, 'PUT'), 'Estado actualizado')));
+      $('e-ubi-ok').addEventListener('click', async (ev) => tras(await accion(ev.target, () => post(`${API}/equipos/${encodeURIComponent(ci)}/ubicacion`, { centro_costo_id: $('e-cc').value, motivo: $('e-umot').value }, 'PUT'), 'Ubicación actualizada')));
+    });
+  }
+
+  // ---------------------------------------------------------------- check list
+  const VALOR_CK = { BUENO: ['Bueno', 'b-ok'], REGULAR: ['Regular', 'b-warn'], MALO: ['Malo', 'b-bad'], NA: ['N/A', 'b-mut'], VIGENTE: ['Vigente', 'b-ok'], VENCIDA: ['Vencida', 'b-bad'] };
+  const RESULTADO_CK = { APTO: ['Apto', 'b-ok'], NO_APTO: ['No apto', 'b-bad'] };
+  const FAMILIA_TXT = { VIAL: 'Vial', MAQUINARIA: 'Maquinaria vial', REMOLQUE: 'Remolque' };
+  const CAPA_TXT = { BASE: 'Base (todo equipo autopropulsado)', FAMILIA: 'Familia', MODULO: 'Módulos según el equipo' };
+  st.filtros.ck = '';
+  st.buscar.ck = '';
+
+  async function pintarChecklist(soloFiltro) {
+    if (!soloFiltro) {
+      $('vista').innerHTML = `${cabecera('Check list', 'Inspecciones de equipos según la plantilla de cada tipo',
+          puede('checklist', 'realizar') ? `<button class="btn btn-primary" id="btn-nuevo-ck">${conIcono('plus', 'Nuevo check list')}</button>` : '')}
+        <div class="card"><div class="toolbar">${chips('ck', [['', 'Todos'], ['APTO', 'Apto'], ['NO_APTO', 'No apto']])}
+          ${buscador('ck', 'Buscar equipo, tipo, realizado por…')}</div>${listaHtml()}</div>`;
+      enlazarBarra('ck', pintarChecklist);
+      const b = $('btn-nuevo-ck'); if (b) b.addEventListener('click', () => formChecklist());
+      st.checklists = await api(`${API}/checklist?resultado=${st.filtros.ck}`);
+    }
+    const filas = st.checklists.filter((c) => coincide([c.display, c.tipo_equipo, c.realizado_por, c.operador], st.buscar.ck));
+    if (!$('tabla')) return; // se cambió de pestaña mientras cargaba
+    $('tabla').innerHTML = filas.length ? `<table class="mt-tbl"><thead><tr><th>#</th><th>Fecha</th><th>Equipo</th><th>Tipo</th><th>Resultado</th><th>Malos</th><th>Regulares</th><th>Novedades</th><th>Realizó</th></tr></thead><tbody>${filas.map((c) => `
+      <tr data-id="${c.id}"><td class="muted">${c.id}</td><td class="num">${fecha(c.fecha)}</td><td><b>${esc(c.display)}</b></td><td class="small">${esc(c.tipo_equipo)}</td>
+      <td>${badge(RESULTADO_CK, c.resultado)}</td><td class="num">${c.malos || ''}</td><td class="num">${c.regulares || ''}</td><td class="num">${c.novedades || ''}</td><td>${esc(c.realizado_por)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">Todavía no hay check list con este filtro.</div>';
+    pie(filas.length, st.checklists.length);
+    $('tabla').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => abrirChecklist(tr.dataset.id)));
+  }
+
+  function formChecklist(ci = '') {
+    $('vista').innerHTML = `${cabecera('Nuevo check list', 'Malo o Regular piden comentario y foto; cada Malo pasa a Novedades.', '<button type="button" class="btn" id="ck-volver">‹ Volver a la lista</button>')}
+      <div class="card" style="padding:16px"><div class="grid2"><div class="field"><label>Equipo</label><select class="input" id="ck-ci"><option value="">Elegir…</option>${opcionesEquipos(ci)}</select></div><div></div></div>
+      <div id="ck-form"></div></div>`;
+    $('ck-volver').addEventListener('click', () => pintarChecklist());
+    $('ck-ci').addEventListener('change', () => cargarFormChecklist($('ck-ci').value));
+    if (ci) cargarFormChecklist(ci);
+  }
+
+  async function cargarFormChecklist(ci) {
+    const cont = $('ck-form');
+    if (!ci) { cont.innerHTML = ''; return; }
+    cont.innerHTML = '<div class="empty">Armando el check list…</div>';
+    let a;
+    try { a = await api(`${API}/checklist/armar/${encodeURIComponent(ci)}`); } catch (e) { cont.innerHTML = `<div class="box">${esc(e.message)}</div>`; return; }
+    const total = a.secciones.reduce((n, s) => n + s.items.length, 0);
+    const botones = (it) => (it.tipo === 'VIGENCIA' ? ['VIGENTE', 'VENCIDA'] : ['BUENO', 'REGULAR', 'MALO']).concat(it.opcional ? ['NA'] : [])
+      .map((v) => `<button type="button" class="chip" data-v="${v}">${VALOR_CK[v][0]}</button>`).join('');
+    cont.innerHTML = `<div class="box" style="margin-top:12px"><dl class="mt-kv"><dt>Tipo de equipo</dt><dd>${esc(a.tipo_equipo)} · ${esc(FAMILIA_TXT[a.familia])}</dd>
+        <dt>Estado</dt><dd>${badge(ESTADO_EQ, a.estado)}</dd><dt>Ubicación</dt><dd>${esc(a.ubicacion) || '—'}</dd></dl>
+        <div class="grid2" style="margin-top:10px"><div class="field"><label>Horómetro</label><input class="input" id="ck-hs" inputmode="decimal" value="${a.cabecera.horometro ?? ''}"></div>
+        <div class="field"><label>Kilómetros</label><input class="input" id="ck-km" inputmode="decimal" value="${a.cabecera.km ?? ''}"></div>
+        <div class="field"><label>Operador</label><input class="input" id="ck-op" value="${esc(a.cabecera.operador || '')}"></div></div>
+        <p class="small muted" style="margin:8px 0 0">Horómetro, km y operador salen del último parte; corregilos si hace falta. Malo o Regular piden comentario y foto; cada Malo pasa a Novedades.</p></div>
+      ${a.secciones.map((s) => `<h3 class="ck-sec">${esc(s.modulo)} <span class="muted small" style="font-weight:400">· ${esc(CAPA_TXT[s.capa].split(' (')[0])}</span></h3>
+        <div class="card">${s.items.map((it) => `<div class="ck-row" data-clave="${esc(it.clave)}" data-foto="${it.foto_obligatoria ? 1 : 0}">
+          <div class="ck-txt">${esc(it.texto)} ${it.critico ? '<span class="chip chip-bad">Crítico</span>' : ''}${it.foto_obligatoria ? ' <span class="chip chip-accent">Foto</span>' : ''}</div>
+          <div class="ck-vals">${botones(it)}</div>
+          <div class="ck-extra" hidden><input class="input" data-com placeholder="Comentario"><input type="file" accept="image/jpeg,image/png" data-foto-in></div></div>`).join('')}</div>`).join('')}
+      <div class="field" style="margin-top:14px"><label>Observaciones generales</label><textarea class="input" id="ck-obs"></textarea></div>
+      <div class="actions"><button class="btn btn-primary" id="ck-enviar">Guardar check list</button><span class="muted small" id="ck-cuenta">0 de ${total} respondidos</span></div>`;
+    const actualizar = () => { $('ck-cuenta').textContent = `${cont.querySelectorAll('.ck-row[data-valor]').length} de ${total} respondidos`; };
+    cont.querySelectorAll('.ck-row').forEach((row) => {
+      const extra = row.querySelector('.ck-extra');
+      if (row.dataset.foto === '1') extra.hidden = false;
+      row.querySelectorAll('.ck-vals .chip').forEach((b) => b.addEventListener('click', () => {
+        row.querySelectorAll('.ck-vals .chip').forEach((x) => x.classList.toggle('on', x === b));
+        row.dataset.valor = b.dataset.v;
+        extra.hidden = !(['REGULAR', 'MALO', 'VENCIDA'].includes(b.dataset.v) || (row.dataset.foto === '1' && b.dataset.v !== 'NA'));
+        actualizar();
+      }));
+    });
+    $('ck-enviar').addEventListener('click', async (e) => {
+      const sinResponder = [...cont.querySelectorAll('.ck-row:not([data-valor])')];
+      if (sinResponder.length) { sinResponder[0].scrollIntoView({ block: 'center' }); toast(`Faltan ${sinResponder.length} ítems por responder.`, true); return; }
+      const respuestas = {}; const fd = new FormData();
+      cont.querySelectorAll('.ck-row').forEach((row) => {
+        respuestas[row.dataset.clave] = { valor: row.dataset.valor, comentario: row.querySelector('[data-com]').value };
+        const f = row.querySelector('[data-foto-in]').files[0];
+        if (f && !row.querySelector('.ck-extra').hidden) fd.append(`foto__${row.dataset.clave}`, f);
+      });
+      fd.append('datos', JSON.stringify({ ci, horometro: $('ck-hs').value, km: $('ck-km').value, operador: $('ck-op').value, observaciones: $('ck-obs').value, respuestas }));
+      e.target.disabled = true;
+      try {
+        const r = await fetch(`${API}/checklist`, { method: 'POST', body: fd, credentials: 'same-origin' });
+        let d = null; try { d = await r.json(); } catch { /* sin JSON */ }
+        if (!r.ok) throw new Error((d && typeof d.detail === 'string' && d.detail) || `Error ${r.status}`);
+        toast(d.resultado === 'NO_APTO' ? 'Check list guardado: NO APTO' : 'Check list guardado', d.resultado === 'NO_APTO');
+        pintarKpis(); await pintarChecklist(); abrirChecklist(d.id);
+      } catch (err) { e.target.disabled = false; toast(err.message, true); }
+    });
+  }
+
+  async function abrirChecklist(id) {
+    const c = await api(`${API}/checklist/${id}`);
+    const grupos = [];
+    c.respuestas.forEach((r) => { const g = grupos.find((x) => x.modulo === r.modulo); if (g) g.items.push(r); else grupos.push({ modulo: r.modulo, items: [r] }); });
+    const novedadesAbiertas = puede('novedades', 'consultar');
+    drawer(`<h2>Check list #${c.id} ${badge(RESULTADO_CK, c.resultado)}</h2><div class="muted">${esc(c.display)} · ${esc(c.tipo_equipo)}</div>
+      <h3>Cabecera</h3><dl class="mt-kv"><dt>Fecha</dt><dd>${fechaHora(c.creado_en)}</dd><dt>Realizó</dt><dd>${esc(c.realizado_por)}</dd>
+      <dt>Horómetro / km</dt><dd>${c.horometro ?? '—'} hs · ${c.km ?? '—'} km</dd><dt>Operador</dt><dd>${esc(c.operador || '—')}</dd><dt>Ubicación</dt><dd>${esc(c.ubicacion || '—')}</dd>
+      ${c.observaciones ? `<dt>Observaciones</dt><dd>${esc(c.observaciones)}</dd>` : ''}<dt>Resumen</dt><dd>${c.total_items} ítems · ${c.malos} malos · ${c.regulares} regulares · ${c.novedades} a Novedades</dd></dl>
+      ${grupos.map((g) => `<h3>${esc(g.modulo)}</h3><table class="mt-tbl"><tbody>${g.items.map((r) => `<tr><td>${esc(r.item)}${r.critico ? ' <span class="chip chip-bad">Crítico</span>' : ''}${r.comentario ? `<div class="small muted">${esc(r.comentario)}</div>` : ''}</td>
+        <td style="width:110px">${badge(VALOR_CK, r.valor)}${r.novedad_id ? `<div class="small">${novedadesAbiertas ? `<a href="#" data-nov="${r.novedad_id}">Novedad #${r.novedad_id}</a>` : `Novedad #${r.novedad_id}`}</div>` : ''}</td>
+        <td style="width:70px">${r.tiene_foto ? `<a href="${API}/checklist/respuestas/${r.id}/foto" target="_blank" rel="noopener"><img src="${API}/checklist/respuestas/${r.id}/foto" alt="Foto" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:6px"></a>` : ''}</td></tr>`).join('')}</tbody></table>`).join('')}`, (d) => {
+      d.querySelectorAll('[data-nov]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); abrirNovedad(a.dataset.nov); }));
+    });
+  }
+
+  // ---------------------------------------------------------------- configuración
+  async function pintarConfig() {
+    const c = st.op.config || {};
+    const editar = puede('configuracion', 'configurar');
+    $('vista').innerHTML = `${cabecera('Configuración', 'Parámetros del módulo de mantenimiento', chips('cfg', [['general', 'General'], ['plantilla', 'Plantilla del check list']]))}<div id="cfg-vista"></div>`;
+    $('vista').querySelectorAll('[data-f="cfg"]').forEach((b) => b.addEventListener('click', () => { st.filtros.cfg = b.dataset.v; pintarConfig(); }));
+    const sub = st.filtros.cfg || 'general';
+    $('vista').querySelectorAll('[data-f="cfg"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === sub)));
+    const v = $('cfg-vista');
+    if (sub === 'general') {
+      // El valor hora puede venir guardado como "1.25e+06": se muestra el número completo
+      const vh = Number(String(c.valor_hora_mecanico ?? '0').replace(',', '.'));
+      v.innerHTML = `<div class="stack" style="max-width:880px">
+        <div class="card"><div class="card-head"><div class="card-title">Horas del mecánico</div></div><div class="card-body">
+          <div class="grid2"><div class="field"><label for="c-vh">Valor hora</label><input class="input" id="c-vh" inputmode="decimal" value="${esc(Number.isFinite(vh) ? String(vh) : c.valor_hora_mecanico || '0')}" ${editar ? '' : 'disabled'}><span class="help" id="c-vh-txt"></span></div>
+          <div class="field"><label for="c-mon">Moneda</label><input class="input" id="c-mon" maxlength="10" value="${esc(c.moneda || 'ARS')}" ${editar ? '' : 'disabled'}></div></div>
+          <p class="help" style="margin-top:12px">Las horas de cada OT salen del cronómetro de la app (Iniciar / Pausar). Costo de mano de obra = horas × valor hora.</p>
+          ${editar ? '<div class="actions" style="justify-content:flex-end"><button type="button" class="btn btn-primary" id="c-ok">Guardar</button></div>' : ''}</div></div>
+        <div class="card"><div class="card-head"><div class="card-title">Quién aprueba y quién finaliza</div></div><div class="card-body">
+          <p class="help">Se asigna por usuario en <a class="btn-link" href="/administracion">Administración › Usuarios</a> › Mantenimiento: <b>Novedades › Aprobador</b> resuelve las novedades,
+          <b>Órdenes › Administrador de Mantenimiento</b> finaliza o devuelve las OT y <b>Check list › Realizar</b> carga los check list.</p></div></div></div>`;
+      const vhTxt = () => { const n = Number($('c-vh').value.replace(',', '.')); $('c-vh-txt').textContent = $('c-vh').value.trim() && Number.isFinite(n) ? `${$('c-mon').value.trim()} ${num(n, 2)} por hora` : ''; };
+      $('c-vh').addEventListener('input', vhTxt);
+      $('c-mon').addEventListener('input', vhTxt);
+      vhTxt();
+      const b = $('c-ok');
+      if (b) b.addEventListener('click', async (e) => {
+        const r = await accion(e.target, () => post(`${API}/config`, { valor_hora_mecanico: $('c-vh').value, moneda: $('c-mon').value }, 'PUT'), 'Configuración guardada');
+        if (r) { st.op.config = r; e.target.disabled = false; }
+      });
+      return;
+    }
+    v.innerHTML = '<div class="empty">Cargando…</div>';
+    const p = await api(`${API}/plantilla`);
+    // plantilla
+    const itemFila = (i, moduloId) => `<tr data-item-id="${i.id || ''}" data-modulo-id="${moduloId}">
+        <td><input class="input" data-k="texto" value="${esc(i.texto || '')}" placeholder="Nuevo ítem" style="width:100%" ${editar ? '' : 'disabled'}></td>
+        <td><select class="input" data-k="tipo" ${editar ? '' : 'disabled'}><option value="ESTADO" ${i.tipo !== 'VIGENCIA' ? 'selected' : ''}>Bueno/Regular/Malo</option><option value="VIGENCIA" ${i.tipo === 'VIGENCIA' ? 'selected' : ''}>Vigente/Vencida</option></select></td>
+        ${['critico', 'opcional', 'foto_obligatoria', 'activo'].map((k) => `<td style="text-align:center"><input type="checkbox" data-k="${k}" ${(k === 'activo' ? i.activo !== 0 : i[k]) ? 'checked' : ''} ${editar ? '' : 'disabled'}></td>`).join('')}
+        <td>${editar ? `<button class="btn" data-guardar-item>${i.id ? 'Guardar' : 'Agregar'}</button>` : ''}</td></tr>`;
+    v.innerHTML = `<div class="box" style="margin-top:0">Qué módulos lleva cada equipo depende de su <b>tipo de equipo</b>, que se estandariza y configura en <b>Logística › Vehículos › Tipos de equipo</b>.</div>
+      <p class="muted small">Los cambios valen para los próximos check list; los ya hechos guardan el texto de ese día. <b>Crítico</b>: en Malo da No apto y la novedad entra urgente. <b>Opcional</b>: admite N/A. <b>Foto</b>: pide foto siempre.</p>
+      ${['BASE', 'FAMILIA', 'MODULO'].map((capa) => `<h3>${CAPA_TXT[capa]}</h3>${p.modulos.filter((m) => m.capa === capa).map((m) => `<details class="card" style="margin-bottom:8px;padding:8px 12px" ${m.activo ? '' : 'data-inactivo'}>
+        <summary style="cursor:pointer;font-weight:600">${esc(m.nombre)}${m.familia ? ` <span class="muted small">· ${FAMILIA_TXT[m.familia]}</span>` : ''} <span class="muted small">· ${m.es_neumaticos ? 'filas por posición del equipo' : `${m.items.filter((i) => i.activo).length} ítems`}</span>${m.activo ? '' : ' <span class="chip chip-muted">Inactivo</span>'}</summary>
+        ${m.es_neumaticos ? '<p class="small muted">Una fila por posición y por auxilio, según el tipo de equipo (o lo cargado en el equipo).</p>' : `<div class="mt-scroll"><table class="mt-tbl"><thead><tr><th>Ítem</th><th>Respuesta</th><th>Crítico</th><th>Opcional</th><th>Foto</th><th>Activo</th><th></th></tr></thead><tbody>
+          ${m.items.map((i) => itemFila(i, m.id)).join('')}${editar ? itemFila({}, m.id) : ''}</tbody></table></div>`}
+        </details>`).join('')}`).join('')}
+      ${editar ? `<h3>Nuevo módulo</h3><div class="box"><div class="grid2"><div class="field"><label>Nombre</label><input class="input" id="nm-nombre"></div>
+        <div class="field"><label>Capa</label><select class="input" id="nm-capa"><option value="MODULO">Módulo según el equipo</option><option value="BASE">Base</option><option value="FAMILIA:VIAL">Familia vial</option><option value="FAMILIA:MAQUINARIA">Familia maquinaria</option><option value="FAMILIA:REMOLQUE">Familia remolque</option></select></div></div>
+        <div class="actions"><button class="btn" id="nm-ok">Crear módulo</button></div></div>` : ''}`;
+    v.querySelectorAll('[data-guardar-item]').forEach((b) => b.addEventListener('click', async () => {
+      const tr = b.closest('tr'); const id = tr.dataset.itemId;
+      const datos = { modulo_id: Number(tr.dataset.moduloId) };
+      tr.querySelectorAll('[data-k]').forEach((i) => { datos[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value; });
+      if (!id) datos.activo = true;
+      const r = await accion(b, () => post(`${API}/plantilla/items${id ? `/${id}` : ''}`, datos, id ? 'PUT' : 'POST'), id ? 'Ítem guardado' : 'Ítem agregado');
+      if (r) { if (id) b.disabled = false; else pintarConfig(); }
+    }));
+    const nm = $('nm-ok');
+    if (nm) nm.addEventListener('click', async (e) => {
+      const [capa, familia] = $('nm-capa').value.split(':');
+      const r = await accion(e.target, () => post(`${API}/plantilla/modulos`, { nombre: $('nm-nombre').value, capa, familia }), 'Módulo creado');
+      if (r) pintarConfig();
+    });
+  }
+
+  iniciar().catch((e) => { $('vista').innerHTML = `<div class="card empty">${esc(e.message)}</div>`; });
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
  * Grilla operador × día: cada celda lleva el ID de un centro de costo o un código de estado. Las horas, los cambios de turno
  * y la columna Obra los calcula el servidor (tarja.py). Carga rápida (escribir, seleccionar/arrastrar un rango, copiar/pegar),
  * autofiltros tipo Excel en cada columna, panel de horas por día, configuración y exportación a Excel.
- * Usa los estilos cert-* del tema claro y showToast / opPuede de operaciones.html.
+ * Usa los componentes del design system (/ui/app.css: .sheet-grid, .modal, .menu) y showToast / opPuede de operaciones.html.
  */
 (() => {
   'use strict';
@@ -47,6 +47,7 @@
   };
   const rangoMes = (a, m) => [iso(a, m, 1), iso(a, m, finDeMes(a, m))];
   const root = () => $('tj-root');
+  const ic = (n, c = '') => `<svg class="i ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
   const opts = (lista, sel) => lista.map(([v, t]) => `<option value="${e(v)}" ${String(v) === String(sel ?? '') ? 'selected' : ''}>${e(t)}</option>`).join('');
 
   async function api(url, metodo = 'GET', cuerpo) {
@@ -98,109 +99,25 @@
   const colorDe = (cel) => (!cel ? null : (cel.e ? ((codigo(cel.c) || {}).color || '#cbd5e1') : paleta(cel.c)));
 
   // ---------------------------------------------------------------- estilos propios de la grilla
+  // Los estilos son los del design system (app.css › .sheet-grid, .modal, .menu). Solo se pasa el color configurado
+  // para el cambio de turno.
   function estilos() {
-    if ($('tj-estilos')) return;
-    const s = document.createElement('style');
-    s.id = 'tj-estilos';
-    s.textContent = `
-      #tj-root .tj-bar { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:flex-end; }
-      #tj-root .tj-bar .cert-field select, #tj-root .tj-bar .cert-field input { height:32px; }
-      #tj-root .tj-info { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; justify-content:space-between; margin:10px 0 8px; }
-      #tj-root .tj-ley { display:flex; flex-wrap:wrap; gap:4px 10px; font-size:11.5px; color:var(--c-muted); }
-      #tj-root .tj-ley i { display:inline-block; width:14px; height:12px; border-radius:2px; vertical-align:-2px; margin-right:4px; border:1px solid rgba(0,0,0,.08); }
-      #tj-root .tj-scroll { overflow:auto; max-height:calc(100vh - 300px); min-height:280px; border:1px solid var(--c-line); border-radius:6px; background:#fff; position:relative; user-select:none; }
-      #tj-root table.tj-t { border-collapse:separate; border-spacing:0; font-size:12px; }
-      #tj-root .tj-t th, #tj-root .tj-t td { border-right:1px solid var(--c-line); border-bottom:1px solid var(--c-line); padding:0 4px; height:26px; white-space:nowrap; background:#fff; color:var(--c-text); }
-      #tj-root .tj-t thead th { position:sticky; top:0; z-index:3; background:var(--c-blue-head); color:var(--c-navy); font-weight:700; height:40px; vertical-align:middle; }
-      #tj-root .tj-t .fx { position:sticky; z-index:2; }
-      #tj-root .tj-t thead th.fx { z-index:4; }
-      #tj-root .tj-t .fx1 { left:0; width:70px; min-width:70px; max-width:70px; }
-      #tj-root .tj-t .fx2 { left:70px; width:220px; min-width:220px; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
-      #tj-root .tj-t .fx3 { left:290px; width:250px; min-width:250px; max-width:250px; overflow:hidden; text-overflow:ellipsis; box-shadow:3px 0 4px -2px rgba(15,36,64,.18); }
-      #tj-root .tj-t th .tj-h { display:flex; align-items:center; justify-content:space-between; gap:2px; }
-      #tj-root .tj-t th.dia { width:40px; min-width:40px; max-width:40px; padding:0 2px; text-align:center; line-height:1.05; }
-      #tj-root .tj-t th.dia .tj-h { flex-direction:column; justify-content:center; gap:1px; }
-      #tj-root .tj-t th.dia small { font-weight:600; font-size:10.5px; color:var(--c-muted); }
-      #tj-root .tj-t th.dia .tj-mes { font-style:normal; font-size:9.5px; font-weight:800; text-transform:uppercase; color:var(--c-blue); line-height:1; }
-      #tj-root .tj-t th.dia.hoy .tj-mes { color:#fff; }
-      #tj-root .tj-t th.m1, #tj-root .tj-t td.m1 { border-left:2px solid var(--c-navy); }
-      #tj-root .tj-t thead th.dia { height:46px; }
-      #tj-root .tj-t th.dia.fin, #tj-root .tj-t td.fin:not([style]) { background:#eef2f7; }
-      #tj-root .tj-t th.dia.fer { background:#f5d0fe; }
-      #tj-root .tj-t th.dia.hoy { background:var(--c-blue); color:#fff; } #tj-root .tj-t th.dia.hoy small { color:#dbeafe; }
-      #tj-root .tj-t td.hoyc { box-shadow: inset 2px 0 0 var(--c-blue), inset -2px 0 0 var(--c-blue); }
-      #tj-root .tj-t th.tot, #tj-root .tj-t td.tot { text-align:right; min-width:54px; background:#f3f7fd; }
-      #tj-root .tj-t th.tot { background:#cfdff3; }
-      #tj-root .tj-t td.d { text-align:center; cursor:cell; font-weight:600; font-size:11.5px; padding:0; }
-      #tj-root .tj-t td.d.ct { box-shadow: inset 0 -4px 0 ${T.op ? T.op.color_cambio_turno : '#d97706'}; }
-      #tj-root .tj-t td.d.hoyc.ct { box-shadow: inset 0 -4px 0 #d97706, inset 2px 0 0 var(--c-blue), inset -2px 0 0 var(--c-blue); }
-      #tj-root .tj-t td.d.man::after { content:''; position:relative; display:inline-block; width:0; height:0; margin-left:1px; vertical-align:top;
-        border-left:5px solid transparent; border-top:5px solid var(--c-red); }
-      #tj-root .tj-t td.d.sel { outline:2px solid var(--c-blue); outline-offset:-2px; filter:brightness(.93); }
-      #tj-root .tj-t td.d.act { outline:2px solid var(--c-navy); outline-offset:-2px; }
-      #tj-root .tj-t tbody tr:hover td.fx { background:#f7faff; }
-      #tj-root .tj-t td.fx2 { cursor:pointer; } #tj-root .tj-t td.fx2:hover { color:var(--c-blue); text-decoration:underline; }
-      #tj-root .tj-reg { display:inline-block; font-size:10px; font-weight:700; padding:0 4px; border-radius:3px; margin-right:4px; background:var(--c-blue-soft); color:var(--c-blue); }
-      #tj-root .tj-reg.dia { background:#ecfdf5; color:var(--c-green); }
-      #tj-root .tj-pend { color:var(--c-red); font-weight:800; }
-      #tj-root .tj-est { color:var(--c-muted); }
-      .tj-fbtn { border:1px solid var(--c-line-strong); background:#fff; border-radius:3px; width:17px; height:16px; padding:0; cursor:pointer; display:inline-grid; place-items:center; flex:none; color:var(--c-muted); }
-      .tj-fbtn svg { width:10px; height:10px; fill:currentColor; } .tj-fbtn.on { background:var(--c-blue); border-color:var(--c-blue); color:#fff; }
-      .tj-menu { position:fixed; z-index:140; background:#fff; border:1px solid var(--c-line-strong); border-radius:6px; box-shadow:0 12px 32px rgba(15,36,64,.25);
-        width:300px; font-size:12.5px; color:var(--c-text); padding:8px; display:flex; flex-direction:column; gap:6px; }
-      .tj-menu button.it { border:0; background:none; text-align:left; padding:5px 6px; border-radius:4px; cursor:pointer; font-family:inherit; font-size:12.5px; color:var(--c-text); }
-      .tj-menu button.it:hover { background:var(--c-blue-soft); }
-      .tj-menu hr { border:0; border-top:1px solid var(--c-line); margin:2px 0; width:100%; }
-      .tj-menu .sec { font-weight:700; color:var(--c-navy); font-size:12px; }
-      .tj-menu select, .tj-menu input[type=text], .tj-menu input[type=number] { padding:4px 6px; font-size:12.5px; border:1px solid var(--c-line-strong); border-radius:4px; font-family:inherit; }
-      .tj-menu .fila { display:flex; gap:4px; } .tj-menu .fila > * { flex:1; min-width:0; }
-      .tj-menu .vals { max-height:210px; overflow:auto; border:1px solid var(--c-line); border-radius:4px; padding:4px; }
-      .tj-menu .vals label { display:flex; gap:6px; align-items:center; padding:2px 2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .tj-menu .vals label small { color:var(--c-muted); overflow:hidden; text-overflow:ellipsis; }
-      .tj-menu .cols { display:flex; flex-wrap:wrap; gap:4px; }
-      .tj-menu .cols label { display:inline-flex; gap:4px; align-items:center; border:1px solid var(--c-line); border-radius:4px; padding:2px 6px; cursor:pointer; }
-      .tj-menu .cols i { width:12px; height:10px; border-radius:2px; display:inline-block; }
-      .tj-menu .pie { display:flex; justify-content:space-between; gap:6px; }
-      .tj-ed { position:fixed; z-index:135; }
-      .tj-ed input { width:110px; height:26px; padding:2px 6px; font-weight:700; font-size:12.5px; border:2px solid var(--c-blue); border-radius:3px; outline:none; text-transform:uppercase; }
-      .tj-sug { background:#fff; border:1px solid var(--c-line-strong); border-radius:5px; box-shadow:0 10px 26px rgba(15,36,64,.22); max-height:260px; overflow:auto; width:340px; margin-top:2px; font-size:12px; }
-      .tj-sug div { padding:4px 8px; cursor:pointer; display:flex; gap:8px; align-items:center; } .tj-sug div b { min-width:44px; }
-      .tj-sug div.on, .tj-sug div:hover { background:var(--c-blue-soft); }
-      .tj-sug i { width:12px; height:12px; border-radius:2px; flex:none; display:inline-block; }
-      #tj-root .tj-resumen td.r { text-align:right; }
-      /* La regla global de Operaciones (input, select { width:100%; fondo oscuro }) no aplica a estos controles. */
-      #tj-root .tj-bar select, #tj-root .tj-bar input { width:auto; }
-      #tj-root .tj-bar #tj-mes { width:120px; } #tj-root .tj-bar #tj-anio { width:84px; } #tj-root .tj-bar #tj-f-cc { width:280px; }
-      #tj-root .tj-bar input[type=date] { width:140px; }
-      #tj-root .tj-bar #tj-f-reg { width:120px; } #tj-root .tj-bar #tj-f-q { width:190px; }
-      #tj-root .tj-bar .cert-actions { flex-wrap:nowrap; }
-      #tj-modal input[type=checkbox], #tj-modal input[type=color] { width:auto; }
-      #tj-modal input[type=color] { width:44px; height:28px; padding:1px; }
-      #tj-modal .cert-t input[type=text], #tj-modal .cert-t select { width:auto; }
-      #tj-modal input[type=date] { width:auto; }
-      .tj-menu input, .tj-menu select, .tj-ed input { background:#fff !important; color:var(--c-text) !important; box-shadow:none; transition:none; }
-      .tj-menu input[type=text], .tj-menu select { width:100%; }
-      .tj-menu input[type=checkbox] { width:14px; height:14px; margin:0; padding:0; flex:none; accent-color:var(--c-blue); }
-      .tj-menu .vals label { justify-content:flex-start; text-align:left; }
-      .tj-menu .cols label { flex:0 0 auto; }
-      .tj-menu .fila input[type=text] { width:auto; }
-      .tj-menu select option { background:#fff; color:var(--c-text); }
-    `;
-    document.head.appendChild(s);
+    const r = root();
+    if (r && T.op) r.style.setProperty('--sg-shift', T.op.color_cambio_turno);
   }
 
-  // ---------------------------------------------------------------- modal (estilo cert-modal)
+  // ---------------------------------------------------------------- modal (componente .modal del design system)
   function modal(titulo, cuerpo, pie = '', ancho = 'sm') {
     let bg = $('tj-modal');
     if (!bg) {
       bg = document.createElement('div');
       bg.id = 'tj-modal';
-      bg.className = 'cert-modal-bg encima';
+      bg.className = 'modal is-toggle encima';
       document.body.appendChild(bg);
       bg.addEventListener('click', (ev) => { if (ev.target === bg || ev.target.closest('[data-tj-cerrar]')) cerrarModal(); });
     }
-    bg.innerHTML = `<div class="cert-modal ${ancho}"><div class="cert-modal-h"><h3>${titulo}</h3><button class="cert-close" type="button" data-tj-cerrar>×</button></div>
-      <div class="cert-modal-b" id="tj-modal-b">${cuerpo}</div>${pie ? `<div class="cert-modal-f">${pie}</div>` : ''}</div>`;
+    bg.innerHTML = `<div class="modal-panel ${ancho}" role="dialog" aria-modal="true"><div class="modal-head"><h3>${titulo}</h3><span class="spacer"></span><button class="btn btn-ghost btn-icon" type="button" data-tj-cerrar aria-label="Cerrar">${ic('x')}</button></div>
+      <div class="modal-body ctl-auto" id="tj-modal-b">${cuerpo}</div>${pie ? `<div class="modal-foot">${pie}</div>` : ''}</div>`;
     bg.classList.add('open');
     return bg;
   }
@@ -295,7 +212,7 @@
   async function abrir() {
     estilos();
     if (!T.cargado) {
-      root().innerHTML = '<p class="cert-muted" style="padding:20px">Cargando…</p>';
+      root().innerHTML = '<section class="card"><div class="empty-state">Cargando la tarja…</div></section>';
       try {
         const [op, prefs] = await Promise.all([api(`${API}/opciones`), api(`${API}/preferencias`).catch(() => ({}))]);
         T.op = op;
@@ -314,7 +231,7 @@
         T.mostrarTot = !!(prefs && prefs.mostrarTotales);
         T.cargado = true;
         estilos(); const st = $('tj-estilos'); if (st) { st.remove(); estilos(); }
-      } catch (err) { root().innerHTML = `<p class="cert-muted" style="padding:20px">${e(err.message)}</p>`; return; }
+      } catch (err) { root().innerHTML = `<section class="card"><div class="empty-state is-danger-text">${e(err.message)}</div></section>`; return; }
     }
     await cargarMes();
   }
@@ -333,41 +250,52 @@
     const anios = []; for (let a = 2025; a <= Number(T.op.hoy.slice(0, 4)) + 2; a += 1) anios.push([a, a]);
     if (!anios.some(([a]) => a === aD)) anios.push([aD, aD]);
     const completo = mesCompleto(T.desde, T.hasta);
+    // Acciones del encabezado de la página (fuera de la grilla): Exportar ▾ y Configuración.
+    $('tj-head-acciones').innerHTML = `
+      <button type="button" class="btn" id="tj-exp" aria-haspopup="menu" aria-expanded="false">${ic('download')}Exportar${ic('chevron-down', 'i-sm')}</button>
+      ${puede('configurar') ? `<button type="button" class="btn btn-icon" id="tj-conf" title="Configuración de la tarja" aria-label="Configuración de la tarja">${ic('settings')}</button>` : ''}
+      <div class="menu" id="tj-exp-menu" role="menu" hidden>
+        <button type="button" class="menu-item" role="menuitem" id="tj-exp-f" data-cerrar-menu>${ic('filter')}Filtrado (lo que se ve en pantalla)</button>
+        <button type="button" class="menu-item" role="menuitem" id="tj-exp-t" data-cerrar-menu>${ic('calendar-days')}Todo el período</button>
+      </div>`;
+    const ayuda = puede('cargar')
+      ? ['Clic o arrastre: seleccionar celdas (Ctrl agrega, Shift extiende)', 'Escriba un código o centro de costo y Enter para cargar', 'Supr: borra la selección · F2: edita la celda',
+        'Ctrl+C / Ctrl+V: copiar y pegar rangos', 'Doble clic: horas del día y horas a mano', 'Flechas, Enter y Tab: moverse por la grilla']
+      : ['Solo consulta: su usuario no tiene habilitada la carga.', 'Doble clic en un día: ver horas e historial'];
     root().innerHTML = `
-      <div class="seguimiento-header"><div><h2>Tarja General</h2><p>Registro diario de operadores: un centro de costo o un código de estado por día. Horas y cambios de turno se calculan solos.</p></div></div>
-      <div class="seguimiento-main"><div class="cert-card"><div class="cert-card-b">
-        <div class="tj-bar">
-          <div class="cert-field"><label>Período (desde – hasta)</label><div class="cert-actions">
-            <button type="button" class="cert-btn sm" id="tj-prev" title="Correr el período un mes atrás">◀</button>
-            <input type="date" id="tj-desde" value="${T.desde}" title="Desde">
-            <span class="cert-muted">al</span>
-            <input type="date" id="tj-hasta" value="${T.hasta}" title="Hasta">
-            <button type="button" class="cert-btn sm" id="tj-next" title="Correr el período un mes adelante">▶</button>
-            <button type="button" class="cert-btn sm primary" id="tj-aplicar">Aplicar</button></div></div>
-          <div class="cert-field"><label>Mes completo</label><div class="cert-actions">
-            <select id="tj-mes">${completo ? '' : '<option value="" selected>—</option>'}${opts(MESES.map((m, i) => [i + 1, m]), completo ? mD : '')}</select>
-            <select id="tj-anio">${opts(anios, aD)}</select>
-            <button type="button" class="cert-btn sm" id="tj-hoy" title="Mes actual">Hoy</button></div></div>
-          <div class="cert-field"><label>Centro de costo (obra de hoy o trabajado en el mes)</label>
-            <select id="tj-f-cc" style="max-width:320px">${opts([['', 'Todos']].concat(T.op.centros_costos.map((c) => [c.id, `${c.id} - ${c.nombre}`])), r.cc)}</select></div>
-          <div class="cert-field"><label>Régimen de turno</label><select id="tj-f-reg">${opts([['', 'Todos'], ['Rotativo', 'Rotativo'], ['Diario', 'Diario']], r.regimen)}</select></div>
-          <div class="cert-field"><label>Buscar legajo o nombre</label><input type="text" id="tj-f-q" value="${e(r.q)}" placeholder="Ej.: 381 o CRUZ" style="width:190px"></div>
-          <span style="flex:1"></span>
-          <div class="cert-actions">
-            <button type="button" class="cert-btn" id="tj-exp-f" title="Exporta lo que se ve en pantalla">Exportar filtrado</button>
-            <button type="button" class="cert-btn" id="tj-exp-t">Exportar todo</button>
-            ${puede('configurar') ? '<button type="button" class="cert-btn" id="tj-conf">Configuración</button>' : ''}
+      <section class="card" aria-label="Grilla de la tarja">
+        <div class="toolbar">
+          <button type="button" class="btn btn-icon btn-sm" id="tj-prev" title="Correr el período un mes atrás" aria-label="Período anterior">${ic('left', 'i-sm')}</button>
+          <select class="chip-select" id="tj-mes" aria-label="Mes">${completo ? '' : '<option value="" selected>Período personalizado</option>'}${opts(MESES.map((m, i) => [i + 1, m]), completo ? mD : '')}</select>
+          <select class="chip-select" id="tj-anio" aria-label="Año">${opts(anios, aD)}</select>
+          <button type="button" class="btn btn-icon btn-sm" id="tj-next" title="Correr el período un mes adelante" aria-label="Período siguiente">${ic('right', 'i-sm')}</button>
+          <button type="button" class="btn btn-sm" id="tj-hoy" title="Mes actual">Hoy</button>
+          <span class="range"><input type="date" class="input input-sm" id="tj-desde" value="${T.desde}" aria-label="Desde">–<input type="date" class="input input-sm" id="tj-hasta" value="${T.hasta}" aria-label="Hasta">
+            <button type="button" class="btn btn-sm" id="tj-aplicar">Aplicar</button></span>
+          <select class="chip-select ${r.cc ? 'on' : ''}" id="tj-f-cc" aria-label="Centro de costo (obra de hoy o trabajado en el período)" title="Obra de hoy o trabajado en el período">${opts([['', 'Todos los centros de costo']].concat(T.op.centros_costos.map((c) => [c.id, `${c.id} - ${c.nombre}`])), r.cc)}</select>
+          <select class="chip-select ${r.regimen ? 'on' : ''}" id="tj-f-reg" aria-label="Régimen de turno">${opts([['', 'Todos los regímenes'], ['Rotativo', 'Rotativo'], ['Diario', 'Diario']], r.regimen)}</select>
+          <div class="search">${ic('search')}<input type="search" class="input" id="tj-f-q" value="${e(r.q)}" placeholder="Legajo o nombre" aria-label="Buscar legajo o nombre" autocomplete="off"></div>
+          <button type="button" class="btn btn-sm" id="tj-tot"></button>
+          <button type="button" class="btn btn-ghost btn-sm" id="tj-borrar-todo">Borrar filtros</button>
+          <span class="spacer"></span>
+          <span class="muted num" id="tj-cuenta"></span>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" id="tj-ayuda" aria-haspopup="dialog" aria-expanded="false" title="Atajos de teclado y mouse" aria-label="Atajos de teclado y mouse">${ic('help', 'i-sm')}</button>
+          <div class="menu pop" id="tj-ayuda-pop" role="dialog" aria-label="Atajos" hidden>
+            <div class="menu-head">${puede('cargar') ? 'Carga rápida' : 'Solo consulta'}</div>
+            <ul class="list-plain help" style="padding: 0 12px 8px">${ayuda.map((t) => `<li>${t}</li>`).join('')}</ul>
           </div>
         </div>
-        <div class="tj-info">
-          <div class="cert-actions"><b id="tj-cuenta"></b><button type="button" class="cert-btn sm" id="tj-borrar-todo">Borrar todos los filtros</button>
-            <button type="button" class="cert-btn sm" id="tj-tot"></button>
-            <span class="cert-muted" style="font-size:11.5px">${puede('cargar') ? 'Clic o arrastre para seleccionar · escriba el código y Enter · Supr borra · Ctrl+C / Ctrl+V · doble clic: horas del día' : 'Solo consulta'}</span></div>
-          <div class="tj-ley" id="tj-ley"></div>
+        <div class="toolbar" style="padding-top: 0">
+          <details class="legend-codes"><summary>Ver códigos${ic('chevron-down', 'i-sm')}</summary><div class="chip-row" id="tj-ley"></div></details>
         </div>
-        <div class="tj-scroll" id="tj-scroll"></div>
-      </div></div>
-      <div class="cert-card tj-resumen"><div class="cert-card-h"><h3>Resumen por centro de costo del ${fFecha(T.desde)} al ${fFecha(T.hasta)} (operadores mostrados)</h3></div><div class="cert-card-b" id="tj-res-cc"></div></div></div>`;
+        <div class="sheet-wrap tj-scroll" id="tj-scroll"></div>
+      </section>
+      <section class="card tj-resumen">
+        <div class="card-head"><div><h3 class="card-title">Resumen por centro de costo del ${fFecha(T.desde)} al ${fFecha(T.hasta)}</h3><p class="card-sub">Operadores mostrados en la grilla</p></div></div>
+        <div class="card-body" id="tj-res-cc"></div>
+      </section>`;
+    $('tj-exp').addEventListener('click', (ev) => SMG.abrirMenu($('tj-exp-menu'), ev.currentTarget));
+    $('tj-ayuda').addEventListener('click', (ev) => SMG.abrirMenu($('tj-ayuda-pop'), ev.currentTarget, { foco: false }));
     $('tj-prev').addEventListener('click', () => mover(-1));
     $('tj-next').addEventListener('click', () => mover(1));
     $('tj-hoy').addEventListener('click', () => fijarPeriodo(...rangoMes(Number(T.op.hoy.slice(0, 4)), Number(T.op.hoy.slice(5, 7)))));
@@ -406,10 +334,11 @@
 
   function leyenda() {
     const k = T.op.codigos.filter((c) => c.activo);
-    $('tj-ley').innerHTML = `<span><i style="background:${T.op.centros_costos[0] ? T.op.centros_costos[0].color : '#cfe3fb'}"></i>Centro de costo (color por obra)</span>
-      <span><i style="background:#fff;box-shadow:inset 0 -4px 0 ${T.op.color_cambio_turno}"></i>Cambio de turno</span>
-      <span><i style="background:#fff;border-top:5px solid var(--c-red);border-left:5px solid transparent;width:0;height:0"></i>Horas a mano</span>
-      ${k.map((c) => `<span title="${e(c.descripcion)}"><i style="background:${e(c.color)}"></i>${e(c.codigo)} ${e(c.descripcion)}</span>`).join('')}`;
+    const cc0 = T.op.centros_costos[0] ? T.op.centros_costos[0].color : '#3B82F6';
+    $('tj-ley').innerHTML = `<span class="chip"><i class="swatch" style="--cell:${e(cc0)}"></i>Centro de costo (color por obra)</span>
+      <span class="chip"><i class="swatch" style="--cell:${e(T.op.color_cambio_turno)}"></i>Cambio de turno (línea inferior)</span>
+      <span class="chip"><i class="swatch" style="--cell:var(--danger)"></i>Horas a mano (esquina)</span>
+      ${k.map((c) => `<span class="chip" title="${e(c.descripcion)}"><i class="swatch" style="--cell:${e(c.color)}"></i><b>${e(c.codigo)}</b>${e(c.descripcion)}</span>`).join('')}`;
   }
 
   function aplicarFiltros(guardar = true) {
@@ -421,39 +350,42 @@
 
   const ICONO_F = '<svg viewBox="0 0 10 10"><path d="M0 1h10L6 5.5V10L4 8.8V5.5z"/></svg>';
   const ICONO_V = '<svg viewBox="0 0 10 10"><path d="M1 3h8L5 8z"/></svg>';
-  const fbtn = (k) => `<button type="button" class="tj-fbtn ${filtroActivo(k) || (T.orden && T.orden.key === k) ? 'on' : ''}" data-tj-f="${k}" title="Filtrar y ordenar">${filtroActivo(k) ? ICONO_F : ICONO_V}</button>`;
+  const fbtn = (k) => `<button type="button" class="tj-fbtn sg-filter ${filtroActivo(k) || (T.orden && T.orden.key === k) ? 'on' : ''}" data-tj-f="${k}" title="Filtrar y ordenar">${filtroActivo(k) ? ICONO_F : ICONO_V}</button>`;
 
   function renderGrilla() {
     const g = T.g; const hoy = g.hoy;
-    const cab = `<tr><th class="fx fx1"><div class="tj-h">Legajo ${fbtn('legajo')}</div></th><th class="fx fx2"><div class="tj-h">Apellido y Nombre ${fbtn('nombre')}</div></th>
-      <th class="fx fx3"><div class="tj-h">Obra (hoy) ${fbtn('obra')}</div></th>
-      ${g.dias.map((d, i) => `<th class="dia ${d.fecha === hoy ? 'hoy' : ''} ${d.feriado ? 'fer' : (d.dow >= 5 ? 'fin' : '')} ${d.dia === 1 && i > 0 ? 'm1' : ''}" title="${fFecha(d.fecha)}${d.feriado ? ` · Feriado: ${e(d.feriado)}` : ''}">
-        <div class="tj-h">${i === 0 || d.dia === 1 ? `<em class="tj-mes">${MES_CORTO[d.mes - 1]}</em>` : ''}<span>${d.dia}</span><small>${INI[d.dow]}</small>${fbtn(`d${i + 1}`)}</div></th>`).join('')}
-      ${T.mostrarTot ? TOTALES.map(([k, c, l]) => `<th class="tot" title="${l}"><div class="tj-h">${c} ${fbtn(k)}</div></th>`).join('') : ''}</tr>`;
+    const cab = `<tr><th class="fx fx1 sg-fix sg-fix-1"><div class="tj-h sg-head">Legajo ${fbtn('legajo')}</div></th><th class="fx fx2 sg-fix sg-fix-2"><div class="tj-h sg-head">Apellido y nombre ${fbtn('nombre')}</div></th>
+      <th class="fx fx3 sg-fix sg-fix-3"><div class="tj-h sg-head">Obra (hoy) ${fbtn('obra')}</div></th>
+      ${g.dias.map((d, i) => `<th class="dia sg-day ${d.fecha === hoy ? 'hoy sg-today' : ''} ${d.feriado ? 'fer sg-holiday' : (d.dow >= 5 ? 'fin sg-weekend' : '')} ${d.dia === 1 && i > 0 ? 'm1 sg-month-start' : ''}" title="${fFecha(d.fecha)}${d.feriado ? ` · Feriado: ${e(d.feriado)}` : ''}">
+        <div class="tj-h sg-head">${i === 0 || d.dia === 1 ? `<em class="tj-mes sg-month">${MES_CORTO[d.mes - 1]}</em>` : ''}<b>${d.dia}</b><small>${INI[d.dow]}</small>${fbtn(`d${i + 1}`)}</div></th>`).join('')}
+      ${T.mostrarTot ? TOTALES.map(([k, c, l]) => `<th class="tot sg-total" title="${l}"><div class="tj-h sg-head">${c} ${fbtn(k)}</div></th>`).join('') : ''}</tr>`;
     const filas = T.visibles.map((o, ri) => {
       const obra = o.obra.pendiente
-        ? `<span class="tj-pend" title="Pendiente: hoy sin cargar${o.obra.cc_id ? ` (último centro: ${o.obra.cc_id} - ${e(descCodigo(o.obra.cc_id))})` : ''}">P</span> <span class="tj-est">Pendiente</span>`
-        : (o.obra.estado ? `<span class="tj-est">${e(o.obra.texto)}</span>` : e(o.obra.texto));
+        ? `<span class="chip chip-warn sg-tag tj-pend" title="Pendiente: hoy sin cargar${o.obra.cc_id ? ` (último centro: ${o.obra.cc_id} - ${e(descCodigo(o.obra.cc_id))})` : ''}">P</span><span class="muted tj-est">Pendiente</span>`
+        : (o.obra.estado ? `<span class="muted tj-est">${e(o.obra.texto)}</span>` : e(o.obra.texto));
       const dias = g.dias.map((d, ci) => {
         const cel = o.dias[d.fecha];
-        let cls = `d${d.fecha === hoy ? ' hoyc' : ''}${d.dow >= 5 || d.feriado ? ' fin' : ''}${d.dia === 1 && ci > 0 ? ' m1' : ''}`;
+        let cls = `d sg-cell${d.fecha === hoy ? ' hoyc sg-today' : ''}${d.dow >= 5 || d.feriado ? ' fin sg-weekend' : ''}${d.dia === 1 && ci > 0 ? ' m1 sg-month-start' : ''}`;
         if (!cel) return `<td class="${cls}" data-r="${ri}" data-c="${ci}"></td>`;
-        if (cel.ct) cls += ' ct';
-        if (cel.m) cls += ' man';
+        if (cel.ct) cls += ' ct is-shift';
+        if (cel.m) cls += ' man is-manual';
         const bg = colorDe(cel);
         const tip = `${cel.c} - ${descCodigo(cel.c)}\n${nf(cel.h)} h efectivas + ${nf(cel.b)} h break${cel.ct ? '\nCambio de turno (subida / bajada)' : ''}${cel.m ? '\nHoras editadas a mano' : ''}${cel.o ? `\nObs.: ${cel.o}` : ''}`;
-        return `<td class="${cls}" data-r="${ri}" data-c="${ci}" style="background:${bg};color:${textoOscuro(bg) ? '#0f2440' : '#fff'}" title="${e(tip)}">${e(cel.c)}</td>`;
+        return `<td class="${cls}" data-r="${ri}" data-c="${ci}" style="--cell:${e(bg)}" title="${e(tip)}">${e(cel.c)}</td>`;
       }).join('');
-      return `<tr><td class="fx fx1">${e(o.legajo)}</td><td class="fx fx2" data-tj-op="${e(o.legajo)}" title="${e(o.nombre)} · Régimen ${e(o.regimen)}"><span class="tj-reg ${o.regimen === 'Diario' ? 'dia' : ''}">${o.regimen === 'Diario' ? 'DIA' : 'ROT'}</span>${e(o.nombre)}</td>
-        <td class="fx fx3" title="${e(o.obra.pendiente ? 'Pendiente: hoy sin cargar' : o.obra.texto)}">${obra}</td>${dias}
-        ${T.mostrarTot ? TOTALES.map(([k]) => `<td class="tot">${nf(o.totales[k])}</td>`).join('') : ''}</tr>`;
+      return `<tr><td class="fx fx1 sg-fix sg-fix-1">${e(o.legajo)}</td><td class="fx fx2 sg-fix sg-fix-2 sg-link" data-tj-op="${e(o.legajo)}" title="${e(o.nombre)} · Régimen ${e(o.regimen)}"><span class="chip ${o.regimen === 'Diario' ? 'chip-accent' : 'chip-muted'} sg-tag tj-reg">${o.regimen === 'Diario' ? 'DIA' : 'ROT'}</span>${e(o.nombre)}</td>
+        <td class="fx fx3 sg-fix sg-fix-3" title="${e(o.obra.pendiente ? 'Pendiente: hoy sin cargar' : o.obra.texto)}">${obra}</td>${dias}
+        ${T.mostrarTot ? TOTALES.map(([k]) => `<td class="tot sg-total">${nf(o.totales[k])}</td>`).join('') : ''}</tr>`;
     }).join('');
-    $('tj-scroll').innerHTML = `<table class="tj-t"><thead>${cab}</thead><tbody>${filas || `<tr><td class="fx fx1"></td><td class="fx fx2 cert-muted" style="cursor:default;text-decoration:none">Sin operadores para los filtros elegidos.</td><td class="fx fx3"></td></tr>`}</tbody></table>`;
+    $('tj-scroll').innerHTML = `<table class="tj-t sheet-grid"><thead>${cab}</thead><tbody>${filas || `<tr><td class="fx fx1 sg-fix sg-fix-1"></td><td class="fx fx2 sg-fix sg-fix-2 muted">Sin operadores para los filtros elegidos.</td><td class="fx fx3 sg-fix sg-fix-3"></td></tr>`}</tbody></table>`;
     $('tj-cuenta').textContent = `Mostrando ${T.visibles.length} de ${g.operadores.length} operadores`;
+    const [aP, mP] = partes(T.desde);
+    $('tj-sub').textContent = `${g.operadores.length} operadores · ${mesCompleto(T.desde, T.hasta) ? `${MESES[mP - 1]} ${aP}` : `${fFecha(T.desde)} al ${fFecha(T.hasta)}`}`;
     // Un filtro u orden sobre una columna de totales oculta sigue aplicado: el botón lo avisa.
     const totFiltrado = TOTALES.some(([k]) => filtroActivo(k) || (T.orden && T.orden.key === k));
     $('tj-tot').textContent = T.mostrarTot ? 'Ocultar totales' : `Mostrar totales${totFiltrado ? ' (con filtro)' : ''}`;
-    $('tj-tot').classList.toggle('primary', !T.mostrarTot && totFiltrado);
+    $('tj-tot').classList.toggle('btn-primary', !T.mostrarTot && totFiltrado);
+    $('tj-tot').setAttribute('aria-pressed', String(T.mostrarTot));
     resumenCentros();
   }
 
@@ -466,10 +398,10 @@
     }));
     const lista = [...acc.values()].sort((a, b) => Number(a.cc) - Number(b.cc));
     const tot = lista.reduce((t, r) => ({ dh: t.dh + r.dh, h: t.h + r.h, b: t.b + r.b }), { dh: 0, h: 0, b: 0 });
-    $('tj-res-cc').innerHTML = lista.length ? `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Centro de costo</th><th>Descripción</th><th>Operadores</th><th>Días-hombre</th><th>Hs efectivas</th><th>Hs break</th></tr></thead><tbody>
-      ${lista.map((r) => `<tr><td class="c"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${paleta(r.cc)};margin-right:6px"></span>${e(r.cc)}</td><td>${e(descCodigo(r.cc))}</td><td class="r">${r.ops.size}</td><td class="r">${r.dh}</td><td class="r">${nf(r.h)}</td><td class="r">${nf(r.b)}</td></tr>`).join('')}
-      <tr class="tot"><td colspan="3">Total</td><td class="r">${tot.dh}</td><td class="r">${nf(tot.h)}</td><td class="r">${nf(tot.b)}</td></tr></tbody></table></div>`
-      : '<p class="cert-muted">No hay días trabajados en el período para los operadores mostrados.</p>';
+    $('tj-res-cc').innerHTML = lista.length ? `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Centro de costo</th><th>Descripción</th><th class="num">Operadores</th><th class="num">Días-hombre</th><th class="num">Hs efectivas</th><th class="num">Hs break</th></tr></thead><tbody>
+      ${lista.map((r) => `<tr><td class="mono"><i class="swatch" style="--cell:${e(paleta(r.cc))};margin-right:6px"></i>${e(r.cc)}</td><td>${e(descCodigo(r.cc))}</td><td class="num">${r.ops.size}</td><td class="num">${r.dh}</td><td class="num">${nf(r.h)}</td><td class="num">${nf(r.b)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="3">Total</td><td class="num">${tot.dh}</td><td class="num">${nf(tot.h)}</td><td class="num">${nf(tot.b)}</td></tr></tbody></table></div>`
+      : '<p class="help">No hay días trabajados en el período para los operadores mostrados.</p>';
   }
 
   // ---------------------------------------------------------------- selección
@@ -477,13 +409,13 @@
   const enRect = (q, r, c) => r >= Math.min(q.r0, q.r1) && r <= Math.max(q.r0, q.r1) && c >= Math.min(q.c0, q.c1) && c <= Math.max(q.c0, q.c1);
   function pintarSeleccion() {
     const sc = $('tj-scroll'); if (!sc) return;
-    sc.querySelectorAll('td.d.sel, td.d.act').forEach((td) => td.classList.remove('sel', 'act'));
+    sc.querySelectorAll('td.d.sel, td.d.act').forEach((td) => td.classList.remove('sel', 'act', 'is-selected', 'is-active'));
     T.rects.forEach((q) => {
       for (let r = Math.min(q.r0, q.r1); r <= Math.max(q.r0, q.r1); r += 1) {
-        for (let c = Math.min(q.c0, q.c1); c <= Math.max(q.c0, q.c1); c += 1) { const td = celdaTd(r, c); if (td) td.classList.add('sel'); }
+        for (let c = Math.min(q.c0, q.c1); c <= Math.max(q.c0, q.c1); c += 1) { const td = celdaTd(r, c); if (td) td.classList.add('sel', 'is-selected'); }
       }
     });
-    if (T.act) { const td = celdaTd(T.act.r, T.act.c); if (td) td.classList.add('act'); }
+    if (T.act) { const td = celdaTd(T.act.r, T.act.c); if (td) td.classList.add('act', 'is-active'); }
   }
   function celdasSeleccionadas() {
     const vistas = new Set(); const salida = [];
@@ -554,18 +486,18 @@
     const td = celdaTd(T.act.r, T.act.c); if (!td) return;
     const rc = td.getBoundingClientRect();
     const box = document.createElement('div');
-    box.className = 'tj-ed';
+    box.className = 'tj-ed sheet-editor';
     box.style.left = `${Math.min(rc.left, window.innerWidth - 360)}px`;
     box.style.top = `${rc.top}px`;
-    box.innerHTML = '<input type="text" autocomplete="off" spellcheck="false"><div class="tj-sug"></div>';
+    box.innerHTML = '<input type="text" class="input" autocomplete="off" spellcheck="false" aria-label="Código o centro de costo"><div class="tj-sug menu" role="listbox"></div>';
     document.body.appendChild(box);
     const inp = box.querySelector('input'); const sug = box.querySelector('.tj-sug');
     T.editor = { box, inp, sug, idx: 0, lista: [] };
     const pintar = () => {
       const l = sugerencias(inp.value); T.editor.lista = l;
       if (T.editor.idx >= l.length) T.editor.idx = 0;
-      sug.innerHTML = l.map((x, i) => `<div data-i="${i}" class="${i === T.editor.idx ? 'on' : ''}"><i style="background:${e(x.col)}"></i><b>${e(x.v)}</b><span>${e(x.d)}</span></div>`).join('')
-        || '<div class="cert-muted" style="cursor:default">Sin coincidencias: no es un centro de costo ni un código de estado</div>';
+      sug.innerHTML = l.map((x, i) => `<div data-i="${i}" role="option" class="menu-item combo-opt ${i === T.editor.idx ? 'on' : ''}" style="justify-content:flex-start"><i class="swatch" style="--cell:${e(x.col)}"></i><b>${e(x.v)}</b><span class="trunc muted">${e(x.d)}</span></div>`).join('')
+        || '<div class="menu-head">Sin coincidencias: no es un centro de costo ni un código de estado</div>';
     };
     const confirmar = (valor) => {
       const v = String(valor ?? '').trim().toUpperCase();
@@ -707,36 +639,36 @@
     base.forEach((o) => { const v = col.valor(o); if (v === '' || v === null || v === undefined) vacias = true; else valores.set(String(v), v); });
     const lista = [...valores.values()].sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'es', { numeric: true })));
     const elegidos = f.vals ? new Set(f.vals) : null;
-    const ops = col.mixto ? [['', '— sin condición —']].concat(OPS_TXT, OPS_NUM) : (col.num ? [['', '— sin condición —']].concat(OPS_NUM) : [['', '— sin condición —']].concat(OPS_TXT));
+    const ops = col.mixto ? [['', 'Sin condición']].concat(OPS_TXT, OPS_NUM) : (col.num ? [['', 'Sin condición']].concat(OPS_NUM) : [['', 'Sin condición']].concat(OPS_TXT));
     const colores = col.mixto ? Object.keys(CATS) : [];
     const muestra = (cat) => ({ trabajado: '#cfe3fb', cambio: T.op.color_cambio_turno, descanso: (codigo('D') || {}).color || '#cbd5e1', vacaciones: (codigo('V') || {}).color || '#9be3b0',
       ausencia: (codigo('F') || {}).color || '#fca5a5', otro: (codigo('VJ') || {}).color || '#c4b5fd', vacia: '#ffffff' }[cat]);
     const m = document.createElement('div');
     m.id = 'tj-menu';
-    m.className = 'tj-menu';
+    m.className = 'tj-menu menu pop pop-stack ctl-auto';
     const asc = col.num || col.mixto ? 'Ordenar de menor a mayor' : 'Ordenar de A a Z';
     const desc = col.num || col.mixto ? 'Ordenar de mayor a menor' : 'Ordenar de Z a A';
-    m.innerHTML = `<div class="sec">${e(col.label)}</div>
-      <button type="button" class="it" data-ord="asc">↑ ${asc}${T.orden && T.orden.key === key && T.orden.dir === 'asc' ? ' ✓' : ''}</button>
-      <button type="button" class="it" data-ord="desc">↓ ${desc}${T.orden && T.orden.key === key && T.orden.dir === 'desc' ? ' ✓' : ''}</button>
-      <hr>
-      ${colores.length ? `<div class="sec">Filtrar por color</div><div class="cols">${colores.map((c) => `<label><input type="checkbox" data-col="${c}" ${(f.color || []).includes(c) ? 'checked' : ''}><i style="background:${muestra(c)};border:1px solid #cbd5e1"></i>${CATS[c]}</label>`).join('')}</div><hr>` : ''}
-      <div class="sec">${col.mixto ? 'Filtros de texto / número' : (col.num ? 'Filtros de número' : 'Filtros de texto')}</div>
-      <div class="fila"><select id="tj-m-op">${col.mixto ? `<option value="">— sin condición —</option><optgroup label="Texto">${opts(OPS_TXT, f.cond && f.cond.op)}</optgroup><optgroup label="Número">${opts(OPS_NUM, f.cond && f.cond.op)}</optgroup>` : opts(ops, f.cond && f.cond.op)}</select></div>
-      <div class="fila"><input type="text" id="tj-m-a" placeholder="valor" value="${e(f.cond ? f.cond.a ?? '' : '')}"><input type="text" id="tj-m-b" placeholder="y" value="${e(f.cond ? f.cond.b ?? '' : '')}"></div>
-      <hr>
-      <input type="text" id="tj-m-q" placeholder="Buscar">
-      <div class="vals" id="tj-m-vals">
+    m.innerHTML = `<div class="menu-head" style="padding: 4px 4px 0"><b>${e(col.label)}</b></div>
+      <div><button type="button" class="menu-item it" data-ord="asc">${ic('up', 'i-sm')}${asc}${T.orden && T.orden.key === key && T.orden.dir === 'asc' ? ` ${ic('check', 'i-sm')}` : ''}</button>
+      <button type="button" class="menu-item it" data-ord="desc">${ic('down', 'i-sm')}${desc}${T.orden && T.orden.key === key && T.orden.dir === 'desc' ? ` ${ic('check', 'i-sm')}` : ''}</button></div>
+      <div class="menu-sep"></div>
+      ${colores.length ? `<div class="kpi-label">Filtrar por color</div><div class="chip-row cols">${colores.map((c) => `<label><input type="checkbox" data-col="${c}" ${(f.color || []).includes(c) ? 'checked' : ''}><i class="swatch" style="--cell:${muestra(c)}"></i>${CATS[c]}</label>`).join('')}</div><div class="menu-sep"></div>` : ''}
+      <div class="kpi-label">${col.mixto ? 'Filtros de texto o número' : (col.num ? 'Filtros de número' : 'Filtros de texto')}</div>
+      <div class="pop-row fila"><select id="tj-m-op" class="select" aria-label="Condición">${col.mixto ? `<option value="">Sin condición</option><optgroup label="Texto">${opts(OPS_TXT, f.cond && f.cond.op)}</optgroup><optgroup label="Número">${opts(OPS_NUM, f.cond && f.cond.op)}</optgroup>` : opts(ops, f.cond && f.cond.op)}</select></div>
+      <div class="pop-row fila"><input type="text" class="input" id="tj-m-a" placeholder="Valor" aria-label="Valor" value="${e(f.cond ? f.cond.a ?? '' : '')}"><input type="text" class="input" id="tj-m-b" placeholder="y" aria-label="Hasta" value="${e(f.cond ? f.cond.b ?? '' : '')}"></div>
+      <div class="menu-sep"></div>
+      <input type="search" class="input" id="tj-m-q" placeholder="Buscar" aria-label="Buscar valores">
+      <div class="pop-list vals" id="tj-m-vals">
         <label><input type="checkbox" id="tj-m-todo"> <b>(Seleccionar todo)</b></label>
         ${vacias ? `<label data-v=""><input type="checkbox" value="" ${!elegidos || elegidos.has('') ? 'checked' : ''}> (Vacías)</label>` : ''}
         ${lista.map((v) => { const s = String(v); const d = col.mixto ? descCodigo(s) : ''; return `<label data-v="${e(s.toLowerCase())} ${e(d.toLowerCase())}"><input type="checkbox" value="${e(s)}" ${!elegidos || elegidos.has(s) ? 'checked' : ''}> ${e(s)} ${d ? `<small>${e(d)}</small>` : ''}</label>`; }).join('')}
       </div>
-      <div class="pie"><button type="button" class="cert-btn sm danger" id="tj-m-borrar">Borrar filtro</button>
-        <span class="cert-actions"><button type="button" class="cert-btn sm" id="tj-m-cancel">Cancelar</button><button type="button" class="cert-btn sm primary" id="tj-m-ok">Aceptar</button></span></div>`;
+      <div class="pop-foot pie"><button type="button" class="btn btn-ghost btn-sm" id="tj-m-borrar">Borrar filtro</button>
+        <span class="head-actions"><button type="button" class="btn btn-sm" id="tj-m-cancel">Cancelar</button><button type="button" class="btn btn-sm btn-primary" id="tj-m-ok">Aceptar</button></span></div>`;
     document.body.appendChild(m);
     T.menuEn = performance.now();
     const rc = boton.getBoundingClientRect();
-    const left = Math.max(8, Math.min(rc.left - 140, window.innerWidth - 310));
+    const left = Math.max(8, Math.min(rc.left - 140, window.innerWidth - 330));
     m.style.left = `${left}px`;
     m.style.top = `${Math.min(rc.bottom + 4, Math.max(8, window.innerHeight - m.offsetHeight - 8))}px`;
     const checks = () => [...m.querySelectorAll('#tj-m-vals input[type=checkbox][value]')];
@@ -780,23 +712,23 @@
     const fmtH = (h) => {
       const a = h.anterior_json ? JSON.parse(h.anterior_json) : null; const n = h.nuevo_json ? JSON.parse(h.nuevo_json) : null;
       const txt = (x) => (x ? Object.entries(x).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v ?? '—'}`).join(', ') : '—');
-      return `<li><b>${e(h.accion.replace(/_/g, ' ').toLowerCase())}</b> · ${e(h.usuario)} · ${e(h.creado_en)}<br><span class="cert-muted">${e(txt(a))} → ${e(txt(n))}</span></li>`;
+      return `<li><b>${e(h.accion.replace(/_/g, ' ').toLowerCase())}</b> <span class="muted">· ${e(h.usuario)} · ${e(SMG.fmtDiaHora(h.creado_en, { utc: true }))}</span><br><span class="muted">${e(txt(a))} → ${e(txt(n))}</span></li>`;
     };
     const cuerpo = `
-      <div class="cert-grid" style="grid-template-columns:1fr 1fr">
-        <div class="cert-field"><label>Operador</label><div class="cert-val">${e(o.legajo)} · ${e(o.nombre)}</div></div>
-        <div class="cert-field"><label>Fecha</label><div class="cert-val">${fFecha(d.fecha)} (${INI[d.dow]})${d.feriado ? ` · Feriado: ${e(d.feriado)}` : ''}</div></div>
-        <div class="cert-field" style="grid-column:span 2"><label>Código</label><div class="cert-val">${cel ? `<b>${e(cel.c)}</b> - ${e(descCodigo(cel.c))}` : '<span class="cert-muted">Sin cargar</span>'}
-          ${cel && cel.ct ? ' <span class="cert-badge cert-b-PENDIENTE">Cambio de turno</span>' : ''}${cel && cel.m ? ' <span class="cert-badge cert-b-ANULADO">Horas a mano</span>' : ''}</div></div>
-        ${cel ? `<div class="cert-field"><label>Horas efectivas</label><input type="number" step="0.5" min="0" max="24" id="tj-d-h" value="${cel.h}" ${editable ? '' : 'disabled'}></div>
-        <div class="cert-field"><label>Horas de break</label><input type="number" step="0.5" min="0" max="24" id="tj-d-b" value="${cel.b}" ${editable ? '' : 'disabled'}></div>
-        <div class="cert-field" style="grid-column:span 2"><label>Observaciones</label><textarea id="tj-d-o" rows="2" ${editable ? '' : 'disabled'}>${e(cel.o || '')}</textarea></div>` : ''}
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>Operador</label><div class="field-val">${e(o.legajo)} · ${e(o.nombre)}</div></div>
+        <div class="field"><label>Fecha</label><div class="field-val">${fFecha(d.fecha)} (${INI[d.dow]})${d.feriado ? ` · Feriado: ${e(d.feriado)}` : ''}</div></div>
+        <div class="field" style="grid-column:span 2"><label>Código</label><div class="field-val">${cel ? `<b>${e(cel.c)}</b> - ${e(descCodigo(cel.c))}` : '<span class="muted">Sin cargar</span>'}
+          ${cel && cel.ct ? ' <span class="chip chip-warn">Cambio de turno</span>' : ''}${cel && cel.m ? ' <span class="chip chip-bad">Horas a mano</span>' : ''}</div></div>
+        ${cel ? `<div class="field"><label>Horas efectivas</label><input type="number" step="0.5" min="0" max="24" id="tj-d-h" value="${cel.h}" ${editable ? '' : 'disabled'}></div>
+        <div class="field"><label>Horas de break</label><input type="number" step="0.5" min="0" max="24" id="tj-d-b" value="${cel.b}" ${editable ? '' : 'disabled'}></div>
+        <div class="field" style="grid-column:span 2"><label>Observaciones</label><textarea id="tj-d-o" rows="2" ${editable ? '' : 'disabled'}>${e(cel.o || '')}</textarea></div>` : ''}
       </div>
-      ${cel ? '<p class="cert-muted" style="margin:8px 0 0">Al cambiar las horas, el día queda marcado como editado a mano y los recálculos no lo modifican.</p>' : ''}
-      <div class="cert-seccion">Historial del día</div>
-      <ul class="cert-timeline">${hist.map(fmtH).join('') || '<li class="cert-muted">Sin cambios registrados.</li>'}</ul>`;
-    const pie = `${editable && cel.m ? '<button type="button" class="cert-btn" id="tj-d-rest">Restaurar cálculo automático</button>' : ''}
-      <button type="button" class="cert-btn" data-tj-cerrar>Cerrar</button>${editable ? '<button type="button" class="cert-btn primary" id="tj-d-ok">Guardar</button>' : ''}`;
+      ${cel ? '<p class="muted" style="margin:8px 0 0">Al cambiar las horas, el día queda marcado como editado a mano y los recálculos no lo modifican.</p>' : ''}
+      <div class="sec-title">Historial del día</div>
+      <ul class="list-plain">${hist.map(fmtH).join('') || '<li class="muted">Sin cambios registrados.</li>'}</ul>`;
+    const pie = `${editable && cel.m ? '<button type="button" class="btn" id="tj-d-rest">Restaurar cálculo automático</button>' : ''}
+      <button type="button" class="btn" data-tj-cerrar>Cerrar</button>${editable ? '<button type="button" class="btn btn-primary" id="tj-d-ok">Guardar</button>' : ''}`;
     modal(`Día ${fFecha(d.fecha)}`, cuerpo, pie, 'sm');
     const enviar = (datos, msg) => ejecutar(async () => {
       const res = await api(`${API}/registro`, 'PUT', { legajo: o.legajo, fecha: d.fecha, desde: T.desde, hasta: T.hasta, ...datos });
@@ -814,15 +746,15 @@
   async function detalleOperador(legajo) {
     const o = T.g.operadores.find((x) => x.legajo === legajo); if (!o) return;
     const editable = puede('configurar');
-    const cuerpo = `<div class="cert-grid" style="grid-template-columns:1fr 1fr">
-        <div class="cert-field"><label>Legajo</label><div class="cert-val">${e(o.legajo)}</div></div>
-        <div class="cert-field"><label>Apellido y Nombre</label><div class="cert-val">${e(o.nombre)}</div></div>
-        <div class="cert-field"><label>Obra (hoy)</label><div class="cert-val">${o.obra.pendiente ? '<span class="tj-pend" style="color:var(--c-red);font-weight:800">P</span> Pendiente: hoy sin cargar' : e(o.obra.texto)}</div></div>
-        <div class="cert-field"><label>Régimen de turno</label><select id="tj-o-reg" ${editable ? '' : 'disabled'}>${opts([['Rotativo', 'Rotativo (subida y bajada con media jornada)'], ['Diario', 'Diario (5x2, oficina / taller)']], o.regimen)}</select></div>
+    const cuerpo = `<div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>Legajo</label><div class="field-val">${e(o.legajo)}</div></div>
+        <div class="field"><label>Apellido y Nombre</label><div class="field-val">${e(o.nombre)}</div></div>
+        <div class="field"><label>Obra (hoy)</label><div class="field-val">${o.obra.pendiente ? '<span class="chip chip-warn">P</span> Pendiente: hoy sin cargar' : e(o.obra.texto)}</div></div>
+        <div class="field"><label>Régimen de turno</label><select id="tj-o-reg" ${editable ? '' : 'disabled'}>${opts([['Rotativo', 'Rotativo (subida y bajada con media jornada)'], ['Diario', 'Diario (5x2, oficina / taller)']], o.regimen)}</select></div>
       </div>
-      <div class="cert-seccion">Totales del ${fFecha(T.desde)} al ${fFecha(T.hasta)}</div>
-      <div class="cert-stats" style="grid-template-columns:repeat(4,minmax(0,1fr))">${TOTALES.map(([k, , l]) => `<div class="cert-stat"><span class="lbl">${l}</span><b>${nf(o.totales[k])}</b></div>`).join('')}</div>`;
-    modal(`Operador ${e(o.legajo)}`, cuerpo, `<button type="button" class="cert-btn" data-tj-cerrar>Cerrar</button>${editable ? '<button type="button" class="cert-btn primary" id="tj-o-ok">Guardar régimen</button>' : ''}`, 'sm');
+      <div class="sec-title">Totales del ${fFecha(T.desde)} al ${fFecha(T.hasta)}</div>
+      <div class="kpis kpis-tight">${TOTALES.map(([k, , l]) => `<div class="card kpi"><span class="kpi-label">${l}</span><span class="kpi-value sm">${nf(o.totales[k])}</span></div>`).join('')}</div>`;
+    modal(`Operador ${e(o.legajo)}`, cuerpo, `<button type="button" class="btn" data-tj-cerrar>Cerrar</button>${editable ? '<button type="button" class="btn btn-primary" id="tj-o-ok">Guardar régimen</button>' : ''}`, 'sm');
     if ($('tj-o-ok')) $('tj-o-ok').addEventListener('click', () => ejecutar(async () => {
       await api(`${API}/regimen`, 'PUT', { legajo: o.legajo, regimen: $('tj-o-reg').value });
       cerrarModal(); await cargarMes();
@@ -833,44 +765,44 @@
   function configuracion(tab) {
     const c = T.op.config;
     const tabs = [['jornada', 'Jornada'], ['codigos', 'Códigos de estado'], ['feriados', 'Feriados'], ['importar', 'Importar histórico']];
-    let cuerpo = `<div class="cert-toggle" style="margin-bottom:14px">${tabs.map(([k, l]) => `<button type="button" data-tj-tab="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    let cuerpo = `<div class="seg seg-lg" role="tablist" style="margin-bottom:14px">${tabs.map(([k, l]) => `<button type="button" data-tj-tab="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     if (tab === 'jornada') {
-      cuerpo += `<div class="cert-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-        <div class="cert-field"><label>Jornada normal: horas efectivas</label><input type="number" step="0.5" id="tj-c-1" value="${c.horas_efectivas}"></div>
-        <div class="cert-field"><label>Jornada normal: horas de break</label><input type="number" step="0.5" id="tj-c-2" value="${c.horas_break}"></div>
-        <div class="cert-field"><label>Cambio de turno (subida / bajada): horas efectivas</label><input type="number" step="0.5" id="tj-c-3" value="${c.horas_efectivas_cambio_turno}"></div>
-        <div class="cert-field"><label>Cambio de turno (subida / bajada): horas de break</label><input type="number" step="0.5" id="tj-c-4" value="${c.horas_break_cambio_turno}"></div></div>
-        <p class="cert-muted" style="margin-top:10px">Al guardar se recalculan todos los días, salvo los editados a mano. La media jornada solo se aplica al régimen Rotativo.</p>
-        <div class="cert-actions" style="justify-content:flex-end"><button type="button" class="cert-btn primary" id="tj-c-ok">Guardar jornada</button></div>`;
+      cuerpo += `<div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <div class="field"><label>Jornada normal: horas efectivas</label><input type="number" step="0.5" id="tj-c-1" value="${c.horas_efectivas}"></div>
+        <div class="field"><label>Jornada normal: horas de break</label><input type="number" step="0.5" id="tj-c-2" value="${c.horas_break}"></div>
+        <div class="field"><label>Cambio de turno (subida / bajada): horas efectivas</label><input type="number" step="0.5" id="tj-c-3" value="${c.horas_efectivas_cambio_turno}"></div>
+        <div class="field"><label>Cambio de turno (subida / bajada): horas de break</label><input type="number" step="0.5" id="tj-c-4" value="${c.horas_break_cambio_turno}"></div></div>
+        <p class="muted" style="margin-top:10px">Al guardar se recalculan todos los días, salvo los editados a mano. La media jornada solo se aplica al régimen Rotativo.</p>
+        <div class="head-actions" style="justify-content:flex-end"><button type="button" class="btn btn-primary" id="tj-c-ok">Guardar jornada</button></div>`;
     } else if (tab === 'codigos') {
       const fila = (k) => `<tr data-id="${k ? k.id : ''}">
         <td><input type="text" class="tj-k-cod" value="${e(k ? k.codigo : '')}" style="width:70px;text-transform:uppercase" maxlength="10"></td>
         <td><input type="text" class="tj-k-desc" value="${e(k ? k.descripcion : '')}" style="width:220px"></td>
-        <td class="c"><input type="color" class="tj-k-color" value="${e(k ? k.color : '#cbd5e1')}"></td>
+        <td class="center"><input type="color" class="tj-k-color" value="${e(k ? k.color : '#cbd5e1')}"></td>
         <td><select class="tj-k-cat">${opts(T.op.categorias.map((x) => [x, x.charAt(0) + x.slice(1).toLowerCase()]), k ? k.categoria : 'OTRO')}</select></td>
-        <td class="c"><input type="checkbox" class="tj-k-trab" ${k && k.cuenta_como_trabajado ? 'checked' : ''}></td>
-        <td class="c"><input type="checkbox" class="tj-k-act" ${!k || k.activo ? 'checked' : ''}></td>
-        <td class="c"><button type="button" class="cert-btn sm ${k ? '' : 'primary'}" data-tj-kok>${k ? 'Guardar' : 'Agregar'}</button></td></tr>`;
-      cuerpo += `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Categoría (totales)</th><th>Cuenta como trabajado</th><th>Activo</th><th></th></tr></thead>
+        <td class="center"><input type="checkbox" class="tj-k-trab" ${k && k.cuenta_como_trabajado ? 'checked' : ''}></td>
+        <td class="center"><input type="checkbox" class="tj-k-act" ${!k || k.activo ? 'checked' : ''}></td>
+        <td class="center"><button type="button" class="btn btn-sm ${k ? '' : 'btn-primary'}" data-tj-kok>${k ? 'Guardar' : 'Agregar'}</button></td></tr>`;
+      cuerpo += `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Categoría (totales)</th><th>Cuenta como trabajado</th><th>Activo</th><th></th></tr></thead>
         <tbody>${T.op.codigos.map(fila).join('')}${fila(null)}</tbody></table></div>
-        <p class="cert-muted" style="margin-top:8px">Los números son siempre centros de costo, por eso los códigos empiezan con letra. Un código que cuenta como trabajado suma jornada y continúa el turno. Los códigos no se borran: se desactivan.</p>`;
+        <p class="muted" style="margin-top:8px">Los números son siempre centros de costo, por eso los códigos empiezan con letra. Un código que cuenta como trabajado suma jornada y continúa el turno. Los códigos no se borran: se desactivan.</p>`;
     } else if (tab === 'importar') {
-      cuerpo += `<div class="cert-alert info" style="margin-bottom:12px"><span class="ic">i</span><div><b>Histórico desde la planilla «TARJA GENERAL»</b>
+      cuerpo += `<div class="callout info" style="margin-bottom:12px">${ic('info')}<div><b>Histórico desde la planilla «TARJA GENERAL»</b> 
         Elija el Excel (Logistica SMG.xlsm). Primero se simula y se muestra qué entra y qué no; recién al confirmar se graba.
         Se cruza por legajo; los centros de costo deben existir en el sistema; los días ya cargados no se pisan. Antes de grabar se respalda la base.</div></div>
-        <div class="cert-actions" style="margin-bottom:12px"><input type="file" id="tj-i-arch" accept=".xlsx,.xlsm" style="width:auto">
-          <button type="button" class="cert-btn primary" id="tj-i-sim">Simular</button></div>
+        <div class="head-actions" style="margin-bottom:12px"><input type="file" id="tj-i-arch" accept=".xlsx,.xlsm" style="width:auto">
+          <button type="button" class="btn btn-primary" id="tj-i-sim">Simular</button></div>
         <div id="tj-i-res"></div>`;
     } else {
       const fer = T.op.feriados || [];
-      cuerpo += `<div class="cert-actions" style="margin-bottom:10px"><input type="date" id="tj-f-fecha"><input type="text" id="tj-f-desc" placeholder="Descripción" style="width:260px">
-        <button type="button" class="cert-btn primary" id="tj-f-add">Agregar feriado</button></div>
-        <div class="cert-wrap" style="max-height:360px;overflow:auto"><table class="cert-t"><thead><tr><th>Fecha</th><th>Descripción</th><th></th></tr></thead><tbody>
-        ${fer.map((f) => `<tr><td>${fFecha(f.fecha)}</td><td>${e(f.descripcion)}</td><td class="c"><button type="button" class="cert-btn sm danger" data-tj-fdel="${f.fecha}">Quitar</button></td></tr>`).join('')
-          || '<tr><td colspan="3" class="cert-muted">No hay feriados cargados.</td></tr>'}</tbody></table></div>
-        <p class="cert-muted" style="margin-top:8px">El feriado resalta la columna del día. Quien no trabaja ese día se carga con el código FER; el resto con su centro de costo.</p>`;
+      cuerpo += `<div class="head-actions" style="margin-bottom:10px"><input type="date" id="tj-f-fecha"><input type="text" id="tj-f-desc" placeholder="Descripción" style="width:260px">
+        <button type="button" class="btn btn-primary" id="tj-f-add">Agregar feriado</button></div>
+        <div class="table-scroll" style="max-height:360px;overflow:auto"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Fecha</th><th>Descripción</th><th></th></tr></thead><tbody>
+        ${fer.map((f) => `<tr><td>${fFecha(f.fecha)}</td><td>${e(f.descripcion)}</td><td class="center"><button type="button" class="btn btn-sm btn-danger" data-tj-fdel="${f.fecha}">Quitar</button></td></tr>`).join('')
+          || '<tr><td colspan="3" class="muted">No hay feriados cargados.</td></tr>'}</tbody></table></div>
+        <p class="muted" style="margin-top:8px">El feriado resalta la columna del día. Quien no trabaja ese día se carga con el código FER; el resto con su centro de costo.</p>`;
     }
-    modal('Configuración de la Tarja', cuerpo, '<button type="button" class="cert-btn" data-tj-cerrar>Cerrar</button>', 'md');
+    modal('Configuración de la Tarja', cuerpo, '<button type="button" class="btn" data-tj-cerrar>Cerrar</button>', 'md');
     const b = $('tj-modal-b');
     b.querySelectorAll('[data-tj-tab]').forEach((x) => x.addEventListener('click', () => configuracion(x.dataset.tjTab)));
     const recargar = async (pestana) => { T.op = await api(`${API}/opciones`); configuracion(pestana); leyenda(); await cargarMes(); };
@@ -913,7 +845,7 @@
       const fd = new FormData();
       fd.append('archivo', arch);
       fd.append('aplicar', aplicar ? 'true' : 'false');
-      $('tj-i-res').innerHTML = `<p class="cert-muted">${aplicar ? 'Importando' : 'Leyendo la planilla y simulando'}… puede tardar un minuto.</p>`;
+      $('tj-i-res').innerHTML = `<p class="muted">${aplicar ? 'Importando' : 'Leyendo la planilla y simulando'}… puede tardar un minuto.</p>`;
       ['tj-i-sim', 'tj-i-apl'].forEach((id) => { if ($(id)) $(id).disabled = true; });
       let res; let data = null;
       try {
@@ -936,23 +868,23 @@
     };
     const mostrar = (d, nombre) => {
       const r = d.resumen;
-      const kv = (k, v) => `<div class="cert-kv"><span>${k}</span><b>${v}</b></div>`;
+      const kv = (k, v) => `<div class="kv-row"><span>${k}</span><b>${v}</b></div>`;
       const aplicado = r.aplicado;
       $('tj-i-res').innerHTML = `
-        <div class="cert-alert ${aplicado ? '' : 'info'}" style="margin-bottom:10px;${aplicado ? 'border-color:#9bd5ae;background:var(--c-green-soft);color:#14532d' : ''}"><span class="ic" style="${aplicado ? 'background:var(--c-green)' : ''}">${aplicado ? '✓' : 'i'}</span>
-          <div><b>${aplicado ? 'Importación aplicada' : 'Simulación: todavía no se grabó nada'}</b>${e(nombre)} · días del ${fFecha(r.desde)} al ${fFecha(r.hasta)}${d.respaldo ? ` · respaldo: ${e(d.respaldo)}` : ''}</div></div>
-        <div class="cert-trio" style="grid-template-columns:1fr 1fr">
+        <div class="callout ${aplicado ? 'ok' : 'info'}" style="margin-bottom:10px">${ic(aplicado ? 'check' : 'info')}
+          <div><b>${aplicado ? 'Importación aplicada' : 'Simulación: todavía no se grabó nada'}</b> ${e(nombre)} · días del ${fFecha(r.desde)} al ${fFecha(r.hasta)}${d.respaldo ? ` · respaldo: ${e(d.respaldo)}` : ''}</div></div>
+        <div class="grid2" style="grid-template-columns:1fr 1fr">
           <div>${kv('Operadores que se importan', nf(r.filas_importables))}${kv(aplicado ? 'Días importados' : 'Días a importar', nf(r.dias_a_importar))}
             ${kv('Días ya cargados (no se pisan)', nf(r.ya_cargados))}${kv('Excepciones (ver reporte)', nf(r.excepciones))}
-            ${d.filas_excluidas.length ? `<div class="cert-seccion">Filas excluidas</div>${d.filas_excluidas.map(([m, n]) => kv(e(m), n)).join('')}` : ''}</div>
-          <div><div class="cert-seccion" style="margin-top:0">Celdas sin importar</div>
-            <div class="cert-wrap" style="max-height:230px;overflow:auto"><table class="cert-t"><thead><tr><th>Valor</th><th>Motivo</th><th>Celdas</th></tr></thead><tbody>
-            ${d.sin_importar.map((x) => `<tr><td>${e(x.valor)}</td><td style="white-space:normal">${e(x.motivo)}</td><td class="r">${nf(x.celdas)}</td></tr>`).join('') || '<tr><td colspan="3" class="cert-muted">Ninguna.</td></tr>'}
+            ${d.filas_excluidas.length ? `<div class="sec-title">Filas excluidas</div>${d.filas_excluidas.map(([m, n]) => kv(e(m), n)).join('')}` : ''}</div>
+          <div><div class="sec-title" style="margin-top:0">Celdas sin importar</div>
+            <div class="table-scroll" style="max-height:230px;overflow:auto"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Valor</th><th>Motivo</th><th>Celdas</th></tr></thead><tbody>
+            ${d.sin_importar.map((x) => `<tr><td>${e(x.valor)}</td><td style="white-space:normal">${e(x.motivo)}</td><td class="num">${nf(x.celdas)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Ninguna.</td></tr>'}
             </tbody></table></div></div>
         </div>
-        <div class="cert-actions" style="justify-content:flex-end;margin-top:12px">
-          <button type="button" class="cert-btn" id="tj-i-rep">Descargar reporte de excepciones</button>
-          ${!aplicado && r.dias_a_importar > 0 ? `<button type="button" class="cert-btn primary" id="tj-i-apl">Importar ${nf(r.dias_a_importar)} días</button>` : ''}
+        <div class="head-actions" style="justify-content:flex-end;margin-top:12px">
+          <button type="button" class="btn" id="tj-i-rep">Descargar reporte de excepciones</button>
+          ${!aplicado && r.dias_a_importar > 0 ? `<button type="button" class="btn btn-primary" id="tj-i-apl">Importar ${nf(r.dias_a_importar)} días</button>` : ''}
         </div>`;
       $('tj-i-rep').addEventListener('click', descargar);
       if ($('tj-i-apl')) $('tj-i-apl').addEventListener('click', () => {
@@ -985,4 +917,452 @@
 
   instalarEventos();
   window.tjAbrir = () => { abrir().catch((err) => toast(err.message, 'error')); };
+})();
+
+/* ==================================================================================================
+ * Tarja General › Próximos movimientos.
+ * Pestaña extra dentro del panel de Tarja: a partir de una fecha (por defecto hoy) lista quién sube y quién baja
+ * de cada proyecto (centro de costo), día por día, para planificar los cambios de turno.
+ *
+ * Cómo lee la tarja: cada día de cada operador tiene un código. Si es un número es el centro de costo donde
+ * está trabajando; si son letras es un estado (D, V, LIC, BAJA, ...). Un movimiento es cualquier día en que el
+ * código cambia respecto del día anterior:
+ *   D → 106          Sube a 106
+ *   106 → D          Baja de 106
+ *   27 → 107         Sale de 27 y entra a 107 (traslado; figura en los dos proyectos)
+ *   107 → 27 / D     Vuelve a 27 / baja de 107 (fin del traslado)
+ *   NUE → 106        Ingreso nuevo        106 → BAJA  Egreso
+ *   106 → V/LIC/...  Sale por estado      V → 106     Regresa
+ * Los días sin cargar no cuentan como movimiento.
+ *
+ * Solo lee datos (GET /api/tarja/grilla y /api/tarja/opciones); no modifica nada.
+ * ================================================================================================== */
+(() => {
+  'use strict';
+  const API = '/api/tarja';
+  const ATRAS = 45;   // días hacia atrás que se leen para saber hace cuánto está cada uno en obra
+  const MARGEN = 60;  // días extra hacia adelante para saber hasta cuándo dura cada tramo
+  const MAX_PERIODO = 186; // tope de días por consulta de /grilla (tarja.MAX_DIAS_PERIODO)
+  const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+  const M = {
+    vista: 'grilla',
+    desde: null,
+    horizonte: 30,
+    regimen: 'Rotativo',
+    cc: '',
+    ver: new Set(['subidas', 'bajadas', 'permanecen', 'traslados']), // qué mostrar (filtro Mostrar)
+    buscar: '',
+    op: null,       // /opciones
+    datos: null,    // resultado procesado
+    cargado: null,  // clave desde|horizonte ya cargada
+  };
+  let abrirGrilla = null; // window.tjAbrir original de la grilla
+
+  // ------------------------------------------------------------------ utilidades
+  const $ = (id) => document.getElementById(id);
+  const e = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const toast = (msg, tipo) => { if (window.showToast) window.showToast(msg, tipo); else console.log(msg); };
+  const ic = (n, c = '') => `<svg class="i ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+
+  const aFecha = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const aIso = (dt) => dt.toISOString().slice(0, 10);
+  const sumar = (iso, n) => { const d = aFecha(iso); d.setUTCDate(d.getUTCDate() + n); return aIso(d); };
+  const difDias = (a, b) => Math.round((aFecha(b) - aFecha(a)) / 86400000);
+  const corta = (iso) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
+  const larga = (iso) => `${DIAS[aFecha(iso).getUTCDay()]} ${corta(iso)}`;
+  const esCC = (c) => /^\d+$/.test(c || '');
+
+  async function api(url) {
+    let res;
+    try { res = await fetch(url, { credentials: 'same-origin' }); } catch (err) { throw new Error('No se pudo conectar con el servidor.'); }
+    if (!res.ok) { let d = null; try { d = await res.json(); } catch (err) { d = null; } throw new Error((d && d.detail) || `Error ${res.status} del servidor.`); }
+    return res.json();
+  }
+
+  function nombreCC(id) {
+    const cc = (M.op?.centros_costos || []).find((c) => String(c.id) === String(id));
+    return cc ? cc.nombre : '';
+  }
+  function colorCC(id) {
+    const cc = (M.op?.centros_costos || []).find((c) => String(c.id) === String(id));
+    return cc?.color || '#e2e8f0';
+  }
+  function codigo(c) { return (M.op?.codigos || []).find((x) => x.codigo === c); }
+  function categoria(c) { return codigo(c)?.categoria || ''; }
+  function etiqueta(c) {
+    if (!c) return 'sin cargar';
+    if (esCC(c)) return c;
+    const k = codigo(c);
+    return k ? `${c} (${k.descripcion})` : c;
+  }
+
+  // ------------------------------------------------------------------ cálculo
+  /* Agrupa los días de un operador en tramos consecutivos con el mismo código. */
+  function tramos(fechas, dias) {
+    const t = [];
+    fechas.forEach((f) => {
+      const c = String(dias?.[f]?.c ?? '').trim().toUpperCase();
+      const u = t[t.length - 1];
+      if (u && u.c === c) u.fin = f; else t.push({ c, ini: f, fin: f });
+    });
+    return t;
+  }
+
+  function tipoEntrada(de) {
+    if (esCC(de)) return 'traslado_in';
+    if (!de || de === 'NUE') return 'ingreso';
+    if (categoria(de) === 'DESCANSO') return 'sube';
+    return 'regresa';
+  }
+  function tipoSalida(a) {
+    if (esCC(a)) return 'traslado_out';
+    if (a === 'BAJA') return 'egreso';
+    if (categoria(a) === 'DESCANSO') return 'baja';
+    return 'sale_estado';
+  }
+
+  /* Recorre la grilla y arma, por centro de costo y por fecha, quién entra y quién sale. */
+  function procesar(g, desde, limite) {
+    const fechas = g.dias.map((d) => d.fecha);
+    const ultima = fechas[fechas.length - 1];
+    const primera = fechas[0];
+    const movs = [];
+    const ops = [];
+    g.operadores.forEach((o) => {
+      const t = tramos(fechas, o.dias);
+      ops.push({ legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, t, ultima });
+      for (let k = 1; k < t.length; k += 1) {
+        const cur = t[k];
+        if (cur.ini < desde || cur.ini > limite) continue;
+        if (cur.c === '') continue;                         // pasar a "sin cargar" no es un movimiento
+        let p = k - 1;                                       // código real anterior (salteando días sin cargar)
+        while (p >= 0 && t[p].c === '') p -= 1;
+        const prev = p >= 0 ? t[p] : null;
+        const de = prev ? prev.c : '';
+        if (de === cur.c) continue;
+        const sigue = t[k + 1];
+        const base = {
+          legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, fecha: cur.ini, de, a: cur.c,
+          // tramo nuevo: hasta cuándo dura y a qué pasa después
+          hasta: cur.fin, hastaAbierto: cur.fin === ultima, despues: sigue ? sigue.c : null,
+          // tramo anterior: desde cuándo venía
+          venia: prev ? prev.ini : null, veniaAbierto: prev ? prev.ini === primera : false,
+        };
+        if (esCC(cur.c)) movs.push({ ...base, cc: cur.c, lado: 'entra', tipo: tipoEntrada(de) });
+        if (esCC(de)) movs.push({ ...base, cc: de, lado: 'sale', tipo: tipoSalida(cur.c) });
+      }
+    });
+    return { movs, ops };
+  }
+
+  /* Los que ese día siguen en el proyecto: están en cc ese día y ya lo estaban el día anterior. */
+  function permanecen(ops, cc, f) {
+    const b = M.buscar.trim().toLowerCase();
+    return ops.filter((o) => (!M.regimen || o.regimen === M.regimen)
+      && (!b || `${o.legajo} ${o.nombre}`.toLowerCase().includes(b)))
+      .map((o) => {
+        const r = o.t.find((x) => x.ini <= f && x.fin >= f);
+        return r && r.c === cc && r.ini < f ? { ...o, hasta: r.fin, abierto: r.fin === o.ultima, desde: r.ini } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b2) => a.nombre.localeCompare(b2.nombre));
+  }
+
+  const TIPOS = {
+    sube: { txt: 'Sube', cls: 'up', grupo: 'subidas' },
+    ingreso: { txt: 'Ingreso nuevo', cls: 'up', grupo: 'subidas' },
+    regresa: { txt: 'Regresa', cls: 'up', grupo: 'subidas' },
+    traslado_in: { txt: 'Entra por traslado', cls: 'tr', grupo: 'traslados' },
+    baja: { txt: 'Baja', cls: 'down', grupo: 'bajadas' },
+    egreso: { txt: 'Egreso', cls: 'down', grupo: 'bajadas' },
+    sale_estado: { txt: 'Sale', cls: 'down', grupo: 'bajadas' },
+    traslado_out: { txt: 'Sale por traslado', cls: 'tr', grupo: 'traslados' },
+  };
+
+  function filtrar(movs) {
+    const b = M.buscar.trim().toLowerCase();
+    return movs.filter((m) => (!M.regimen || m.regimen === M.regimen)
+      && (!M.cc || m.cc === M.cc)
+      && (!b || `${m.legajo} ${m.nombre}`.toLowerCase().includes(b)));
+  }
+
+  /* Aplica el filtro "Mostrar". Si solo se tildó "Permanecen", las fechas salen de todos los movimientos. */
+  function seleccion() {
+    const base = filtrar(M.datos.movs);
+    const hayMov = ['subidas', 'bajadas', 'traslados'].some((g) => M.ver.has(g));
+    return { hayMov, movs: hayMov ? base.filter((m) => M.ver.has(TIPOS[m.tipo].grupo)) : base };
+  }
+
+  const OPCIONES_VER = [['subidas', 'Ingresan'], ['bajadas', 'Salen'], ['permanecen', 'Permanecen'], ['traslados', 'Traslados']];
+  function textoVer() {
+    if (M.ver.size === OPCIONES_VER.length) return 'Todos';
+    if (!M.ver.size) return 'Nada';
+    return OPCIONES_VER.filter(([v]) => M.ver.has(v)).map(([, t]) => t).join(', ');
+  }
+
+  // ------------------------------------------------------------------ carga
+  async function cargar(forzar) {
+    const clave = `${M.desde}|${M.horizonte}`;
+    if (!forzar && M.cargado === clave && M.datos) { render(); return; }
+    cuerpo().innerHTML = '<section class="card"><div class="empty-state">Cargando movimientos…</div></section>';
+    try {
+      if (!M.op) M.op = await api(`${API}/opciones`);
+      if (!M.desde) M.desde = M.op.hoy;
+      const limite = sumar(M.desde, M.horizonte - 1);
+      const ini = sumar(M.desde, -ATRAS);
+      // El servidor acepta hasta MAX_PERIODO días por consulta: el margen hacia adelante se recorta si hace falta.
+      const fin = [sumar(limite, MARGEN), sumar(ini, MAX_PERIODO - 1)].sort()[0];
+      const g = await api(`${API}/grilla?${new URLSearchParams({ desde: ini, hasta: fin })}`);
+      M.datos = { ...procesar(g, M.desde, limite), limite };
+      M.cargado = clave;
+    } catch (err) {
+      cuerpo().innerHTML = `<section class="card"><div class="empty-state is-danger-text">${e(err.message)}</div></section>`;
+      toast(err.message, 'error');
+      return;
+    }
+    render();
+  }
+
+  // ------------------------------------------------------------------ dibujo
+  const cuerpo = () => $('tjm-cuerpo');
+
+  const VARIANTE = { up: 'ok', down: 'bad', tr: 'accent' };
+  function chip(m) {
+    const t = TIPOS[m.tipo];
+    let det;
+    if (m.lado === 'entra') {
+      const dias = difDias(m.fecha, m.hasta) + 1;
+      const fin = m.hastaAbierto ? `más de ${dias} d` : `hasta ${corta(m.hasta)} (${dias} d)`;
+      const luego = m.hastaAbierto || m.despues == null ? '' : ` → ${e(etiqueta(m.despues))}`;
+      const origen = m.tipo === 'traslado_in' ? `desde ${e(m.de)} · ` : (m.tipo === 'regresa' ? `de ${e(etiqueta(m.de))} · ` : '');
+      det = `${origen}${fin}${luego}`;
+    } else {
+      const dias = m.venia ? difDias(m.venia, m.fecha) : 0;
+      const enObra = m.venia ? (m.veniaAbierto ? `${dias}+ d en obra` : `${dias} d en obra`) : '';
+      const destino = m.tipo === 'traslado_out' ? `a ${e(m.a)}` : `a ${e(etiqueta(m.a))}`;
+      det = [destino, enObra].filter(Boolean).join(' · ');
+    }
+    return `<div class="line-item ${VARIANTE[t.cls]}" title="${e(t.txt)}: ${e(etiqueta(m.de))} → ${e(etiqueta(m.a))}">
+      <span class="line-tag">${e(t.txt)}</span>
+      <span><b>${e(m.legajo)}</b> ${e(m.nombre)}${m.regimen !== 'Rotativo' ? ' <span class="muted">(diario)</span>' : ''}</span>
+      <span class="muted">${det}</span></div>`;
+  }
+
+  function chipPermanece(p) {
+    const dias = difDias(p.desde, p.hasta) + 1;
+    const fin = p.abierto ? 'sin fecha de bajada cargada' : `baja el ${corta(sumar(p.hasta, 1))}`;
+    return `<span class="chip chip-muted" title="${e(p.legajo)} ${e(p.nombre)} · en obra desde ${corta(p.desde)} · ${e(fin)}">
+      <b>${e(p.legajo)}</b> ${e(p.nombre)}${p.regimen !== 'Rotativo' ? ' (diario)' : ''}
+      <span class="muted">${p.abierto ? `${dias}+ d` : `hasta ${corta(p.hasta)}`}</span></span>`;
+  }
+
+  function render() {
+    if (!M.datos) return;
+    const { movs, hayMov } = seleccion();
+    const hoy = M.op.hoy;
+
+    // Totales
+    const personas = (g) => new Set(movs.filter((m) => TIPOS[m.tipo].grupo === g).map((m) => m.legajo + m.fecha)).size;
+    const ccs = [...new Set(movs.map((m) => m.cc))].sort((a, b) => Number(a) - Number(b));
+    const prox = movs.map((m) => m.fecha).sort()[0];
+    const kpi = (v, l) => `<div class="card kpi"><span class="kpi-label">${l}</span><span class="kpi-value">${v}</span></div>`;
+    $('tjm-kpis').innerHTML = kpi(personas('subidas'), 'Ingresan') + kpi(personas('bajadas'), 'Salen')
+      + kpi(new Set(movs.filter((m) => m.tipo === 'traslado_in').map((m) => m.legajo + m.fecha)).size, 'Traslados entre proyectos')
+      + kpi(ccs.length, 'Proyectos con cambios') + kpi(prox ? (prox === hoy ? 'Hoy' : larga(prox)) : '—', 'Próximo cambio');
+
+    // Combo de centros de costo (solo los que tienen movimientos en el período)
+    const todos = [...new Set(M.datos.movs.map((m) => m.cc))].sort((a, b) => Number(a) - Number(b));
+    $('tjm-cc').innerHTML = `<option value="">Todos los centros de costo</option>${todos.map((c) => `<option value="${e(c)}" ${c === M.cc ? 'selected' : ''}>${e(c)} - ${e(nombreCC(c))}</option>`).join('')}`;
+
+    if (!M.ver.size) {
+      cuerpo().innerHTML = '<section class="card"><div class="empty-state">Tildá al menos una opción en «Mostrar».</div></section>';
+      return;
+    }
+    if (!movs.length) {
+      cuerpo().innerHTML = `<section class="card"><div class="empty-state">No hay movimientos entre el ${corta(M.desde)} y el ${corta(M.datos.limite)} con estos filtros.</div></section>`;
+      return;
+    }
+
+    // Columnas visibles según el filtro "Mostrar"
+    const verE = M.ver.has('subidas') || M.ver.has('traslados');
+    const verS = M.ver.has('bajadas') || M.ver.has('traslados');
+    const verP = M.ver.has('permanecen');
+    const nada = '<span class="muted">—</span>';
+    const ancho = ` style="width:${Math.floor(88 / ([verE, verS, verP].filter(Boolean).length || 1))}%"`;
+
+    const html = ccs.map((cc) => {
+      const lista = movs.filter((m) => m.cc === cc);
+      const fechas = [...new Set(lista.map((m) => m.fecha))].sort();
+      const nE = lista.filter((m) => m.lado === 'entra').length;
+      const nS = lista.filter((m) => m.lado === 'sale').length;
+      let nFilas = 0;
+      const filas = fechas.map((f) => {
+        const en = lista.filter((m) => m.fecha === f && m.lado === 'entra').sort((a, b) => a.nombre.localeCompare(b.nombre));
+        const sa = lista.filter((m) => m.fecha === f && m.lado === 'sale').sort((a, b) => a.nombre.localeCompare(b.nombre));
+        const enDias = difDias(hoy, f);
+        const cuando = enDias === 0 ? 'hoy' : enDias === 1 ? 'mañana' : enDias === -1 ? 'ayer'
+          : enDias < 0 ? `hace ${-enDias} días` : `en ${enDias} días`;
+        const pe = permanecen(M.datos.ops, cc, f);
+        const enDot = new Set(en.map((m) => m.legajo)).size;
+        if (!hayMov && !pe.length) return '';
+        nFilas += 1;
+        return `<tr>
+          <td><b>${larga(f)}</b><div class="muted">${cuando}</div>
+            <div class="muted" title="Personas en el proyecto ese día: las que ingresan más las que permanecen">Dotación: <b>${enDot + pe.length}</b></div></td>
+          ${verE ? `<td>${en.map(chip).join('') || nada}</td>` : ''}
+          ${verS ? `<td>${sa.map(chip).join('') || nada}</td>` : ''}
+          ${verP ? `<td>${pe.length ? `<div class="help" style="margin-bottom:4px">${pe.length} ${pe.length === 1 ? 'sigue' : 'siguen'} en obra</div><div class="chip-row">${pe.map(chipPermanece).join('')}</div>` : nada}</td>` : ''}</tr>`;
+      }).join('');
+      if (!nFilas) return '';
+      return `<details class="card card-fold" open>
+        <summary class="card-head" style="padding-bottom: 12px"><span class="chip-row"><i class="swatch" style="--cell:${e(colorCC(cc))}"></i>
+          <b>${e(cc)} - ${e(nombreCC(cc))}</b>
+          ${verE ? `<span class="chip chip-ok">${nE} ingresan</span>` : ''}${verS ? `<span class="chip chip-bad">${nS} salen</span>` : ''}
+          <span class="muted">${fechas.length} ${fechas.length === 1 ? 'fecha' : 'fechas'} de cambio</span></span>${ic('chevron-down', 'i-sm fold-ico')}</summary>
+        <div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th style="width:130px">Fecha</th>${verE ? `<th${ancho}>Ingresan</th>` : ''}${verS ? `<th${ancho}>Salen</th>` : ''}${verP ? `<th${ancho}>Permanecen</th>` : ''}</tr></thead>
+        <tbody>${filas}</tbody></table></div></details>`;
+    }).join('');
+    cuerpo().innerHTML = html || `<section class="card"><div class="empty-state">No hay datos entre el ${corta(M.desde)} y el ${corta(M.datos.limite)} con estos filtros.</div></section>`;
+  }
+
+  // ------------------------------------------------------------------ exportar
+  function exportar() {
+    if (!M.datos) return;
+    const { movs: sel, hayMov } = seleccion();
+    const movs = sel.slice().sort((a, b) => Number(a.cc) - Number(b.cc) || a.fecha.localeCompare(b.fecha) || a.lado.localeCompare(b.lado));
+    const enc = ['Centro de costo', 'Proyecto', 'Fecha', 'Movimiento', 'Legajo', 'Apellido y Nombre', 'Régimen', 'Código anterior', 'Código nuevo', 'Tramo hasta', 'Días del tramo', 'Después', 'En obra desde'];
+    const filas = (hayMov ? movs : []).map((m) => [m.cc, nombreCC(m.cc), m.fecha, TIPOS[m.tipo].txt, m.legajo, m.nombre, m.regimen, m.de, m.a,
+      m.lado === 'entra' ? (m.hastaAbierto ? `${m.hasta}+` : m.hasta) : '',
+      m.lado === 'entra' ? difDias(m.fecha, m.hasta) + 1 : '',
+      m.lado === 'entra' && !m.hastaAbierto ? (m.despues ?? '') : '',
+      m.lado === 'sale' ? (m.venia || '') : '']);
+    // Los que permanecen en cada proyecto en cada fecha de cambio
+    const vistos = new Set();
+    if (M.ver.has('permanecen')) movs.forEach((m) => {
+      const k = `${m.cc}|${m.fecha}`;
+      if (vistos.has(k)) return;
+      vistos.add(k);
+      permanecen(M.datos.ops, m.cc, m.fecha).forEach((p) => filas.push([m.cc, nombreCC(m.cc), m.fecha, 'Permanece', p.legajo, p.nombre, p.regimen,
+        m.cc, m.cc, p.abierto ? `${p.hasta}+` : p.hasta, difDias(p.desde, p.hasta) + 1, '', p.desde]));
+    });
+    filas.sort((a, b) => Number(a[0]) - Number(b[0]) || String(a[2]).localeCompare(String(b[2])));
+    const csv = [enc, ...filas].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Proximos_movimientos_${M.desde}_a_${M.datos.limite}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ------------------------------------------------------------------ pestañas
+  function estructura() {
+    return `
+      <section class="card" aria-label="Filtros de próximos movimientos">
+        <div class="toolbar">
+          <label class="range">Desde <input type="date" class="input input-sm" id="tjm-desde"></label>
+          <select class="chip-select" id="tjm-hor" aria-label="Horizonte">
+            ${[7, 14, 30, 45, 60, 90].map((n) => `<option value="${n}">Próximos ${n} días</option>`).join('')}</select>
+          <select class="chip-select" id="tjm-reg" aria-label="Régimen">
+            <option value="Rotativo">Solo rotativos</option><option value="Diario">Solo diarios</option><option value="">Todos los regímenes</option></select>
+          <select class="chip-select" id="tjm-cc" aria-label="Centro de costo"><option value="">Todos los centros de costo</option></select>
+          <details class="dropdown" id="tjm-ver"><summary class="chip-select" id="tjm-ver-txt" aria-label="Mostrar"></summary>
+            <div class="menu pop-stack ctl-auto"><div class="menu-head">Mostrar</div><div class="pop-list" style="border: 0">
+              ${OPCIONES_VER.map(([v, t]) => `<label><input type="checkbox" value="${v}"> ${t}</label>`).join('')}</div>
+              <div class="pop-foot" style="margin-top: 0"><button type="button" class="btn btn-sm" data-todo="1">Todos</button><button type="button" class="btn btn-sm btn-ghost" data-todo="0">Ninguno</button></div>
+            </div></details>
+          <div class="search">${ic('search')}<input type="search" class="input" id="tjm-bus" placeholder="Legajo o nombre" aria-label="Buscar legajo o nombre" autocomplete="off"></div>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-sm" id="tjm-hoy">Hoy</button>
+          <button type="button" class="btn btn-sm btn-icon" id="tjm-rec" title="Actualizar" aria-label="Actualizar">${ic('refresh', 'i-sm')}</button>
+          <button type="button" class="btn btn-sm" id="tjm-exp" title="Exporta los movimientos filtrados (CSV compatible con Excel)">${ic('download', 'i-sm')}Exportar</button>
+        </div>
+        <p class="help" style="padding: 0 16px 12px">Cambios de turno desde la fecha elegida: quién sube, quién baja, quién se traslada de un centro de costo a otro (y hasta cuándo) y quién permanece en obra.</p>
+      </section>
+      <div class="kpis kpis-tight" id="tjm-kpis"></div>
+      <div id="tjm-cuerpo" class="stack"></div>`;
+  }
+
+  function enlazar() {
+    $('tjm-desde').value = M.desde || '';
+    $('tjm-hor').value = String(M.horizonte);
+    $('tjm-reg').value = M.regimen;
+    $('tjm-bus').value = M.buscar;
+    $('tjm-desde').addEventListener('change', (ev) => { if (ev.target.value) { M.desde = ev.target.value; cargar(); } });
+    $('tjm-hor').addEventListener('change', (ev) => { M.horizonte = Number(ev.target.value); cargar(); });
+    $('tjm-reg').addEventListener('change', (ev) => { M.regimen = ev.target.value; render(); });
+    $('tjm-cc').addEventListener('change', (ev) => { M.cc = ev.target.value; render(); });
+    const ver = $('tjm-ver');
+    const marcar = () => {
+      ver.querySelectorAll('input').forEach((c) => { c.checked = M.ver.has(c.value); });
+      $('tjm-ver-txt').textContent = `Mostrar: ${textoVer().toLowerCase()}`;
+    };
+    marcar();
+    ver.addEventListener('change', (ev) => {
+      if (ev.target.checked) M.ver.add(ev.target.value); else M.ver.delete(ev.target.value);
+      marcar(); render();
+    });
+    ver.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-todo]');
+      if (!b) return;
+      M.ver = new Set(b.dataset.todo === '1' ? OPCIONES_VER.map(([v]) => v) : []);
+      marcar(); render();
+    });
+    document.addEventListener('click', (ev) => { if (ver.open && !ver.contains(ev.target)) ver.open = false; });
+    $('tjm-bus').addEventListener('input', (ev) => { M.buscar = ev.target.value; render(); });
+    $('tjm-hoy').addEventListener('click', () => { M.desde = M.op?.hoy || M.desde; $('tjm-desde').value = M.desde; cargar(); });
+    $('tjm-rec').addEventListener('click', () => cargar(true));
+    $('tjm-exp').addEventListener('click', exportar);
+  }
+
+  /* Cambia de pestaña sin recargar la grilla (abrir=true la vuelve a pedir al servidor). */
+  function mostrar(vista, abrir) {
+    M.vista = vista;
+    document.querySelectorAll('#tjm-tabs .tjm-tab').forEach((b) => b.classList.toggle('on', b.dataset.v === vista));
+    const grilla = $('tj-root');
+    if (grilla) grilla.style.display = vista === 'grilla' ? '' : 'none';
+    const acciones = $('tj-head-acciones');
+    if (acciones) acciones.style.display = vista === 'grilla' ? '' : 'none';
+    document.querySelectorAll('#tjm-tabs .tjm-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.v === vista)));
+    $('tjm-root').style.display = vista === 'mov' ? '' : 'none';
+    if (vista === 'mov') {
+      if (!$('tjm-cuerpo')) { $('tjm-root').innerHTML = estructura(); enlazar(); }
+      cargar().then(() => { if ($('tjm-desde') && !$('tjm-desde').value) $('tjm-desde').value = M.desde; });
+    } else if (abrir && abrirGrilla) {
+      abrirGrilla();
+    }
+  }
+
+  // Los estilos son los del design system (app.css): no se inyecta CSS propio.
+  function estilos() {}
+
+  function instalar() {
+    const panel = $('panel-tarja');
+    const grilla = $('tj-root');
+    if (!panel || !grilla || $('tjm-root')) return;
+    estilos();
+    // Las pestañas Grilla / Próximos movimientos están en el encabezado de la página (.seg); si no, se crean acá.
+    let tabs = $('tjm-tabs');
+    if (!tabs) {
+      tabs = document.createElement('div');
+      tabs.id = 'tjm-tabs';
+      tabs.className = 'seg';
+      tabs.innerHTML = '<button type="button" class="tjm-tab on" data-v="grilla">Grilla</button><button type="button" class="tjm-tab" data-v="mov">Próximos movimientos</button>';
+      grilla.parentNode.insertBefore(tabs, grilla);
+    }
+    const raiz = document.createElement('div');
+    raiz.id = 'tjm-root';
+    raiz.className = 'stack';
+    raiz.style.display = 'none';
+    grilla.parentNode.insertBefore(raiz, grilla.nextSibling);
+    // La grilla ya quedó dibujada al volver a su pestaña: no hace falta pedirla de nuevo.
+    tabs.addEventListener('click', (ev) => { const b = ev.target.closest('.tjm-tab'); if (b) mostrar(b.dataset.v, !grilla.childElementCount); });
+    // El botón "Tarja General" de la barra lateral llama a window.tjAbrir: siempre vuelve a la pestaña Grilla.
+    abrirGrilla = window.tjAbrir;
+    window.tjAbrir = () => mostrar('grilla', true);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', instalar); else instalar();
+  window.tjmAbrir = () => mostrar('mov');
 })();

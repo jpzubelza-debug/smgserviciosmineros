@@ -1,53 +1,45 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Facturación y Cobranzas · SMG</title>
+<link rel="stylesheet" href="/ui/app.css">
+<script src="/ui/shell.js"></script>
 <style>
   /* ======================================================================
-     Facturación y Cobranzas. Mismo tema que la maqueta aprobada y que
-     Certificados (app-shell, sidebar azul marino, panel-section, tablas .t,
-     badges, modales).
+     Facturación y Cobranzas. Shell compartido (/ui/app.css + /ui/shell.js:
+     sidebar oscura y topbar) con el contenido en tema claro
+     (<html data-theme="light">). El contenido conserva sus estilos propios
+     (panel-section, tablas .t, badges, modales); los colores base salen de
+     los tokens claros de app.css.
      ====================================================================== */
   :root {
-    --bg: #f1f5f9; --card: #ffffff; --line: #dbe3ee; --line-strong: #c3d0e0;
-    --text: #0f2440; --muted: #5b6b80; --navy: #0f2847; --navy-2: #12305a;
+    --card: var(--surface); --line: var(--border); --line-strong: var(--border-strong);
+    --muted: var(--text-muted); --navy: #0f2847; --navy-2: #12305a;
     --blue: #1565c0; --blue-hover: #0f4f9c; --blue-soft: #e3edf9; --blue-head: #dce8f7; --blue-tot: #e8f1fb;
     --amber: #b45309; --amber-soft: #fff7e6; --amber-line: #f5c46b;
     --red: #b91c1c; --red-soft: #fdecec; --green: #15803d; --green-soft: #e7f6ec;
     --violet: #6d28d9; --violet-soft: #f1ebfd; --grey-soft: #eef2f7;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); font-size: 13px; overflow-x: hidden; }
+  body { margin: 0; min-height: 100vh; font-family: var(--font); font-variant-numeric: tabular-nums; color: var(--text); background: var(--bg); font-size: 13px; overflow-x: hidden; }
   button, input, select, textarea { font: inherit; }
-  a { color: var(--blue); cursor: pointer; }
+  .content a, .modal-bg a { color: var(--blue); cursor: pointer; }
   .hidden { display: none !important; }
   .muted { color: var(--muted); }
 
-  .app-shell { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; min-height: 100vh; padding: 0 14px 14px 0; transition: grid-template-columns 0.22s ease; }
-  .app-shell:has(.sidebar:hover), .app-shell:has(.sidebar:focus-within) { grid-template-columns: 250px minmax(0, 1fr); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
-  .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 14px; }
-
-  .sidebar.card { background: linear-gradient(180deg, var(--navy), var(--navy-2)); color: #e6edf7; border: 0; border-radius: 0; position: sticky; top: 0; height: 100vh; }
-  .sidebar { padding: 12px; display: flex; flex-direction: column; gap: 12px; width: 100%; overflow: hidden; }
-  .brand { display: flex; justify-content: center; align-items: center; min-height: 90px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(255,255,255,0.95); }
-  .brand img { width: 78%; max-width: 160px; object-fit: contain; }
-  .sidebar:not(:hover):not(:focus-within) .brand img { width: 38px; }
-  .menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-  .menu-btn { border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: inherit; border-radius: 8px; padding: 11px 12px; font-weight: 600; font-size: 13px;
-              cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: background 0.18s ease; }
-  .menu-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .menu-btn.active { background: var(--blue); border-color: #8fb4e6; color: #fff; box-shadow: 0 4px 12px rgba(21,101,192,0.35); }
-  .menu-icon { width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; }
-  .menu-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .sidebar:not(:hover):not(:focus-within) .menu-label { display: none; }
-  .sidebar:not(:hover):not(:focus-within) .menu-btn { justify-content: center; padding: 11px 0; }
-  .menu-sep { border-top: 1px solid rgba(255,255,255,0.14); margin: 4px 0; }
-
-  .maqueta { padding: 6px 12px; background: #fff8e1; border: 1px solid #f1d58a; border-radius: 8px; color: #7a5300; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
-  .crumbs { color: var(--muted); } .crumbs b { color: var(--text); } .crumbs i { font-style: normal; margin: 0 6px; }
+  /* Colisiones con clases de app.css: el contenido conserva su aspecto anterior */
+  .modal-bg .modal { position: relative; inset: auto; z-index: auto; display: block; place-items: normal; padding: 0; }
+  .kpi { display: block; gap: 0; } .kpi > b { font-weight: 700; letter-spacing: normal; }
+  .timeline { display: block; } .timeline li { display: block; position: static; gap: 0; } .timeline li::before { content: none; }
+  .timeline li:last-child { padding-bottom: 9px; }
+  .field { font-size: inherit; font-weight: inherit; color: inherit; }
+  .req::after { content: none; }
+  /* app.css da line-height 1.45 al body y los controles lo heredan (font: inherit): con alto fijo (28px) recortaba el texto */
+  :is(.content, .modal-bg) :is(input, select, textarea) { line-height: normal; }
+  /* Controles de 28px en los encabezados de panel (heredan 14px): sin padding vertical para que Inter no se recorte */
+  .panel-section-header :is(input, select) { padding-top: 0; padding-bottom: 0; font-size: 13px; }
 
   .seguimiento-panel { padding: 0; overflow: hidden; }
   .seguimiento-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
@@ -142,7 +134,6 @@
   .modal-f { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
   .modal-f .muted { margin-right: auto; }
   .close { border: 0; background: none; font-size: 22px; color: var(--muted); cursor: pointer; }
-  .toast { position: fixed; right: 20px; bottom: 20px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 6px; z-index: 200; display: none; max-width: 460px; }
 
   /* Editor de pedido: formulario + vista previa del formulario oficial D.C. 1-9-14 */
   .editor { display: grid; grid-template-columns: minmax(0, 1fr) 620px; gap: 14px; align-items: start; }
@@ -195,7 +186,7 @@
   ol.dec li { margin-bottom: 7px; }
 
   @media (max-width: 1250px) { .editor { grid-template-columns: 1fr; } .preview-wrap { position: static; } .kpis { grid-template-columns: repeat(3, 1fr); } .kpi-mon { grid-column: 1 / -1; padding: 4px; } .er { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; padding: 0 8px 8px; } .sidebar { display: none; } .two, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } .span2, .span3 { grid-column: auto; } .er { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .two, .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } .span2, .span3 { grid-column: auto; } .er { grid-template-columns: 1fr; } }
   /* ---- Agregados v2 ---- */
   .si { display: inline-block; font-size: 10px; font-weight: 800; color: #7a4a06; background: var(--amber-soft); border: 1px solid var(--amber-line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
   .menu-card { border: 1px solid #cfdff3; border-radius: 12px; padding: 14px 16px; background: linear-gradient(180deg, #fff, #f3f8ff); max-width: 360px; }
@@ -207,29 +198,14 @@
   .cobro-x td { background: #fbfdff; }
   .mini { font-size: 11px; color: var(--muted); display: block; }
   @media (max-width: 1500px) { .editor { grid-template-columns: 1fr; } .preview-wrap { position: static; max-width: 720px; } }
-  #barra-estado { background: var(--blue-soft); border-color: #b7cff0; color: #1d3c66; }
-  #barra-estado b { color: var(--navy); }
 </style>
 </head>
 <body>
-<div class="app-shell">
-  <aside class="sidebar card" aria-label="Menú de Facturación y Cobranzas">
-    <div class="brand"><img src="/Imagenes/09-smg.png" alt="Logo SMG"></div>
-    <nav class="menu">
-      <button class="menu-btn active" data-vista="tablero"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span class="menu-label">Tablero de Seguimiento</span></button>
-      <button class="menu-btn" data-vista="pedidos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span><span class="menu-label">Pedidos de Facturación</span></button>
-      <button class="menu-btn" data-vista="documentos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 1V2l-1 1-3-2-3 2-3-2-3 2-3-2z"></path><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></span><span class="menu-label">Facturas, ND y NC</span></button>
-      <button class="menu-btn" data-vista="cobranzas"><span class="menu-icon"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg></span><span class="menu-label">Cobranzas y Recibos</span></button>
-      <button class="menu-btn" data-vista="ctacte"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg></span><span class="menu-label">Cuenta Corriente</span></button>
-      <button class="menu-btn" data-vista="saldos"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M4 22V4"></path><path d="M4 4h12l-2 4 2 4H4"></path></svg></span><span class="menu-label">Puesta en marcha</span></button>
-      <div class="menu-sep"></div>
-      <button class="menu-btn" data-vista="config"><span class="menu-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></span><span class="menu-label">Configuración y permisos</span></button>
-      <a class="menu-btn" href="/" style="margin-top: auto;"><span class="menu-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span><span class="menu-label">Menú Principal</span></a>
-    </nav>
-  </aside>
-
-  <main class="main">
-    <div class="maqueta" id="barra-estado"><span id="estado-corte"></span><span class="crumbs" id="crumbs"></span></div>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content">
 
     <!-- ===================================================== TABLERO ===================================================== -->
     <section class="card seguimiento-panel vista" id="v-tablero">
@@ -391,7 +367,8 @@
       <div class="seguimiento-header"><div><h2>Configuración y permisos</h2><p>Los responsables del módulo se asignan en Administración › Responsables por módulo. Cada cambio de configuración queda en el historial.</p></div></div>
       <div class="seguimiento-main" id="config"></div>
     </section>
-  </main>
+    </main>
+  </div>
 </div>
 
 <!-- ===================================================== MODAL: DETALLE DE COMPROBANTE ===================================================== -->
@@ -578,7 +555,6 @@
   <div class="modal-f"><span class="muted">Queda registrado con tu usuario, la fecha y el motivo.</span><button class="btn" onclick="cerrar('m-anu')">Cancelar</button><button class="btn danger" id="anu-ok" disabled onclick="confirmarAnul()">Anular registro</button></div>
 </div></div>
 
-<div class="toast" id="toast"></div>
 <script>
 /* =========================================================================
    Facturación y Cobranzas. Todos los importes definitivos los calcula el
@@ -620,7 +596,7 @@ function num(s) {
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
   const x = parseFloat(t); return isNaN(x) ? 0 : x;
 }
-function toast(t, error) { const el = $('toast'); el.style.background = error ? 'var(--red)' : ''; el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', error ? 9000 : 4500); }
+function toast(t, error) { SMG.toast(t, error ? 'error' : 'ok'); }
 function abrir(id) { $(id).classList.add('open'); } function cerrar(id) { $(id).classList.remove('open'); }
 const puedeCargar = () => !!(S.sesion && S.sesion.puede_cargar);
 const esResp = () => !!(S.sesion && S.sesion.es_responsable);
@@ -640,29 +616,62 @@ const qs = o => { const p = Object.entries(o).filter(([, v]) => v !== '' && v !=
 /* ============================== NAVEGACIÓN ============================== */
 const TITULOS = { tablero: 'Tablero de Seguimiento', pedidos: 'Pedidos de Facturación', documentos: 'Facturas, ND y NC', cobranzas: 'Cobranzas y Recibos', ctacte: 'Cuenta Corriente', saldos: 'Puesta en marcha', config: 'Configuración y permisos' };
 const RENDER = { tablero: () => renderTablero(), pedidos: () => renderPedidos(), documentos: () => renderDocs(), cobranzas: () => renderRecibos(), ctacte: () => renderCtaCte(), saldos: () => renderSaldos(), config: () => renderConfig() };
-function ir(v) {
+// Cada vista tiene su hash (/facturacion#pedidos…): marca el ítem de la sidebar y las migas del shell, y
+// permite enlaces directos y el botón «atrás». Se aceptan también los hashes anteriores (#documentos, #saldos…).
+const HASH = { tablero: 'tablero', pedidos: 'pedidos', documentos: 'facturas', cobranzas: 'cobranzas', ctacte: 'cuenta-corriente', saldos: 'puesta-en-marcha', config: 'configuracion' };
+const vistaDeHash = h => Object.keys(HASH).find(v => HASH[v] === h) || (TITULOS[h] ? h : null);
+function ir(v, { reemplazar = false } = {}) {
   S.vista = v;
   document.querySelectorAll('.vista').forEach(s => s.classList.toggle('hidden', s.id !== 'v-' + v));
-  document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.classList.toggle('active', b.dataset.vista === v));
-  $('crumbs').innerHTML = `Menú Principal<i>›</i>Facturación y Cobranzas<i>›</i><b>${TITULOS[v]}</b>`;
   if (v !== 'pedidos') cerrarEditor();
-  history.replaceState(null, '', '#' + v);
+  if (location.hash.slice(1) !== HASH[v]) {
+    if (reemplazar) history.replaceState(null, '', '#' + HASH[v]);
+    else history.pushState(null, '', '#' + HASH[v]);
+  }
+  SMG.navegacion();
   RENDER[v]();
 }
-document.querySelectorAll('.menu-btn[data-vista]').forEach(b => b.addEventListener('click', () => ir(b.dataset.vista)));
+// Sidebar, enlaces con hash y «atrás / adelante»
+window.addEventListener('hashchange', () => { const v = vistaDeHash(location.hash.slice(1)); if (v && v !== S.vista && S.sesion) ir(v, { reemplazar: true }); });
+window.addEventListener('popstate', () => { const v = vistaDeHash(location.hash.slice(1)); if (v && v !== S.vista && S.sesion) ir(v, { reemplazar: true }); });
 function refrescar() { RENDER[S.vista](); }
+// Estado de la puesta en marcha: chip en la topbar y punto en el ítem de la sidebar mientras no esté cerrada.
 function barraEstado() {
   const c = S.sesion.corte;
-  const hab = S.sesion.clientes_validados || 0;
-  const txt = 'Seguimiento desde las operaciones nuevas: <b>comprobantes y cobranzas habilitados</b>'
-    + (c ? ` · carga inicial por cliente: fecha <b>${c.fecha_corte ? f(c.fecha_corte) : 'pendiente'}</b>${c.estado === 'CONFIRMADO' ? ' (cerrada)' : ''}, <b>${hab}</b> cliente(s) validado(s)` : '');
-  $('estado-corte').innerHTML = `${txt} · Usuario: <b>${esc(S.sesion.nombre || S.sesion.usuario)}</b>${esResp() ? ' (responsable)' : puedeCargar() ? '' : ' (consulta)'}`;
+  const abierta = !c || c.estado !== 'CONFIRMADO';
+  const hab = S.sesion.clientes_validados || 0, total = (S.cat.clientes || []).length;
+  SMG.chipEstado(abierta ? {
+    texto: `Puesta en marcha: ${c && c.fecha_corte ? 'corte ' + f(c.fecha_corte) : 'fecha pendiente'} · ${hab}${total ? ' de ' + total : ''} clientes validados`,
+    href: '#' + HASH.saldos, titulo: 'Ir a Puesta en marcha', tipo: 'warn',
+  } : null);
+  SMG.contador('facturacion', 'puesta_en_marcha', abierta ? { punto: true, tipo: 'warning', titulo: 'Puesta en marcha abierta' } : null);
   document.querySelectorAll('.carga').forEach(el => el.classList.toggle('hidden', !puedeCargar()));
+}
+// Pedidos emitidos pendientes de facturar (sin filtro de cliente): contador en «Pedidos de facturación»
+const contarPendientes = t => SMG.contador('facturacion', 'pedidos', t.pedidos_pendientes.length);
+// Buscador de la topbar: elegir un cliente abre su cuenta corriente
+function enlazarBuscador() {
+  SMG.registrarBuscador('Buscar cliente, comprobante o pedido…', valor => {
+    const t = SMG.fold(valor.trim());
+    if (!t) return;
+    const cli = S.cat.clientes.find(c => SMG.fold(`${c.codigo} · ${c.razon_social}`) === t || SMG.fold(c.codigo) === t)
+      || (S.cat.clientes.filter(c => SMG.fold(c.razon_social) === t).length === 1 ? S.cat.clientes.find(c => SMG.fold(c.razon_social) === t) : null);
+    if (!cli) return;
+    $('buscar-global').value = '';
+    $('buscar-global').blur();
+    $('cc-cli').value = cli.codigo;
+    if (S.vista === 'ctacte') renderCtaCte(); else ir('ctacte');
+  });
+  const input = $('buscar-global');
+  if (!input) return;
+  if (!$('fac-buscar-lista')) document.body.insertAdjacentHTML('beforeend', `<datalist id="fac-buscar-lista">${S.cat.clientes.map(c => `<option value="${esc(c.codigo)} · ${esc(c.razon_social)}">`).join('')}</datalist>`);
+  input.setAttribute('list', 'fac-buscar-lista');
 }
 
 /* ============================== TABLERO ============================== */
 async function renderTablero() {
   const t = await api('GET', '/tablero' + qs({ cliente: $('f-cli').value }));
+  if (!$('f-cli').value) contarPendientes(t);
   const monedas = Object.keys(t.saldos_por_moneda).sort();
   $('kpis').innerHTML = monedas.length ? monedas.map(mon => {
     const ag = t.antiguedad[mon] || {}, vencido = r2((ag['1-30'] || 0) + (ag['31-60'] || 0) + (ag['61-90'] || 0) + (ag['+90'] || 0));
@@ -1706,11 +1715,15 @@ async function recargarSesion() { S.sesion = await api('GET', '/sesion'); barraE
     ['f-cli', 'fd-cli', 'fp-cli', 'fr-cli'].forEach(id => $(id).innerHTML = '<option value="">Todos</option>' + o);
     $('cc-cli').innerHTML = o;
     $('d-vto').addEventListener('input', () => $('d-vto').dataset.manual = '1');
+    barraEstado();          // con el catálogo ya cargado (total de clientes del chip)
+    enlazarBuscador();
     // Enlaces directos: #<vista>, #documento-<id>, #recibo-<id>, #pedido-<id> (abre el detalle),
     // #nuevo-pedido, #nuevo-comprobante, #nueva-cobranza (abre el formulario de alta).
     const h = location.hash.slice(1), [clase, id] = h.split('-');
     const detalle = { documento: ['documentos', verDoc], recibo: ['cobranzas', verRecibo], pedido: ['pedidos', verPedido] }[clase];
-    ir(TITULOS[h] ? h : detalle ? detalle[0] : 'tablero');
+    const inicial = vistaDeHash(h) || (detalle ? detalle[0] : 'tablero');
+    ir(inicial, { reemplazar: true });
+    if (inicial !== 'tablero') api('GET', '/tablero').then(contarPendientes).catch(() => {});
     if (detalle && Number(id)) detalle[1](Number(id));
     if (puedeCargar()) ({ 'nuevo-pedido': () => { ir('pedidos'); nuevoPedido(); }, 'nuevo-comprobante': () => abrirDoc({}), 'nueva-cobranza': () => abrirCobro({}) }[h] || (() => {}))();
   } catch (e) { toast('No se pudo cargar el módulo: ' + e.message, true); }

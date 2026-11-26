@@ -1,7 +1,7 @@
 /* Operaciones › Actas de Medición.
  * Un acta = OC del cliente + período + equipos (CI) + columnas del parte diario. La cantidad de cada equipo es la suma de
  * una columna de sus partes del período y va al ítem de la OC elegido; desde un acta cerrada se precarga el certificado.
- * Todo cálculo lo hace el servidor (actas_medicion.py). Usa los estilos cert-* del panel de Certificados y showToast / opPuede.
+ * Todo cálculo lo hace el servidor (actas_medicion.py). Usa los componentes del design system (/ui/app.css) y showToast / opPuede.
  */
 (() => {
   'use strict';
@@ -17,10 +17,13 @@
   const nf = (v, d = 2) => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? '' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: d }));
   const money = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   const opts = (lista, sel) => lista.map(([v, t]) => `<option value="${e(v)}" ${String(v) === String(sel ?? '') ? 'selected' : ''}>${e(t)}</option>`).join('');
-  const campo = (etq, html, ancho = '') => `<div class="cert-field" ${ancho ? `style="grid-column:span ${ancho}"` : ''}><label>${e(etq)}</label>${html}</div>`;
-  const tarjeta = (titulo, cuerpo, acciones = '', id = '') => `<div class="cert-card" style="margin-bottom:12px" ${id ? `id="${id}"` : ''}>
-    <div class="cert-card-h"><h3>${titulo}</h3><span class="cert-actions">${acciones}</span></div><div class="cert-card-b">${cuerpo}</div></div>`;
-  const badge = (estado) => `<span class="cert-badge cert-b-${estado === 'ANULADA' ? 'ANULADO' : (estado === 'CERRADA' ? 'EMITIDO' : 'BORRADOR')}">${e(estado)}</span>`;
+  const ic = (n, c = '') => `<svg class="i ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+  const campo = (etq, html, ancho = '') => `<div class="field ${Number(ancho) >= 4 ? 'span-all' : ''}"><label>${e(etq)}</label>${html}</div>`;
+  const tarjeta = (titulo, cuerpo, acciones = '', id = '') => `<section class="card" ${id ? `id="${id}"` : ''}>
+    <div class="card-head"><h2 class="card-title">${titulo}</h2><span class="head-actions">${acciones}</span></div><div class="card-body">${cuerpo}</div></section>`;
+  // Estados en sentence case: Borrador (advertencia), Cerrada (acento), Certificada (éxito), Anulada.
+  const ESTADO_ACTA = { BORRADOR: ['chip-warn', 'Borrador'], CERRADA: ['chip-accent', 'Cerrada'], ANULADA: ['chip-bad', 'Anulada'], CERTIFICADA: ['chip-ok', 'Certificada'] };
+  const badge = (estado) => { const x = ESTADO_ACTA[estado] || ['chip-muted', estado]; return `<span class="chip ${x[0]}">${e(x[1])}</span>`; };
   const certTxt = (c) => (c ? `${c.numero ? `N° ${c.numero}` : 'borrador'} (${e(c.estado)})` : '—');
 
   async function api(url, metodo = 'GET', cuerpo) {
@@ -51,12 +54,12 @@
     if (!bg) {
       bg = document.createElement('div');
       bg.id = 'am-modal';
-      bg.className = 'cert-modal-bg encima';
+      bg.className = 'modal is-toggle encima';
       document.body.appendChild(bg);
       bg.addEventListener('click', (ev) => { if (ev.target === bg || ev.target.closest('[data-am-cerrar]')) cerrarModal(); });
     }
-    bg.innerHTML = `<div class="cert-modal ${ancho}"><div class="cert-modal-h"><h3>${titulo}</h3><button class="cert-close" type="button" data-am-cerrar>×</button></div>
-      <div class="cert-modal-b" id="am-modal-b">${cuerpo}</div>${pie ? `<div class="cert-modal-f">${pie}</div>` : ''}</div>`;
+    bg.innerHTML = `<div class="modal-panel ${ancho}" role="dialog" aria-modal="true"><div class="modal-head"><h3>${titulo}</h3><span class="spacer"></span><button class="btn btn-ghost btn-icon" type="button" data-am-cerrar aria-label="Cerrar">${ic('x')}</button></div>
+      <div class="modal-body ctl-auto" id="am-modal-b">${cuerpo}</div>${pie ? `<div class="modal-foot">${pie}</div>` : ''}</div>`;
     bg.classList.add('open');
     return bg;
   }
@@ -72,32 +75,74 @@
   const segTxt = (s) => `#${s.id} ${s.cliente || s.cliente_codigo || ''}${s.centro_costo ? ` · ${s.centro_costo}` : ''}`;
   const ocTxt = (o) => `${o.orden_compra || `OC ${o.numero}`}${o.revision ? ` rev. ${o.revision}` : ''}${o.moneda ? ` · ${o.moneda}` : ''}`;
   const descEquipo = (ci) => ((AM.opciones.equipos.find((x) => x.codigo === String(ci).toUpperCase()) || {}).descripcion || '');
+  // Centro de costos de los partes (Obra/Proyecto «209 - …»). null = todos los partes del equipo.
+  const centros = () => AM.opciones.centros_costos || [];
+  const ccTxt = (id) => { const c = centros().find((x) => x.id === Number(id)); return c ? `${c.id} - ${c.nombre}` : (id ? String(id) : ''); };
+  const ccDelSeguimiento = () => { const s = AM.opciones.seguimientos.find((x) => x.id === Number(AM.ed.seguimiento_cc_id)); return (s && s.centro_costo_id) || null; };
+  const opCentros = () => [['', 'Todos']].concat(centros().map((c) => [c.id, `${c.id} - ${c.nombre}`]));
 
-  function encabezado() {
-    root().innerHTML = `<div class="seguimiento-header"><div><h2>Actas de Medición</h2>
-        <p>Partes diarios de los equipos elegidos en un período, vinculados a los ítems de una orden de compra para certificar.</p></div></div>
-      <div class="seguimiento-main"><div id="am-body"></div></div>`;
+  // Encabezado de la página (.page-head) + cuerpo; título, subtítulo y acciones los completa cada vista.
+  function encabezado(titulo = 'Actas de medición', sub = 'Partes diarios de los equipos de un período, vinculados a los ítems de una orden de compra para certificar.') {
+    root().classList.add('ctl-auto');
+    root().innerHTML = `<div class="page-head"><div><div id="am-volver-wrap"></div><h1 id="am-titulo">${titulo}</h1><p class="page-sub" id="am-sub">${sub}</p></div>
+        <div class="head-actions" id="am-acciones"></div></div>
+      <div class="stack" id="am-body"></div>`;
   }
 
   // ================================================================= LISTA
+  const AM_LISTA = { estado: '', q: '', filas: [] };
   async function vistaLista() {
     AM.ed = null;
     AM.res = null;
     encabezado();
     const body = $('am-body');
-    body.innerHTML = '<p class="cert-muted">Cargando…</p>';
+    body.innerHTML = '<section class="card"><div class="empty-state">Cargando…</div></section>';
     const actas = await api(`${API}/actas${AM.filtroSeg ? `?seguimiento=${AM.filtroSeg}` : ''}`);
-    body.innerHTML = tarjeta('Actas', `
-      <div class="cert-actions" style="margin-bottom:10px">${campo('Seguimiento de cliente', `<select id="am-f-seg" style="min-width:320px">${opts([['', 'Todos']].concat(AM.opciones.seguimientos.map((s) => [s.id, segTxt(s)])), AM.filtroSeg)}</select>`)}</div>
-      <div class="cert-wrap"><table class="cert-t"><thead><tr><th>N°</th><th>Cliente</th><th>OC</th><th>Período</th><th>Equipos</th><th>Estado</th><th>Certificado</th><th></th></tr></thead><tbody>
-      ${actas.map((a) => `<tr><td class="c">${a.numero}</td><td>${e(a.cliente || '')}</td><td>${e(a.orden_compra || `OC ${a.oc_numero}`)}</td>
-        <td>${fFecha(a.periodo_desde)} al ${fFecha(a.periodo_hasta)}</td><td class="c">${a.equipos}</td><td>${badge(a.estado)}</td><td>${certTxt(a.certificado)}</td>
-        <td class="c"><button type="button" class="cert-btn sm" data-am-abrir="${a.id}">Abrir</button></td></tr>`).join('')
-      || '<tr><td colspan="8" class="cert-muted">Todavía no hay actas. Use «+ Nueva acta».</td></tr>'}
-      </tbody></table></div>`, puede('generar') ? '<button type="button" class="cert-btn primary" id="am-nueva">+ Nueva acta</button>' : '');
+    AM_LISTA.filas = actas;
+    if (puede('generar')) $('am-acciones').innerHTML = `<button type="button" class="btn btn-primary" id="am-nueva">${ic('plus')}Nueva acta</button>`;
+    body.innerHTML = `<section class="card" aria-label="Listado de actas">
+      <div class="toolbar">
+        <div class="search">${ic('search')}<input type="search" class="input" id="am-f-q" placeholder="N.º, cliente u OC" aria-label="Buscar actas" value="${e(AM_LISTA.q)}" autocomplete="off"></div>
+        <select class="chip-select ${AM.filtroSeg ? 'on' : ''}" id="am-f-seg" aria-label="Seguimiento de cliente">${opts([['', 'Todos los seguimientos']].concat(AM.opciones.seguimientos.map((s) => [s.id, segTxt(s)])), AM.filtroSeg)}</select>
+        <select class="chip-select ${AM_LISTA.estado ? 'on' : ''}" id="am-f-estado" aria-label="Estado">${opts([['', 'Todos los estados'], ['BORRADOR', 'Borrador'], ['CERRADA', 'Cerrada'], ['CERTIFICADA', 'Certificada'], ['ANULADA', 'Anulada']], AM_LISTA.estado)}</select>
+        <span class="spacer"></span><span class="muted num" id="am-cuenta"></span>
+      </div>
+      <div class="table-wrap is-auto"><table class="tbl" id="am-tabla"><colgroup></colgroup><thead><tr><th>N.º</th><th>Cliente</th><th>OC</th><th>Período</th><th class="num">Equipos</th><th>Estado</th><th>Certificado</th><th class="center"><span class="sr-only">Acciones</span></th></tr></thead><tbody id="am-lista"></tbody></table></div>
+    </section>`;
+    SMG.columnasTabla($('am-tabla'), $('am-tabla').querySelector('colgroup'), [{ w: 72 }, { w: 220, flex: true }, { w: 160 }, { w: 200 }, { w: 90 }, { w: 120 }, { w: 170 }, { w: 52 }]);
+    pintarLista();
     $('am-f-seg').addEventListener('change', (ev) => { AM.filtroSeg = ev.target.value; vistaLista().catch((err) => toast(err.message, 'error')); });
-    body.querySelectorAll('[data-am-abrir]').forEach((b) => b.addEventListener('click', () => abrirActa(Number(b.dataset.amAbrir)).catch((err) => toast(err.message, 'error'))));
+    $('am-f-estado').addEventListener('change', (ev) => { AM_LISTA.estado = ev.target.value; ev.target.classList.toggle('on', !!ev.target.value); pintarLista(); });
+    $('am-f-q').addEventListener('input', (ev) => { AM_LISTA.q = ev.target.value; pintarLista(); });
+    $('am-lista').addEventListener('click', (ev) => {
+      const tr = ev.target.closest('tr[data-am-fila]');
+      if (!tr) return;
+      const id = Number(tr.dataset.amFila);
+      const menu = ev.target.closest('[data-menu-fila]');
+      if (menu && typeof opMenuFila === 'function') {
+        opMenuFila(menu, [
+          { t: 'Abrir', i: 'eye', fn: () => abrirActa(id).catch((err) => toast(err.message, 'error')) },
+          { t: 'Descargar Excel', i: 'download', fn: () => { location.href = `${API}/actas/${id}/excel`; } },
+          { t: 'Imprimir / PDF', i: 'printer', fn: () => abrirActa(id).then(imprimir).catch((err) => toast(err.message, 'error')) },
+        ]);
+        return;
+      }
+      abrirActa(id).catch((err) => toast(err.message, 'error'));
+    });
     if ($('am-nueva')) $('am-nueva').addEventListener('click', nuevaActa);
+  }
+
+  const estadoLista = (a) => (a.estado === 'CERRADA' && a.certificado && a.certificado.estado !== 'ANULADO' ? 'CERTIFICADA' : a.estado);
+  function pintarLista() {
+    const q = SMG.fold(AM_LISTA.q.trim());
+    const filas = AM_LISTA.filas.filter((a) => (!AM_LISTA.estado || estadoLista(a) === AM_LISTA.estado)
+      && (!q || SMG.fold(`${a.numero} ${a.cliente || ''} ${a.orden_compra || ''} ${a.oc_numero || ''}`).includes(q)));
+    $('am-cuenta').textContent = `${filas.length} de ${AM_LISTA.filas.length} actas`;
+    $('am-lista').innerHTML = filas.map((a) => `<tr data-am-fila="${a.id}" tabindex="0">
+        <td class="mono">${a.numero}</td><td title="${e(a.cliente || '')}">${e(a.cliente || '')}</td><td class="mono">${e(a.orden_compra || `OC ${a.oc_numero}`)}</td>
+        <td>${fFecha(a.periodo_desde)} al ${fFecha(a.periodo_hasta)}</td><td class="num">${a.equipos}</td><td>${badge(estadoLista(a))}</td><td>${certTxt(a.certificado)}</td>
+        <td class="center"><button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-fila data-am-abrir="${a.id}" aria-haspopup="menu" aria-label="Acciones del acta ${a.numero}">${ic('more')}</button></td></tr>`).join('')
+      || `<tr><td colspan="8" class="empty-cell">${AM_LISTA.filas.length ? 'Ninguna acta coincide con los filtros.' : 'Todavía no hay actas. Use «Nueva acta».'}</td></tr>`;
   }
 
   // ================================================================= ACTA
@@ -136,39 +181,45 @@
     const ocs = ordenesDe(d.seguimiento_cc_id);
     const nuevo = !d.id;
     const vigente = (d.certificados || []).find((c) => c.estado !== 'ANULADO');
-    const acciones = [
-      '<button type="button" class="cert-btn" id="am-volver">← Actas</button>',
-      editable() ? `<button type="button" class="cert-btn primary" id="am-guardar">${nuevo ? 'Crear acta' : 'Guardar'}</button>` : '',
-      d.id && d.estado === 'BORRADOR' && puede('aprobar') ? '<button type="button" class="cert-btn primary" id="am-cerrar" title="Guarda el resultado y habilita la precarga del certificado">Cerrar acta</button>' : '',
-      d.id && d.estado === 'CERRADA' && puede('aprobar') && !vigente ? '<button type="button" class="cert-btn" id="am-reabrir">Reabrir</button>' : '',
-      d.id && d.estado !== 'ANULADA' && puede('anular') && !vigente ? '<button type="button" class="cert-btn danger" id="am-anular">Anular</button>' : '',
-      d.id && d.estado === 'BORRADOR' && puede('generar') ? '<button type="button" class="cert-btn danger" id="am-eliminar">Eliminar</button>' : '',
-      d.id ? `<a class="cert-btn" href="${API}/actas/${d.id}/excel">Excel</a>` : '',
-      d.id ? '<button type="button" class="cert-btn" id="am-imprimir">Imprimir</button>' : '',
-    ].join('');
+    const visibles = [
+      d.id && d.estado === 'BORRADOR' && puede('aprobar') ? '<button type="button" class="btn" id="am-cerrar" title="Guarda el resultado y habilita la precarga del certificado">Cerrar acta</button>' : '',
+      d.id && d.estado === 'CERRADA' && puede('aprobar') && !vigente ? '<button type="button" class="btn" id="am-reabrir">Reabrir</button>' : '',
+      editable() ? `<button type="button" class="btn btn-primary" id="am-guardar">${nuevo ? 'Crear acta' : 'Guardar'}</button>` : '',
+    ].filter(Boolean);
+    const mas = [
+      d.id ? `<button type="button" class="menu-item" role="menuitem" id="am-imprimir" data-cerrar-menu>${ic('printer')}Imprimir / PDF</button>` : '',
+      d.id ? `<a class="menu-item" role="menuitem" href="${API}/actas/${d.id}/excel" data-cerrar-menu>${ic('download')}Descargar Excel</a>` : '',
+      d.id && d.estado !== 'ANULADA' && puede('anular') && !vigente ? `<button type="button" class="menu-item danger" role="menuitem" id="am-anular" data-cerrar-menu>${ic('ban')}Anular</button>` : '',
+      d.id && d.estado === 'BORRADOR' && puede('generar') ? `<button type="button" class="menu-item danger" role="menuitem" id="am-eliminar" data-cerrar-menu>${ic('trash')}Eliminar</button>` : '',
+    ].filter(Boolean);
+    const acciones = visibles.join('') + (mas.length ? `<button type="button" class="btn btn-icon" id="am-mas" aria-haspopup="menu" aria-label="Más acciones">${ic('more')}</button>
+      <div class="menu" id="am-mas-menu" role="menu" hidden>${mas.join('')}</div>` : '');
     let estadoTxt = '';
     if (d.estado === 'CERRADA') estadoTxt = `Cerrada por ${e(d.cerrada_por)} el ${e(d.cerrada_en)}: el resultado quedó guardado y no cambia aunque cambien los partes.`;
     else if (d.estado === 'ANULADA') estadoTxt = `Anulada por ${e(d.anulada_por)}: ${e(d.motivo_anulacion)}`;
     else estadoTxt = 'Borrador: se calcula en vivo desde los partes diarios.';
 
-    const datos = `<div class="cert-actions" style="margin-bottom:10px">${badge(d.estado)} <span class="cert-muted">${estadoTxt}</span>
-        ${(d.certificados || []).length ? `<span class="cert-muted">· Certificado: ${(d.certificados || []).map(certTxt).join(', ')}</span>` : ''}</div>
-      <div class="cert-grid" style="grid-template-columns:repeat(6,minmax(0,1fr))">
-        ${campo('Seguimiento de cliente', `<select id="am-seg" ${ro || (d.id ? 'disabled' : '')}>${opts([['', '— elegir —']].concat(AM.opciones.seguimientos.map((s) => [s.id, segTxt(s)])), d.seguimiento_cc_id)}</select>`, 2)}
-        ${campo('Orden de compra', `<select id="am-oc" ${ro || (d.id ? 'disabled' : '')}>${opts([['', ocs.length ? '— elegir —' : 'sin OC en el seguimiento']].concat(ocs.map((o) => [o.id, ocTxt(o)])), d.orden_compra_cliente_id)}</select>`, 2)}
-        ${campo('N° de acta', `<input id="am-num" type="number" min="1" value="${e(d.numero)}" ${ro}>`)}
+    const datos = `<div class="form-grid">
+        ${campo('Seguimiento de cliente', `<select id="am-seg" ${ro || (d.id ? 'disabled' : '')}>${opts([['', 'Elegir seguimiento']].concat(AM.opciones.seguimientos.map((s) => [s.id, segTxt(s)])), d.seguimiento_cc_id)}</select>`, 2)}
+        ${campo('Orden de compra', `<select id="am-oc" ${ro || (d.id ? 'disabled' : '')}>${opts([['', ocs.length ? 'Elegir orden de compra' : 'Sin OC en el seguimiento']].concat(ocs.map((o) => [o.id, ocTxt(o)])), d.orden_compra_cliente_id)}</select>`, 2)}
+        ${campo('N.º de acta', `<input id="am-num" type="number" min="1" value="${e(d.numero)}" ${ro}>`)}
         ${campo('Fecha', `<input id="am-fecha" type="date" value="${e(d.fecha)}" ${ro}>`)}
         ${campo('Período desde', `<input id="am-desde" type="date" value="${e(d.periodo_desde)}" ${ro}>`)}
         ${campo('Período hasta', `<input id="am-hasta" type="date" value="${e(d.periodo_hasta)}" ${ro}>`)}
         ${campo('Observaciones', `<input id="am-obs" value="${e(d.observaciones)}" ${ro}>`, 4)}</div>`;
 
     const listo = d.orden_compra_cliente_id && d.periodo_desde && d.periodo_hasta;
+    $('am-titulo').innerHTML = `${nuevo ? 'Nueva acta de medición' : `Acta N.º ${e(d.numero)}`} ${badge(d.estado)}`;
+    $('am-sub').innerHTML = `${estadoTxt}${(d.certificados || []).length ? ` · Certificado: ${(d.certificados || []).map(certTxt).join(', ')}` : ''}`;
+    $('am-acciones').innerHTML = acciones;
+    $('am-volver-wrap').innerHTML = `<button type="button" class="back-link btn-link" id="am-volver">${ic('left', 'i-sm')}Actas de medición</button>`;
+    if ($('am-mas')) $('am-mas').addEventListener('click', (ev) => SMG.abrirMenu($('am-mas-menu'), ev.currentTarget));
     $('am-body').innerHTML = `
-      ${tarjeta(nuevo ? 'Nueva acta de medición' : `Acta N° ${e(d.numero)}`, datos, acciones)}
-      ${listo ? tarjeta('Equipos', '<div id="am-equipos"></div>', editable() ? `<button type="button" class="cert-btn sm primary" id="am-eq-partes">+ Equipos con partes en el período</button>` : '') : ''}
-      ${listo ? tarjeta('Mínimo y objetivo por ítem', '<div id="am-metas"></div>', '<span class="cert-muted">Referencias de gestión: no cambian lo que se certifica</span>') : ''}
+      ${tarjeta('Datos del acta', datos)}
+      ${listo ? tarjeta('Equipos', '<div id="am-equipos"></div>', editable() ? `<button type="button" class="btn btn-sm" id="am-eq-partes">${ic('plus', 'i-sm')}Equipos con partes en el período</button>` : '') : ''}
+      ${listo ? tarjeta('Mínimo y objetivo por ítem', '<div id="am-metas"></div>', '<span class="muted">Referencias de gestión: no cambian lo que se certifica</span>') : ''}
       ${listo ? tarjeta('Columnas del parte diario', '<div id="am-columnas"></div>') : ''}
-      ${listo ? '<div id="am-res"></div>' : '<p class="cert-muted">Elija el seguimiento, la orden de compra y el período para continuar.</p>'}`;
+      ${listo ? '<div id="am-res" class="stack"></div>' : '<section class="card"><div class="empty-state">Elija el seguimiento, la orden de compra y el período para continuar.</div></section>'}`;
 
     $('am-volver').addEventListener('click', () => {
       if (AM.sucio && !confirm('Hay cambios sin guardar. ¿Salir igual?')) return;
@@ -231,23 +282,25 @@
     const ro = editable() ? '' : 'disabled';
     const items = itemsDe(d.orden_compra_cliente_id);
     const porCi = Object.fromEntries(((AM.res && AM.res.equipos) || []).map((x) => [x.ci, x]));
-    const opItems = [['', '— sin ítem (no se certifica) —']].concat(items.map((i) => [i.id, `${i.numero} · ${i.descripcion || ''}${i.unidad ? ` (${i.unidad})` : ''}`]));
+    const opItems = [['', 'Sin ítem (no se certifica)']].concat(items.map((i) => [i.id, `${i.numero} · ${i.descripcion || ''}${i.unidad ? ` (${i.unidad})` : ''}`]));
     const opCant = [['', `(${etiqueta(d.campo_cantidad)})`]].concat(numericos().map((c) => [c.campo, c.etiqueta]));
     const filas = d.equipos.map((x, i) => {
       const r = porCi[String(x.ci).toUpperCase()];
-      return `<tr><td><b>${e(x.ci)}</b></td><td>${e(descEquipo(x.ci))}</td>
+      return `<tr><td class="mono"><b>${e(x.ci)}</b></td><td>${e(descEquipo(x.ci))}</td>
+        <td><select data-am-eq-cc="${i}" ${ro} style="max-width:220px" title="Solo cuentan los partes de este equipo cargados en este centro de costos (Obra/Proyecto)">${opts(opCentros(), x.centro_costo_id || '')}</select></td>
         <td><select data-am-eq-item="${i}" ${ro} style="min-width:260px">${opts(opItems, x.item_oc_cliente_id)}</select></td>
         <td><select data-am-eq-campo="${i}" ${ro}>${opts(opCant, x.campo_cantidad || '')}</select></td>
-        <td class="c">${r ? r.partes.length : ''}</td><td class="r"><b>${r ? nf(r.total) : ''}</b></td>
-        <td class="c">${ro ? '' : `<button type="button" class="cert-btn sm danger" data-am-eq-del="${i}" title="Quitar">×</button>`}</td></tr>`;
+        <td >${r ? r.partes.length : ''}</td><td class="num"><b>${r ? nf(r.total) : ''}</b></td>
+        <td class="center">${ro ? '' : `<button type="button" class="btn btn-ghost btn-icon btn-sm" data-am-eq-del="${i}" title="Quitar" aria-label="Quitar ${e(x.ci)}">${ic('trash', 'i-sm')}</button>`}</td></tr>`;
     }).join('');
-    $('am-equipos').innerHTML = `${items.length ? '' : '<div class="cert-alert warn" style="margin-bottom:8px"><span class="ic">!</span><div>La OC no tiene ítems cargados: cárguelos en Seguimiento de Cliente para poder certificar.</div></div>'}
-      <div class="cert-wrap"><table class="cert-t"><thead><tr><th>CI</th><th>Equipo</th><th>Ítem de la OC donde se certifica</th><th>Cantidad = suma de</th><th>Partes</th><th>Cantidad</th><th></th></tr></thead>
-      <tbody>${filas || '<tr><td colspan="7" class="cert-muted">Sin equipos. Agréguelos con «+ Equipos con partes en el período» o escribiendo el CI.</td></tr>'}</tbody></table></div>
-      ${ro ? '' : `<div class="cert-actions" style="margin-top:8px"><input id="am-eq-ci" list="am-dl-eq" placeholder="CI del equipo (ej. M-25)" autocomplete="off" style="width:220px">
-        <button type="button" class="cert-btn sm" id="am-eq-add">Agregar</button>
+    $('am-equipos').innerHTML = `${items.length ? '' : `<div class="callout warn">${ic('alert')}<div>La OC no tiene ítems cargados: cárguelos en Seguimiento de cliente para poder certificar.</div></div>`}
+      <div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>CI</th><th>Equipo</th><th>Centro de costos</th><th>Ítem de la OC donde se certifica</th><th>Cantidad = suma de</th><th class="num">Partes</th><th class="num">Cantidad</th><th></th></tr></thead>
+      <tbody>${filas || '<tr><td colspan="8" class="muted">Sin equipos. Agréguelos con «+ Equipos con partes en el período» o escribiendo el CI.</td></tr>'}</tbody></table></div>
+      ${ro ? '' : `<div class="head-actions" style="margin-top:8px"><input id="am-eq-ci" list="am-dl-eq" placeholder="CI del equipo (ej. M-25)" autocomplete="off" style="width:220px">
+        <button type="button" class="btn btn-sm" id="am-eq-add">Agregar</button>
         <datalist id="am-dl-eq">${AM.opciones.equipos.map((x) => `<option value="${e(x.codigo)}">${e(x.descripcion)}</option>`).join('')}</datalist></div>`}`;
     const box = $('am-equipos');
+    box.querySelectorAll('[data-am-eq-cc]').forEach((s) => s.addEventListener('change', () => { d.equipos[Number(s.dataset.amEqCc)].centro_costo_id = s.value ? Number(s.value) : null; AM.sucio = true; recalcular(); }));
     box.querySelectorAll('[data-am-eq-item]').forEach((s) => s.addEventListener('change', () => { d.equipos[Number(s.dataset.amEqItem)].item_oc_cliente_id = s.value ? Number(s.value) : null; AM.sucio = true; recalcular(); }));
     box.querySelectorAll('[data-am-eq-campo]').forEach((s) => s.addEventListener('change', () => { d.equipos[Number(s.dataset.amEqCampo)].campo_cantidad = s.value || null; AM.sucio = true; recalcular(); }));
     box.querySelectorAll('[data-am-eq-del]').forEach((b) => b.addEventListener('click', () => { d.equipos.splice(Number(b.dataset.amEqDel), 1); AM.sucio = true; renderEquipos(); recalcular(); }));
@@ -255,7 +308,7 @@
       const ci = $('am-eq-ci').value.trim().toUpperCase();
       if (!ci) return;
       if (d.equipos.some((x) => String(x.ci).toUpperCase() === ci)) { toast(`${ci} ya está en el acta.`); return; }
-      d.equipos.push({ ci, item_oc_cliente_id: null, campo_cantidad: null });
+      d.equipos.push({ ci, item_oc_cliente_id: null, campo_cantidad: null, centro_costo_id: ccDelSeguimiento() });
       AM.sucio = true;
       renderEquipos();
       recalcular();
@@ -271,22 +324,46 @@
     let lista;
     try { lista = await api(`${API}/equipos-con-partes?desde=${d.periodo_desde}&hasta=${d.periodo_hasta}`); } catch (err) { toast(err.message, 'error'); return; }
     const ya = new Set(d.equipos.map((x) => String(x.ci).toUpperCase()));
+    const ccLista = [...new Set(lista.map((x) => x.centro_costo_id).filter((x) => x != null))].sort((a, b) => a - b);
+    const ccSeg = ccDelSeguimiento();
+    const ccIni = ccSeg && ccLista.includes(ccSeg) ? String(ccSeg) : '';
+    const opFiltro = [['', 'Todos'], ['sin', 'Sin centro de costos']].concat(ccLista.map((c) => [c, ccTxt(c)]));
     modal(`Equipos con partes del ${fFecha(d.periodo_desde)} al ${fFecha(d.periodo_hasta)}`, lista.length ? `
-      <div class="cert-actions" style="margin-bottom:8px"><input id="am-eq-buscar" placeholder="Buscar CI, equipo o cliente…" style="width:300px">
-        <span class="cert-muted">${lista.length} equipos con partes</span></div>
-      <div class="cert-wrap" style="max-height:55vh;overflow:auto"><table class="cert-t"><thead><tr><th></th><th>CI</th><th>Equipo</th><th>Cliente en los partes</th><th>Partes</th><th>Total hs</th></tr></thead><tbody>
-      ${lista.map((x) => `<tr data-am-buscar="${e(`${x.ci} ${x.descripcion} ${x.clientes.join(' ')}`.toLowerCase())}"><td class="c"><input type="checkbox" data-am-ci="${e(x.ci)}" ${ya.has(x.ci) ? 'checked disabled' : ''}></td>
-        <td><b>${e(x.ci)}</b></td><td>${e(x.descripcion)}</td><td>${e(x.clientes.join(', '))}</td><td class="c">${x.partes}</td><td class="r">${nf(x.total_hs)}</td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="cert-muted">No hay partes cargados en ese período.</p>',
-    `<button class="cert-btn" type="button" data-am-cerrar>Cancelar</button>${lista.length ? '<button class="cert-btn primary" type="button" id="am-eq-ok">Agregar seleccionados</button>' : ''}`, 'md');
+      <div class="head-actions" style="margin-bottom:8px"><label class="range">Centro de costos (obra / proyecto)
+        <select id="am-eq-cc" style="max-width:320px">${opts(opFiltro, ccIni)}</select></label>
+        <input id="am-eq-buscar" type="search" placeholder="Buscar CI, equipo o cliente" style="width:260px">
+        <span class="muted" id="am-eq-cuenta"></span></div>
+      <div class="table-scroll" style="max-height:55vh;overflow:auto"><table class="tbl tbl-static tbl-auto"><thead><tr><th></th><th>CI</th><th>Equipo</th><th>Centro de costos</th><th>Cliente en los partes</th><th>Partes</th><th>Total hs</th></tr></thead><tbody>
+      ${lista.map((x) => `<tr data-am-cc="${x.centro_costo_id == null ? 'sin' : x.centro_costo_id}" data-am-buscar="${e(`${x.ci} ${x.descripcion} ${x.clientes.join(' ')}`.toLowerCase())}"><td ><input type="checkbox" data-am-ci="${e(x.ci)}" data-am-ci-cc="${x.centro_costo_id ?? ''}" ${ya.has(x.ci) ? 'checked disabled' : ''}></td>
+        <td><b>${e(x.ci)}</b></td><td>${e(x.descripcion)}</td><td>${e(x.centro_costo || 'Sin centro de costos')}</td><td>${e(x.clientes.join(', '))}</td><td >${x.partes}</td><td class="num">${nf(x.total_hs)}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="muted">No hay partes cargados en ese período.</p>',
+    `<button class="btn" type="button" data-am-cerrar>Cancelar</button>${lista.length ? '<button class="btn btn-primary" type="button" id="am-eq-ok">Agregar seleccionados</button>' : ''}`, 'md');
     if (!lista.length) return;
-    $('am-eq-buscar').addEventListener('input', (ev) => {
-      const q = ev.target.value.trim().toLowerCase();
-      $('am-modal-b').querySelectorAll('[data-am-buscar]').forEach((tr) => { tr.style.display = !q || tr.dataset.amBuscar.includes(q) ? '' : 'none'; });
-    });
+    const filtrar = () => {
+      const q = $('am-eq-buscar').value.trim().toLowerCase();
+      const cc = $('am-eq-cc').value;
+      let n = 0;
+      $('am-modal-b').querySelectorAll('[data-am-buscar]').forEach((tr) => {
+        const ver = (!q || tr.dataset.amBuscar.includes(q)) && (!cc || tr.dataset.amCc === cc);
+        tr.style.display = ver ? '' : 'none';
+        if (ver) n += 1;
+      });
+      $('am-eq-cuenta').textContent = `${n} de ${lista.length}`;
+    };
+    $('am-eq-buscar').addEventListener('input', filtrar);
+    $('am-eq-cc').addEventListener('change', filtrar);
+    filtrar();
     $('am-eq-ok').addEventListener('click', () => {
-      const nuevos = [...$('am-modal-b').querySelectorAll('[data-am-ci]:checked:not(:disabled)')].map((c) => c.dataset.amCi);
-      nuevos.forEach((ci) => d.equipos.push({ ci, item_oc_cliente_id: null, campo_cantidad: null }));
+      // Solo las filas visibles (las del centro de costos filtrado); un CI entra una sola vez al acta.
+      const marcados = [...$('am-modal-b').querySelectorAll('[data-am-ci]:checked:not(:disabled)')].filter((c) => c.closest('tr').style.display !== 'none');
+      const nuevos = [];
+      const repetidos = [];
+      marcados.forEach((c) => {
+        if (nuevos.some((x) => x.ci === c.dataset.amCi)) { repetidos.push(c.dataset.amCi); return; }
+        nuevos.push({ ci: c.dataset.amCi, item_oc_cliente_id: null, campo_cantidad: null, centro_costo_id: c.dataset.amCiCc ? Number(c.dataset.amCiCc) : null });
+      });
+      if (repetidos.length) toast(`${[...new Set(repetidos)].join(', ')}: se marcó en más de un centro de costos; se tomó el primero. Cámbielo en la tabla si hace falta.`);
+      nuevos.forEach((x) => d.equipos.push(x));
       cerrarModal();
       if (nuevos.length) { AM.sucio = true; renderEquipos(); recalcular(); toast(`${nuevos.length} equipo(s) agregados. Elija el ítem de la OC de cada uno.`); }
     });
@@ -297,11 +374,11 @@
     const d = AM.ed;
     const ro = editable() ? '' : 'disabled';
     const elegidas = new Set(d.columnas);
-    $('am-columnas').innerHTML = `<div class="cert-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">
+    $('am-columnas').innerHTML = `<div class="form-grid" style="margin-bottom:12px">
         ${campo('Cantidad a certificar = suma de la columna', `<select id="am-campo" ${ro}>${opts(numericos().map((c) => [c.campo, c.etiqueta]), d.campo_cantidad)}</select>`)}
-        <div class="cert-field" style="grid-column:span 2"><label>&nbsp;</label><span class="cert-muted">Cada equipo puede usar otra columna (columna «Cantidad = suma de» en Equipos).</span></div></div>
-      <div class="cert-field"><label>Columnas que se muestran en el detalle de partes</label>
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px">${campos().map((c) => `<label style="display:inline-flex;align-items:center;gap:5px;font-weight:400;white-space:nowrap">
+        <p class="help" style="align-self:end">Cada equipo puede usar otra columna (columna «Cantidad = suma de» en Equipos).</p></div>
+      <div class="field"><label>Columnas que se muestran en el detalle de partes</label>
+      <div class="chip-row" style="gap:8px 16px;margin-top:4px">${campos().map((c) => `<label class="check">
         <input type="checkbox" data-am-col="${e(c.campo)}" ${elegidas.has(c.campo) ? 'checked' : ''} ${ro}>${e(c.etiqueta)}</label>`).join('')}</div></div>`;
     if (ro) return;
     $('am-campo').addEventListener('change', (ev) => { d.campo_cantidad = ev.target.value; AM.sucio = true; renderEquipos(); recalcular(); });
@@ -321,7 +398,7 @@
     return {
       id: d.id, orden_compra_cliente_id: d.orden_compra_cliente_id, numero: d.numero, periodo_desde: d.periodo_desde, periodo_hasta: d.periodo_hasta,
       fecha: d.fecha, campo_cantidad: d.campo_cantidad, columnas: d.columnas, observaciones: d.observaciones,
-      equipos: d.equipos.map((x) => ({ ci: x.ci, item_oc_cliente_id: x.item_oc_cliente_id || null, campo_cantidad: x.campo_cantidad || null })),
+      equipos: d.equipos.map((x) => ({ ci: x.ci, item_oc_cliente_id: x.item_oc_cliente_id || null, campo_cantidad: x.campo_cantidad || null, centro_costo_id: x.centro_costo_id || null })),
       metas: (d.metas || []).map((m) => ({ item_oc_cliente_id: m.item_oc_cliente_id, minimo: m.minimo ?? null, objetivo: m.objetivo ?? null })),
       graficos: d.graficos,
     };
@@ -346,33 +423,33 @@
   function tablaResumen(res) {
     const conMeta = res.items_oc.some((i) => i.estado_meta);
     const n = conMeta ? 9 : 7;
-    return `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Ítem OC</th><th>Descripción</th><th>Unidad</th><th>Equipos</th><th>Cantidad</th><th>Precio</th><th>Importe</th>${conMeta ? '<th>Mín. / Obj.</th><th>Cumplimiento</th>' : ''}</tr></thead><tbody>
-      ${res.items_oc.map((i) => `<tr><td class="c">${e(i.numero)}</td><td>${e(i.descripcion)}</td><td class="c">${e(i.unidad || '')}</td><td>${e(i.equipos.join(', '))}</td>
-        <td class="r"><b>${nf(i.cantidad_periodo)}</b></td><td class="r">${money(i.precio)}</td><td class="r">${money(i.importe)}</td>
-        ${conMeta ? `<td class="r">${i.minimo == null ? '—' : nf(i.minimo)} / ${i.objetivo == null ? '—' : nf(i.objetivo)}</td><td>${chipMeta(i)}</td>` : ''}</tr>`).join('')
-      || `<tr><td colspan="${n}" class="cert-muted">Ningún equipo tiene ítem de la OC asignado.</td></tr>`}</tbody>
-      ${res.items_oc.length ? `<tfoot><tr class="tot"><td colspan="6">Total</td><td class="r">${money(res.total_importe)}</td>${conMeta ? '<td colspan="2"></td>' : ''}</tr></tfoot>` : ''}</table></div>`;
+    return `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Ítem OC</th><th>Descripción</th><th>Unidad</th><th>Equipos</th><th>Cantidad</th><th>Precio</th><th>Importe</th>${conMeta ? '<th>Mín. / Obj.</th><th>Cumplimiento</th>' : ''}</tr></thead><tbody>
+      ${res.items_oc.map((i) => `<tr><td >${e(i.numero)}</td><td>${e(i.descripcion)}</td><td >${e(i.unidad || '')}</td><td>${e(i.equipos.join(', '))}</td>
+        <td class="num"><b>${nf(i.cantidad_periodo)}</b></td><td class="num">${money(i.precio)}</td><td class="num">${money(i.importe)}</td>
+        ${conMeta ? `<td class="num">${i.minimo == null ? '—' : nf(i.minimo)} / ${i.objetivo == null ? '—' : nf(i.objetivo)}</td><td>${chipMeta(i)}</td>` : ''}</tr>`).join('')
+      || `<tr><td colspan="${n}" class="muted">Ningún equipo tiene ítem de la OC asignado.</td></tr>`}</tbody>
+      ${res.items_oc.length ? `<tfoot><tr class="tot"><td colspan="6">Total</td><td class="num">${money(res.total_importe)}</td>${conMeta ? '<td colspan="2"></td>' : ''}</tr></tfoot>` : ''}</table></div>`;
   }
 
   function tablaIndicadores(res) {
     const ind = res.indicadores;
     if (!ind || !ind.equipos.length) return '';
     const cols = ind.columnas;
-    const celdas = (f, general) => `<td class="r">${general ? '' : f.dias}</td><td class="r">${general ? '' : f.partes}</td>${cols.map((c) => `<td class="r">${e(nf(f.valores[c.campo]))}</td>`).join('')}<td class="r">${f.consumo_lh == null ? '—' : e(nf(f.consumo_lh))}</td>`;
-    return `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Equipo</th><th>Días</th><th>Partes</th>${cols.map((c) => `<th>${e(c.etiqueta)}</th>`).join('')}<th>Consumo (L/h)</th></tr></thead><tbody>
-      ${ind.equipos.map((f) => `<tr><td><b>${e(f.ci)}</b> <span class="cert-muted">${e(f.descripcion)}</span></td>${celdas(f)}</tr>`).join('')}</tbody>
+    const celdas = (f, general) => `<td class="num">${general ? '' : f.dias}</td><td class="num">${general ? '' : f.partes}</td>${cols.map((c) => `<td class="num">${e(nf(f.valores[c.campo]))}</td>`).join('')}<td class="num">${f.consumo_lh == null ? '—' : e(nf(f.consumo_lh))}</td>`;
+    return `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Equipo</th><th>Días</th><th>Partes</th>${cols.map((c) => `<th>${e(c.etiqueta)}</th>`).join('')}<th>Consumo (L/h)</th></tr></thead><tbody>
+      ${ind.equipos.map((f) => `<tr><td><b>${e(f.ci)}</b> <span class="muted">${e(f.descripcion)}</span></td>${celdas(f)}</tr>`).join('')}</tbody>
       <tfoot><tr class="tot"><td>General</td>${celdas(ind.general, true)}</tr></tfoot></table></div>`;
   }
 
   function tablaEquipo(eq, cols) {
     const celda = (c, v) => {
       if (c.campo.startsWith('fecha')) return `<td>${e(fFecha(String(v ?? '').slice(0, 10)))}</td>`;
-      return c.numerico ? `<td class="r">${e(nf(v))}</td>` : `<td>${e(v ?? '')}</td>`;
+      return c.numerico ? `<td class="num">${e(nf(v))}</td>` : `<td>${e(v ?? '')}</td>`;
     };
-    return `<div class="cert-wrap"><table class="cert-t ajustar"><thead><tr>${cols.map((c) => `<th>${e(c.etiqueta)}</th>`).join('')}<th>Cantidad<br><span class="cert-muted">${e(eq.etiqueta_cantidad)}</span></th></tr></thead><tbody>
-      ${eq.partes.map((p) => `<tr>${cols.map((c) => celda(c, p.valores[c.campo])).join('')}<td class="r"><b>${nf(p.cantidad)}</b></td></tr>`).join('')
-      || `<tr><td colspan="${cols.length + 1}" class="cert-muted">Sin partes en el período.</td></tr>`}</tbody>
-      ${eq.partes.length ? `<tfoot><tr class="tot">${cols.map((c, i) => `<td class="r">${i === 0 ? 'TOTAL' : (c.campo in eq.totales ? e(nf(eq.totales[c.campo])) : '')}</td>`).join('')}<td class="r">${nf(eq.total)}</td></tr></tfoot>` : ''}
+    return `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr>${cols.map((c) => `<th>${e(c.etiqueta)}</th>`).join('')}<th>Cantidad<br><span class="muted">${e(eq.etiqueta_cantidad)}</span></th></tr></thead><tbody>
+      ${eq.partes.map((p) => `<tr>${cols.map((c) => celda(c, p.valores[c.campo])).join('')}<td class="num"><b>${nf(p.cantidad)}</b></td></tr>`).join('')
+      || `<tr><td colspan="${cols.length + 1}" class="muted">Sin partes en el período.</td></tr>`}</tbody>
+      ${eq.partes.length ? `<tfoot><tr class="tot">${cols.map((c, i) => `<td class="num">${i === 0 ? 'TOTAL' : (c.campo in eq.totales ? e(nf(eq.totales[c.campo])) : '')}</td>`).join('')}<td class="num">${nf(eq.total)}</td></tr></tfoot>` : ''}
       </table></div>`;
   }
 
@@ -380,31 +457,31 @@
     const res = AM.res;
     if (!$('am-res')) return;
     if (!res) { $('am-res').innerHTML = ''; return; }
-    const avisos = res.avisos.length ? `<div class="cert-alert warn" style="margin-bottom:10px"><span class="ic">!</span><div>${res.avisos.map(e).join('<br>')}</div></div>` : '';
-    const detalle = res.equipos.map((eq) => `<details style="margin-bottom:8px" ${res.equipos.length <= 2 ? 'open' : ''}>
-        <summary style="cursor:pointer;padding:6px 0"><b>${e(eq.ci)}</b> ${e(eq.descripcion)} · <span class="cert-muted">${e(eq.item_oc ? `ítem ${eq.item_oc}` : 'sin ítem de OC')}</span>
-        · ${eq.partes.length} partes · <b>${nf(eq.total)}</b> ${e(eq.etiqueta_cantidad)}</summary>${tablaEquipo(eq, res.columnas)}</details>`).join('');
+    const avisos = res.avisos.length ? `<div class="callout warn">${ic('alert')}<div>${res.avisos.map(e).join('<br>')}</div></div>` : '';
+    const detalle = res.equipos.map((eq) => `<details class="card card-fold" style="margin-bottom:8px" ${res.equipos.length <= 2 ? 'open' : ''}>
+        <summary class="card-head" style="padding-bottom:12px"><span><b class="mono">${e(eq.ci)}</b> ${e(eq.descripcion)}${eq.centro_costo ? ` · CC ${e(eq.centro_costo)}` : ''} · <span class="muted">${e(eq.item_oc ? `ítem ${eq.item_oc}` : 'sin ítem de OC')}</span>
+        · ${eq.partes.length} partes · <b>${nf(eq.total)}</b> ${e(eq.etiqueta_cantidad)}</span>${ic('chevron-down', 'i-sm fold-ico')}</summary>${tablaEquipo(eq, res.columnas)}</details>`).join('');
     const puedeAcomodar = AM.ed.estado !== 'ANULADA' && puede('generar');
     const accKpi = AM.acomodar
-      ? `<select id="am-g-tipo" style="font-size:12px">${opts(Object.entries(TIPOS_G), 'items_meta')}</select><button type="button" class="cert-btn sm" id="am-g-add">+ Agregar</button>
-         <button type="button" class="cert-btn sm" id="am-g-reset" title="Vuelve a los gráficos de siempre">Restablecer</button><button type="button" class="cert-btn sm primary" id="am-g-listo">Listo</button>`
-      : (puedeAcomodar ? '<button type="button" class="cert-btn sm" id="am-g-acomodar">Acomodar gráficos</button>' : '');
-    $('am-res').innerHTML = `${tarjeta('A certificar por ítem de la OC', avisos + tablaResumen(res), `<span class="cert-muted">${res.total_partes} partes${AM.sucio ? ' · cambios sin guardar' : ''}</span>`)}
+      ? `<select id="am-g-tipo" class="select" style="width:auto;height:28px;font-size:12px" aria-label="Tipo de gráfico">${opts(Object.entries(TIPOS_G), 'items_meta')}</select><button type="button" class="btn btn-sm" id="am-g-add">${ic('plus', 'i-sm')}Agregar</button>
+         <button type="button" class="btn btn-sm" id="am-g-reset" title="Vuelve a los gráficos de siempre">Restablecer</button><button type="button" class="btn btn-sm btn-primary" id="am-g-listo">Listo</button>`
+      : (puedeAcomodar ? '<button type="button" class="btn btn-sm" id="am-g-acomodar">Acomodar gráficos</button>' : '');
+    $('am-res').innerHTML = `${tarjeta('A certificar por ítem de la OC', avisos + tablaResumen(res), `<span class="muted">${res.total_partes} partes${AM.sucio ? ' · cambios sin guardar' : ''}</span>`)}
       ${tarjeta('Gráficos KPI del acta', '<div id="am-kpi"></div>', accKpi)}
-      ${res.indicadores && res.indicadores.equipos.length ? tarjeta('Indicadores por equipo', tablaIndicadores(res), '<span class="cert-muted">Consumo = combustible / horas efectivas</span>') : ''}
-      ${tarjeta('Detalle de partes por equipo', detalle || '<p class="cert-muted">Agregue equipos para ver sus partes.</p>')}`;
+      ${res.indicadores && res.indicadores.equipos.length ? tarjeta('Indicadores por equipo', tablaIndicadores(res), '<span class="muted">Consumo = combustible / horas efectivas</span>') : ''}
+      ${tarjeta('Detalle de partes por equipo', detalle || '<p class="muted">Agregue equipos para ver sus partes.</p>')}`;
     renderKpi();
   }
 
 
   // ================================================================= MÍNIMO Y OBJETIVO POR ÍTEM
   const ESTADOS_META = {
-    BAJO_MINIMO: ['ANULADO', '▼', 'Bajo el mínimo'], BAJO_OBJETIVO: ['BORRADOR', '●', 'Bajo el objetivo'],
-    CUMPLE_MINIMO: ['EMITIDO', '✓', 'Cumple el mínimo'], OBJETIVO: ['EMITIDO', '★', 'Alcanzó el objetivo'],
+    BAJO_MINIMO: ['chip-bad', '▼', 'Bajo el mínimo'], BAJO_OBJETIVO: ['chip-warn', '●', 'Bajo el objetivo'],
+    CUMPLE_MINIMO: ['chip-accent', '✓', 'Cumple el mínimo'], OBJETIVO: ['chip-ok', '★', 'Alcanzó el objetivo'],
   };
   const chipMeta = (i) => {
     const x = i && ESTADOS_META[i.estado_meta];
-    return x ? `<span class="cert-badge cert-b-${x[0]}" title="${e(x[2])}">${x[1]} ${e(x[2])}${i.pct_objetivo != null ? ` · ${nf(i.pct_objetivo, 1)}%` : ''}</span>` : '<span class="cert-muted">sin meta</span>';
+    return x ? `<span class="chip ${x[0]}" title="${e(x[2])}">${x[1]} ${e(x[2])}${i.pct_objetivo != null ? ` · ${nf(i.pct_objetivo, 1)}%` : ''}</span>` : '<span class="muted">sin meta</span>';
   };
   const metaDe = (itemId) => (AM.ed.metas || []).find((m) => m.item_oc_cliente_id === itemId);
   const lineaRes = (itemId) => ((AM.res && AM.res.items_oc) || []).find((x) => x.item_oc_cliente_id === itemId);
@@ -415,22 +492,22 @@
     if (!box) return;
     const ro = editable() ? '' : 'disabled';
     const items = itemsDe(d.orden_compra_cliente_id);
-    if (!items.length) { box.innerHTML = '<p class="cert-muted">La OC no tiene ítems cargados.</p>'; return; }
+    if (!items.length) { box.innerHTML = '<p class="muted">La OC no tiene ítems cargados.</p>'; return; }
     // En un acta cerrada se muestran los valores con que se cerró (quedaron en el resultado).
     const valor = (it, k) => {
       const r = d.estado !== 'BORRADOR' ? lineaRes(it.id) : null;
       const v = r && r[k] !== undefined ? r[k] : (metaDe(it.id) || {})[k];
       return v == null ? '' : v;
     };
-    box.innerHTML = `<div class="cert-wrap"><table class="cert-t"><thead><tr><th>Ítem OC</th><th>Descripción</th><th>Unidad</th><th>Cantidad del período</th>
+    box.innerHTML = `<div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>Ítem OC</th><th>Descripción</th><th>Unidad</th><th class="num">Cantidad del período</th>
       <th>Mínimo</th><th>Objetivo</th><th style="min-width:180px">Avance</th><th>Cumplimiento</th></tr></thead><tbody>
-      ${items.map((it) => `<tr><td class="c">${e(it.numero)}</td><td>${e(it.descripcion || '')}</td><td class="c">${e(it.unidad || '')}</td>
-        <td class="r"><b data-am-mt-cant="${it.id}"></b></td>
+      ${items.map((it) => `<tr><td >${e(it.numero)}</td><td>${e(it.descripcion || '')}</td><td >${e(it.unidad || '')}</td>
+        <td class="num"><b data-am-mt-cant="${it.id}"></b></td>
         <td><input type="number" min="0" step="any" style="width:100px" data-am-mt="${it.id}" data-k="minimo" value="${e(valor(it, 'minimo'))}" ${ro}></td>
         <td><input type="number" min="0" step="any" style="width:100px" data-am-mt="${it.id}" data-k="objetivo" value="${e(valor(it, 'objetivo'))}" ${ro}></td>
         <td data-am-mt-barra="${it.id}"></td><td data-am-mt-chip="${it.id}"></td></tr>`).join('')}
       </tbody></table></div>
-      <p class="cert-muted" style="margin:6px 0 0">Deje vacío lo que no aplique. El estado compara la cantidad del período del ítem (suma de sus equipos) contra el mínimo y el objetivo.</p>`;
+      <p class="muted" style="margin:6px 0 0">Deje vacío lo que no aplique. El estado compara la cantidad del período del ítem (suma de sus equipos) contra el mínimo y el objetivo.</p>`;
     box.querySelectorAll('[data-am-mt]').forEach((inp) => inp.addEventListener('change', () => {
       const id = Number(inp.dataset.amMt);
       const k = inp.dataset.k;
@@ -456,7 +533,7 @@
       const cant = box.querySelector(`[data-am-mt-cant="${it.id}"]`);
       if (cant) cant.textContent = r ? nf(r.cantidad_periodo) : '—';
       const chip = box.querySelector(`[data-am-mt-chip="${it.id}"]`);
-      if (chip) chip.innerHTML = r ? chipMeta(r) : '<span class="cert-muted">sin equipos</span>';
+      if (chip) chip.innerHTML = r ? chipMeta(r) : '<span class="muted">sin equipos</span>';
       const barra = box.querySelector(`[data-am-mt-barra="${it.id}"]`);
       if (barra) barra.innerHTML = r && (r.objetivo || r.minimo) ? barraMeta(r) : '';
     });
@@ -465,7 +542,7 @@
   function barraMeta(r) {
     const tope = Math.max(r.cantidad_periodo || 0, r.objetivo || 0, r.minimo || 0) * 1.05 || 1;
     const pct = (v) => `${Math.min(100, (v / tope) * 100).toFixed(1)}%`;
-    return `<div style="position:relative;height:12px;background:#e6edf5;border-radius:3px" title="Cantidad ${nf(r.cantidad_periodo)} · mínimo ${r.minimo == null ? '—' : nf(r.minimo)} · objetivo ${r.objetivo == null ? '—' : nf(r.objetivo)}">
+    return `<div style="position:relative;height:10px;background:var(--surface-2, #e6edf5);border-radius:999px" title="Cantidad ${nf(r.cantidad_periodo)} · mínimo ${r.minimo == null ? '—' : nf(r.minimo)} · objetivo ${r.objetivo == null ? '—' : nf(r.objetivo)}">
       <i style="position:absolute;left:0;top:0;bottom:0;width:${pct(r.cantidad_periodo || 0)};background:${COL.barra};border-radius:3px"></i>
       ${r.minimo != null ? `<i style="position:absolute;top:-3px;bottom:-3px;left:${pct(r.minimo)};border-left:2px dashed ${COL.min}"></i>` : ''}
       ${r.objetivo != null ? `<i style="position:absolute;top:-3px;bottom:-3px;left:${pct(r.objetivo)};border-left:2px solid ${COL.obj}"></i>` : ''}</div>`;
@@ -473,7 +550,13 @@
 
   // ================================================================= GRÁFICOS KPI
   // Cada acta guarda qué gráficos ve y en qué orden (null = los de siempre). Se dibujan en SVG, sin librerías.
-  const COL = { barra: '#1565c0', min: '#b91c1c', obj: '#15803d', ritmo: '#8a99ad', grid: '#e3e9f1', eje: '#5b6b80', texto: '#0f2440' };
+  // Colores de los gráficos: los del tema en pantalla; los de papel (claros) mientras se arma la impresión.
+  const tema = (v, papel) => (AM.imprimiendo || typeof SMG === 'undefined' ? papel : (SMG.css(v) || papel));
+  const COL = {
+    get barra() { return tema('--accent', '#1565c0'); }, get min() { return tema('--danger', '#b91c1c'); }, get obj() { return tema('--success', '#15803d'); },
+    get ritmo() { return tema('--text-faint', '#8a99ad'); }, get grid() { return tema('--border', '#e3e9f1'); }, get eje() { return tema('--text-muted', '#5b6b80'); },
+    get texto() { return tema('--text', '#0f2440'); },
+  };
   const TIPOS_G = { tarjetas: 'Tarjetas de resumen', items_meta: 'Cantidad por ítem vs. mínimo y objetivo', avance_item: 'Avance acumulado del período',
     equipos: 'Indicador por equipo', diario: 'Cantidad diaria' };
   const IND_G = [['cantidad', 'Cantidad a certificar'], ['total_hs', 'Horas efectivas'], ['gasoil', 'Combustible (L)'], ['consumo_lh', 'Consumo (L/h)'],
@@ -481,24 +564,14 @@
     ['hs_disposicion', 'Hs a disposición'], ['hs_mantenimiento', 'Hs mantenimiento'], ['hs_reparaciones', 'Hs reparaciones']];
   let GRAFICOS_DEFECTO = [{ tipo: 'tarjetas', ancho: 'completo' }, { tipo: 'items_meta', ancho: 'medio' },
     { tipo: 'equipos', indicador: 'total_hs', ancho: 'medio' }, { tipo: 'diario', ancho: 'completo' }];
-  const KPI_CSS = `.am-kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .am-kpi-g{border:1px solid var(--c-line);border-radius:8px;padding:10px 12px;background:var(--c-card);min-width:0}
-    .am-kpi-g.completo{grid-column:1/-1} .am-kpi-g h4{margin:0 0 8px;font-size:13px;color:var(--c-text)}
-    .am-kpi-g.mover{outline:2px dashed #93b4dc;outline-offset:2px}
-    .am-kpi-tools{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:-2px 0 8px} .am-kpi-tools select{max-width:220px}
-    .am-kpi-g svg{display:block;width:100%;height:auto;overflow:visible} .am-kpi-g svg .hit:hover{fill:rgba(21,101,192,.08)}
-    .am-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--c-muted);margin-top:6px}
-    .am-ley span{display:inline-flex;align-items:center;gap:5px} .am-ley i{display:inline-block;width:14px;height:0;border-top:3px solid}
-    .am-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-    .am-tile{border:1px solid var(--c-line);border-radius:8px;padding:8px 10px} .am-tile .v{font-size:20px;font-weight:800;color:var(--c-text);font-variant-numeric:tabular-nums}
-    .am-tile .l{font-size:11px;color:var(--c-muted)} .am-tile.mal{border-color:#f0b4b4;background:#fdf3f3} .am-tile.bien{border-color:#a9dcb9;background:#f1faf4}
-    @media (max-width:900px){.am-kpi-grid{grid-template-columns:1fr}}`;
-  if (!document.getElementById('am-kpi-css')) {
-    const st = document.createElement('style');
-    st.id = 'am-kpi-css';
-    st.textContent = KPI_CSS;
-    document.head.appendChild(st);
-  }
+  // Solo para la ventana de impresión (documento aparte, sin app.css): mismas clases que en pantalla.
+  const KPI_CSS = `.chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .chart-card{border:1px solid #c3d0e0;border-radius:8px;padding:10px 12px;min-width:0}.chart-card.is-full{grid-column:1/-1}
+    .chart-card h4{margin:0 0 8px;font-size:13px}.chart-card svg{display:block;width:100%;height:auto;overflow:visible}
+    .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#555;margin-top:6px}.legend span{display:inline-flex;align-items:center;gap:5px}
+    .legend i.line{display:inline-block;width:14px;height:0;border-top:3px solid}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.kpi{border:1px solid #c3d0e0;border-radius:8px;padding:8px 10px}
+    .kpi-value{font-size:20px;font-weight:800}.kpi-label,.kpi-sub{font-size:11px;color:#555;display:block}`;
 
   const listaGraficos = () => (AM.ed && AM.ed.graficos) || GRAFICOS_DEFECTO;
   const nombreItem = (id) => {
@@ -514,8 +587,8 @@
     return TIPOS_G[g.tipo] || g.tipo;
   }
   const corto = (t, n) => (String(t).length > n ? `${String(t).slice(0, n - 1)}…` : String(t));
-  const vacioG = (t) => `<p class="cert-muted" style="padding:18px 4px;text-align:center">${e(t)}</p>`;
-  const ley = (lista) => `<div class="am-ley">${lista.map(([c, t, dash]) => `<span><i style="border-top-color:${c};${dash ? 'border-top-style:dashed' : ''}"></i>${e(t)}</span>`).join('')}</div>`;
+  const vacioG = (t) => `<div class="empty-state">${e(t)}</div>`;
+  const ley = (lista) => `<div class="legend">${lista.map(([c, t, dash]) => `<span><i class="line" style="border-top-color:${c};${dash ? 'border-top-style:dashed' : ''}"></i>${e(t)}</span>`).join('')}</div>`;
   const txt = (x, y, t, { anchor = 'start', size = 11, color = COL.eje, peso = 400 } = {}) => `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" font-weight="${peso}" fill="${color}" font-family="inherit">${e(t)}</text>`;
   function pasoEje(max) {
     const bruto = max / 4;
@@ -583,7 +656,7 @@
     }
     if (minimo != null) s += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${m.y(minimo)}" y2="${m.y(minimo)}" stroke="${COL.min}" stroke-width="2" stroke-dasharray="4 3"/>${txt(pad.l + 6, m.y(minimo) + 14, `Mínimo ${nf(minimo)}`, { color: COL.texto })}`;
     s += `<path d="${cum.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${m.y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${COL.barra}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    s += `<circle cx="${x(hasta)}" cy="${m.y(acum)}" r="4" fill="${COL.barra}" stroke="#fff" stroke-width="2"/>${txt(x(hasta) - 8, m.y(acum) - 8, nf(acum), { anchor: 'end', peso: 700, color: COL.texto })}`;
+    s += `<circle cx="${x(hasta)}" cy="${m.y(acum)}" r="4" fill="${COL.barra}" stroke="${tema('--surface', '#fff')}" stroke-width="2"/>${txt(x(hasta) - 8, m.y(acum) - 8, nf(acum), { anchor: 'end', peso: 700, color: COL.texto })}`;
     serie.forEach((d, i) => {
       const ritmo = objetivo != null && hasta > 0 ? ` · ritmo para el objetivo ${nf((objetivo * i) / hasta)}` : '';
       s += `<rect class="hit" x="${pad.l + m.ancho * i}" y="${pad.t}" width="${m.ancho}" height="${H - pad.t - pad.b}" fill="transparent"><title>${e(`${fFecha(d.fecha)}: ${nf(d.valor)} en el día · acumulado ${nf(cum[i])}${ritmo}`)}</title></rect>`;
@@ -608,7 +681,7 @@
       if (d.valor) s += `<rect x="${x0}" y="${m.y(d.valor)}" width="${bw}" height="${Math.max(0, m.y(0) - m.y(d.valor))}" rx="${Math.min(3, bw / 2)}" fill="${COL.barra}"/>`;
       s += `<rect class="hit" x="${pad.l + m.ancho * i}" y="${pad.t}" width="${m.ancho}" height="${H - pad.t - pad.b}" fill="transparent"><title>${e(`${fFecha(d.fecha)}: ${nf(d.valor)}${det ? ` (${det})` : ''}`)}</title></rect>`;
     });
-    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${e(tituloG(g))}">${s}</svg><div class="am-ley"><span>${dias} días con cantidad · promedio ${nf(serie.reduce((a, x) => a + x.valor, 0) / (dias || 1))} por día trabajado</span></div>`;
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${e(tituloG(g))}">${s}</svg><div class="legend"><span>${dias} días con cantidad · promedio ${nf(serie.reduce((a, x) => a + x.valor, 0) / (dias || 1))} por día trabajado</span></div>`;
   }
 
   // Barras horizontales (una fila por ítem o por equipo) con marcas opcionales de mínimo y objetivo.
@@ -647,7 +720,7 @@
         tip: `Ítem ${i.numero}: ${nf(i.cantidad_periodo)} ${i.unidad || ''} · mínimo ${i.minimo == null ? '—' : nf(i.minimo)} · objetivo ${i.objetivo == null ? '—' : nf(i.objetivo)}${est ? ` · ${est[2]}` : ''}` };
     });
     return barrasH(filas, W, true) + ley([[COL.barra, 'Cantidad del período'], ...(hayMin ? [[COL.min, 'Mínimo', true]] : []), ...(hayObj ? [[COL.obj, 'Objetivo (% = avance)']] : []),
-      ...(!hayMin && !hayObj ? [['#c3d0e0', 'Cargue mínimo y objetivo por ítem para ver las marcas']] : [])]);
+      ...(!hayMin && !hayObj ? [[COL.ritmo, 'Cargue mínimo y objetivo por ítem para ver las marcas']] : [])]);
   }
 
   function valorEquipo(res, ci, ind) {
@@ -672,8 +745,8 @@
     const k = res.kpi || {};
     const ind = (res.indicadores && res.indicadores.general) || { valores: {} };
     const cant = res.items_oc.reduce((a, x) => a + (x.cantidad_periodo || 0), 0);
-    const t = (l, v, cls = '', sub = '') => `<div class="am-tile ${cls}"><div class="l">${e(l)}</div><div class="v">${v}</div>${sub ? `<div class="l">${sub}</div>` : ''}</div>`;
-    return `<div class="am-tiles">
+    const t = (l, v, cls = '', sub = '') => `<div class="card kpi ${cls === 'mal' ? 'is-danger' : cls === 'bien' ? 'is-success' : ''}"><span class="kpi-label">${e(l)}</span><span class="kpi-value sm">${v}</span>${sub ? `<span class="kpi-sub">${sub}</span>` : ''}</div>`;
+    return `<div class="kpis kpis-tight">
       ${t('Importe a certificar', money(res.total_importe))}
       ${t('Cantidad a certificar', nf(cant), '', `${res.items_oc.length} ítem(s) · ${res.equipos.length} equipo(s)`)}
       ${k.pct_objetivo != null ? t('Avance sobre el objetivo', `${nf(k.pct_objetivo, 1)}%`, k.pct_objetivo >= 100 ? 'bien' : '', 'ítems con objetivo') : ''}
@@ -696,13 +769,13 @@
   function herramientasG(g, i, total) {
     const itemsRes = AM.res.items_oc.map((x) => [x.item_oc_cliente_id, `Ítem ${x.numero} · ${corto(x.descripcion || '', 30)}`]);
     const extra = g.tipo === 'equipos'
-      ? `<select style="font-size:12px" data-am-g-ind="${i}">${opts(IND_G, g.indicador || 'total_hs')}</select>`
-      : (g.tipo === 'avance_item' || g.tipo === 'diario' ? `<select style="font-size:12px" data-am-g-item="${i}">${opts([['', 'Todos los ítems']].concat(itemsRes), g.item_oc_cliente_id || '')}</select>` : '');
-    return `<div class="am-kpi-tools">
-      <button type="button" class="cert-btn sm" data-am-g-mov="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Subir">↑</button>
-      <button type="button" class="cert-btn sm" data-am-g-mov="${i}" data-d="1" ${i === total - 1 ? 'disabled' : ''} title="Bajar">↓</button>
-      <button type="button" class="cert-btn sm" data-am-g-ancho="${i}">${g.ancho === 'completo' ? '⇤ Medio ancho' : '⇥ Ancho completo'}</button>
-      ${extra}<button type="button" class="cert-btn sm danger" data-am-g-del="${i}" title="Quitar">×</button></div>`;
+      ? `<select class="select" style="width:auto;height:28px;font-size:12px" data-am-g-ind="${i}" aria-label="Indicador">${opts(IND_G, g.indicador || 'total_hs')}</select>`
+      : (g.tipo === 'avance_item' || g.tipo === 'diario' ? `<select class="select" style="width:auto;height:28px;font-size:12px" data-am-g-item="${i}" aria-label="Ítem">${opts([['', 'Todos los ítems']].concat(itemsRes), g.item_oc_cliente_id || '')}</select>` : '');
+    return `<div class="head-actions" style="margin:-2px 0 8px">
+      <button type="button" class="btn btn-sm btn-icon" data-am-g-mov="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Subir" aria-label="Subir">${ic('up', 'i-sm')}</button>
+      <button type="button" class="btn btn-sm btn-icon" data-am-g-mov="${i}" data-d="1" ${i === total - 1 ? 'disabled' : ''} title="Bajar" aria-label="Bajar">${ic('down', 'i-sm')}</button>
+      <button type="button" class="btn btn-sm" data-am-g-ancho="${i}">${g.ancho === 'completo' ? 'Medio ancho' : 'Ancho completo'}</button>
+      ${extra}<button type="button" class="btn btn-ghost btn-sm btn-icon" data-am-g-del="${i}" title="Quitar" aria-label="Quitar gráfico">${ic('trash', 'i-sm')}</button></div>`;
   }
 
   function renderKpi() {
@@ -710,10 +783,10 @@
     if (!box || !AM.res) return;
     const lista = listaGraficos();
     if (!lista.length) {
-      box.innerHTML = `<p class="cert-muted">Sin gráficos. ${AM.acomodar ? 'Agregue uno con «+ Agregar».' : 'Use «Acomodar gráficos» para elegirlos.'}</p>`;
+      box.innerHTML = `<div class="empty-state">Sin gráficos. ${AM.acomodar ? 'Agregue uno con «Agregar».' : 'Use «Acomodar gráficos» para elegirlos.'}</div>`;
     } else {
-      box.innerHTML = `<div class="am-kpi-grid">${lista.map((g, i) => `<div class="am-kpi-g ${g.ancho === 'completo' ? 'completo' : ''} ${AM.acomodar ? 'mover' : ''}">
-        <h4>${e(tituloG(g))}</h4>${AM.acomodar ? herramientasG(g, i, lista.length) : ''}<div data-am-g="${i}"></div></div>`).join('')}</div>`;
+      box.innerHTML = `<div class="chart-grid">${lista.map((g, i) => `<div class="card chart-card ${g.ancho === 'completo' ? 'is-full' : ''} ${AM.acomodar ? 'is-arranging' : ''}">
+        <h4 class="card-title">${e(tituloG(g))}</h4>${AM.acomodar ? herramientasG(g, i, lista.length) : ''}<div data-am-g="${i}"></div></div>`).join('')}</div>`;
       box.querySelectorAll('[data-am-g]').forEach((el) => {
         const g = lista[Number(el.dataset.amG)];
         el.innerHTML = dibujarG(g, AM.res, Math.max(280, Math.round(el.clientWidth || 600)));
@@ -803,21 +876,23 @@
     const s = AM.opciones.seguimientos.find((x) => x.id === Number(d.seguimiento_cc_id)) || {};
     const w = window.open('', '_blank');
     if (!w) { toast('El navegador bloqueó la ventana de impresión.', 'error'); return; }
+    AM.imprimiendo = true;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Acta de medición N° ${e(d.numero)}</title><style>
       body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:18px} table{border-collapse:collapse;width:100%;margin-bottom:12px}
-      th,td{border:1px solid #888;padding:3px 5px;vertical-align:top} th{background:#dce8f7} td.r{text-align:right} td.c{text-align:center}
-      tr.tot td{background:#eef4fc;font-weight:bold} h1{font-size:17px;margin:0 0 4px} h2{font-size:13px;margin:16px 0 6px} .cert-muted{color:#555;font-weight:normal}
+      th,td{border:1px solid #888;padding:3px 5px;vertical-align:top;text-align:left} th{background:#dce8f7} .num{text-align:right} .center{text-align:center}
+      tr.tot td{background:#eef4fc;font-weight:bold} h1{font-size:17px;margin:0 0 4px} h2{font-size:13px;margin:16px 0 6px} .muted{color:#555;font-weight:normal} .chip{font-size:10px}
       .enc{display:flex;gap:16px;align-items:center;margin-bottom:10px} .firmas{display:flex;justify-content:space-around;margin-top:50px;text-align:center}
-      .firmas div{min-width:220px;border-top:1px solid #555;padding-top:6px} @page{size:landscape;margin:12mm} .cert-wrap{overflow:visible}
-      :root{--c-line:#c3d0e0;--c-card:#fff;--c-text:#111;--c-muted:#555} ${KPI_CSS} .am-kpi-g{break-inside:avoid}</style></head><body>
+      .firmas div{min-width:220px;border-top:1px solid #555;padding-top:6px} @page{size:landscape;margin:12mm} .table-scroll{overflow:visible}
+      ${KPI_CSS} .chart-card{break-inside:avoid}</style></head><body>
       <div class="enc"><img src="/Imagenes/09-smg.png" alt="" style="height:46px"><div><h1>ACTA DE MEDICIÓN N° ${e(d.numero)}${d.estado === 'ANULADA' ? ' (ANULADA)' : ''}</h1>
       <div><b>Cliente:</b> ${e(s.cliente || s.cliente_codigo || '')} &nbsp; <b>OC:</b> ${e(ocTxt(o))} &nbsp; <b>Período:</b> ${fFecha(d.periodo_desde)} al ${fFecha(d.periodo_hasta)} &nbsp; <b>Fecha:</b> ${fFecha(d.fecha)}</div>
       ${d.observaciones ? `<div><b>Observaciones:</b> ${e(d.observaciones)}</div>` : ''}</div></div>
       <h2>A certificar por ítem de la OC</h2>${tablaResumen(res)}
-      ${listaGraficos().length ? `<h2>Gráficos KPI</h2><div class="am-kpi-grid">${listaGraficos().map((g) => `<div class="am-kpi-g ${g.ancho === 'completo' ? 'completo' : ''}"><h4>${e(tituloG(g))}</h4>${dibujarG(g, res, g.ancho === 'completo' ? 980 : 480)}</div>`).join('')}</div>` : ''}
+      ${listaGraficos().length ? `<h2>Gráficos KPI</h2><div class="chart-grid">${listaGraficos().map((g) => `<div class="chart-card ${g.ancho === 'completo' ? 'is-full' : ''}"><h4>${e(tituloG(g))}</h4>${dibujarG(g, res, g.ancho === 'completo' ? 980 : 480)}</div>`).join('')}</div>` : ''}
       ${res.indicadores && res.indicadores.equipos.length ? `<h2>Indicadores por equipo</h2>${tablaIndicadores(res)}` : ''}
-      ${res.equipos.map((eq) => `<h2>${e(eq.ci)} ${e(eq.descripcion)} <span class="cert-muted">· ${e(eq.item_oc ? `ítem ${eq.item_oc}` : 'sin ítem de OC')}</span></h2>${tablaEquipo(eq, res.columnas)}`).join('')}
+      ${res.equipos.map((eq) => `<h2>${e(eq.ci)} ${e(eq.descripcion)} <span class="muted">${eq.centro_costo ? `· CC ${e(eq.centro_costo)} ` : ''}· ${e(eq.item_oc ? `ítem ${eq.item_oc}` : 'sin ítem de OC')}</span></h2>${tablaEquipo(eq, res.columnas)}`).join('')}
       <div class="firmas"><div><b>Contratista</b></div><div><b>Cliente</b></div></div></body></html>`);
+    AM.imprimiendo = false;
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
@@ -830,7 +905,7 @@
     try {
       if (!AM.opciones) AM.opciones = await api(`${API}/opciones`);
       if (AM.ed && AM.ed.id) await abrirActa(AM.ed.id); else await vistaLista();
-    } catch (err) { $('am-body').innerHTML = `<div class="cert-alert err"><span class="ic">!</span><div>${e(err.message)}</div></div>`; }
+    } catch (err) { $('am-body').innerHTML = `<div class="callout bad">${ic('alert')}<div>${e(err.message)}</div></div>`; }
   };
 
   // Llamada desde el editor de certificados (Seguimiento de Cliente › Certificados › Nuevo).
@@ -840,12 +915,12 @@
     let lista;
     try { lista = await api(`/operaciones/seguimiento-cliente/${certState.sid}/actas-medicion?oc=${ed.alcance === 'OC' ? (ed.oc || 0) : 0}`); } catch (err) { toast(err.message, 'error'); return; }
     if (!lista.length) { toast('No hay actas de medición cerradas para este seguimiento (cree el acta en Operaciones › Actas de Medición y ciérrela).'); return; }
-    modal('Precargar desde acta de medición', `<p class="cert-muted">Se cargan las cantidades del período en los ítems de la OC elegidos para cada equipo del acta. Todo queda editable.</p>
-      <div class="cert-wrap"><table class="cert-t"><thead><tr><th>OC</th><th>Acta</th><th>Período</th><th>Estado</th><th>Certificado vigente</th><th></th></tr></thead><tbody>
-      ${lista.map((a) => `<tr><td>${e(a.contrato)}</td><td class="c">N° ${a.numero}</td><td>${fFecha(a.periodo_desde)} al ${fFecha(a.periodo_hasta)}</td><td>${badge(a.estado)}</td>
-        <td>${certTxt(a.certificado_vigente)}${a.coincide_oc ? '' : ' <span class="cert-muted">(otra OC)</span>'}</td>
-        <td class="c"><button type="button" class="cert-btn sm primary" data-am-pc="${a.acta_id}" ${a.certificado_vigente && a.certificado_vigente.id !== ed.id ? 'disabled title="Ya tiene un certificado vigente"' : ''}>Precargar</button></td></tr>`).join('')}
-      </tbody></table></div>`, '<button class="cert-btn" type="button" data-am-cerrar>Cerrar</button>', 'md');
+    modal('Precargar desde acta de medición', `<p class="help">Se cargan las cantidades del período en los ítems de la OC elegidos para cada equipo del acta. Todo queda editable.</p>
+      <div class="table-scroll"><table class="tbl tbl-static tbl-auto"><thead><tr><th>OC</th><th>Acta</th><th>Período</th><th>Estado</th><th>Certificado vigente</th><th></th></tr></thead><tbody>
+      ${lista.map((a) => `<tr><td>${e(a.contrato)}</td><td >N° ${a.numero}</td><td>${fFecha(a.periodo_desde)} al ${fFecha(a.periodo_hasta)}</td><td>${badge(a.estado)}</td>
+        <td>${certTxt(a.certificado_vigente)}${a.coincide_oc ? '' : ' <span class="muted">(otra OC)</span>'}</td>
+        <td><button type="button" class="btn btn-sm btn-primary" data-am-pc="${a.acta_id}" ${a.certificado_vigente && a.certificado_vigente.id !== ed.id ? 'disabled title="Ya tiene un certificado vigente"' : ''}>Precargar</button></td></tr>`).join('')}
+      </tbody></table></div>`, '<button class="btn" type="button" data-am-cerrar>Cerrar</button>', 'md');
     $('am-modal-b').querySelectorAll('[data-am-pc]').forEach((b) => b.addEventListener('click', async () => {
       try {
         const p = await api(`/operaciones/seguimiento-cliente/${certState.sid}/actas-medicion/${b.dataset.amPc}/precarga`);

@@ -1,1103 +1,956 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Gestión de Personal</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
-      min-height: 100vh;
-      overflow-x: hidden;
-      color: #eef4ff;
-      padding: 20px;
-      position: relative;
-    }
-    .bg-photo {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-      opacity: 0.66;
-      pointer-events: none;
-    }
-    .bg-blur {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-        radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-    }
-    .page {
-      position: relative;
-      z-index: 2;
-      max-width: 1500px;
-      margin: 0 auto;
-      background: rgba(15, 23, 42, 0.66);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-      border-radius: 12px;
-      padding: 16px;
-    }
-    .logo-corner {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 3;
-      padding: 0;
-    }
-    .logo-corner img {
-      display: block;
-      width: 195px;
-      max-width: 38vw;
-      height: auto;
-    }
-    .logo-box img { filter: none; }
-    h2 { text-align: center; color: #ffffff; }
-    .actions-bar { max-width: 600px; margin: 0 auto 10px; }
-    .actions-bar button { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .actions-bar button:hover { box-shadow: 0 0 12px rgba(59,130,246,0.6); transform: scale(1.05); }
-    .form-wrapper { display: none; }
-    .form-wrapper.open { display: block; }
-    form {
-      max-width: 600px;
-      margin: auto;
-      background: rgba(15, 23, 42, 0.45);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-      padding: 20px;
-      border-radius: 8px;
-    }
-    input, select, button { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border-radius: 8px; }
-    input, select {
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      color: #eef4ff;
-    }
-
-    select option,
-    select optgroup {
-      background: #0f2237;
-      color: #eef4ff;
-    }
-
-    select option:checked {
-      background: #2f6fca;
-      color: #ffffff;
-    }
-    button {
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    button:hover { box-shadow: none; transform: none; }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
-      margin: 14px 0 12px;
-    }
-    .stat-card {
-      background: rgba(255,255,255,0.09);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-    }
-    .stat-title {
-      margin: 0 0 10px;
-      font-size: 14px;
-      color: #dbeafe;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-    }
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .kpi-pill {
-      background: rgba(15,23,42,0.38);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      padding: 8px;
-      text-align: center;
-    }
-    .kpi-alerta {
-      border: 1px solid rgba(255, 80, 80, 0.5);
-      box-shadow: 0 0 10px rgba(255, 80, 80, 0.3);
-    }
-    .kpi-label {
-      display: block;
-      font-size: 11px;
-      color: #dbeafe;
-      opacity: 0.88;
-    }
-    .kpi-value {
-      display: block;
-      margin-top: 4px;
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffffff;
-      line-height: 1;
-    }
-    .chart-box {
-      position: relative;
-      height: 220px;
-    }
-    .chart-box canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    .conclusion-card {
-      margin-top: 10px;
-      background: rgba(255,255,255,0.09);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-    }
-    .conclusion {
-      background: rgba(0,0,0,0.2);
-      border-left: 3px solid #3b82f6;
-    }
-    .conclusion-title {
-      margin: 0 0 8px;
-      font-size: 15px;
-      font-weight: 700;
-      color: #f8fbff;
-      letter-spacing: 0.3px;
-    }
-    .conclusion-main {
-      margin: 0 0 10px;
-      color: #e6f0ff;
-      line-height: 1.45;
-      font-size: 14px;
-    }
-    .conclusion-list {
-      margin: 0;
-      padding-left: 18px;
-      color: #dbeafe;
-      line-height: 1.5;
-      font-size: 13px;
-    }
-
-    .message { text-align: center; margin-top: 10px; color: #86efac; }
-
-    .tabla-personal-wrap {
-      margin-top: 8px;
-      max-height: 56vh;
-      overflow: auto;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      background: rgba(255,255,255,0.08);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: rgba(255,255,255,0.08);
-    }
-    th {
-      background: rgba(10, 24, 38, 0.82);
-      color: white;
-      padding: 12px;
-      text-align: left;
-      font-weight: bold;
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(255,255,255,0.24);
-    }
-    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); }
-    tr:hover { background: rgba(255,255,255,0.08); }
-    #lista-personal th, #lista-personal td { white-space: nowrap; }
-    #lista-personal th:nth-child(2), #lista-personal td:nth-child(2) { min-width: 220px; }
-    #lista-personal th:nth-child(3), #lista-personal td:nth-child(3) { min-width: 140px; }
-    #lista-personal th:nth-child(n+4), #lista-personal td:nth-child(n+4) { min-width: 110px; }
-    #lista-personal th:first-child, #lista-personal td:first-child {
-      position: sticky;
-      left: 0;
-      z-index: 2;
-      background: rgba(10, 24, 38, 0.98);
-      box-shadow: 2px 0 6px rgba(0,0,0,0.35);
-    }
-    #lista-personal th:first-child { z-index: 4; }
-    #lista-personal td:first-child { color: #eef4ff; }
-    .col-filter {
-      display: block;
-      width: 100%;
-      margin: 6px 0 0;
-      padding: 4px 6px;
-      font-size: 12px;
-      font-weight: normal;
-      box-sizing: border-box;
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      color: #eef4ff;
-      border-radius: 6px;
-    }
-    .col-filter::placeholder { color: rgba(238, 244, 255, 0.5); }
-    .filtros-bar {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-    .filtros-bar button {
-      width: auto;
-      padding: 8px 14px;
-      margin: 0;
-      font-size: 13px;
-    }
-    .check-ocultar-inactivos {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #dbeafe;
-      cursor: pointer;
-    }
-    .check-ocultar-inactivos input {
-      width: auto;
-      margin: 0;
-    }
-    .chip-habilitacion {
-      display: inline-block;
-      width: 100%;
-      padding: 6px 8px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      text-align: center;
-      cursor: pointer;
-      border: 1px solid transparent;
-      box-sizing: border-box;
-    }
-    .chip-habilitacion:hover { filter: brightness(1.15); }
-    .chip-vigente { background: rgba(34, 197, 94, 0.22); border-color: rgba(34, 197, 94, 0.5); color: #bbf7d0; }
-    .chip-por_vencer { background: rgba(234, 179, 8, 0.22); border-color: rgba(234, 179, 8, 0.5); color: #fef08a; }
-    .chip-vencido { background: rgba(239, 68, 68, 0.22); border-color: rgba(239, 68, 68, 0.5); color: #fecaca; }
-    .chip-vacio { background: rgba(148, 163, 184, 0.12); border-color: rgba(148, 163, 184, 0.3); color: #9fb3c8; }
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(2, 6, 23, 0.72);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-    }
-    .modal-box {
-      background: #13213c;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 12px;
-      padding: 20px;
-      width: min(360px, 90vw);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.5);
-    }
-    .modal-box h3 { margin: 0 0 12px; color: #fff; }
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .modal-actions button { width: auto; flex: 1; padding: 10px 8px; font-size: 13px; }
-    .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; }
-    .cell-select {
-      width: 100%;
-      min-width: 72px;
-      padding: 6px;
-      margin: 0;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-image:
-        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
-        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
-      background-position:
-        calc(100% - 14px) calc(50% - 3px),
-        calc(100% - 8px) calc(50% - 3px);
-      background-size: 6px 6px, 6px 6px;
-      background-repeat: no-repeat;
-      padding-right: 26px;
-    }
-    .form-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .form-actions button { width: auto; flex: 1; }
-    #lista-personal tbody tr { cursor: pointer; }
-    #lista-personal tbody tr.fila-seleccionada { background: rgba(59, 130, 246, 0.26); }
-    #lista-personal tbody tr.fila-seleccionada td:first-child { background: rgba(30, 64, 175, 0.98); }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personal · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
 </head>
-<body>
 
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="logo-corner logo-box">
-  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
-</div>
+<body data-titulo="Personal">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-<div class="page">
-
-<h2>Gestión de Personal</h2>
-
-<section class="stats-grid">
-  <article class="stat-card">
-    <h3 class="stat-title">Resumen General</h3>
-    <div class="kpi-row">
-      <div class="kpi-pill">
-        <span class="kpi-label">Total Personal</span>
-        <span id="kpi-total" class="kpi-value">0</span>
-      </div>
-      <div class="kpi-pill">
-        <span class="kpi-label">Con Alguna Habilitación</span>
-        <span id="kpi-con" class="kpi-value">0</span>
-      </div>
-      <div class="kpi-pill kpi-alerta">
-        <span class="kpi-label">Sin Habilitaciones</span>
-        <span id="kpi-sin" class="kpi-value">0</span>
-      </div>
-    </div>
-    <div class="chart-box"><canvas id="chart-resumen"></canvas></div>
-  </article>
-
-  <article class="stat-card">
-    <h3 class="stat-title">Habilitaciones SI por Proyecto</h3>
-    <div class="chart-box"><canvas id="chart-si"></canvas></div>
-  </article>
-
-  <article class="stat-card">
-    <h3 class="stat-title">Habilitaciones NO por Proyecto</h3>
-    <div class="chart-box"><canvas id="chart-no"></canvas></div>
-  </article>
-</section>
-
-<section class="conclusion-card conclusion">
-  <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
-  <p id="conclusion-main" class="conclusion-main">Cargando conclusión operativa...</p>
-  <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
-  <ul id="conclusion-list" class="conclusion-list"></ul>
-</section>
-
-<div class="actions-bar">
-  <button type="button" id="btn-cargar-empleado">Cargar empleados</button>
-</div>
-
-<div id="form-wrapper" class="form-wrapper">
-  <form id="form">
-    <h3 id="form-empleado-titulo">Cargar empleado</h3>
-    <div class="campo-legajo-wrap" style="display:flex; gap:8px; align-items:center;">
-      <input type="text" id="legajo" placeholder="N° de Legajo" required style="flex:1;">
-      <button type="button" id="btn-corregir-legajo" style="display:none; white-space:nowrap;">Corregir legajo</button>
-    </div>
-    <input type="text" id="nombre" placeholder="Nombre del Empleado" required>
-    <input type="text" id="cuil" placeholder="CUIL" required>
-    <input type="date" id="fecha_nacimiento" aria-label="Fecha de nacimiento">
-    <select id="activo">
-      <option value="ACTIVO">Activo</option>
-      <option value="INACTIVO">Inactivo</option>
-    </select>
-
-    <p class="message" style="margin: 4px 0 0; color: #9fb3c8; font-size: 13px;">
-      Las habilitaciones por proyecto y su vencimiento se cargan despues, desde la tabla.
-    </p>
-
-    <div class="form-actions">
-      <button type="submit" id="btn-guardar-empleado">Guardar</button>
-      <button type="button" id="btn-cancelar-edicion" style="display:none;">Cancelar</button>
-    </div>
-
-  </form>
-</div>
-
-<p class="message" id="mensaje"></p>
-
-<div class="filtros-bar">
-  <label class="check-ocultar-inactivos">
-    <input type="checkbox" id="chk-ocultar-inactivos"> Ocultar inactivos
-  </label>
-  <button type="button" id="btn-limpiar-filtros-personal">Limpiar filtros</button>
-</div>
-<div class="tabla-personal-wrap">
-  <table id="lista-personal">
-    <thead>
-      <tr id="thead-personal-row">
-        <th>Legajo<input class="col-filter" data-campo="legajo" placeholder="Filtrar..."></th>
-        <th>Empleado<input class="col-filter" data-campo="nombre" placeholder="Filtrar..."></th>
-        <th>CUIL<input class="col-filter" data-campo="cuil" placeholder="Filtrar..."></th>
-        <th>Fecha de nacimiento<input class="col-filter" data-campo="fecha_nacimiento" placeholder="Filtrar..."></th>
-        <th>Estado
-          <select class="col-filter" data-campo="activo">
-            <option value="">Todos</option>
-            <option value="ACTIVO">ACTIVO</option>
-            <option value="INACTIVO">INACTIVO</option>
+    <main class="content" id="contenido">
+      <!-- ============================== Encabezado ============================== -->
+      <div class="page-head">
+        <div>
+          <h1>Personal</h1>
+          <p class="page-sub"><span id="page-sub">Cargando…</span>
+            <button type="button" class="chip chip-warn dq-chip" id="chip-inconsistencias" hidden title="Mostrar solo los empleados con datos a revisar"></button></p>
+        </div>
+        <div class="head-actions">
+          <label class="sr-only" for="filtro-sitio">Sitio</label>
+          <select id="filtro-sitio" class="select" title="Filtra indicadores y tabla por sitio de habilitación">
+            <option value="">Todos los sitios</option>
           </select>
-        </th>
-      </tr>
-    </thead>
-    <tbody id="personal-body"></tbody>
-  </table>
-</div>
+          <button type="button" class="btn btn-primary" id="btn-nuevo"><svg class="i"><use href="#i-plus"/></svg>Nuevo empleado</button>
+          <button type="button" class="btn btn-icon" id="btn-mas" aria-haspopup="menu" aria-label="Más acciones" title="Más acciones"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+      </div>
 
-<div id="modal-habilitacion" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <h3 id="modal-habilitacion-titulo">Habilitación</h3>
-    <label for="modal-habilitacion-fecha">Fecha de vencimiento</label>
-    <input type="date" id="modal-habilitacion-fecha">
-    <div class="modal-actions">
-      <button type="button" id="modal-habilitacion-guardar">Guardar</button>
-      <button type="button" id="modal-habilitacion-quitar" class="btn-danger">Quitar habilitación</button>
-      <button type="button" id="modal-habilitacion-cancelar">Cancelar</button>
-    </div>
+      <!-- ============================== KPIs ============================== -->
+      <section class="kpis" aria-label="Indicadores">
+        <article class="card kpi">
+          <span class="kpi-label">Total de personal</span>
+          <span id="kpi-total" class="kpi-value">—</span>
+          <span class="kpi-sub" id="kpi-total-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi">
+          <span class="kpi-label">Activos</span>
+          <span id="kpi-activos" class="kpi-value">—</span>
+          <div class="bar" role="progressbar" aria-label="Porcentaje de personal activo" aria-valuemin="0" aria-valuemax="100" id="kpi-activos-bar"><span style="width:0%"></span></div>
+          <span class="kpi-sub" id="kpi-activos-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi">
+          <span class="kpi-label">Con habilitación vigente</span>
+          <span id="kpi-con" class="kpi-value">—</span>
+          <span class="kpi-sub" id="kpi-con-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi">
+          <span class="kpi-label">Cobertura de habilitaciones</span>
+          <span id="kpi-cob" class="kpi-value">—</span>
+          <div class="bar" role="progressbar" aria-label="Cobertura de habilitaciones" aria-valuemin="0" aria-valuemax="100" id="kpi-cob-bar"><span style="width:0%"></span></div>
+          <span class="kpi-sub" id="kpi-cob-sub">&nbsp;</span>
+        </article>
+      </section>
+
+      <!-- ============================== Gráficos + Observaciones ============================== -->
+      <section class="grid-cards">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Estado de habilitaciones</h2><span class="help">personal activo, por sitio</span></div>
+          <div class="card-body">
+            <div class="chart-box" id="chart-estado-box"><canvas id="chart-estado" aria-label="Estado de habilitaciones por sitio" role="img"></canvas></div>
+            <div class="empty-state" id="chart-estado-vacio" hidden><svg class="i"><use href="#i-inbox"/></svg><b>Sin habilitaciones cargadas</b>Se cargan desde la ficha de cada empleado.</div>
+            <div class="legend" aria-hidden="true" id="chart-estado-leyenda">
+              <span><i class="lv-success"></i>Vigente</span><span><i class="lv-warning"></i>Por vencer (≤ 30 días)</span><span><i class="lv-danger"></i>Vencida</span>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Habilitaciones</h2><span class="help">% vigente sobre el personal activo</span></div>
+          <div class="card-body">
+            <div class="meters" id="hab-meters"></div>
+            <div class="legend" aria-hidden="true">
+              <span><i class="lv-danger"></i>&lt; 50%</span><span><i class="lv-warning"></i>50–80%</span><span><i class="lv-success"></i>&gt; 80%</span>
+            </div>
+          </div>
+        </article>
+        <article class="card obs" aria-labelledby="obs-title">
+          <div class="card-head"><h2 class="card-title" id="obs-title"><span class="obs-icon"><svg class="i i-sm"><use href="#i-sparkles"/></svg></span>Observaciones</h2></div>
+          <div class="card-body">
+            <ul class="obs-list" id="conclusion-list">
+              <li><span></span><span class="skel" style="width:90%"></span></li>
+              <li><span></span><span class="skel" style="width:75%"></span></li>
+              <li><span></span><span class="skel" style="width:82%"></span></li>
+            </ul>
+            <details id="obs-detalle"><summary>Ver análisis completo</summary><p id="conclusion-main"></p></details>
+          </div>
+          <div class="obs-foot"><span id="obs-estado">Generando…</span>
+            <button type="button" class="btn btn-sm" id="obs-regenerar"><svg class="i i-sm"><use href="#i-refresh"/></svg>Regenerar</button></div>
+        </article>
+      </section>
+
+      <!-- ============================== Tabla ============================== -->
+      <section class="card" id="seccion-tabla" aria-label="Listado de personal">
+        <div class="toolbar">
+          <div class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="buscar-tabla" class="input" type="search" placeholder="Buscar por nombre, legajo o CUIL" aria-label="Buscar en la tabla" autocomplete="off"></div>
+          <select class="chip-select" id="f-estado" aria-label="Estado del empleado">
+            <option value="ACTIVO">Activos</option><option value="INACTIVO">Inactivos</option><option value="">Activos e inactivos</option></select>
+          <select class="chip-select" id="f-sitio" aria-label="Sitio"></select>
+          <select class="chip-select" id="f-hab" aria-label="Habilitación">
+            <option value="">Habilitación: todas</option>
+            <option value="VIGENTE">Habilitación: vigente</option>
+            <option value="POR_VENCER">Habilitación: por vencer</option>
+            <option value="VENCIDO">Habilitación: vencida</option>
+            <option value="SIN">Habilitación: sin</option>
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-mas-filtros" aria-haspopup="dialog"><svg class="i i-sm"><use href="#i-filter"/></svg>Por columna<span class="count-badge" id="cnt-col-filtros" hidden>0</span></button>
+          <button type="button" class="chip chip-warn dq-chip" id="chip-solo-issues" hidden title="Quitar este filtro">Con inconsistencias <svg class="i i-sm"><use href="#i-x"/></svg></button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-limpiar-filtros" hidden>Limpiar</button>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="Vistas guardadas" id="vistas">
+            <button type="button" data-vista="general">General</button>
+            <button type="button" data-vista="habilitaciones">Habilitaciones</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-icon" id="btn-columnas" aria-haspopup="dialog" aria-label="Columnas visibles" title="Columnas visibles"><svg class="i i-sm"><use href="#i-columns"/></svg></button>
+          <button type="button" class="btn btn-sm" id="btn-exportar" title="Exporta las filas filtradas (CSV compatible con Excel)"><svg class="i i-sm"><use href="#i-download"/></svg>Exportar</button>
+        </div>
+        <div class="table-wrap" id="tabla-wrap">
+          <table id="lista-personal" class="tbl">
+            <colgroup id="lista-cols"></colgroup>
+            <thead id="lista-head"></thead>
+            <tbody id="personal-body"></tbody>
+          </table>
+        </div>
+        <div class="tfoot">
+          <span id="tabla-rango" class="num">&nbsp;</span>
+          <div class="pager">
+            <label for="page-size" class="muted">Filas</label>
+            <select id="page-size" class="select"><option>25</option><option>50</option><option>100</option></select>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-prev" aria-label="Página anterior"><svg class="i i-sm"><use href="#i-left"/></svg></button>
+            <span id="pag-info" class="num"></span>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-next" aria-label="Página siguiente"><svg class="i i-sm"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const formWrapper = document.getElementById("form-wrapper");
-const btnCargarEmpleado = document.getElementById("btn-cargar-empleado");
-const formEmpleado = document.getElementById("form");
-const inputLegajo = document.getElementById("legajo");
-const btnCorregirLegajo = document.getElementById("btn-corregir-legajo");
-const tituloFormEmpleado = document.getElementById("form-empleado-titulo");
-const btnGuardarEmpleado = document.getElementById("btn-guardar-empleado");
-const btnCancelarEdicion = document.getElementById("btn-cancelar-edicion");
-let esAdministrador = false;
-let chartResumen;
-let chartSi;
-let chartNo;
-let legajoEnEdicion = null;
-let legajoSeleccionado = null;
-
-let proyectosHabilitacion = [];
-
-function actualizarTextoBotonCarga() {
-  if (formWrapper.classList.contains("open")) {
-    btnCargarEmpleado.textContent = "Ocultar carga";
-    return;
-  }
-  btnCargarEmpleado.textContent = legajoSeleccionado ? "Editar empleado" : "Cargar empleados";
-}
-
-function toggleFormularioEmpleado() {
-  if (formWrapper.classList.contains("open")) {
-    minimizarFormularioEmpleado();
-    return;
-  }
-  if (legajoSeleccionado) {
-    editarEmpleado(legajoSeleccionado);
-    return;
-  }
-  restablecerFormularioEmpleado();
-  formWrapper.classList.add("open");
-  actualizarTextoBotonCarga();
-}
-
-function minimizarFormularioEmpleado() {
-  formWrapper.classList.remove("open");
-  restablecerFormularioEmpleado();
-  actualizarTextoBotonCarga();
-}
-
-function restablecerFormularioEmpleado() {
-  legajoEnEdicion = null;
-  formEmpleado.reset();
-  inputLegajo.readOnly = false;
-  tituloFormEmpleado.textContent = "Cargar empleado";
-  btnGuardarEmpleado.textContent = "Guardar";
-  btnCancelarEdicion.style.display = "none";
-  btnCorregirLegajo.style.display = "none";
-}
-
-function editarEmpleado(legajo) {
-  const empleado = personalData.find((persona) => String(persona.legajo) === String(legajo));
-  if (!empleado) return;
-
-  legajoEnEdicion = String(empleado.legajo);
-  inputLegajo.value = empleado.legajo || "";
-  inputLegajo.readOnly = true;
-  document.getElementById("nombre").value = empleado.nombre || "";
-  document.getElementById("cuil").value = empleado.cuil || "";
-  document.getElementById("fecha_nacimiento").value = empleado.fecha_nacimiento || "";
-  document.getElementById("activo").value = empleado.activo || "ACTIVO";
-  tituloFormEmpleado.textContent = `Editar empleado: ${empleado.nombre || empleado.legajo}`;
-  btnGuardarEmpleado.textContent = "Guardar cambios";
-  btnCancelarEdicion.style.display = "";
-  btnCorregirLegajo.style.display = esAdministrador ? "" : "none";
-  formWrapper.classList.add("open");
-  actualizarTextoBotonCarga();
-  inputLegajo.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-async function corregirLegajo() {
-  if (!legajoEnEdicion) return;
-  const nuevoLegajo = prompt(`Corregir legajo (actual: ${legajoEnEdicion})`, legajoEnEdicion);
-  if (nuevoLegajo === null) return;
-  const valor = nuevoLegajo.trim();
-  if (!valor || valor === legajoEnEdicion) return;
-
-  const mensaje = document.getElementById("mensaje");
-  try {
-    const res = await fetch(`/personal/${encodeURIComponent(legajoEnEdicion)}/legajo`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nuevo_legajo: valor })
-    });
-    const resultado = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      mensaje.style.color = "#fca5a5";
-      mensaje.textContent = resultado.detail || resultado.error || "No se pudo corregir el legajo";
-      return;
-    }
-    mensaje.style.color = "#86efac";
-    mensaje.textContent = "Legajo corregido correctamente.";
-    legajoSeleccionado = valor;
-    minimizarFormularioEmpleado();
-    await cargarPersonal();
-  } catch (error) {
-    mensaje.style.color = "#fca5a5";
-    mensaje.textContent = "No se pudo corregir el legajo.";
-    console.error(error);
-  }
-}
-
-btnCorregirLegajo.addEventListener("click", corregirLegajo);
-
-btnCargarEmpleado.addEventListener("click", toggleFormularioEmpleado);
-btnCancelarEdicion.addEventListener("click", minimizarFormularioEmpleado);
-
-function escapeHtml(texto) {
-  return (texto || "")
-    .toString()
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function estadoHabilitacion(persona, clave) {
-  const hab = (persona.habilitaciones || {})[clave];
-  return hab ? hab.estado : null;
-}
-
-function habilitacionVigente(persona, clave) {
-  const estado = estadoHabilitacion(persona, clave);
-  return estado === "VIGENTE" || estado === "POR_VENCER";
-}
-
-function construirResumenPersonal(data) {
-  const total = data.length;
-
-  const conteoSiPorProyecto = {};
-  const conteoNoPorProyecto = {};
-  proyectosHabilitacion.forEach(pr => {
-    conteoSiPorProyecto[pr.nombre] = 0;
-    conteoNoPorProyecto[pr.nombre] = 0;
-  });
-
-  let conAlguna = 0;
-  let totalSiChecks = 0;
-
-  data.forEach(p => {
-    let tieneAlguna = false;
-    proyectosHabilitacion.forEach(pr => {
-      if (habilitacionVigente(p, pr.clave)) {
-        conteoSiPorProyecto[pr.nombre] += 1;
-        totalSiChecks += 1;
-        tieneAlguna = true;
-      } else {
-        conteoNoPorProyecto[pr.nombre] += 1;
-      }
-    });
-    if (tieneAlguna) {
-      conAlguna += 1;
-    }
-  });
-
-  const sinHabilitaciones = total - conAlguna;
-  const totalChecks = total * proyectosHabilitacion.length;
-  const pctCobertura = totalChecks > 0 ? Math.round((totalSiChecks / totalChecks) * 100) : 0;
-
-  let proyectoPrincipal = "SIN DATO";
-  let maxSi = -1;
-  Object.keys(conteoSiPorProyecto).forEach(k => {
-    if (conteoSiPorProyecto[k] > maxSi) {
-      maxSi = conteoSiPorProyecto[k];
-      proyectoPrincipal = k;
-    }
-  });
-
-  return {
-    total,
-    con_alguna: conAlguna,
-    sin_habilitaciones: sinHabilitaciones,
-    pct_cobertura: pctCobertura,
-    proyecto_principal: proyectoPrincipal,
-    si_por_proyecto: conteoSiPorProyecto,
-    no_por_proyecto: conteoNoPorProyecto
-  };
-}
-
-function renderGraficosPersonal(resumen) {
-  document.getElementById("kpi-total").textContent = resumen.total;
-  document.getElementById("kpi-con").textContent = resumen.con_alguna;
-  document.getElementById("kpi-sin").textContent = resumen.sin_habilitaciones;
-
-  if (typeof Chart === "undefined") {
-    return;
-  }
-
-  if (chartResumen) chartResumen.destroy();
-  chartResumen = new Chart(document.getElementById("chart-resumen"), {
-    type: "doughnut",
-    data: {
-      labels: ["Con alguna habilitación", "Sin habilitaciones"],
-      datasets: [{
-        data: [resumen.con_alguna, resumen.sin_habilitaciones],
-        backgroundColor: ["rgba(34,197,94,0.82)", "rgba(239,68,68,0.82)"],
-        borderColor: ["rgba(34,197,94,1)", "rgba(239,68,68,1)"],
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          labels: {
-            color: "#e2e8f0",
-            font: { size: 12, family: "Arial" }
-          }
-        }
-      }
-    }
-  });
-
-  const labels = Object.keys(resumen.si_por_proyecto);
-  const valoresSi = labels.map(k => resumen.si_por_proyecto[k]);
-  const valoresNo = labels.map(k => resumen.no_por_proyecto[k]);
-
-  const baseOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        labels: {
-          color: "#e2e8f0",
-          font: { size: 12, family: "Arial" }
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: { color: "#dbeafe", font: { family: "Arial" } },
-        grid: { color: "rgba(255,255,255,0.12)" }
-      },
-      y: {
-        beginAtZero: true,
-        ticks: { color: "#dbeafe", precision: 0, font: { family: "Arial" } },
-        grid: { color: "rgba(255,255,255,0.12)" }
-      }
-    }
-  };
-
-  if (chartSi) chartSi.destroy();
-  chartSi = new Chart(document.getElementById("chart-si"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "SI",
-        data: valoresSi,
-        backgroundColor: "rgba(56,189,248,0.72)",
-        borderColor: "rgba(56,189,248,1)",
-        borderWidth: 1,
-        borderRadius: 8
-      }]
-    },
-    options: baseOptions
-  });
-
-  if (chartNo) chartNo.destroy();
-  chartNo = new Chart(document.getElementById("chart-no"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "NO",
-        data: valoresNo,
-        backgroundColor: "rgba(250,204,21,0.72)",
-        borderColor: "rgba(250,204,21,1)",
-        borderWidth: 1,
-        borderRadius: 8
-      }]
-    },
-    options: baseOptions
-  });
-}
-
-function generarConclusionLocal(resumen) {
-  let texto = "";
-  if (resumen.pct_cobertura < 50) {
-    texto += "Cobertura de habilitaciones baja para la dotación actual. ";
-  }
-  if (resumen.sin_habilitaciones > resumen.con_alguna) {
-    texto += "Predomina personal sin habilitaciones registradas. ";
-  }
-  if (!texto) {
-    texto = "La dotación presenta un nivel de habilitación aceptable para la operación.";
-  }
-  return texto.trim();
-}
-
-async function obtenerConclusionIA(resumen) {
-  const res = await fetch("/analisis_personal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(resumen)
-  });
-  if (!res.ok) throw new Error("No disponible");
-  const body = await res.json();
-  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) {
-    throw new Error("Respuesta invalida");
-  }
-  return body.conclusion.trim();
-}
-
-async function actualizarConclusiones(resumen) {
-  let conclusion = generarConclusionLocal(resumen);
-  let fuente = "Fuente: motor local de reglas";
-
-  try {
-    conclusion = await obtenerConclusionIA(resumen);
-    fuente = "Fuente: IA backend (/analisis_personal)";
-  } catch (error) {
-    // fallback local
-  }
-
-  const recomendaciones = [
-    `Total personal: ${resumen.total}. Con habilitación: ${resumen.con_alguna}. Sin habilitaciones: ${resumen.sin_habilitaciones}.`,
-    `Cobertura global de habilitaciones: ${resumen.pct_cobertura}%.`,
-    `Proyecto con mayor dotación habilitada: ${resumen.proyecto_principal}.`
-  ];
-  if (resumen.pct_cobertura < 50) {
-    recomendaciones.push("Reforzar carga documental y regularización de habilitaciones críticas.");
-  }
-  if (resumen.sin_habilitaciones > 0) {
-    recomendaciones.push("Priorizar plan de habilitación para personal sin cobertura.");
-  }
-
-  document.getElementById("conclusion-main").textContent = conclusion;
-  document.getElementById("conclusion-source").textContent = fuente;
-  document.getElementById("conclusion-list").innerHTML = recomendaciones
-    .map(item => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-}
-
-async function cargarProyectosHabilitacion() {
-  const res = await fetch("/personal/proyectos");
-  proyectosHabilitacion = await res.json();
-
-  const headRow = document.getElementById("thead-personal-row");
-  proyectosHabilitacion.forEach(pr => {
-    const th = document.createElement("th");
-    th.innerHTML = `${escapeHtml(pr.nombre)}<input class="col-filter" data-campo="hab_${pr.clave}" placeholder="vigente / vencido...">`;
-    headRow.appendChild(th);
-  });
-
-  configurarFiltrosPersonal();
-}
-
-function configurarFiltrosPersonal() {
-  document.querySelectorAll("#lista-personal thead .col-filter").forEach((control) => {
-    const campo = control.dataset.campo;
-    if (!campo || campo in filtrosPersonal) return;
-    filtrosPersonal[campo] = "";
-    const manejarCambio = () => {
-      filtrosPersonal[campo] = (control.value || "").trim();
-      aplicarFiltrosPersonal();
-    };
-    control.addEventListener("input", manejarCambio);
-    control.addEventListener("change", manejarCambio);
-  });
-}
-
-function formatoFechaDDMMYYYY(fecha) {
-  if (!fecha) return "";
-  const partes = String(fecha).slice(0, 10).split("-");
-  if (partes.length !== 3) return fecha;
-  const [anio, mes, dia] = partes;
-  return `${dia}/${mes}/${anio}`;
-}
-
-function chipHabilitacion(persona, proyecto) {
-  const hab = (persona.habilitaciones || {})[proyecto.clave];
-  if (!hab) {
-    return `<span class="chip-habilitacion chip-vacio" data-legajo="${escapeHtml(persona.legajo)}" data-proyecto="${proyecto.id}">Sin habilitación</span>`;
-  }
-  const fechaFormateada = formatoFechaDDMMYYYY(hab.vencimiento);
-  const etiquetas = {
-    VIGENTE: `Vigente hasta ${fechaFormateada}`,
-    POR_VENCER: `Vence ${fechaFormateada}`,
-    VENCIDO: `Vencido (${fechaFormateada})`,
-  };
-  const clase = `chip-${(hab.estado || "vacio").toLowerCase()}`;
-  const texto = etiquetas[hab.estado] || fechaFormateada;
-  return `<span class="chip-habilitacion ${clase}" data-legajo="${escapeHtml(persona.legajo)}" data-proyecto="${proyecto.id}">${escapeHtml(texto)}</span>`;
-}
-
-let modalHabilitacionActual = null;
-
-function abrirModalHabilitacion(legajo, proyectoId) {
-  const proyecto = proyectosHabilitacion.find(pr => String(pr.id) === String(proyectoId));
-  if (!proyecto) return;
-  const persona = personalData.find(p => String(p.legajo) === String(legajo));
-  const habActual = persona ? (persona.habilitaciones || {})[proyecto.clave] : null;
-
-  modalHabilitacionActual = { legajo, proyectoId: proyecto.id, tieneHabilitacion: !!habActual };
-  document.getElementById("modal-habilitacion-titulo").textContent =
-    `${persona ? persona.nombre : legajo} — ${proyecto.nombre}`;
-  document.getElementById("modal-habilitacion-fecha").value = habActual ? habActual.vencimiento : "";
-  document.getElementById("modal-habilitacion-quitar").style.display = habActual ? "" : "none";
-  document.getElementById("modal-habilitacion").style.display = "flex";
-}
-
-function cerrarModalHabilitacion() {
-  document.getElementById("modal-habilitacion").style.display = "none";
-  modalHabilitacionActual = null;
-}
-
-document.getElementById("personal-body").addEventListener("click", (ev) => {
-  ev.stopPropagation();
-  const chip = ev.target.closest(".chip-habilitacion");
-  if (chip) {
-    abrirModalHabilitacion(chip.dataset.legajo, chip.dataset.proyecto);
-    return;
-  }
-  const fila = ev.target.closest("tr[data-legajo]");
-  if (!fila) return;
-  const legajo = String(fila.dataset.legajo);
-  legajoSeleccionado = legajoSeleccionado === legajo ? null : legajo;
-  aplicarFiltrosPersonal();
-  actualizarTextoBotonCarga();
-});
-
-function limpiarSeleccionEmpleado() {
-  if (!legajoSeleccionado) return;
-  legajoSeleccionado = null;
-  aplicarFiltrosPersonal();
-  actualizarTextoBotonCarga();
-}
-
-document.addEventListener("click", (ev) => {
-  if (!ev.target.closest("#personal-body tr[data-legajo]")) {
-    limpiarSeleccionEmpleado();
-  }
-});
-
-document.addEventListener("keydown", (ev) => {
-  if (ev.key === "Escape") {
-    limpiarSeleccionEmpleado();
-  }
-});
-
-document.getElementById("modal-habilitacion-cancelar").addEventListener("click", cerrarModalHabilitacion);
-
-document.getElementById("modal-habilitacion-guardar").addEventListener("click", async () => {
-  if (!modalHabilitacionActual) return;
-  const fecha = document.getElementById("modal-habilitacion-fecha").value;
-  if (!fecha) {
-    alert("Elegí una fecha de vencimiento");
-    return;
-  }
-  await fetch(`/personal/${encodeURIComponent(modalHabilitacionActual.legajo)}/habilitaciones`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ proyecto_id: modalHabilitacionActual.proyectoId, fecha_vencimiento: fecha })
-  });
-  cerrarModalHabilitacion();
-  cargarPersonal();
-});
-
-document.getElementById("modal-habilitacion-quitar").addEventListener("click", async () => {
-  if (!modalHabilitacionActual) return;
-  await fetch(`/personal/${encodeURIComponent(modalHabilitacionActual.legajo)}/habilitaciones/${modalHabilitacionActual.proyectoId}`, {
-    method: "DELETE"
-  });
-  cerrarModalHabilitacion();
-  cargarPersonal();
-});
-
-let personalData = [];
-let filtrosPersonal = {};
-let ocultarInactivos = false;
-
-function renderFilasPersonal(data) {
-  const tbody = document.getElementById("personal-body");
-  tbody.innerHTML = "";
-
-  data.forEach(p => {
-    const fila = document.createElement("tr");
-    const legajo = p.legajo || "";
-    fila.dataset.legajo = legajo;
-    if (String(legajo) === String(legajoSeleccionado)) {
-      fila.classList.add("fila-seleccionada");
-    }
-    const celdasHabilitacion = proyectosHabilitacion
-      .map(pr => `<td>${chipHabilitacion(p, pr)}</td>`)
-      .join("");
-    fila.innerHTML = `
-      <td>${escapeHtml(legajo)}</td>
-      <td>${escapeHtml(p.nombre || "")}</td>
-      <td>${escapeHtml(p.cuil || "")}</td>
-      <td>${escapeHtml(formatoFechaDDMMYYYY(p.fecha_nacimiento))}</td>
-      <td>${escapeHtml(p.activo || "ACTIVO")}</td>
-      ${celdasHabilitacion}
-    `;
-    tbody.appendChild(fila);
-  });
-}
-
-function valorFiltroPersonal(p, campo) {
-  if (campo.startsWith("hab_")) {
-    const clave = campo.slice(4);
-    return estadoHabilitacion(p, clave) || "sin habilitacion";
-  }
-  if (campo === "fecha_nacimiento") {
-    return formatoFechaDDMMYYYY(p.fecha_nacimiento);
-  }
-  if (campo === "activo") {
-    return (p.activo || "ACTIVO").toUpperCase();
-  }
-  return p[campo];
-}
-
-function aplicarFiltrosPersonal() {
-  const activos = Object.entries(filtrosPersonal).filter(([, valor]) => valor);
-  let base = personalData;
-  if (ocultarInactivos) {
-    base = base.filter((p) => (p.activo || "ACTIVO") !== "INACTIVO");
-  }
-  if (!activos.length) {
-    renderFilasPersonal(base);
-    return;
-  }
-  const filtrados = base.filter((p) =>
-    activos.every(([campo, valor]) => {
-      const valorPersonal = String(valorFiltroPersonal(p, campo) || "").toLowerCase();
-      const valorFiltro = String(valor || "").toLowerCase();
-      if (campo === "activo") {
-        return valorPersonal === valorFiltro;
-      }
-      return valorPersonal.includes(valorFiltro);
-    })
-  );
-  renderFilasPersonal(filtrados);
-}
-
-document.getElementById("chk-ocultar-inactivos").addEventListener("change", (ev) => {
-  ocultarInactivos = ev.target.checked;
-  aplicarFiltrosPersonal();
-});
-
-configurarFiltrosPersonal();
-
-document.getElementById("btn-limpiar-filtros-personal").addEventListener("click", () => {
-  document.querySelectorAll("#lista-personal thead .col-filter").forEach((control) => { control.value = ""; });
-  Object.keys(filtrosPersonal).forEach((campo) => { filtrosPersonal[campo] = ""; });
-  aplicarFiltrosPersonal();
-});
-
-async function cargarPersonal() {
-  try {
-    const res = await fetch("/personal");
-    const data = await res.json();
-    personalData = data;
-    aplicarFiltrosPersonal();
-
-    const resumen = construirResumenPersonal(data);
-    renderGraficosPersonal(resumen);
-    actualizarConclusiones(resumen);
-
-  } catch (error) {
-    console.error("Error cargando personal:", error);
-  }
-}
-
-formEmpleado.addEventListener("submit", async function(e) {
-  e.preventDefault();
-
-  const empleado = {
-    legajo: document.getElementById("legajo").value,
-    nombre: document.getElementById("nombre").value,
-    cuil: document.getElementById("cuil").value,
-    fecha_nacimiento: document.getElementById("fecha_nacimiento").value,
-    activo: document.getElementById("activo").value
-  };
-
-  const editando = legajoEnEdicion !== null;
-  const res = await fetch(editando ? `/personal/${encodeURIComponent(legajoEnEdicion)}` : "/personal", {
-    method: editando ? "PUT" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(empleado)
-  });
-
-  const result = await res.json();
-  const mensaje = document.getElementById("mensaje");
-
-  if (result.error) {
-    mensaje.style.color = "#fca5a5";
-    mensaje.textContent = result.error;
-    return;
-  }
-
-  mensaje.style.color = "#86efac";
-  mensaje.textContent = editando ? "Empleado actualizado correctamente." : "Empleado agregado correctamente.";
-  minimizarFormularioEmpleado();
-  cargarPersonal();
-});
-
-async function detectarAdministrador() {
-  try {
-    const res = await fetch("/me");
-    const me = await res.json();
-    esAdministrador = !!me.autenticado && String(me.tipo_usuario || "").toUpperCase() === "ADMINISTRADOR";
-  } catch (error) {
-    esAdministrador = false;
-  }
-}
-
-detectarAdministrador().then(() =>
-  cargarProyectosHabilitacion()
-    .then(cargarPersonal)
-    .catch(err => {
-      const mensaje = document.getElementById("mensaje");
-      mensaje.style.color = "#fca5a5";
-      mensaje.textContent = "No se pudo cargar el personal. Verifique que el servidor esté activo.";
-      console.error(err);
-    })
-);
-</script>
-
+<!-- ============================== Menús / popovers ============================== -->
+<div class="menu" id="menu-mas" role="menu" hidden>
+  <button type="button" class="menu-item" role="menuitem" data-act="exportar"><svg class="i"><use href="#i-download"/></svg>Exportar CSV</button>
+  <button type="button" class="menu-item" role="menuitem" data-act="recargar"><svg class="i"><use href="#i-refresh"/></svg>Recargar datos</button>
+</div>
+<div class="menu" id="menu-fila" role="menu" hidden>
+  <button type="button" class="menu-item" role="menuitem" data-act="editar"><svg class="i"><use href="#i-pencil"/></svg>Editar</button>
+  <button type="button" class="menu-item" role="menuitem" data-act="legajo" data-solo-admin><svg class="i"><use href="#i-pencil"/></svg>Corregir legajo</button>
+  <div class="menu-sep"></div>
+  <button type="button" class="menu-item" role="menuitem" data-act="estado"><svg class="i"><use href="#i-refresh"/></svg><span>Desactivar</span></button>
+</div>
+<div class="menu" id="menu-drawer" role="menu" hidden>
+  <button type="button" class="menu-item" role="menuitem" data-act="legajo"><svg class="i"><use href="#i-pencil"/></svg>Corregir legajo</button>
+</div>
+<div class="menu pop" id="pop-filtros" role="dialog" aria-label="Filtros por columna" hidden>
+  <div class="pop-grid" id="pop-filtros-grid"></div>
+  <div class="pop-foot"><button type="button" class="btn btn-ghost btn-sm" id="pop-filtros-limpiar">Limpiar</button><button type="button" class="btn btn-sm" data-cerrar-menu>Listo</button></div>
+</div>
+<div class="menu pop" id="pop-columnas" role="dialog" aria-label="Columnas visibles" hidden>
+  <div class="pop-grid" id="pop-columnas-grid" style="gap:var(--s2)"></div>
+  <div class="pop-foot"><button type="button" class="btn btn-ghost btn-sm" id="pop-columnas-todas">Mostrar todas</button><button type="button" class="btn btn-sm" data-cerrar-menu>Listo</button></div>
 </div>
 
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
+<!-- ============================== Drawer: empleado ============================== -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-head">
+    <div><h2 id="drawer-title">Empleado</h2><p id="drawer-sub"></p></div>
+    <div class="head-actions">
+      <button type="button" class="btn btn-ghost btn-icon" id="btn-drawer-mas" aria-haspopup="menu" aria-label="Más acciones" title="Más acciones" hidden><svg class="i"><use href="#i-more"/></svg></button>
+      <button type="button" class="btn btn-ghost btn-icon" data-cerrar-drawer aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <form id="form" class="form" novalidate autocomplete="off">
+      <div class="callout warn" id="fe-issues" hidden></div>
+      <fieldset>
+        <legend>Datos personales</legend>
+        <div class="grid2">
+          <label class="field"><span class="req">Legajo</span><input id="legajo" class="input mono" required></label>
+          <label class="field">Estado
+            <select id="activo" class="select"><option value="ACTIVO">Activo</option><option value="INACTIVO">Inactivo</option></select></label>
+          <label class="field span2"><span class="req">Nombre y apellido</span><input id="nombre" class="input" required></label>
+          <label class="field"><span class="req">CUIL</span><input id="cuil" class="input mono" required placeholder="20-12345678-3"><span class="field-error" id="cuil-error" hidden></span></label>
+          <label class="field">Fecha de nacimiento<input type="date" id="fecha_nacimiento" class="input mono"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Habilitaciones</legend>
+        <p class="help" id="habs-ayuda" style="margin-bottom:var(--s3)">Una fecha de vencimiento por sitio. Se guardan con «Guardar cambios».</p>
+        <div class="grid2" id="habs-drawer"></div>
+      </fieldset>
+    </form>
+  </div>
+  <div class="drawer-foot">
+    <button type="button" class="btn" data-cerrar-drawer>Cancelar</button>
+    <button type="button" class="btn btn-primary" id="drawer-save">Guardar cambios</button>
+  </div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const { $, $$, css, collator, fmtNum, fmtFecha, icon, prefs, escapeHtml, fold, nivel, pedirJson, toast, confirmar, pedirTexto, abrirMenu, cerrarMenu, posicionarMenu } = SMG;
+
+// =====================================================================================================
+// Datos y helpers
+// =====================================================================================================
+const ESTADOS = {
+  VIGENTE: { l: "Vigente", ico: "check", cls: "hab-si", chip: "chip-ok" },
+  POR_VENCER: { l: "Por vencer", ico: "alert", cls: "hab-warn", chip: "chip-warn" },
+  VENCIDO: { l: "Vencida", ico: "x", cls: "hab-bad", chip: "chip-bad" },
+};
+const S = {
+  personas: [], sitios: [], cargando: true, actualizado: null, esAdmin: false,
+  sitio: "", q: "", estado: "ACTIVO", hab: "", soloIssues: false, colFiltros: {},
+  sort: { k: "legajo", dir: 1 }, page: 1,
+  pageSize: [25, 50, 100].includes(prefs.get("personal.pageSize", 25)) ? prefs.get("personal.pageSize", 25) : 25,
+  vista: "general", visibles: null, issues: new Map(), obsPedida: false,
+};
+let COLS = [];
+let VISTAS = {};
+
+const esActivo = (p) => String(p.activo || "ACTIVO").trim().toUpperCase() !== "INACTIVO";
+const activos = () => S.personas.filter(esActivo);
+const habDe = (p, clave) => ((p.habilitaciones || {})[clave]) || null;
+const esVigente = (h) => !!h && (h.estado === "VIGENTE" || h.estado === "POR_VENCER");
+function ddmmaaaa(iso) {
+  const m = String(iso || "").slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso || "");
+}
+function diasHasta(iso) {
+  const f = new Date(`${String(iso).slice(0, 10)}T00:00:00`), hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.round((f - hoy) / 86400000);
+}
+function textoHab(h) {
+  if (!h) return "Sin habilitación";
+  if (h.estado === "VIGENTE") return `Vigente hasta ${ddmmaaaa(h.vencimiento)}`;
+  if (h.estado === "POR_VENCER") { const d = diasHasta(h.vencimiento); return `Vence ${d === 0 ? "hoy" : `en ${d} ${d === 1 ? "día" : "días"}`} (${ddmmaaaa(h.vencimiento)})`; }
+  if (h.estado === "VENCIDO") return `Vencida el ${ddmmaaaa(h.vencimiento)}`;
+  return `Vence ${ddmmaaaa(h.vencimiento)}`;
+}
+
+function armarColumnas() {
+  COLS = [
+    { k: "legajo", l: "Legajo", w: 88, sticky: 0, mono: true, right: true },
+    { k: "nombre", l: "Empleado", w: 260, sticky: 88, flex: true },
+    { k: "cuil", l: "CUIL", w: 140, mono: true },
+    { k: "fecha_nacimiento", l: "Fecha de nacimiento", w: 160, mono: true },
+    { k: "activo", l: "Estado", w: 112 },
+    ...S.sitios.map((s) => ({ k: `hab_${s.clave}`, l: s.nombre, w: 96, hab: true, clave: s.clave })),
+    { k: "_accion", l: "Acción", w: 56 },
+  ];
+  VISTAS = {
+    general: COLS.map((c) => c.k),
+    habilitaciones: ["legajo", "nombre", "activo", ...S.sitios.map((s) => `hab_${s.clave}`), "_accion"],
+  };
+  const guardadas = prefs.get("personal.cols", null);
+  const vista = prefs.get("personal.vista", "general");
+  S.vista = guardadas ? "" : (VISTAS[vista] ? vista : "general");
+  S.visibles = new Set(guardadas ? guardadas.filter((k) => COLS.some((c) => c.k === k)) : VISTAS[S.vista]);
+  S.visibles.add("legajo"); S.visibles.add("nombre"); S.visibles.add("_accion");
+}
+
+function valorCelda(p, k) {
+  if (k === "fecha_nacimiento") return ddmmaaaa(p.fecha_nacimiento);
+  if (k === "activo") return esActivo(p) ? "Activo" : "Inactivo";
+  if (k.startsWith("hab_")) return textoHab(habDe(p, k.slice(4)));
+  return String(p[k] ?? "").trim();
+}
+function valorOrden(p, k) {
+  if (k === "fecha_nacimiento") return String(p.fecha_nacimiento || "");
+  if (k.startsWith("hab_")) { const h = habDe(p, k.slice(4)); return h ? `${{ VIGENTE: 1, POR_VENCER: 2, VENCIDO: 3 }[h.estado] || 4}${h.vencimiento}` : ""; }
+  return valorCelda(p, k);
+}
+function cumpleHab(p, filtro) {
+  const claves = S.sitio ? [S.sitio] : S.sitios.map((s) => s.clave);
+  if (filtro === "SIN") return S.sitio ? !habDe(p, S.sitio) : claves.every((c) => !habDe(p, c));
+  return claves.some((c) => { const h = habDe(p, c); return h && h.estado === filtro; });
+}
+
+// Indicadores: personal activo (y el sitio elegido arriba, si hay)
+function datosTabla() {
+  let d = S.personas.filter((p) => !S.estado || (S.estado === "ACTIVO") === esActivo(p));
+  if (S.sitio && !S.hab) d = d.filter((p) => !!habDe(p, S.sitio));
+  if (S.hab) d = d.filter((p) => cumpleHab(p, S.hab));
+  if (S.soloIssues) d = d.filter((p) => S.issues.has(String(p.legajo)));
+  const act = Object.entries(S.colFiltros).filter(([, x]) => x);
+  if (act.length) d = d.filter((p) => act.every(([k, x]) => fold(valorCelda(p, k)).includes(fold(x))));
+  if (S.q) {
+    const q = fold(S.q.trim()), qd = S.q.replace(/\D/g, "");
+    d = d.filter((p) => fold(p.nombre).includes(q) || fold(p.legajo).includes(q) || fold(p.cuil).includes(q) || (qd.length >= 3 && String(p.cuil || "").replace(/\D/g, "").includes(qd)));
+  }
+  const { k, dir } = S.sort;
+  return [...d].sort((a, b) => {
+    const x = valorOrden(a, k), y = valorOrden(b, k);
+    if (!x && y) return 1;
+    if (x && !y) return -1;
+    return dir * collator.compare(x, y);
+  });
+}
+
+// =====================================================================================================
+// Carga
+// =====================================================================================================
+async function cargar() {
+  try {
+    if (!S.sitios.length) {
+      S.sitios = await pedirJson("/personal/proyectos") || [];
+      armarColumnas();
+      poblarSitios();
+      $("#pop-filtros-grid").innerHTML = COLS.filter((c) => c.k !== "_accion").map((c) =>
+        `<label>${escapeHtml(c.l)}<input class="input col-filter" data-campo="${c.k}" placeholder="Contiene…"></label>`).join("");
+      $$("#pop-filtros-grid .col-filter").forEach((i) => { S.colFiltros[i.dataset.campo] = S.colFiltros[i.dataset.campo] || ""; });
+    }
+    const data = await pedirJson("/personal");
+    S.personas = Array.isArray(data) ? data : [];
+  } catch (e) {
+    toast(`No se pudo cargar el personal: ${e.message}`, "error");
+  }
+  S.cargando = false;
+  S.actualizado = new Date();
+  calcularInconsistencias();
+  renderTodo();
+  if (!S.obsPedida) { S.obsPedida = true; actualizarConclusiones(); } else renderObservaciones();
+}
+
+function renderTodo() {
+  renderEncabezado();
+  renderKpis();
+  renderGraficos();
+  renderTabla();
+}
+
+function poblarSitios() {
+  const opts = S.sitios.map((s) => `<option value="${escapeHtml(s.clave)}">${escapeHtml(s.nombre)}</option>`).join("");
+  $("#filtro-sitio").innerHTML = `<option value="">Todos los sitios</option>${opts}`;
+  $("#f-sitio").innerHTML = `<option value="">Sitio: todos</option>${S.sitios.map((s) => `<option value="${escapeHtml(s.clave)}">Sitio: ${escapeHtml(s.nombre)}</option>`).join("")}`;
+}
+function setSitio(valor) {
+  S.sitio = valor || ""; S.page = 1;
+  $("#filtro-sitio").value = S.sitio;
+  $("#f-sitio").value = S.sitio;
+  $("#f-sitio").classList.toggle("on", !!S.sitio);
+  renderTodo();
+}
+
+// =====================================================================================================
+// Encabezado, KPIs y gráficos
+// =====================================================================================================
+function renderEncabezado() {
+  const total = S.personas.length, act = activos().length;
+  const cuando = S.actualizado ? ` · actualizado ${fmtFecha(S.actualizado)}` : "";
+  const sitio = S.sitio ? ` · ${S.sitios.find((s) => s.clave === S.sitio)?.nombre || S.sitio}` : "";
+  $("#page-sub").textContent = `${fmtNum(total)} empleados · ${fmtNum(act)} activos${sitio}${cuando}`;
+  const n = S.issues.size, chip = $("#chip-inconsistencias");
+  chip.hidden = !n;
+  chip.innerHTML = `${icon("alert", "i-sm")}${n} ${n === 1 ? "inconsistencia" : "inconsistencias"}`;
+}
+
+function resumenHabs(lista, claves) {
+  let vig = 0, porVencer = 0, vencidas = 0, conAlguna = 0;
+  lista.forEach((p) => {
+    let alguna = false;
+    claves.forEach((c) => {
+      const h = habDe(p, c);
+      if (!h) return;
+      if (h.estado === "VIGENTE") { vig += 1; alguna = true; }
+      else if (h.estado === "POR_VENCER") { porVencer += 1; alguna = true; }
+      else if (h.estado === "VENCIDO") vencidas += 1;
+    });
+    if (alguna) conAlguna += 1;
+  });
+  return { vig, porVencer, vencidas, conAlguna, checks: lista.length * claves.length };
+}
+
+function renderKpis() {
+  const total = S.personas.length, act = activos(), n = act.length;
+  const claves = S.sitio ? [S.sitio] : S.sitios.map((s) => s.clave);
+  const r = resumenHabs(act, claves);
+  const pctAct = total ? Math.round((n / total) * 100) : 0;
+  const cob = r.checks ? Math.round(((r.vig + r.porVencer) / r.checks) * 100) : 0;
+  $("#kpi-total").textContent = fmtNum(total);
+  $("#kpi-total-sub").textContent = `${fmtNum(total - n)} ${total - n === 1 ? "inactivo" : "inactivos"}`;
+  $("#kpi-activos").textContent = fmtNum(n);
+  $("#kpi-activos-bar span").style.width = `${pctAct}%`;
+  $("#kpi-activos-bar").setAttribute("aria-valuenow", pctAct);
+  $("#kpi-activos-sub").textContent = `${pctAct}% del personal`;
+  $("#kpi-con").textContent = fmtNum(r.conAlguna);
+  $("#kpi-con-sub").textContent = `de ${fmtNum(n)} activos · ${fmtNum(n - r.conAlguna)} sin ninguna vigente`;
+  $("#kpi-cob").textContent = `${cob}%`;
+  const bar = $("#kpi-cob-bar span");
+  bar.style.width = `${cob}%`;
+  bar.className = `lv-${nivel(cob)}`;
+  $("#kpi-cob-bar").setAttribute("aria-valuenow", cob);
+  $("#kpi-cob-sub").textContent = `${fmtNum(r.vig + r.porVencer)} de ${fmtNum(r.checks)} habilitaciones vigentes${S.sitio ? "" : ` (${claves.length} sitios)`}`;
+}
+
+let chartEstado;
+function renderGraficos() {
+  const act = activos();
+  const filas = S.sitios.map((s) => ({ s, ...resumenHabs(act, [s.clave]) }));
+  const hayDatos = filas.some((f) => f.vig + f.porVencer + f.vencidas > 0);
+  $("#chart-estado-box").hidden = !hayDatos;
+  $("#chart-estado-leyenda").hidden = !hayDatos;
+  $("#chart-estado-vacio").hidden = hayDatos;
+  if (hayDatos && typeof Chart !== "undefined") {
+    $("#chart-estado-box").style.height = `${Math.max(120, filas.length * 30 + 28)}px`;
+    const labels = filas.map((f) => f.s.nombre);
+    const sets = [["Vigente", "vig", "--success"], ["Por vencer", "porVencer", "--warning"], ["Vencida", "vencidas", "--danger"]];
+    if (chartEstado) {
+      chartEstado.data.labels = labels;
+      sets.forEach(([, k], i) => { chartEstado.data.datasets[i].data = filas.map((f) => f[k]); });
+      chartEstado.update();
+    } else {
+      chartEstado = new Chart($("#chart-estado"), {
+        type: "bar",
+        data: { labels, datasets: sets.map(([l, k, c]) => ({ label: l, data: filas.map((f) => f[k]), backgroundColor: css(c), borderRadius: 2, barThickness: 16 })) },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { displayColors: true, callbacks: { label: (c) => `${c.dataset.label}: ${fmtNum(c.raw)}` } } },
+          scales: {
+            x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: css("--border") }, border: { display: false } },
+            y: { stacked: true, ticks: { color: css("--text"), autoSkip: false }, grid: { display: false }, border: { display: false } },
+          },
+        },
+      });
+    }
+  }
+  const n = act.length;
+  $("#hab-meters").innerHTML = filas.map((f) => {
+    const v = f.vig + f.porVencer, pct = n ? Math.round((v / n) * 100) : 0;
+    return `<div class="meter-row" title="${escapeHtml(f.s.nombre)}: ${v} de ${n} activos con habilitación vigente (${pct}%)">
+      <span class="meter-label">${escapeHtml(f.s.nombre)}</span>
+      <div class="meter" role="progressbar" aria-label="Habilitación ${escapeHtml(f.s.nombre)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="lv-${nivel(pct)}" style="width:${pct}%"></span></div>
+      <span class="meter-val num">${v} / ${n} · ${pct}%</span></div>`;
+  }).join("") || '<div class="empty-state"><svg class="i"><use href="#i-inbox"/></svg><b>Sin sitios de habilitación</b></div>';
+}
+
+// =====================================================================================================
+// Observaciones (IA en /analisis_personal, con reglas locales de respaldo)
+// =====================================================================================================
+function construirResumenPersonal(data) {
+  const si = {}, no = {};
+  S.sitios.forEach((s) => { si[s.nombre] = 0; no[s.nombre] = 0; });
+  let conAlguna = 0, totalSi = 0;
+  data.forEach((p) => {
+    let alguna = false;
+    S.sitios.forEach((s) => {
+      if (esVigente(habDe(p, s.clave))) { si[s.nombre] += 1; totalSi += 1; alguna = true; } else no[s.nombre] += 1;
+    });
+    if (alguna) conAlguna += 1;
+  });
+  const checks = data.length * S.sitios.length;
+  let principal = "SIN DATO", max = -1;
+  Object.keys(si).forEach((k) => { if (si[k] > max) { max = si[k]; principal = k; } });
+  return {
+    total: data.length, con_alguna: conAlguna, sin_habilitaciones: data.length - conAlguna,
+    pct_cobertura: checks ? Math.round((totalSi / checks) * 100) : 0, proyecto_principal: principal,
+    si_por_proyecto: si, no_por_proyecto: no,
+  };
+}
+function generarConclusionLocal(r) {
+  let t = "";
+  if (r.pct_cobertura < 50) t += "Cobertura de habilitaciones baja para la dotación actual. ";
+  if (r.sin_habilitaciones > r.con_alguna) t += "Predomina personal sin habilitaciones registradas. ";
+  return (t || "La dotación presenta un nivel de habilitación aceptable para la operación.").trim();
+}
+async function obtenerConclusionIA(resumen) {
+  const res = await fetch("/analisis_personal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(resumen) });
+  if (!res.ok) throw new Error("No disponible");
+  const body = await res.json();
+  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) throw new Error("Respuesta inválida");
+  return body.conclusion.trim();
+}
+async function actualizarConclusiones() {
+  const resumen = construirResumenPersonal(activos());
+  const btn = $("#obs-regenerar");
+  btn.disabled = true;
+  $("#obs-estado").textContent = "Generando…";
+  let conclusion = generarConclusionLocal(resumen);
+  try { conclusion = await obtenerConclusionIA(resumen); } catch { /* se conserva la conclusión local */ }
+  $("#conclusion-main").textContent = conclusion;
+  $("#obs-estado").textContent = `Generado ${fmtFecha(new Date())}`;
+  btn.disabled = false;
+  renderObservaciones();
+}
+function renderObservaciones() {
+  const act = activos(), n = act.length, items = [];
+  const claves = S.sitios.map((s) => s.clave);
+  const r = resumenHabs(act, claves);
+  if (r.vencidas) items.push(["bad", "alert", `${fmtNum(r.vencidas)} ${r.vencidas === 1 ? "habilitación vencida" : "habilitaciones vencidas"} en personal activo: renovarlas o quitarlas.`]);
+  if (r.porVencer) {
+    let prox = null;
+    act.forEach((p) => S.sitios.forEach((s) => { const h = habDe(p, s.clave); if (h && h.estado === "POR_VENCER" && (!prox || h.vencimiento < prox.h.vencimiento)) prox = { h, s }; }));
+    items.push(["warn", "alert", `${fmtNum(r.porVencer)} ${r.porVencer === 1 ? "vence" : "vencen"} en los próximos 30 días${prox ? ` (la primera: ${prox.s.nombre}, ${ddmmaaaa(prox.h.vencimiento)})` : ""}.`]);
+  }
+  const cob = r.checks ? Math.round(((r.vig + r.porVencer) / r.checks) * 100) : 0;
+  const porSitio = S.sitios.map((s) => [s.nombre, act.filter((p) => esVigente(habDe(p, s.clave))).length]).sort((a, b) => a[1] - b[1]);
+  if (porSitio.length) {
+    const txt = `Cobertura ${cob}%; el sitio más bajo es ${porSitio[0][0]} (${porSitio[0][1]} de ${n} activos)`;
+    items.push(cob < 50 ? ["warn", "alert", `${txt}.`] : ["info", "info", `${txt}.`]);
+  }
+  if (S.issues.size) items.push(["warn", "alert", `${S.issues.size} ${S.issues.size === 1 ? "empleado" : "empleados"} con datos a revisar (CUIL, legajo, fecha de nacimiento o estado).`]);
+  if (n - r.conAlguna > 0) items.push(["info", "info", `${fmtNum(n - r.conAlguna)} activos sin ninguna habilitación vigente.`]);
+  const orden = { bad: 0, warn: 1, ok: 2, info: 3 };
+  items.sort((a, b) => orden[a[0]] - orden[b[0]]);
+  $("#conclusion-list").innerHTML = (items.length ? items : [["ok", "check", "Sin observaciones: el personal activo tiene sus habilitaciones al día."]])
+    .slice(0, 4).map(([c, i, t]) => `<li class="obs-${c}">${icon(i)}<span>${escapeHtml(t)}</span></li>`).join("");
+}
+
+// =====================================================================================================
+// Calidad de datos (solo avisa: no modifica nada)
+// =====================================================================================================
+function cuilValido(c) {
+  const d = String(c || "").replace(/\D/g, "");
+  if (d.length !== 11) return false;
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const suma = pesos.reduce((s, w, i) => s + w * Number(d[i]), 0);
+  let v = 11 - (suma % 11);
+  if (v === 11) v = 0;
+  return v !== 10 && v === Number(d[10]);
+}
+const legajoNorm = (l) => { const t = String(l ?? "").trim(); return /^\d+$/.test(t) ? String(Number(t)) : t.toUpperCase(); };
+
+function calcularInconsistencias() {
+  const issues = new Map();
+  const add = (p, txt) => { const k = String(p.legajo); if (!issues.has(k)) issues.set(k, []); issues.get(k).push(txt); };
+  const porCuil = new Map(), porLegajo = new Map();
+  const hoy = new Date(), minNac = "1950-01-01", maxNac = `${hoy.getFullYear() - 16}-12-31`;
+  S.personas.forEach((p) => {
+    const cuil = String(p.cuil || "").trim(), dig = cuil.replace(/\D/g, "");
+    if (!cuil) add(p, "Sin CUIL");
+    else if (!cuilValido(cuil)) add(p, `CUIL ${cuil} con formato o dígito verificador inválido`);
+    if (dig) { if (!porCuil.has(dig)) porCuil.set(dig, []); porCuil.get(dig).push(p); }
+    const ln = legajoNorm(p.legajo);
+    if (!porLegajo.has(ln)) porLegajo.set(ln, []); porLegajo.get(ln).push(p);
+    const f = String(p.fecha_nacimiento || "").slice(0, 10);
+    if (f && (!/^\d{4}-\d{2}-\d{2}$/.test(f) || f < minNac || f > maxNac)) add(p, `Fecha de nacimiento fuera de rango (${ddmmaaaa(f)})`);
+    if (!esActivo(p)) {
+      const vig = S.sitios.filter((s) => esVigente(habDe(p, s.clave))).map((s) => s.nombre);
+      if (vig.length) add(p, `Inactivo con habilitación vigente en ${vig.join(", ")}`);
+    }
+  });
+  porCuil.forEach((ps) => { if (ps.length > 1) ps.forEach((p) => add(p, `CUIL repetido con el legajo ${ps.filter((x) => x !== p).map((x) => x.legajo).join(", ")}`)); });
+  porLegajo.forEach((ps) => { if (ps.length > 1) ps.forEach((p) => add(p, `Legajo repetido (${ps.map((x) => x.legajo).join(", ")})`)); });
+  S.issues = issues;
+}
+
+// =====================================================================================================
+// Tabla
+// =====================================================================================================
+function thSticky(c) { return c.sticky !== undefined ? ` sticky-col" style="left:${c.sticky}px` : ""; }
+
+function celda(p, c) {
+  const raw = String(p[c.k] ?? "").trim();
+  const st = c.sticky !== undefined ? ` style="left:${c.sticky}px"` : "";
+  if (c.k === "legajo") {
+    const iss = S.issues.get(String(p.legajo));
+    return `<td class="sticky-col right"${st} title="${escapeHtml(iss ? `Legajo ${raw}\n⚠ ${iss.join("\n⚠ ")}` : `Legajo ${raw}`)}"><span class="cell-flex" style="justify-content:flex-end">${iss ? `<span class="warn-ico" aria-label="Con inconsistencias">${icon("alert", "i-sm")}</span>` : ""}<span class="mono codigo">${escapeHtml(raw)}</span></span></td>`;
+  }
+  if (c.k === "nombre") return `<td class="sticky-col"${st} title="${escapeHtml(raw)}"><span class="trunc" style="display:block;font-weight:500">${escapeHtml(raw || "—")}</span></td>`;
+  if (c.k === "activo") {
+    const a = esActivo(p);
+    return `<td><span class="chip ${a ? "chip-ok" : "chip-muted"}"><span class="chip-dot"></span>${a ? "Activo" : "Inactivo"}</span></td>`;
+  }
+  if (c.k === "fecha_nacimiento") return `<td class="mono" title="${escapeHtml(ddmmaaaa(raw))}">${raw ? escapeHtml(ddmmaaaa(raw)) : '<span class="muted">—</span>'}</td>`;
+  if (c.hab) {
+    const h = habDe(p, c.clave), e = h && ESTADOS[h.estado];
+    return `<td class="center" data-hab="${escapeHtml(c.clave)}" title="${escapeHtml(`${c.l}: ${textoHab(h)}`)}">${e
+      ? `<span class="${e.cls}" aria-label="${escapeHtml(textoHab(h))}">${icon(e.ico, "i-sm")}</span>`
+      : '<span class="hab-no" aria-label="Sin habilitación">—</span>'}</td>`;
+  }
+  if (c.k === "_accion") return `<td class="center"><button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-fila aria-haspopup="menu" aria-label="Acciones de ${escapeHtml(p.nombre || p.legajo)}">${icon("more")}</button></td>`;
+  return `<td class="${c.mono ? "mono" : ""}" title="${escapeHtml(raw)}">${raw ? escapeHtml(raw) : '<span class="muted">—</span>'}</td>`;
+}
+
+function renderTabla() {
+  if (!COLS.length) { renderSkeleton(); return; }
+  const cols = COLS.filter((c) => S.visibles.has(c.k));
+  SMG.columnasTabla($("#lista-personal"), $("#lista-cols"), cols);
+  $("#lista-head").innerHTML = `<tr>${cols.map((c) => {
+    if (c.k === "_accion") return `<th class="center"><span class="sr-only">Acciones</span></th>`;
+    const activo = S.sort.k === c.k;
+    const aria = activo ? (S.sort.dir > 0 ? "ascending" : "descending") : "none";
+    return `<th class="${c.hab ? "center" : ""}${c.right ? " right" : ""}${thSticky(c)}" aria-sort="${aria}"><button type="button" class="th-sort" data-sort="${c.k}">${escapeHtml(c.l)}${icon(activo ? (S.sort.dir > 0 ? "up" : "down") : "sort")}</button></th>`;
+  }).join("")}</tr>`;
+  if (S.cargando) { renderSkeleton(cols); return; }
+
+  const filas = datosTabla(), total = filas.length;
+  const paginas = Math.max(1, Math.ceil(total / S.pageSize));
+  S.page = Math.min(Math.max(1, S.page), paginas);
+  const desde = (S.page - 1) * S.pageSize;
+  const pagina = filas.slice(desde, desde + S.pageSize);
+  $("#personal-body").innerHTML = pagina.length
+    ? pagina.map((p) => `<tr data-legajo="${escapeHtml(p.legajo)}" class="${esActivo(p) ? "" : "inactivo"}" tabindex="0">${cols.map((c) => celda(p, c)).join("")}</tr>`).join("")
+    : `<tr><td class="empty" colspan="${cols.length}"><b>${S.personas.length ? "No hay empleados que coincidan" : "Todavía no hay personal cargado"}</b>
+        ${S.personas.length ? 'Probá con otra búsqueda o <button type="button" class="btn-link" data-limpiar>limpiá los filtros</button>.' : "Usá «Nuevo empleado» para cargar el primero."}</td></tr>`;
+  $("#tabla-rango").textContent = total ? `Mostrando ${fmtNum(desde + 1)}–${fmtNum(desde + pagina.length)} de ${fmtNum(total)}` : "Sin resultados";
+  $("#pag-info").textContent = `${S.page} / ${paginas}`;
+  $("#pag-prev").disabled = S.page <= 1;
+  $("#pag-next").disabled = S.page >= paginas;
+  $("#page-size").value = String(S.pageSize);
+
+  const nCol = Object.values(S.colFiltros).filter(Boolean).length;
+  $("#cnt-col-filtros").hidden = !nCol;
+  $("#cnt-col-filtros").textContent = nCol;
+  $("#chip-solo-issues").hidden = !S.soloIssues;
+  $("#btn-limpiar-filtros").hidden = !(nCol || S.q || S.hab || S.sitio || S.soloIssues || S.estado !== "ACTIVO");
+  $("#f-estado").value = S.estado;
+  $("#f-estado").classList.toggle("on", S.estado !== "ACTIVO");
+  $("#f-hab").value = S.hab;
+  $("#f-hab").classList.toggle("on", !!S.hab);
+  $$("#vistas [data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === S.vista)));
+}
+function renderSkeleton(cols) {
+  const n = cols ? cols.length : 10;
+  $("#personal-body").innerHTML = Array.from({ length: 8 }, () => `<tr>${Array.from({ length: n }, (_, i) => `<td${cols && cols[i].sticky !== undefined ? ` class="sticky-col" style="left:${cols[i].sticky}px"` : ""}><span class="skel" style="width:${40 + Math.round(Math.random() * 50)}%"></span></td>`).join("")}</tr>`).join("");
+  $("#tabla-rango").textContent = "Cargando…";
+  $("#pag-info").textContent = "";
+}
+
+function limpiarFiltros() {
+  S.q = ""; S.hab = ""; S.estado = "ACTIVO"; S.soloIssues = false; S.page = 1;
+  Object.keys(S.colFiltros).forEach((k) => { S.colFiltros[k] = ""; });
+  $("#buscar-tabla").value = "";
+  if ($("#buscar-global")) $("#buscar-global").value = "";
+  $$("#pop-filtros-grid .col-filter").forEach((i) => { i.value = ""; });
+  setSitio("");
+}
+function aplicarVista(nombre) {
+  S.vista = nombre;
+  S.visibles = new Set(VISTAS[nombre]);
+  prefs.set("personal.vista", nombre);
+  prefs.set("personal.cols", null);
+  renderTabla();
+}
+function pintarPopColumnas() {
+  $("#pop-columnas-grid").innerHTML = COLS.filter((c) => !["legajo", "nombre", "_accion"].includes(c.k)).map((c) =>
+    `<label class="check"><input type="checkbox" value="${c.k}" ${S.visibles.has(c.k) ? "checked" : ""}>${escapeHtml(c.l)}</label>`).join("");
+}
+function exportarCsv() {
+  const cols = COLS.filter((c) => c.k !== "_accion");
+  const filas = datosTabla();
+  const esc = (s) => { s = String(s ?? ""); if (/^[=+@]/.test(s)) s = `'${s}`; return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = "﻿" + [cols.map((c) => esc(c.l)).join(";"), ...filas.map((p) => cols.map((c) => esc(c.hab || c.k === "activo" || c.k === "fecha_nacimiento" ? valorCelda(p, c.k) : p[c.k])).join(";"))].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `personal_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  toast(`${filas.length} empleados exportados`);
+}
+
+// =====================================================================================================
+// Drawer: empleado y habilitaciones
+// =====================================================================================================
+let drawerModo = null;      // { accion: "nuevo" | "editar", legajo, original }
+let drawerVolverFoco = null;
+const CAMPOS = ["legajo", "nombre", "cuil", "fecha_nacimiento", "activo"];
+
+function abrirDrawer(titulo, sub, textoGuardar) {
+  cerrarMenu();
+  if ($("#drawer").hidden) drawerVolverFoco = document.activeElement;
+  $("#drawer-title").textContent = titulo;
+  $("#drawer-sub").textContent = sub || "";
+  $("#drawer-save").textContent = textoGuardar;
+  $("#drawer").hidden = false;
+  $("#scrim").hidden = false;
+  $(".drawer-body").scrollTop = 0;
+}
+function cerrarDrawer() {
+  $("#drawer").hidden = true;
+  $("#scrim").hidden = true;
+  drawerModo = null;
+  if (drawerVolverFoco && document.contains(drawerVolverFoco)) drawerVolverFoco.focus();
+}
+
+function pintarHabsDrawer(p) {
+  $("#habs-drawer").innerHTML = S.sitios.map((s) => {
+    const h = p ? habDe(p, s.clave) : null, e = h && ESTADOS[h.estado];
+    return `<div class="field span2" data-sitio="${escapeHtml(s.clave)}">
+      <span class="cell-flex"><span style="color:var(--text);font-weight:500">${escapeHtml(s.nombre)}</span>
+        ${e ? `<span class="chip ${e.chip}" title="${escapeHtml(textoHab(h))}"><span class="chip-dot"></span>${escapeHtml(textoHab(h))}</span>` : '<span class="chip chip-muted">Sin habilitación</span>'}</span>
+      <span class="cell-flex">
+        <input type="date" class="input mono" data-hab-fecha data-proyecto-id="${s.id}" data-inicial="${escapeHtml(h ? String(h.vencimiento).slice(0, 10) : "")}" value="${escapeHtml(h ? String(h.vencimiento).slice(0, 10) : "")}" aria-label="Vencimiento ${escapeHtml(s.nombre)}">
+        ${h && p ? `<button type="button" class="btn btn-ghost btn-sm" data-quitar="${s.id}" data-sitio-nombre="${escapeHtml(s.nombre)}"><svg class="i i-sm"><use href="#i-trash"/></svg>Quitar</button>` : ""}
+      </span></div>`;
+  }).join("");
+}
+
+function abrirDrawerEmpleado(legajo, enfocarSitio) {
+  const p = S.personas.find((x) => String(x.legajo) === String(legajo));
+  if (!p) return;
+  drawerModo = { accion: "editar", legajo: String(p.legajo), original: p };
+  $("#legajo").value = p.legajo ?? "";
+  $("#legajo").readOnly = true;
+  $("#nombre").value = p.nombre || "";
+  $("#cuil").value = p.cuil || "";
+  $("#fecha_nacimiento").value = String(p.fecha_nacimiento || "").slice(0, 10);
+  $("#activo").value = esActivo(p) ? "ACTIVO" : "INACTIVO";
+  $("#cuil-error").hidden = true;
+  const iss = S.issues.get(String(p.legajo));
+  $("#fe-issues").hidden = !iss;
+  $("#fe-issues").innerHTML = iss ? `${icon("alert")}<div><b>Datos a revisar</b><ul>${iss.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul></div>` : "";
+  $("#habs-ayuda").textContent = "Una fecha de vencimiento por sitio. Se guardan con «Guardar cambios».";
+  pintarHabsDrawer(p);
+  $("#btn-drawer-mas").hidden = !S.esAdmin;
+  abrirDrawer(p.nombre || `Legajo ${p.legajo}`, `Legajo ${p.legajo}${p.cuil ? ` · CUIL ${p.cuil}` : ""}`, "Guardar cambios");
+  const foco = enfocarSitio ? $(`#habs-drawer [data-sitio="${CSS.escape(enfocarSitio)}"] input`) : $("#nombre");
+  if (foco) { foco.focus(); if (enfocarSitio) foco.scrollIntoView({ block: "center" }); }
+}
+
+function abrirDrawerNuevo() {
+  drawerModo = { accion: "nuevo" };
+  $("#form").reset();
+  $("#legajo").readOnly = false;
+  $("#activo").value = "ACTIVO";
+  $("#cuil-error").hidden = true;
+  $("#fe-issues").hidden = true;
+  $("#habs-ayuda").textContent = "Opcional: podés cargar los vencimientos ahora o después, desde la ficha del empleado.";
+  pintarHabsDrawer(null);
+  $("#btn-drawer-mas").hidden = true;
+  abrirDrawer("Nuevo empleado", "Completá los datos personales.", "Crear empleado");
+  $("#legajo").focus();
+}
+
+function leerForm() {
+  const d = {};
+  CAMPOS.forEach((k) => { d[k] = $(`#${k}`).value.trim(); });
+  return d;
+}
+function validarForm(d) {
+  for (const [k, l] of [["legajo", "el legajo"], ["nombre", "el nombre"], ["cuil", "el CUIL"]]) {
+    if (!d[k]) { toast(`Completá ${l}.`, "error"); $(`#${k}`).focus(); return false; }
+  }
+  return true;
+}
+function habsCambiadas() {
+  return $$("#habs-drawer [data-hab-fecha]").filter((i) => i.value && i.value !== i.dataset.inicial).map((i) => ({ proyecto_id: Number(i.dataset.proyectoId), fecha_vencimiento: i.value }));
+}
+
+async function guardarEmpleado() {
+  const d = leerForm();
+  if (!validarForm(d)) return;
+  const habs = habsCambiadas();
+  if (drawerModo.accion === "nuevo") {
+    await pedirJson("/personal", { method: "POST", body: JSON.stringify(d) });
+  } else {
+    const o = drawerModo.original;
+    const cambio = ["nombre", "cuil", "fecha_nacimiento", "activo"].some((k) => d[k] !== (k === "activo" ? (esActivo(o) ? "ACTIVO" : "INACTIVO") : String(o[k] ?? "").trim().slice(0, k === "fecha_nacimiento" ? 10 : undefined)));
+    if (!cambio && !habs.length) { cerrarDrawer(); toast("Sin cambios para guardar", "info"); return; }
+    if (cambio) await pedirJson(`/personal/${encodeURIComponent(drawerModo.legajo)}`, { method: "PUT", body: JSON.stringify(d) });
+  }
+  const legajo = drawerModo.accion === "nuevo" ? d.legajo : drawerModo.legajo;
+  for (const h of habs) await pedirJson(`/personal/${encodeURIComponent(legajo)}/habilitaciones`, { method: "POST", body: JSON.stringify(h) });
+  const nuevo = drawerModo.accion === "nuevo";
+  cerrarDrawer();
+  toast(nuevo ? `Empleado ${d.nombre} agregado` : `Cambios guardados en ${d.nombre}`);
+  await cargar();
+}
+
+async function quitarHabilitacion(proyectoId, sitioNombre) {
+  const legajo = drawerModo && drawerModo.legajo;
+  if (!legajo) return;
+  if (!await confirmar(`¿Quitar la habilitación de ${sitioNombre}?`, `Se borra la habilitación de ${drawerModo.original.nombre || legajo} para ${sitioNombre}. Se puede volver a cargar con una fecha nueva.`, { ok: "Quitar", peligro: true })) return;
+  try {
+    await pedirJson(`/personal/${encodeURIComponent(legajo)}/habilitaciones/${proyectoId}`, { method: "DELETE" });
+    toast(`Habilitación de ${sitioNombre} quitada`);
+    await cargar();
+    abrirDrawerEmpleado(legajo);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function corregirLegajo(legajo) {
+  const p = S.personas.find((x) => String(x.legajo) === String(legajo));
+  if (!p) return;
+  const nuevo = await pedirTexto("Corregir legajo", `Cambia el legajo de ${p.nombre || legajo} en el personal y en todos los registros que lo referencian (partes, Tarja, almacén, compras, mantenimiento).`,
+    { valor: String(p.legajo), etiqueta: "Nuevo legajo", ok: "Corregir", mono: true });
+  if (nuevo === null || !nuevo || nuevo === String(p.legajo)) return;
+  try {
+    await pedirJson(`/personal/${encodeURIComponent(legajo)}/legajo`, { method: "PUT", body: JSON.stringify({ nuevo_legajo: nuevo }) });
+    toast(`Legajo corregido: ${legajo} → ${nuevo}`);
+    const abierto = !$("#drawer").hidden;
+    await cargar();
+    if (abierto) abrirDrawerEmpleado(nuevo);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function cambiarEstado(legajo) {
+  const p = S.personas.find((x) => String(x.legajo) === String(legajo));
+  if (!p) return;
+  const nuevo = esActivo(p) ? "INACTIVO" : "ACTIVO";
+  if (nuevo === "INACTIVO" && !await confirmar(`¿Desactivar a ${p.nombre || legajo}?`, "Deja de contar como personal activo en los indicadores. Sus datos y habilitaciones se conservan.", { ok: "Desactivar", peligro: true })) return;
+  try {
+    await pedirJson(`/personal/${encodeURIComponent(legajo)}`, { method: "PUT", body: JSON.stringify({ legajo: p.legajo, nombre: p.nombre, cuil: p.cuil, fecha_nacimiento: p.fecha_nacimiento, activo: nuevo }) });
+    toast(nuevo === "INACTIVO" ? `${p.nombre || legajo} desactivado` : `${p.nombre || legajo} activado`);
+  } catch (e) { toast(e.message, "error"); }
+  await cargar();
+}
+
+// =====================================================================================================
+// Eventos
+// =====================================================================================================
+function enlazar() {
+  // búsqueda (topbar y tabla comparten estado)
+  const buscar = (valor, origen) => {
+    S.q = valor; S.page = 1;
+    const otro = origen === "global" ? $("#buscar-tabla") : $("#buscar-global");
+    if (otro) otro.value = valor;
+    renderTabla();
+  };
+  SMG.registrarBuscador("Buscar por nombre, legajo o CUIL", (v) => buscar(v, "global"));
+  $("#buscar-tabla").addEventListener("input", (e) => buscar(e.target.value, "tabla"));
+
+  // filtros
+  $("#filtro-sitio").addEventListener("change", (e) => setSitio(e.target.value));
+  $("#f-sitio").addEventListener("change", (e) => setSitio(e.target.value));
+  $("#f-estado").addEventListener("change", (e) => { S.estado = e.target.value; S.page = 1; renderTabla(); });
+  $("#f-hab").addEventListener("change", (e) => { S.hab = e.target.value; S.page = 1; renderTabla(); });
+  $("#pop-filtros-grid").addEventListener("input", (e) => {
+    const i = e.target.closest(".col-filter");
+    if (!i) return;
+    S.colFiltros[i.dataset.campo] = i.value.trim(); S.page = 1; renderTabla();
+  });
+  $("#btn-mas-filtros").addEventListener("click", (e) => abrirMenu($("#pop-filtros"), e.currentTarget));
+  $("#pop-filtros-limpiar").addEventListener("click", () => {
+    $$("#pop-filtros-grid .col-filter").forEach((i) => { i.value = ""; S.colFiltros[i.dataset.campo] = ""; });
+    renderTabla();
+  });
+  $("#btn-limpiar-filtros").addEventListener("click", limpiarFiltros);
+  $("#chip-inconsistencias").addEventListener("click", () => { S.soloIssues = true; S.estado = ""; S.page = 1; renderTabla(); $("#seccion-tabla").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  $("#chip-solo-issues").addEventListener("click", () => { S.soloIssues = false; S.page = 1; renderTabla(); });
+
+  // vistas y columnas
+  $$("#vistas [data-vista]").forEach((b) => b.addEventListener("click", () => aplicarVista(b.dataset.vista)));
+  $("#btn-columnas").addEventListener("click", (e) => { pintarPopColumnas(); abrirMenu($("#pop-columnas"), e.currentTarget); });
+  $("#pop-columnas-grid").addEventListener("change", (e) => {
+    const k = e.target.value;
+    if (e.target.checked) S.visibles.add(k); else S.visibles.delete(k);
+    S.vista = Object.entries(VISTAS).find(([, ks]) => ks.length === S.visibles.size && ks.every((x) => S.visibles.has(x)))?.[0] || "";
+    prefs.set("personal.cols", [...S.visibles]);
+    renderTabla();
+  });
+  $("#pop-columnas-todas").addEventListener("click", () => { aplicarVista("general"); pintarPopColumnas(); });
+  $("#btn-exportar").addEventListener("click", exportarCsv);
+
+  // tabla
+  $("#lista-head").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sort]");
+    if (!b) return;
+    S.sort = { k: b.dataset.sort, dir: S.sort.k === b.dataset.sort ? -S.sort.dir : 1 };
+    renderTabla();
+  });
+  $("#personal-body").addEventListener("click", (e) => {
+    if (e.target.closest("[data-limpiar]")) { limpiarFiltros(); return; }
+    const tr = e.target.closest("tr[data-legajo]");
+    if (!tr) return;
+    const bm = e.target.closest("[data-menu-fila]");
+    if (bm) {
+      const p = S.personas.find((x) => String(x.legajo) === tr.dataset.legajo);
+      const m = $("#menu-fila");
+      m.dataset.legajo = tr.dataset.legajo;
+      m.querySelector("[data-act=estado] span").textContent = p && !esActivo(p) ? "Activar" : "Desactivar";
+      m.querySelector("[data-act=legajo]").hidden = !S.esAdmin;
+      abrirMenu(m, bm);
+      return;
+    }
+    const celdaHab = e.target.closest("td[data-hab]");
+    abrirDrawerEmpleado(tr.dataset.legajo, celdaHab ? celdaHab.dataset.hab : null);
+  });
+  $("#personal-body").addEventListener("keydown", (e) => {
+    const tr = e.target.closest("tr[data-legajo]");
+    if (tr && e.target === tr && e.key === "Enter") { e.preventDefault(); abrirDrawerEmpleado(tr.dataset.legajo); }
+  });
+  $("#page-size").addEventListener("change", (e) => { S.pageSize = Number(e.target.value); S.page = 1; prefs.set("personal.pageSize", S.pageSize); renderTabla(); });
+  $("#pag-prev").addEventListener("click", () => { S.page -= 1; renderTabla(); $("#tabla-wrap").scrollTop = 0; });
+  $("#pag-next").addEventListener("click", () => { S.page += 1; renderTabla(); $("#tabla-wrap").scrollTop = 0; });
+  $("#tabla-wrap").addEventListener("scroll", () => {
+    const m = SMG.menuActual();
+    if (!m || m.menu.id !== "menu-fila") return;
+    const w = $("#tabla-wrap").getBoundingClientRect(), r = m.ancla.getBoundingClientRect();
+    if (!document.contains(m.ancla) || r.bottom < w.top || r.top > w.bottom) { cerrarMenu(); return; }
+    posicionarMenu(m.menu, m.ancla);
+  });
+  $("#menu-fila").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const legajo = $("#menu-fila").dataset.legajo;
+    cerrarMenu();
+    if (b.dataset.act === "editar") abrirDrawerEmpleado(legajo);
+    if (b.dataset.act === "legajo") corregirLegajo(legajo);
+    if (b.dataset.act === "estado") cambiarEstado(legajo);
+  });
+
+  // encabezado
+  $("#btn-nuevo").addEventListener("click", abrirDrawerNuevo);
+  $("#btn-mas").addEventListener("click", (e) => abrirMenu($("#menu-mas"), e.currentTarget));
+  $("#menu-mas").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    cerrarMenu();
+    if (b.dataset.act === "exportar") exportarCsv();
+    if (b.dataset.act === "recargar") cargar().then(() => toast("Datos actualizados", "info"));
+  });
+  $("#obs-regenerar").addEventListener("click", actualizarConclusiones);
+
+  // drawer
+  $$("[data-cerrar-drawer]").forEach((b) => b.addEventListener("click", cerrarDrawer));
+  $("#scrim").addEventListener("click", cerrarDrawer);
+  $("#btn-drawer-mas").addEventListener("click", (e) => abrirMenu($("#menu-drawer"), e.currentTarget));
+  $("#menu-drawer").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act=legajo]");
+    if (!b || !drawerModo) return;
+    cerrarMenu();
+    corregirLegajo(drawerModo.legajo);
+  });
+  $("#habs-drawer").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-quitar]");
+    if (b) quitarHabilitacion(b.dataset.quitar, b.dataset.sitioNombre);
+  });
+  $("#cuil").addEventListener("blur", () => {
+    const v = $("#cuil").value.trim();
+    const mal = v && !cuilValido(v);
+    $("#cuil-error").hidden = !mal;
+    $("#cuil-error").textContent = mal ? "Revisá el CUIL: el formato o el dígito verificador no coinciden. Se puede guardar igual." : "";
+  });
+  $("#drawer-save").addEventListener("click", async () => {
+    const b = $("#drawer-save");
+    if (!drawerModo || b.disabled) return;
+    b.disabled = true;
+    try { await guardarEmpleado(); }
+    catch (e) { toast(e.message, "error"); }
+    finally { b.disabled = false; }
+  });
+  $("#form").addEventListener("submit", (e) => { e.preventDefault(); $("#drawer-save").click(); });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !SMG.hayDialogoAbierto() && !$("#drawer").hidden) cerrarDrawer();
+  });
+}
+
+SMG.configurarChart();
+enlazar();
+renderTabla();
+SMG.usuario.then((me) => { S.esAdmin = !!me && !!me.autenticado && SMG.esAdmin(me); });
+cargar();
+</script>
 </body>
 </html>
-

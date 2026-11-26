@@ -3,302 +3,422 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Administracion de Usuarios</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <title>Administración · SMG</title>
+  <link rel="stylesheet" href="/ui/app.css" />
+  <script src="/ui/shell.js"></script>
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #111c34;
-      --panel-2: #152545;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --line: #233458;
-      --ok: #22c55e;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-      --accent: #38bdf8;
+    /* Administración sobre el design system (/ui/app.css): acá va solo lo propio de la página */
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: var(--fs-body); }
+    .adm-view { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }
+    .adm-view[hidden] { display: none !important; }
+    input[type=checkbox] { accent-color: var(--accent); }
+    label { font-size: var(--fs-label); font-weight: 500; color: var(--text-muted); }
+    .field > label { display: block; margin-bottom: 6px; }
+    .msg { font-size: 12px; margin: 0; }
+    .msg:empty { display: none; }
+    .msg.ok { color: var(--success-text); }
+    .msg.err { color: var(--danger-text); }
+    .msg-pad { padding: 0 var(--s4) var(--s3); }
+    .msg-pad:has(.msg:empty) { display: none; }
+    .t-danger { color: var(--danger-text) !important; }
+    .t-danger:hover { background: var(--danger-soft) !important; }
+
+    /* listas de checkboxes (las arman los renderers con <div class="checks"><label><input> texto</label>…) */
+    .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--chk-min, 200px), 100%), 1fr)); gap: var(--s2) var(--s3); }
+    .checks label { display: flex; align-items: flex-start; gap: var(--s2); font-size: 13px; font-weight: 400; color: var(--text); cursor: pointer; min-width: 0; line-height: 1.35; }
+    .checks label input { width: 15px; height: 15px; margin: 1px 0 0; flex: 0 0 auto; }
+    .checks label .muted { color: var(--text-muted); }
+    .checks-1l label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .checks-1l label input { vertical-align: -2px; margin-right: var(--s2); }
+
+    /* tablas: una línea por fila (td 40px, th 36px vienen de app.css) */
+    .tbl .cell-chips { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
+    .tbl .cell-chips .chip { flex: 0 1 auto; min-width: 0; }
+    .tbl .cell-chips .chip > .trunc { display: block; }
+    .tbl .cell-chips .chip-btn { flex: 0 0 auto; }
+    .tbl .ops { display: flex; align-items: center; gap: 2px; }
+    .tbl .sticky-right { position: sticky; right: 0; z-index: 1; border-left: 1px solid var(--border); text-overflow: clip; }
+    .tbl th.sticky-right { z-index: 3; }
+    .tbl tbody tr { cursor: default; }
+    .tbl td.empty-row { color: var(--text-muted); text-align: center; }
+    .chip-btn { cursor: pointer; font: inherit; font-size: 12px; }
+    .chip-btn:hover { border-color: var(--text-faint); }
+    .user-cell b { font-weight: 500; }
+    .user-cell .muted { margin-left: 6px; font-size: 12px; }
+    #tbl-users { min-width: 1574px; }
+    #tbl-op { min-width: 1150px; }
+    #tbl-access { min-width: 900px; }
+    .table-wrap.adm-wrap { max-height: calc(100vh - 290px); min-height: 0; }
+    .adm-pop { width: auto; min-width: 220px; max-width: 420px; max-height: 60vh; overflow: auto; padding: var(--s3); }
+    .adm-pop .chip-list { gap: 6px; }
+
+    /* PIN: link de la app en una línea */
+    .op-link { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); flex-wrap: wrap; }
+    .op-link code { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--surface-2); border-radius: var(--r-ctl); padding: 4px 8px; min-width: 0; overflow-wrap: anywhere; }
+    .toolbar .select-sm { width: auto; height: 28px; font-size: 12px; }
+
+    /* drawer de usuario (520px) */
+    .drawer.adm-drawer { width: 520px; }
+    .adm-drawer form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    .adm-drawer .grid2 { gap: var(--s3); }
+    .permission-section { border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); }
+    .permission-section > summary { cursor: pointer; padding: var(--s2) var(--s3); font-weight: 600; font-size: 13px; color: var(--text); list-style: none; display: flex; align-items: center; gap: var(--s2); }
+    .permission-section > summary::-webkit-details-marker { display: none; }
+    .permission-section > summary::before { content: "▸"; color: var(--text-faint); font-size: 11px; transition: transform .12s; }
+    .permission-section[open] > summary::before { transform: rotate(90deg); }
+    .permission-section[open] > summary { border-bottom: 1px solid var(--border); }
+    .permission-section > div { padding: var(--s3); }
+    #modulos-box, #roles-box { --chk-min: 140px; }
+    .paneles-box, .acciones-box { display: flex; flex-direction: column; gap: var(--s3); }
+    .paneles-group h4, .acciones-group h5 { margin: 0 0 var(--s2); font-size: 11px; font-weight: 600; letter-spacing: .3px; color: var(--text-faint); text-transform: uppercase; }
+    .paneles-group .checks { --chk-min: 140px; }
+    .acciones-group .checks { --chk-min: 200px; }
+    .drawer-foot .msg { margin-right: auto; align-self: center; }
+
+    /* plantillas */
+    .templates-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: var(--s4); align-items: start; }
+    .template-list { display: flex; flex-direction: column; gap: var(--s2); max-height: calc(100vh - 220px); overflow: auto; padding: var(--s3); }
+    .template-item { all: unset; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: var(--s2) var(--s3); border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; font-size: 12px; }
+    .template-item:hover { background: var(--surface-2); }
+    .template-item:focus-visible { outline: 2px solid var(--accent); }
+    .template-item.active { border-color: var(--accent); background: var(--accent-soft); }
+    .template-item strong { flex: 1 1 100%; font-size: 13px; font-weight: 500; color: var(--text); }
+    .template-item .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 var(--s2); border-radius: 999px; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 500; }
+    .template-item .muted { flex: 1 1 100%; font-size: 11px; }
+    #email-template-form { padding: var(--s4); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s3) var(--s4); }
+    #email-template-form > * { order: 10; }
+    #email-template-form .full { grid-column: 1 / -1; }
+    /* fila 1: código · módulo · formato · estado; fila 2: nombre · descripción (mismo formulario, solo reubicado) */
+    #email-template-form > .field:has(#tpl_codigo) { order: 1; }
+    #email-template-form > .field:has(#tpl_modulo) { order: 2; }
+    #email-template-form > .field:has(#tpl_formato) { order: 3; }
+    #email-template-form > .field:has(#tpl_activo) { order: 4; }
+    #email-template-form > .field:has(#tpl_nombre) { order: 5; grid-column: span 2; }
+    #email-template-form > .field:has(#tpl_descripcion) { order: 6; grid-column: span 2; }
+    #tpl_cuerpo { min-height: 180px; font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+    .variables-box { display: flex; flex-wrap: wrap; gap: 6px; }
+    .variables-box .btn { height: 24px; padding: 0 var(--s2); font-family: var(--mono); font-size: 11px; }
+    .template-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
+    .preview-box { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; line-height: 1.5; padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--bg); color: var(--text); overflow-wrap: anywhere; }
+    @media (max-width: 1279px) {
+      .templates-layout { grid-template-columns: minmax(0, 1fr); }
+      .template-list { max-height: 168px; }
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Outfit", sans-serif;
-      background: radial-gradient(circle at 20% 10%, #12345f 0, transparent 35%), var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-    .page {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 28px;
-    }
-    .head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .head h1 { margin: 0; font-size: 1.6rem; }
-    .head .actions { display: flex; gap: 8px; }
-    .btn {
-      border: 1px solid var(--line);
-      background: var(--panel-2);
-      color: var(--text);
-      padding: 9px 12px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn.primary { border-color: #2563eb; background: #1d4ed8; }
-    .btn.warn { border-color: #b45309; background: #92400e; }
-    .btn.danger { border-color: #991b1b; background: #b91c1c; }
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
-      gap: 18px;
-      align-items: start;
-    }
-    .card {
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(21,37,69,0.95), rgba(17,28,52,0.95));
-      border-radius: 14px;
-      padding: 14px;
-    }
-    .user-card { min-width: 0; }
-    .side-column { display: grid; gap: 18px; min-width: 0; }
-    .users-card { grid-column: 1 / -1; }
-    .templates-card { grid-column: 1 / -1; }
-    .section-kicker {
-      margin: -4px 0 14px;
-      color: var(--muted);
-      font-size: 0.84rem;
-      line-height: 1.4;
-    }
-    .card h2 {
-      margin: 0 0 10px;
-      font-size: 1.05rem;
-    }
-    .grid {
-      display: grid;
-      gap: 10px;
-      grid-template-columns: 1fr 1fr;
-    }
-    label { font-size: 0.86rem; color: var(--muted); }
-    input, select, textarea {
-      width: 100%;
-      background: #0b1328;
-      color: var(--text);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 9px;
-      outline: none;
-    }
-    textarea {
-      min-height: 180px;
-      resize: vertical;
-      line-height: 1.45;
-      font-family: "Outfit", sans-serif;
-    }
-    .full { grid-column: 1 / -1; }
-    .checks {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-top: 4px;
-    }
-    .checks label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--text);
-      font-size: 0.86rem;
-    }
-    .checks input { width: auto; }
-    .permission-section {
-      grid-column: 1 / -1;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(11, 19, 40, 0.36);
-      overflow: hidden;
-    }
-    .permission-section summary {
-      padding: 10px;
-      cursor: pointer;
-      color: #bfdbfe;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-    .permission-section > div { padding: 0 10px 10px; }
-    .paneles-box {
-      display: grid;
-      gap: 10px;
-      margin-top: 6px;
-    }
-    .paneles-group {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px;
-      background: rgba(11, 19, 40, 0.55);
-    }
-    .paneles-group h4 {
-      margin: 0 0 8px;
-      font-size: 0.86rem;
-      color: #bfdbfe;
-      font-weight: 600;
-    }
-    .acciones-box {
-      display: grid;
-      gap: 10px;
-      margin-top: 6px;
-    }
-    .acciones-group {
-      border: 1px dashed #365081;
-      border-radius: 10px;
-      padding: 8px;
-      background: rgba(8, 15, 33, 0.52);
-    }
-    .acciones-group h5 {
-      margin: 0 0 8px;
-      font-size: 0.84rem;
-      color: #93c5fd;
-      font-weight: 600;
-    }
-    .table-wrap { overflow: auto; }
-    .table-toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .table-toolbar h2 { margin: 0; }
-    .table-toolbar input { max-width: 320px; }
-    .templates-layout {
-      display: grid;
-      grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
-      gap: 14px;
-    }
-    .template-list { display: grid; gap: 8px; align-content: start; }
-    .template-item {
-      width: 100%;
-      text-align: left;
-      border: 1px solid var(--line);
-      background: rgba(11, 19, 40, 0.45);
-      color: var(--text);
-      border-radius: 8px;
-      padding: 10px;
-      cursor: pointer;
-    }
-    .template-item.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.12); }
-    .template-item strong { display: block; margin-bottom: 4px; }
-    .template-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .variables-box { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-    .preview-box {
-      white-space: pre-wrap;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: rgba(8, 15, 33, 0.55);
-      min-height: 120px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 900px;
-      font-size: 0.88rem;
-    }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      padding: 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th { color: #bfdbfe; font-weight: 600; }
-    .badge {
-      border: 1px solid #334155;
-      color: #cbd5e1;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      margin-right: 4px;
-      display: inline-block;
-      margin-bottom: 4px;
-    }
-    .muted { color: var(--muted); }
-    .op-link { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .op-link code { background: rgba(8, 15, 33, 0.55); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; word-break: break-all; }
-    .op-link a.btn { text-decoration: none; }
-    .badge.ok-b { border-color: #166534; color: #86efac; }
-    .badge.err-b { border-color: #991b1b; color: #fca5a5; }
-    .pin-val { font-family: ui-monospace, Consolas, monospace; letter-spacing: .2em; }
-    .msg { min-height: 20px; margin-top: 8px; font-size: 0.86rem; }
-    .ok { color: #86efac; }
-    .err { color: #fca5a5; }
-    @media (max-width: 1000px) {
-      .layout { grid-template-columns: 1fr; }
-      .users-card { grid-column: auto; }
-      .templates-card { grid-column: auto; }
-      .templates-layout { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 620px) {
-      .page { padding: 16px; }
-      .head, .table-toolbar { align-items: flex-start; flex-direction: column; }
-      .head .actions { width: 100%; }
-      .head .actions .btn { flex: 1; }
-      .grid { grid-template-columns: 1fr; }
-      .full { grid-column: auto; }
-      .table-toolbar input { max-width: none; }
+    @media (max-width: 767px) {
+      #email-template-form, .adm-drawer .grid2 { grid-template-columns: minmax(0, 1fr); }
+      #email-template-form > .field { grid-column: 1 / -1 !important; }
+      .drawer.adm-drawer { width: 100vw; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <header class="head">
-      <h1>Modulo Administracion</h1>
-      <div class="actions">
-        <button class="btn" onclick="window.location.href='/'">Volver al menu</button>
-        <button class="btn" onclick="window.location.href='/logout'">Salir</button>
-      </div>
-    </header>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="content">
 
-    <section class="layout">
-      <article class="card user-card">
-        <h2>Gestion de Usuarios</h2>
-        <p class="section-kicker">Cree o edite una cuenta y configure sus accesos desde los apartados desplegables.</p>
-        <form id="user-form" class="grid">
-          <div class="full">
+      <!-- ============ ACCESOS › Usuarios (tabla "Usuarios y accesos" + formulario "Gestión de usuarios" en drawer) ============ -->
+      <section class="adm-view" data-vista="usuarios" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Usuarios y accesos</h1>
+            <p class="page-sub">Consulta, búsqueda y administración de las cuentas creadas.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-primary" type="button" id="btn-nuevo-usuario"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Nuevo usuario</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="toolbar">
+            <div class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+              <input id="users-search" class="input" type="search" placeholder="Buscar por nombre, correo o legajo" autocomplete="off" aria-label="Buscar usuarios" />
+            </div>
+            <span class="spacer"></span>
+            <span class="muted" id="users-count"></span>
+          </div>
+          <div class="table-wrap adm-wrap">
+            <table class="tbl" id="tbl-users">
+              <colgroup>
+                <col style="width:48px"><col><col style="width:116px"><col style="width:104px"><col style="width:150px">
+                <col style="width:220px"><col style="width:104px"><col style="width:116px"><col style="width:130px"><col style="width:366px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Usuario</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Contraseña</th>
+                  <th>Módulos</th>
+                  <th>Paneles</th>
+                  <th>Acciones panel</th>
+                  <th>Roles</th>
+                  <th class="sticky-right">Operaciones</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
+          <div class="tfoot" id="users-pie" hidden></div>
+        </div>
+      </section>
+
+      <!-- ============ ACCESOS › PIN de operadores ============ -->
+      <section class="adm-view" data-vista="pin" id="operadores-card" hidden>
+        <div class="page-head">
+          <div>
+            <h1>PIN de operadores (app de Partes Diarios)</h1>
+            <p class="page-sub">
+              Cada operador crea su PIN la primera vez que entra a la app, validando su DNI.
+              Desde aquí puede consultarlo, resetearlo (el operador vuelve a crearlo) o desbloquearlo.
+            </p>
+          </div>
+        </div>
+        <div class="card op-link">
+          <svg class="i muted" aria-hidden="true"><use href="#i-link"/></svg>
+          <span class="muted">Link de la app para los teléfonos:</span>
+          <code id="op-link-url"></code>
+          <button class="btn btn-sm" type="button" id="op-link-copiar">Copiar</button>
+          <a class="btn btn-sm" id="op-link-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
+        <div class="card">
+          <div class="toolbar">
+            <div class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+              <input id="op-search" class="input" type="search" placeholder="Buscar por nombre o legajo" autocomplete="off" aria-label="Buscar operadores" />
+            </div>
+            <select id="op-filtro" class="select select-sm" aria-label="Filtrar operadores">
+              <option value="">Todos</option>
+              <option value="con">Con PIN</option>
+              <option value="sin">Sin PIN</option>
+              <option value="bloq">Bloqueados</option>
+            </select>
+            <span class="spacer"></span>
+            <span id="op-resumen" class="muted"></span>
+          </div>
+          <div class="msg-pad"><div id="op-msg" class="msg"></div></div>
+          <div class="table-wrap adm-wrap">
+            <table class="tbl" id="tbl-op">
+              <colgroup>
+                <col style="width:80px"><col><col style="width:200px"><col style="width:100px"><col style="width:145px">
+                <col style="width:145px"><col style="width:120px"><col style="width:215px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Legajo</th>
+                  <th>Operador</th>
+                  <th>Estado</th>
+                  <th>PIN</th>
+                  <th>Creado</th>
+                  <th>Último acceso</th>
+                  <th class="num">Partes desde app</th>
+                  <th class="sticky-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="op-body"></tbody>
+            </table>
+          </div>
+          <div class="tfoot" id="op-pie"></div>
+        </div>
+      </section>
+
+      <!-- ============ NOTIFICACIONES › Responsables de módulo (incluye "Uso rápido") ============ -->
+      <section class="adm-view" data-vista="responsables" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Responsables de módulo</h1>
+            <p class="page-sub">Los responsables reciben las notificaciones de las solicitudes emitidas en el módulo seleccionado.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding-top: var(--s4);">
+            <div class="callout info" style="margin-bottom: var(--s4);">
+              <svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
+              <div><b>Uso rápido.</b> Para Compras, asigne uno o más responsables. Cada nueva solicitud les llegará por correo y su emisor recibirá una copia.</div>
+            </div>
+            <div class="field" style="max-width: 320px; margin-bottom: var(--s4);">
+              <label for="responsable-modulo">Módulo</label>
+              <select id="responsable-modulo" class="select"></select>
+            </div>
+            <div class="field">
+              <label>Usuarios responsables</label>
+              <div class="checks checks-1l" id="responsables-box" style="--chk-min: 300px;"></div>
+            </div>
+          </div>
+          <div class="card-foot">
+            <div id="responsables-msg" class="msg"></div>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" type="button" id="btn-guardar-responsables">Guardar responsables</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ NOTIFICACIONES › Plantillas de email ============ -->
+      <section class="adm-view" data-vista="plantillas" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Plantillas de emails</h1>
+            <p class="page-sub">Administre los textos usados en las notificaciones automáticas del sistema.</p>
+          </div>
+        </div>
+        <div class="templates-layout">
+          <div class="card template-list" id="email-template-list"></div>
+          <div class="card">
+            <form id="email-template-form">
+              <div class="field">
+                <label for="tpl_codigo">Código interno</label>
+                <input id="tpl_codigo" class="input mono" disabled />
+              </div>
+              <div class="field">
+                <label for="tpl_modulo">Módulo</label>
+                <input id="tpl_modulo" class="input" disabled />
+              </div>
+              <div class="field full">
+                <label for="tpl_nombre">Nombre visible</label>
+                <input id="tpl_nombre" class="input" required />
+              </div>
+              <div class="field full">
+                <label for="tpl_descripcion">Descripción</label>
+                <input id="tpl_descripcion" class="input" />
+              </div>
+              <div class="field">
+                <label for="tpl_formato">Formato</label>
+                <select id="tpl_formato" class="select">
+                  <option value="texto">Texto plano</option>
+                  <option value="html">HTML</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="tpl_activo">Estado</label>
+                <select id="tpl_activo" class="select">
+                  <option value="1">Activo</option>
+                  <option value="0">Inactivo (usa original)</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="tpl_asunto">Asunto</label>
+                <input id="tpl_asunto" class="input" required />
+              </div>
+              <div class="field full">
+                <label for="tpl_cuerpo">Cuerpo</label>
+                <textarea id="tpl_cuerpo" class="textarea" required></textarea>
+              </div>
+              <div class="field full">
+                <label>Variables permitidas</label>
+                <div class="variables-box" id="tpl_variables"></div>
+              </div>
+              <div class="full template-actions">
+                <button class="btn btn-primary" type="submit">Guardar plantilla</button>
+                <button class="btn" type="button" id="btn-preview-template">Vista previa</button>
+                <button class="btn btn-ghost" type="button" id="btn-toggle-template">Activar/desactivar</button>
+                <button class="btn btn-ghost" type="button" id="btn-restore-template">Restaurar original</button>
+              </div>
+              <div id="templates-msg" class="msg full"></div>
+              <div class="field full">
+                <label>Vista previa</label>
+                <div class="preview-box" id="template-preview">Seleccione una plantilla y presione Vista previa.</div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ APP DE OPERADORES › Pestañas ============ -->
+      <section class="adm-view" data-vista="pestanas" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Pestañas de la app de Partes Diarios</h1>
+            <p class="page-sub">Active u oculte cada pestaña para todos los operadores desde una sola configuración.</p>
+          </div>
+        </div>
+        <div class="card" style="max-width: 720px;">
+          <div class="card-body" style="padding-top: var(--s4);">
+            <div class="checks" id="op-tabs-box" style="grid-template-columns: repeat(3, minmax(0, 1fr));"></div>
+          </div>
+          <div class="card-foot">
+            <span id="op-tabs-msg" class="muted" role="status"></span>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" type="button" id="btn-guardar-op-tabs">Guardar pestañas</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ AUDITORÍA › Historial de accesos ============ -->
+      <section class="adm-view" data-vista="accesos" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Historial de accesos</h1>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap adm-wrap" style="border-top: 0;">
+            <table class="tbl" id="tbl-access">
+              <colgroup><col style="width:170px"><col style="width:200px"><col style="width:240px"><col><col style="width:150px"></colgroup>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Evento</th>
+                  <th>Usuario</th>
+                  <th>Detalle</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="access-body"></tbody>
+            </table>
+          </div>
+          <div class="tfoot" id="access-pie"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Gestión de usuarios: el mismo formulario, en un drawer lateral -->
+<div id="user-drawer" hidden>
+  <div class="scrim" data-cerrar-drawer></div>
+  <aside class="drawer adm-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
+    <div class="drawer-head">
+      <div style="min-width:0">
+        <h2 id="user-drawer-title">Gestión de usuarios</h2>
+        <p>Cree o edite una cuenta y configure sus accesos desde los apartados desplegables.</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" data-cerrar-drawer aria-label="Cerrar"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <form id="user-form">
+      <div class="drawer-body">
+        <div class="grid2">
+          <div class="field span2">
             <label for="f_nombre">Apellido y Nombre</label>
-            <input id="f_nombre" list="empleados-nombres" required autocomplete="off" />
+            <input id="f_nombre" class="input" list="empleados-nombres" required autocomplete="off" />
             <datalist id="empleados-nombres"></datalist>
           </div>
-          <div>
-            <label>DNI</label>
-            <input id="f_dni" />
+          <div class="field">
+            <label for="f_dni">DNI</label>
+            <input id="f_dni" class="input" />
           </div>
-          <div>
-            <label>Legajo</label>
-            <input id="f_legajo" />
+          <div class="field">
+            <label for="f_legajo">Legajo</label>
+            <input id="f_legajo" class="input" />
           </div>
-          <div class="full">
-            <label>Correo (usuario de acceso)</label>
-            <input id="f_correo" required />
+          <div class="field span2">
+            <label for="f_correo">Correo (usuario de acceso)</label>
+            <input id="f_correo" class="input" required />
           </div>
-          <div>
-            <label>Contrasena (si vacio, se genera temporal)</label>
-            <input id="f_password" />
+          <div class="field">
+            <label for="f_password">Contraseña (si vacío, se genera temporal)</label>
+            <input id="f_password" class="input" />
           </div>
-          <div>
-            <label>Estado</label>
-            <select id="f_estado">
+          <div class="field">
+            <label for="f_estado">Estado</label>
+            <select id="f_estado" class="select">
               <option value="ACTIVO">ACTIVO</option>
               <option value="INACTIVO">INACTIVO</option>
             </select>
           </div>
-          <div class="full">
-            <label>Tipo de Usuario</label>
-            <select id="f_tipo">
+          <div class="field span2">
+            <label for="f_tipo">Tipo de Usuario</label>
+            <select id="f_tipo" class="select">
               <option>ADMINISTRADOR</option>
               <option>SUPERVISOR</option>
               <option>JEFE DE AREA</option>
@@ -307,222 +427,47 @@
               <option selected>CONSULTOR</option>
             </select>
           </div>
-          <details class="permission-section" open>
+          <details class="permission-section span2" open>
             <summary>1. Permisos por módulo</summary>
             <div class="checks" id="modulos-box"></div>
           </details>
-          <details class="permission-section">
+          <details class="permission-section span2">
             <summary>2. Paneles habilitados</summary>
             <div class="paneles-box" id="paneles-box"></div>
           </details>
-          <details class="permission-section">
+          <details class="permission-section span2">
             <summary>3. Acciones permitidas</summary>
             <div class="acciones-box" id="acciones-box"></div>
           </details>
-          <details class="permission-section">
+          <details class="permission-section span2">
             <summary>Roles funcionales</summary>
             <div class="checks" id="roles-box"></div>
           </details>
-          <div class="full" style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn primary" type="submit" id="btn-save">Crear usuario</button>
-            <button class="btn" type="button" id="btn-cancel" style="display:none;">Cancelar edicion</button>
-          </div>
-          <div id="form-msg" class="msg full"></div>
-        </form>
-      </article>
+        </div>
+      </div>
+      <div class="drawer-foot">
+        <div id="form-msg" class="msg"></div>
+        <button class="btn" type="button" id="btn-cancel" style="display:none;">Cancelar edición</button>
+        <button class="btn btn-primary" type="submit" id="btn-save">Crear usuario</button>
+      </div>
+    </form>
+  </aside>
+</div>
 
-      <aside class="side-column">
-      <article class="card">
-        <h2>Responsables de módulo</h2>
-        <p class="section-kicker">Los responsables reciben las notificaciones de las solicitudes emitidas en el módulo seleccionado.</p>
-        <div class="grid">
-          <div class="full">
-            <label for="responsable-modulo">Módulo</label>
-            <select id="responsable-modulo"></select>
-          </div>
-          <div class="full">
-            <label>Usuarios responsables</label>
-            <div class="checks" id="responsables-box"></div>
-          </div>
-          <div class="full" style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn primary" type="button" id="btn-guardar-responsables">Guardar responsables</button>
-          </div>
-          <div id="responsables-msg" class="msg full"></div>
-        </div>
-      </article>
-      <article class="card">
-        <h2>Uso rápido</h2>
-        <p class="section-kicker">Para Compras, asigne uno o más responsables. Cada nueva solicitud les llegará por correo y su emisor recibirá una copia.</p>
-      </article>
-      </aside>
-
-      <article class="card templates-card">
-        <div class="table-toolbar">
-          <div>
-            <h2>Plantillas de Emails</h2>
-            <p class="section-kicker">Administre los textos usados en las notificaciones automaticas del sistema.</p>
-          </div>
-        </div>
-        <div class="templates-layout">
-          <div class="template-list" id="email-template-list"></div>
-          <form id="email-template-form" class="grid">
-            <div>
-              <label>Codigo interno</label>
-              <input id="tpl_codigo" disabled />
-            </div>
-            <div>
-              <label>Modulo</label>
-              <input id="tpl_modulo" disabled />
-            </div>
-            <div class="full">
-              <label>Nombre visible</label>
-              <input id="tpl_nombre" required />
-            </div>
-            <div class="full">
-              <label>Descripcion</label>
-              <input id="tpl_descripcion" />
-            </div>
-            <div>
-              <label>Formato</label>
-              <select id="tpl_formato">
-                <option value="texto">Texto plano</option>
-                <option value="html">HTML</option>
-              </select>
-            </div>
-            <div>
-              <label>Estado</label>
-              <select id="tpl_activo">
-                <option value="1">Activo</option>
-                <option value="0">Inactivo (usa original)</option>
-              </select>
-            </div>
-            <div class="full">
-              <label>Asunto</label>
-              <input id="tpl_asunto" required />
-            </div>
-            <div class="full">
-              <label>Cuerpo</label>
-              <textarea id="tpl_cuerpo" required></textarea>
-            </div>
-            <div class="full">
-              <label>Variables permitidas</label>
-              <div class="variables-box" id="tpl_variables"></div>
-            </div>
-            <div class="full template-actions">
-              <button class="btn primary" type="submit">Guardar plantilla</button>
-              <button class="btn" type="button" id="btn-preview-template">Vista previa</button>
-              <button class="btn warn" type="button" id="btn-toggle-template">Activar/desactivar</button>
-              <button class="btn danger" type="button" id="btn-restore-template">Restaurar original</button>
-            </div>
-            <div id="templates-msg" class="msg full"></div>
-            <div class="full">
-              <label>Vista previa</label>
-              <div class="preview-box" id="template-preview">Seleccione una plantilla y presione Vista previa.</div>
-            </div>
-          </form>
-        </div>
-      </article>
-
-      <article class="card users-card">
-        <div class="table-toolbar">
-          <div><h2>Usuarios y Accesos</h2><p class="section-kicker">Consulta, búsqueda y administración de las cuentas creadas.</p></div>
-          <input id="users-search" type="search" placeholder="Buscar por nombre, correo o legajo" autocomplete="off" />
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Contrasena</th>
-                <th>Modulos</th>
-                <th>Paneles</th>
-                <th>Acciones panel</th>
-                <th>Roles</th>
-                <th>Operaciones</th>
-              </tr>
-            </thead>
-            <tbody id="users-body"></tbody>
-          </table>
-        </div>
-        <h2 style="margin-top:12px;">Historial de accesos</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Evento</th>
-                <th>Usuario</th>
-                <th>Detalle</th>
-                <th>IP</th>
-              </tr>
-            </thead>
-            <tbody id="access-body"></tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="card users-card" id="operadores-card">
-        <div class="table-toolbar">
-          <div>
-            <h2>PIN de Operadores (app de Partes Diarios)</h2>
-            <p class="section-kicker">
-              Cada operador crea su PIN la primera vez que entra a la app, validando su DNI.
-              Desde aquí puede consultarlo, resetearlo (el operador vuelve a crearlo) o desbloquearlo.
-            </p>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <select id="op-filtro" style="max-width:180px;">
-              <option value="">Todos</option>
-              <option value="con">Con PIN</option>
-              <option value="sin">Sin PIN</option>
-              <option value="bloq">Bloqueados</option>
-            </select>
-            <input id="op-search" type="search" placeholder="Buscar por nombre o legajo" autocomplete="off" />
-          </div>
-        </div>
-        <div class="op-link">
-          <span class="muted">Link de la app para los teléfonos:</span>
-          <code id="op-link-url"></code>
-          <button class="btn" type="button" id="op-link-copiar">Copiar</button>
-          <a class="btn" id="op-link-abrir" target="_blank" rel="noopener">Abrir</a>
-        </div>
-        <div id="op-resumen" class="muted" style="margin:8px 0;"></div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Legajo</th>
-                <th>Operador</th>
-                <th>Estado</th>
-                <th>PIN</th>
-                <th>Creado</th>
-                <th>Último acceso</th>
-                <th>Partes desde app</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="op-body"></tbody>
-          </table>
-        </div>
-        <div id="op-msg" class="msg"></div>
-      </article>
-    </section>
-  </div>
+<!-- popover compartido de Paneles / Acciones panel / Módulos -->
+<div class="menu adm-pop" id="adm-pop" role="dialog" hidden></div>
 
   <script>
     const MODULOS = [
-      ["logistica", "Logistica"],
-      ["almacen", "Almacen"],
+      ["logistica", "Logística"],
+      ["almacen", "Almacén"],
       ["operaciones", "Operaciones"],
       ["compras", "Compras"],
-      ["facturacion", "Facturacion y Cobranzas"],
+      ["facturacion", "Facturación y Cobranzas"],
       ["rrhh", "Recursos Humanos"],
       ["mantenimiento", "Mantenimiento"],
       ["dashboard_ejecutivo", "Dashboard Ejecutivo"],
-      ["administracion", "Administracion"],
+      ["administracion", "Administración"],
       ["base_datos", "Base de Datos"],
     ];
 
@@ -531,14 +476,14 @@
         ["dashboard", "Dashboard"],
         ["solicitud_viaje", "Solicitud de Viaje"],
         ["asignar_recursos", "Asignar Recursos"],
-        ["vehiculos", "Vehiculos"],
+        ["vehiculos", "Vehículos"],
         ["personal", "Personal"],
-        ["ordenes_salida", "Ordenes de Salida"],
-        ["gestion_operativa", "Gestion Operativa"],
+        ["ordenes_salida", "Órdenes de Salida"],
+        ["gestion_operativa", "Gestión Operativa"],
       ],
       almacen: [
         ["dashboard", "Dashboard"],
-        ["catalogos", "Catalogos"],
+        ["catalogos", "Catálogos"],
         ["productos", "Productos"],
         ["ingresos_salidas", "Ingresos / Salidas"],
         ["documentos", "Documentos"],
@@ -549,7 +494,7 @@
         ["dashboard", "Dashboard"],
         ["solicitud_compra", "Solicitud de Compra"],
         ["solicitudes_emitidas", "Solicitudes Emitidas"],
-        ["emision_orden_compra", "Emision Orden de Compra"],
+        ["emision_orden_compra", "Emisión Orden de Compra"],
         ["ordenes_compra_emitidas", "OC Emitidas"],
         ["proveedores", "Proveedores"],
       ],
@@ -560,6 +505,15 @@
         ["centros_costos", "Centro de Costos"],
         ["seguimiento_cliente", "Seguimiento de Clientes"],
         ["actas_medicion", "Actas de Medición"],
+      ],
+      mantenimiento: [
+        ["novedades", "Novedades"],
+        ["ordenes", "Órdenes de trabajo"],
+        ["checklist", "Check list"],
+        ["equipos", "Equipos (estado y ubicación)"],
+        ["preventivo", "Preventivo"],
+        ["indicadores", "Indicadores"],
+        ["configuracion", "Configuración"],
       ],
     };
 
@@ -580,17 +534,18 @@
           ["asignar", "Asignar recursos"],
         ],
         vehiculos: [
-          ["crear", "Crear vehiculo"],
-          ["editar", "Editar vehiculo"],
-          ["eliminar", "Eliminar vehiculo"],
+          ["crear", "Crear vehículo"],
+          ["editar", "Editar vehículo (incluye tipo, neumáticos y módulos del check list)"],
+          ["eliminar", "Eliminar vehículo"],
+          ["tipos_equipo", "Configurar el catálogo de tipos de equipo"],
         ],
         personal: [
           ["crear", "Crear personal"],
           ["editar", "Editar personal"],
         ],
         ordenes_salida: [
-          ["ver", "Ver panel de ordenes"],
-          ["guardar_cierre", "Guardar cierre logistico"],
+          ["ver", "Ver panel de órdenes"],
+          ["guardar_cierre", "Guardar cierre logístico"],
           ["imprimir", "Imprimir"],
           ["cerrar_orden", "(Legado) Cerrar orden"],
         ],
@@ -602,12 +557,12 @@
       },
       almacen: {
         dashboard: [
-          ["ver", "Ver dashboard de almacen"],
+          ["ver", "Ver dashboard de almacén"],
         ],
         catalogos: [
-          ["consultar", "Consultar catalogos"],
-          ["crear", "Crear en catalogos"],
-          ["eliminar", "Eliminar en catalogos"],
+          ["consultar", "Consultar catálogos"],
+          ["crear", "Crear en catálogos"],
+          ["eliminar", "Eliminar en catálogos"],
         ],
         productos: [
           ["consultar", "Consultar productos"],
@@ -694,6 +649,36 @@
           ["anular", "Anular actas"],
         ],
       },
+      mantenimiento: {
+        novedades: [
+          ["consultar", "Consultar novedades"],
+          ["cargar", "Cargar y confirmar novedades desde la web"],
+          ["aprobar", "Aprobador: resolver novedades (pasar a OT o cerrar sin OT)"],
+        ],
+        ordenes: [
+          ["consultar", "Consultar órdenes de trabajo"],
+          ["gestionar", "Crear OT, asignar mecánicos, comentar y anular"],
+          ["finalizar", "Administrador de Mantenimiento: finalizar o devolver OT"],
+        ],
+        checklist: [
+          ["consultar", "Consultar check list realizados"],
+          ["realizar", "Realizar check list"],
+        ],
+        equipos: [
+          ["consultar", "Consultar estado y ubicación de equipos"],
+          ["cambiar_estado", "Cambiar estado y ubicación manual (con motivo)"],
+        ],
+        indicadores: [
+          ["consultar", "Consultar indicadores (disponibilidad, costos, fallas, mecánicos)"],
+        ],
+        preventivo: [
+          ["consultar", "Consultar vencimientos del preventivo y lecturas a revisar"],
+          ["gestionar", "Crear planes, asignar equipos, registrar services y revisar lecturas (crear la OT pide además Órdenes › gestionar)"],
+        ],
+        configuracion: [
+          ["configurar", "Valor hora y plantilla del check list"],
+        ],
+      },
     };
 
     const state = {
@@ -706,8 +691,88 @@
       selectedTemplate: null,
       editId: null,
     };
+    const OP_TABS = [["inicio", "Inicio"], ["nuevo", "Nuevo parte"], ["lista", "Mis partes"], ["novedades", "Novedades"], ["mto", "Mantenimiento"]];
 
     const $ = (id) => document.getElementById(id);
+
+    // ---------- distribución: una sección por hash, drawer del formulario, popovers y paginación (solo visual) ----------
+    const VISTAS = ["usuarios", "pin", "responsables", "plantillas", "pestanas", "accesos"];
+    function vistaDelHash() {
+      const h = location.hash.replace(/^#\/?/, "").split(/[/?]/)[0];
+      return VISTAS.includes(h) ? h : "usuarios";
+    }
+    if (!VISTAS.includes(location.hash.replace(/^#\/?/, "").split(/[/?]/)[0])) history.replaceState(null, "", "#usuarios");
+    function mostrarVista() {
+      const v = vistaDelHash();
+      document.querySelectorAll(".adm-view").forEach((el) => { el.hidden = el.dataset.vista !== v; });
+      cerrarDrawer();
+      cerrarPop();
+    }
+    window.addEventListener("hashchange", mostrarVista);
+    setTimeout(mostrarVista, 0);
+
+    function abrirDrawer() {
+      $("user-drawer").hidden = false;
+      setTimeout(() => $("f_nombre").focus(), 0);
+    }
+    function cerrarDrawer() {
+      const d = $("user-drawer");
+      if (d) d.hidden = true;
+    }
+    document.querySelectorAll("[data-cerrar-drawer]").forEach((el) => el.addEventListener("click", cerrarDrawer));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("user-drawer").hidden && !(window.SMG && SMG.menuActual && SMG.menuActual())) cerrarDrawer();
+    });
+
+    // Popover compartido (lista completa de módulos / paneles / acciones de un usuario)
+    const popContenido = {};
+    function cerrarPop() { if (window.SMG && SMG.menuActual && SMG.menuActual()?.menu === $("adm-pop")) SMG.cerrarMenu(); }
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pop]");
+      if (!btn) return;
+      const pop = $("adm-pop");
+      pop.innerHTML = popContenido[btn.dataset.pop] || "";
+      SMG.abrirMenu(pop, btn, { foco: false });
+    });
+
+    // Paginación de visualización sobre los datos ya cargados
+    const paginas = {};
+    function paginar(clave, filas, pieId, { tamanos = [25, 50, 100], firma = "", siempre = true } = {}) {
+      const p = paginas[clave] || (paginas[clave] = { pagina: 1, tamano: tamanos[0], firma });
+      if (p.firma !== firma) { p.firma = firma; p.pagina = 1; }
+      const total = filas.length;
+      const paginasTot = Math.max(1, Math.ceil(total / p.tamano));
+      p.pagina = Math.min(Math.max(1, p.pagina), paginasTot);
+      const desde = (p.pagina - 1) * p.tamano;
+      const visibles = filas.slice(desde, desde + p.tamano);
+      const pie = $(pieId);
+      if (pie) {
+        pie.hidden = !siempre && total <= tamanos[0];
+        pie.innerHTML = `
+          <span>${total ? `${desde + 1}–${desde + visibles.length} de ${total}` : "0 resultados"}</span>
+          <div class="pager">
+            <select class="select" data-pager-tamano="${clave}" aria-label="Filas por página">${tamanos.map((n) => `<option value="${n}" ${n === p.tamano ? "selected" : ""}>${n} por página</option>`).join("")}</select>
+            <button type="button" class="btn btn-sm btn-icon" data-pager-ir="${clave}" data-delta="-1" ${p.pagina <= 1 ? "disabled" : ""} aria-label="Página anterior"><svg class="i" aria-hidden="true"><use href="#i-left"/></svg></button>
+            <span>Página ${p.pagina} de ${paginasTot}</span>
+            <button type="button" class="btn btn-sm btn-icon" data-pager-ir="${clave}" data-delta="1" ${p.pagina >= paginasTot ? "disabled" : ""} aria-label="Página siguiente"><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></button>
+          </div>`;
+      }
+      return visibles;
+    }
+    const REPINTAR = { users: () => renderUsers(), op: () => renderOperadores(), access: () => renderAccess(state.accesos || []) };
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pager-ir]");
+      if (!b) return;
+      paginas[b.dataset.pagerIr].pagina += Number(b.dataset.delta);
+      REPINTAR[b.dataset.pagerIr]();
+    });
+    document.addEventListener("change", (e) => {
+      const s = e.target.closest("[data-pager-tamano]");
+      if (!s) return;
+      const p = paginas[s.dataset.pagerTamano];
+      p.tamano = Number(s.value); p.pagina = 1;
+      REPINTAR[s.dataset.pagerTamano]();
+    });
 
     function setMsg(text, ok = false) {
       const el = $("form-msg");
@@ -778,8 +843,7 @@
       const usuarios = state.users.filter((usuario) => usuario.estado === "ACTIVO" && !usuario.bloqueado);
       $("responsables-box").innerHTML = usuarios.length
         ? usuarios.map((usuario) => `
-            <label><input type="checkbox" data-responsable-usuario="${usuario.id}" ${seleccionados.has(Number(usuario.id)) ? "checked" : ""} />
-            ${usuario.nombre_apellido || usuario.correo} <span class="muted">(${usuario.correo})</span></label>
+            <label title="${esc(usuario.nombre_apellido || usuario.correo)} (${esc(usuario.correo)})"><input type="checkbox" data-responsable-usuario="${usuario.id}" ${seleccionados.has(Number(usuario.id)) ? "checked" : ""} />${usuario.nombre_apellido || usuario.correo} <span class="muted">(${usuario.correo})</span></label>
           `).join("")
         : '<span class="muted">No hay usuarios activos disponibles.</span>';
       setResponsablesMsg("");
@@ -816,7 +880,7 @@
         })
         .join("");
 
-      box.innerHTML = html || '<div class="muted">Seleccione modulo(s) para configurar paneles.</div>';
+      box.innerHTML = html || '<div class="muted">Seleccione módulo(s) para configurar paneles.</div>';
 
       // Restaurar estado previo de paneles
       document.querySelectorAll("input[data-panel-modulo][data-panel]").forEach((el) => {
@@ -959,13 +1023,13 @@
     }
 
     function badges(items) {
-      return (items || []).map((x) => `<span class="badge">${x}</span>`).join("");
+      return (items || []).map((x) => `<span class="chip chip-muted" title="${esc(x)}"><span class="trunc">${x}</span></span>`).join("");
     }
 
     function badgesPaneles(paneles) {
       const chunks = [];
       Object.entries(paneles || {}).forEach(([modulo, lista]) => {
-        chunks.push(`<span class="badge">${modulo}: ${(lista || []).length}</span>`);
+        chunks.push(`<span class="chip chip-muted">${modulo}: ${(lista || []).length}</span>`);
       });
       return chunks.join("");
     }
@@ -974,7 +1038,7 @@
       const chunks = [];
       Object.entries(acciones || {}).forEach(([modulo, porPanel]) => {
         Object.entries(porPanel || {}).forEach(([panel, lista]) => {
-          chunks.push(`<span class="badge">${modulo}/${panel}: ${(lista || []).length}</span>`);
+          chunks.push(`<span class="chip chip-muted">${modulo}/${panel}: ${(lista || []).length}</span>`);
         });
       });
       return chunks.join("");
@@ -1055,7 +1119,7 @@
 
     async function restoreEmailTemplate() {
       if (!state.selectedTemplate) return;
-      if (!confirm("Restaurar el asunto y cuerpo original de esta plantilla?")) return;
+      if (!confirm("¿Restaurar el asunto y cuerpo original de esta plantilla?")) return;
       const codigo = state.selectedTemplate.codigo;
       await api(`/admin/email-templates/${encodeURIComponent(codigo)}/restore`, { method: "POST", body: JSON.stringify({}) });
       await reloadEmailTemplates(codigo);
@@ -1071,7 +1135,7 @@
         body: JSON.stringify({ activo }),
       });
       await reloadEmailTemplates(codigo);
-      setTemplatesMsg(activo ? "Plantilla activada" : "Plantilla inactiva: se usara el texto original", true);
+      setTemplatesMsg(activo ? "Plantilla activada" : "Plantilla inactiva: se usará el texto original", true);
     }
 
     function renderUsers() {
@@ -1082,62 +1146,83 @@
         return [u.nombre_apellido, u.correo, u.legajo, u.dni, u.tipo_usuario]
           .some((valor) => String(valor || "").toLocaleLowerCase().includes(buscado));
       });
-      tb.innerHTML = usuarios.map((u) => {
-        const modulos = badges(u.modulos || []);
-        const paneles = badgesPaneles(u.paneles || {});
-        const acciones = badgesAcciones(u.acciones || {});
-        const roles = badges((u.roles || []).map((r) => r.nombre));
+      $("users-count").textContent = `${usuarios.length} de ${state.users.length} usuarios`;
+      const pagina = paginar("users", usuarios, "users-pie", { firma: buscado, siempre: false });
+      const resumen = (clave, n, singular, plural, chips) => {
+        if (!n) return '<span class="muted">—</span>';
+        popContenido[clave] = `<div class="chip-list">${chips}</div>`;
+        return `<button type="button" class="chip chip-btn" data-pop="${clave}" aria-haspopup="dialog">${n} ${n === 1 ? singular : plural}</button>`;
+      };
+      tb.innerHTML = pagina.map((u) => {
+        const listaModulos = u.modulos || [];
+        const modulos = badges(listaModulos.slice(0, 3))
+          + (listaModulos.length > 3
+            ? `<button type="button" class="chip chip-btn" data-pop="mod-${u.id}" title="${esc(listaModulos.slice(3).join(", "))}">+${listaModulos.length - 3}</button>`
+            : "");
+        if (listaModulos.length > 3) popContenido[`mod-${u.id}`] = `<div class="chip-list">${badges(listaModulos)}</div>`;
+        const nPaneles = Object.values(u.paneles || {}).reduce((s, l) => s + (l || []).length, 0);
+        const nAcciones = Object.values(u.acciones || {}).reduce((s, porPanel) =>
+          s + Object.values(porPanel || {}).reduce((s2, l) => s2 + (l || []).length, 0), 0);
+        const paneles = resumen(`pan-${u.id}`, nPaneles, "panel", "paneles", badgesPaneles(u.paneles || {}));
+        const acciones = resumen(`acc-${u.id}`, nAcciones, "acción", "acciones", badgesAcciones(u.acciones || {}));
+        const nombresRoles = (u.roles || []).map((r) => r.nombre);
+        const roles = badges(nombresRoles);
+        const estado = `<span class="chip ${u.estado === "ACTIVO" ? "chip-ok" : "chip-muted"}">${u.estado || ""}</span>`
+          + (u.bloqueado ? '<span class="chip chip-bad">BLOQUEADO</span>' : "");
         return `
           <tr>
-            <td>${u.id}</td>
-            <td>
-              <div><strong>${u.nombre_apellido || ""}</strong></div>
-              <div class="muted">${u.correo || ""}</div>
-              <div class="muted">Legajo: ${u.legajo || "-"} | DNI: ${u.dni || "-"}</div>
+            <td class="muted">${u.id}</td>
+            <td class="user-cell" title="${esc(`${u.nombre_apellido || ""} · ${u.correo || ""} · Legajo: ${u.legajo || "-"} | DNI: ${u.dni || "-"}`)}">
+              <b>${u.nombre_apellido || ""}</b><span class="muted">${u.correo || ""} · Legajo: ${u.legajo || "-"} | DNI: ${u.dni || "-"}</span>
             </td>
             <td>${u.tipo_usuario || ""}</td>
-            <td>${u.estado || ""}${u.bloqueado ? " / BLOQUEADO" : ""}</td>
+            <td><div class="cell-chips">${estado}</div></td>
             <td>
-              <span class="muted" id="pwd-${u.id}">Protegida</span>
-              <button class="btn" id="btn-pwd-${u.id}" data-visible="0" onclick="togglePwd(${u.id})">Ver</button>
+              <div class="cell-chips">
+                <span class="muted trunc" id="pwd-${u.id}">Protegida</span>
+                <button class="btn btn-sm btn-ghost" id="btn-pwd-${u.id}" data-visible="0" onclick="togglePwd(${u.id})">Ver</button>
+              </div>
             </td>
-            <td>${modulos}</td>
+            <td><div class="cell-chips" title="${esc(listaModulos.join(", "))}">${modulos}</div></td>
             <td>${paneles}</td>
             <td>${acciones}</td>
-            <td>${roles}</td>
-            <td>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button class="btn" onclick="editUser(${u.id})">Editar</button>
-                <button class="btn warn" onclick="toggleBlock(${u.id}, ${u.bloqueado ? "false" : "true"})">${u.bloqueado ? "Desbloquear" : "Bloquear"}</button>
-                <button class="btn" onclick="toggleState(${u.id}, '${u.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO"}')">${u.estado === "ACTIVO" ? "Desactivar" : "Activar"}</button>
-                <button class="btn danger" onclick="resetPwd(${u.id})">Restablecer clave</button>
+            <td><div class="cell-chips" title="${esc(nombresRoles.join(", "))}">${roles}</div></td>
+            <td class="sticky-right">
+              <div class="ops">
+                <button class="btn btn-sm" onclick="editUser(${u.id})">Editar</button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleBlock(${u.id}, ${u.bloqueado ? "false" : "true"})">${u.bloqueado ? "Desbloquear" : "Bloquear"}</button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleState(${u.id}, '${u.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO"}')">${u.estado === "ACTIVO" ? "Desactivar" : "Activar"}</button>
+                <button class="btn btn-sm btn-ghost t-danger" onclick="resetPwd(${u.id})">Restablecer clave</button>
               </div>
             </td>
           </tr>
         `;
-      }).join("") || '<tr><td colspan="10" class="muted">No se encontraron usuarios.</td></tr>';
+      }).join("") || '<tr><td colspan="10" class="empty-row">No se encontraron usuarios.</td></tr>';
     }
 
     function renderAccess(rows) {
+      state.accesos = rows || [];
       const tb = $("access-body");
-      tb.innerHTML = rows.map((r) => `
+      tb.innerHTML = paginar("access", state.accesos, "access-pie").map((r) => `
         <tr>
           <td>${r.created_at || ""}</td>
-          <td>${r.evento || ""}</td>
+          <td>${r.evento ? `<span class="chip">${r.evento}</span>` : ""}</td>
           <td>${r.nombre_apellido || r.username_input || ""}</td>
-          <td>${r.detalle || ""}</td>
-          <td>${r.ip || ""}</td>
+          <td title="${esc(r.detalle || "")}">${r.detalle || ""}</td>
+          <td class="mono">${r.ip || ""}</td>
         </tr>
-      `).join("");
+      `).join("") || '<tr><td colspan="5" class="empty-row">Sin registros.</td></tr>';
     }
 
     async function loadAll() {
       const me = await api("/me", { method: "GET", headers: {} });
-      if (!me.autenticado || me.tipo_usuario !== "ADMINISTRADOR") {
+      if (!me.autenticado || !(Array.isArray(me.modulos) && me.modulos.includes("administracion"))) {
         window.location.href = "/";
         return;
       }
       state.me = me;
+      const pestanas = await api("/admin/operador/pestanas", { method: "GET", headers: {} });
+      $("op-tabs-box").innerHTML = OP_TABS.map(([key, label]) => `<label><input type="checkbox" data-op-tab="${key}" ${pestanas[key] ? "checked" : ""}> ${label}</label>`).join("");
       state.empleados = await api("/personal", { method: "GET", headers: {} });
       renderEmpleados();
       state.roles = await api("/admin/roles_funcionales", { method: "GET", headers: {} });
@@ -1151,6 +1236,22 @@
       fillForm(null);
       await loadOperadores();
     }
+
+    $("btn-guardar-op-tabs").addEventListener("click", async () => {
+      const msg = $("op-tabs-msg");
+      msg.textContent = "Guardando…";
+      try {
+        const visibles = Object.fromEntries(OP_TABS.map(([key]) => [key, Boolean(document.querySelector(`[data-op-tab="${key}"]`)?.checked)]));
+        if (!Object.entries(visibles).some(([key, visible]) => visible && key !== "mto")) {
+          msg.textContent = "Dejá visible al menos una pestaña general.";
+          return;
+        }
+        await api("/admin/operador/pestanas", { method: "PUT", body: JSON.stringify({ visibles }) });
+        msg.textContent = "Configuración guardada.";
+      } catch (err) {
+        msg.textContent = `No se pudo guardar: ${err.message || err}`;
+      }
+    });
 
     // --- PIN de operadores (app móvil /operador) ---
     function setOpMsg(text, ok = false) {
@@ -1184,29 +1285,30 @@
       const conPin = lista.filter((o) => o.tiene_pin).length;
       const bloqueados = lista.filter((o) => o.bloqueado).length;
       $("op-resumen").textContent = `${lista.length} empleados · ${conPin} con PIN · ${bloqueados} bloqueados`;
-      $("op-body").innerHTML = filas.map((o) => {
+      const pagina = paginar("op", filas, "op-pie", { firma: `${filtro}|${buscado}` });
+      $("op-body").innerHTML = pagina.map((o) => {
         const leg = esc(o.legajo);
-        let estado = o.tiene_pin ? '<span class="badge ok-b">Con PIN</span>' : '<span class="badge">Sin PIN</span>';
-        if (o.bloqueado) estado += `<span class="badge err-b">${o.bloqueo_permanente ? "Bloqueado" : "Bloqueo temporal"}</span>`;
-        else if (o.intentos_fallidos) estado += `<span class="badge">${o.intentos_fallidos} intento(s) fallido(s)</span>`;
-        if (o.activo !== "ACTIVO") estado += '<span class="badge">Empleado inactivo</span>';
+        let estado = o.tiene_pin ? '<span class="chip chip-ok">Con PIN</span>' : '<span class="chip chip-muted">Sin PIN</span>';
+        if (o.bloqueado) estado += `<span class="chip chip-bad">${o.bloqueo_permanente ? "Bloqueado" : "Bloqueo temporal"}</span>`;
+        else if (o.intentos_fallidos) estado += `<span class="chip chip-warn">${o.intentos_fallidos} intento(s) fallido(s)</span>`;
+        if (o.activo !== "ACTIVO") estado += '<span class="chip chip-muted">Empleado inactivo</span>';
         const acciones = [];
-        if (o.tiene_pin) acciones.push(`<button class="btn danger" data-op-accion="reset" data-legajo="${leg}">Resetear PIN</button>`);
-        if (o.bloqueado || o.intentos_fallidos) acciones.push(`<button class="btn warn" data-op-accion="desbloquear" data-legajo="${leg}">Desbloquear</button>`);
+        if (o.tiene_pin) acciones.push(`<button class="btn btn-sm btn-ghost t-danger" data-op-accion="reset" data-legajo="${leg}">Resetear PIN</button>`);
+        if (o.bloqueado || o.intentos_fallidos) acciones.push(`<button class="btn btn-sm" data-op-accion="desbloquear" data-legajo="${leg}">Desbloquear</button>`);
         return `
           <tr>
-            <td>${leg}</td>
-            <td><strong>${esc(o.nombre)}</strong></td>
-            <td>${estado}</td>
+            <td class="mono">${leg}</td>
+            <td title="${esc(o.nombre)}">${esc(o.nombre)}</td>
+            <td><div class="cell-chips" title="${esc(estado.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())}">${estado}</div></td>
             <td>${o.tiene_pin
-              ? `<span class="muted pin-val" id="op-pin-${leg}">••••</span> <button class="btn" data-op-accion="ver" data-legajo="${leg}">Ver</button>`
+              ? `<div class="cell-chips"><span class="muted pin-val mono" id="op-pin-${leg}">••••</span> <button class="btn btn-sm btn-ghost" data-op-accion="ver" data-legajo="${leg}">Ver</button></div>`
               : '<span class="muted">-</span>'}</td>
             <td>${esc(o.pin_creado_en || "-")}</td>
             <td>${esc(o.ultimo_acceso || "-")}</td>
-            <td>${o.partes_app || 0}</td>
-            <td><div style="display:flex; gap:6px; flex-wrap:wrap;">${acciones.join("") || '<span class="muted">-</span>'}</div></td>
+            <td class="num">${o.partes_app || 0}</td>
+            <td class="sticky-right"><div class="ops">${acciones.join("") || '<span class="muted">-</span>'}</div></td>
           </tr>`;
-      }).join("") || '<tr><td colspan="8" class="muted">Sin resultados.</td></tr>';
+      }).join("") || '<tr><td colspan="8" class="empty-row">Sin resultados.</td></tr>';
     }
 
     $("op-body").addEventListener("click", async (e) => {
@@ -1255,7 +1357,7 @@
       const u = state.users.find((x) => x.id === id);
       if (!u) return;
       fillForm(u);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      abrirDrawer();
     }
 
     async function toggleState(id, estado) {
@@ -1269,12 +1371,12 @@
     }
 
     async function resetPwd(id) {
-      const password = prompt("Nueva contrasena (vacio para generar temporal):", "");
+      const password = prompt("Nueva contraseña (vacío para generar temporal):", "");
       const data = await api(`/admin/usuarios/${id}/reset_password`, {
         method: "POST",
         body: JSON.stringify({ password: password || "", generar_automatica: !password }),
       });
-      alert(`Contrasena restablecida: ${data.password || "(sin retorno)"}`);
+      alert(`Contraseña restablecida: ${data.password || "(sin retorno)"}`);
       await loadAll();
     }
 
@@ -1316,7 +1418,8 @@
       }
     };
 
-    $("btn-cancel").addEventListener("click", () => fillForm(null));
+    $("btn-cancel").addEventListener("click", () => { fillForm(null); cerrarDrawer(); });
+    $("btn-nuevo-usuario").addEventListener("click", () => { fillForm(null); abrirDrawer(); });
     $("f_nombre").addEventListener("input", completarLegajoDesdeEmpleado);
     $("f_nombre").addEventListener("change", completarLegajoDesdeEmpleado);
     $("users-search").addEventListener("input", renderUsers);
@@ -1399,6 +1502,7 @@
           setMsg(r.password_temporal ? `Usuario creado. Clave temporal: ${r.password_temporal}` : "Usuario creado", true);
         }
         await loadAll();
+        cerrarDrawer();
       } catch (err) {
         setMsg(String(err.message || err));
       }
@@ -1407,6 +1511,5 @@
     renderModulos();
     loadAll().catch(() => { window.location.href = "/"; });
   </script>
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

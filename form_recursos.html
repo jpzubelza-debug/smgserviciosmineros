@@ -1,441 +1,117 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Asignar Recursos</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 20px;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    .bg-photo {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-      opacity: 0.66;
-      pointer-events: none;
-    }
-
-    .bg-blur {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-        radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-    }
-
-    .card {
-      position: relative;
-      z-index: 2;
-      width: min(96vw, 1200px);
-      max-width: 1200px;
-      padding: 28px;
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.66);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      transition: none;
-    }
-
-    .card:hover {
-      transform: none;
-    }
-
-    .logo-corner {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 3;
-      padding: 0;
-    }
-
-    .logo-corner img {
-      display: block;
-      width: 195px;
-      max-width: 38vw;
-      height: auto;
-    }
-
-    .logo-box img { filter: none; }
-
-    .logo-text {
-      color: #ffffff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-    }
-
-    h2 {
-      text-align: center;
-      color: #ffffff;
-      margin-bottom: 20px;
-    }
-
-    form {
-      width: 100%;
-    }
-
-    .subtitle {
-      color: #cde7f2;
-      text-align: center;
-      font-size: 13px;
-      margin: -8px 0 18px;
-    }
-
-    label {
-      color: #ddd;
-      font-size: 13px;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0 15px 0;
-      border-radius: 8px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(2, 6, 23, 0.55);
-      color: white;
-      outline: none;
-      font-size: 14px;
-      transition: border-color 0.2s ease;
-    }
-
-    select option,
-    select optgroup {
-      background: #0f2237;
-      color: #eef4ff;
-    }
-
-    select option:checked {
-      background: #2f6fca;
-      color: #ffffff;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: rgba(147, 197, 253, 0.85);
-      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
-    }
-
-    textarea {
-      min-height: 70px;
-      resize: vertical;
-    }
-
-    input::placeholder,
-    textarea::placeholder {
-      color: #bbb;
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 14px;
-    }
-
-    .section-title {
-      color: #dff5ff;
-      font-size: 13px;
-      margin: 8px 0 4px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-    }
-
-    .companero-grid {
-      display: grid;
-      grid-template-columns: minmax(260px, 2.5fr) minmax(160px, 1fr);
-      gap: 14px;
-      align-items: end;
-    }
-
-    .acomp-actions {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .btn-small {
-      width: auto;
-      padding: 8px 12px;
-      margin: 0;
-      font-size: 13px;
-    }
-
-    .btn-remove {
-      background: linear-gradient(90deg, #ef4444, #dc2626);
-    }
-
-    .btn-remove:hover {
-      box-shadow: 0 0 12px #ef4444;
-    }
-
-    .acomp-row {
-      display: grid;
-      grid-template-columns: minmax(260px, 2.5fr) minmax(160px, 1fr) auto;
-      gap: 14px;
-      align-items: end;
-      margin-bottom: 10px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    button:hover {
-      transform: none;
-      box-shadow: none;
-    }
-
-    #mensaje {
-      color: #dff5ff;
-      text-align: center;
-      margin-top: 10px;
-    }
-
-    @media (max-width: 768px) {
-      .card {
-        width: 100%;
-        margin: 8px;
-        padding: 20px;
-      }
-
-      .row {
-        grid-template-columns: 1fr;
-        gap: 0;
-      }
-
-      .companero-grid {
-        grid-template-columns: 1fr;
-        gap: 0;
-      }
-
-      .acomp-actions {
-        flex-direction: column;
-      }
-
-      .acomp-row {
-        grid-template-columns: 1fr;
-        gap: 0;
-      }
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asignar recursos · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
 </head>
 
-<body>
+<body data-titulo="Asignar recursos">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
+    <main class="content" id="contenido">
+      <div class="page-head">
+        <div>
+          <h1>Asignar recursos</h1>
+          <p class="page-sub">Completá todos los ítems para asignar recursos al viaje aprobado</p>
+        </div>
+      </div>
 
-<div class="logo-corner logo-box">
-  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
-</div>
-
-<div class="card">
-
-<h2>Asignar Recursos</h2>
-<p class="subtitle">Complete todos los items para asignar recursos al viaje aprobado</p>
-
-<form id="form">
-  <label>Viaje aprobado</label>
-  <select id="id_viaje" required onchange="completarDatosViaje()"></select>
-
-  <div class="row">
-    <div>
-      <label>Fecha</label>
-      <input type="date" id="fecha" required readonly>
-    </div>
-
-    <div>
-      <label>Centro de Costo</label>
-      <select id="centro_costo" required>
-        <option value="">Seleccione el Centro de Costo</option>
-      </select>
-    </div>
-  </div>
-
-  <label>Datos de quien solicita</label>
-  <input type="text" id="datos_solicitante" placeholder="Solicitante" readonly>
-
-  <label>Area Solicitante</label>
-  <input type="text" id="area_solicitante" placeholder="Area" readonly>
-
-  <div class="row">
-    <div>
-      <label>Partida</label>
-      <input type="text" id="partida" placeholder="Origen" readonly>
-    </div>
-
-    <div>
-      <label>Destino</label>
-      <input type="text" id="destino" placeholder="Destino" readonly>
-    </div>
-  </div>
-
-  <label>Motivo del Viaje</label>
-  <input type="text" id="motivo_viaje" placeholder="Motivo" readonly>
-
-  <div class="row">
-    <div>
-      <label>Fecha de Salida</label>
-      <input type="date" id="fecha_salida_viaje">
-    </div>
-
-    <div>
-      <label>Fecha de Regreso</label>
-      <input type="date" id="fecha_regreso_viaje">
-    </div>
-  </div>
-
-  <div class="row">
-    <div>
-      <label>Hora estimada de Ingreso a Base</label>
-      <input type="time" id="hora_ingreso_base">
-    </div>
-
-    <div>
-      <label>Hora estimada de Salida</label>
-      <input type="time" id="hora_salida">
-    </div>
-
-    <div>
-      <label>Hora estimada de Regreso</label>
-      <input type="time" id="hora_regreso">
-    </div>
-  </div>
-
-  <label>Duracion estimada en jornadas</label>
-  <input type="text" id="duracion_jornadas" placeholder="0" readonly>
-
-  <div class="section-title">Itinerario / Rutas</div>
-  <label>Itinerario</label>
-  <textarea id="itinerario" placeholder="Itinerario del viaje"></textarea>
-
-  <label>Rutas</label>
-  <textarea id="rutas" placeholder="Rutas previstas"></textarea>
-
-  <div class="companero-grid">
-    <div>
-      <label>Chofer</label>
-      <input type="text" id="chofer" list="lista-choferes" placeholder="Seleccionar o escribir chofer" required>
+      <form id="form" class="card form-wide form" novalidate autocomplete="off">
+        <div class="card-head"><h2 class="card-title">Orden de salida</h2></div>
+        <div class="card-body">
+          <fieldset>
+            <legend>Viaje</legend>
+            <div class="form-grid">
+              <label class="field span-all">Viaje aprobado<select id="id_viaje" class="select" required onchange="completarDatosViaje()"></select></label>
+              <label class="field">Fecha<input type="date" id="fecha" class="input" required readonly></label>
+              <label class="field">Centro de costo<select id="centro_costo" class="select" required><option value="">Seleccione el centro de costo</option></select></label>
+              <label class="field">Solicitante<input type="text" id="datos_solicitante" class="input" readonly></label>
+              <label class="field">Área solicitante<input type="text" id="area_solicitante" class="input" readonly></label>
+              <label class="field">Partida<input type="text" id="partida" class="input" readonly></label>
+              <label class="field">Destino<input type="text" id="destino" class="input" readonly></label>
+              <label class="field span-all">Motivo del viaje<input type="text" id="motivo_viaje" class="input" readonly></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Fechas y horarios</legend>
+            <div class="form-grid">
+              <label class="field">Fecha de salida<input type="date" id="fecha_salida_viaje" class="input"></label>
+              <label class="field">Fecha de regreso<input type="date" id="fecha_regreso_viaje" class="input"></label>
+              <label class="field">Duración estimada (jornadas)<input type="text" id="duracion_jornadas" class="input num" placeholder="0" readonly></label>
+              <label class="field">Ingreso a base (estimado)<input type="time" id="hora_ingreso_base" class="input"></label>
+              <label class="field">Salida (estimada)<input type="time" id="hora_salida" class="input"></label>
+              <label class="field">Regreso (estimado)<input type="time" id="hora_regreso" class="input"></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Itinerario y rutas</legend>
+            <div class="form-grid">
+              <label class="field">Itinerario<textarea id="itinerario" class="textarea" rows="4" placeholder="Itinerario del viaje"></textarea></label>
+              <label class="field">Rutas<textarea id="rutas" class="textarea" rows="4" placeholder="Rutas previstas"></textarea></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Chofer y vehículo</legend>
+            <div class="form-grid">
+              <label class="field">Chofer<input type="text" id="chofer" class="input" list="lista-choferes" placeholder="Seleccionar o escribir chofer" required></label>
+              <label class="field">Viático del chofer ($)<input type="number" id="viatico_chofer" class="input num" placeholder="0" min="0" step="0.01"></label>
+              <label class="field span-all">Vehículo<input type="text" id="vehiculo" class="input" list="lista-vehiculos" placeholder="Seleccionar o escribir vehículo" required></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Acompañantes y viáticos</legend>
+            <div class="card table-scroll">
+              <table class="tbl tbl-edit">
+                <colgroup><col><col style="width:180px"><col style="width:96px"></colgroup>
+                <thead><tr><th>Acompañante</th><th class="right">Viático ($)</th><th><span class="sr-only">Quitar</span></th></tr></thead>
+                <tbody id="acompanantes-container"></tbody>
+              </table>
+            </div>
+            <div class="cell-flex" style="margin-top:var(--s3)">
+              <button class="btn btn-sm" type="button" id="btn-add-acomp"><svg class="i i-sm"><use href="#i-plus"/></svg>Agregar acompañante</button>
+            </div>
+            <div class="form-grid" style="margin-top:var(--s3)">
+              <label class="field">Total viáticos ($)<input type="number" id="viaticos" class="input num" min="0" step="0.01" readonly></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Recursos económicos</legend>
+            <div class="form-grid">
+              <label class="field">Viáticos ($)<input type="number" id="viaticos_monto" class="input num" min="0" step="0.01" readonly></label>
+              <label class="field">Medio de pago<select id="medio_pago" class="select"><option value="Caja">Caja</option><option value="Transferencia">Transferencia</option></select></label>
+              <label class="field">Alojamiento<select id="alojamiento" class="select"><option value="NO">No</option><option value="SI">Sí</option></select></label>
+              <label class="field">Otros gastos ($)<input type="number" id="otros_gastos" class="input num" placeholder="0" min="0" step="0.01"></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Comprobación de operaciones y logística</legend>
+            <div class="form-grid">
+              <label class="field">Taller<select id="comp_taller" class="select"><option value="SI">Sí</option><option value="NO" selected>No</option><option value="NO VERIFICADO">No verificado</option></select></label>
+              <label class="field">RRHH<select id="comp_rrhh" class="select"><option value="SI" selected>Sí</option><option value="NO">No</option><option value="NO VERIFICADO">No verificado</option></select></label>
+              <label class="field">Administración<select id="comp_administracion" class="select"><option value="SI">Sí</option><option value="NO" selected>No</option><option value="NO VERIFICADO">No verificado</option></select></label>
+              <label class="field">Logística y operaciones<select id="comp_logistica_operaciones" class="select"><option value="SI">Sí</option><option value="NO">No</option><option value="NO VERIFICADO" selected>No verificado</option></select></label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="card-foot">
+          <span id="mensaje" class="help" role="status"></span>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-primary" id="btn-asignar">Asignar recursos</button>
+        </div>
+      </form>
       <datalist id="lista-choferes"></datalist>
-    </div>
-    <div>
-      <label>Viatico Chofer</label>
-      <input type="number" id="viatico_chofer" placeholder="0" min="0" step="0.01">
-    </div>
+      <datalist id="lista-vehiculos"></datalist>
+      <datalist id="lista-acompanantes"></datalist>
+    </main>
   </div>
-
-  <label>Vehiculo</label>
-  <input type="text" id="vehiculo" list="lista-vehiculos" placeholder="Seleccionar o escribir vehiculo" required>
-  <datalist id="lista-vehiculos"></datalist>
-
-  <div class="section-title">Acompanantes y viaticos</div>
-  <div class="acomp-actions">
-    <button class="btn-small" type="button" id="btn-add-acomp">+ Agregar acompañante</button>
-  </div>
-  <div id="acompanantes-container"></div>
-
-  <label>Total Viaticos</label>
-  <input type="number" id="viaticos" placeholder="Viáticos" min="0" step="0.01" readonly>
-
-  <datalist id="lista-acompanantes"></datalist>
-
-  <div class="section-title">RECURSOS ECONOMICOS</div>
-
-  <div class="row">
-    <div>
-      <label>Viaticos ($)</label>
-      <input type="number" id="viaticos_monto" min="0" step="0.01" readonly>
-    </div>
-
-    <div>
-      <label>Medio (Caja/Transferencia)</label>
-      <select id="medio_pago">
-        <option value="Caja">Caja</option>
-        <option value="Transferencia">Transferencia</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="row">
-    <div>
-      <label>Alojamiento</label>
-      <select id="alojamiento">
-        <option value="NO">NO</option>
-        <option value="SI">SI</option>
-      </select>
-    </div>
-
-    <div>
-      <label>Otros Gastos</label>
-      <input type="number" id="otros_gastos" placeholder="0" min="0" step="0.01">
-    </div>
-  </div>
-
-  <div class="section-title">COMPROBACION DE OPERACIONES Y LOGISTICA</div>
-  <div class="row">
-    <div>
-      <label>Taller</label>
-      <select id="comp_taller">
-        <option value="SI">SI</option>
-        <option value="NO" selected>NO</option>
-        <option value="NO VERIFICADO">NO VERIFICADO</option>
-      </select>
-    </div>
-    <div>
-      <label>RRHH</label>
-      <select id="comp_rrhh">
-        <option value="SI" selected>SI</option>
-        <option value="NO">NO</option>
-        <option value="NO VERIFICADO">NO VERIFICADO</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="row">
-    <div>
-      <label>Administracion</label>
-      <select id="comp_administracion">
-        <option value="SI">SI</option>
-        <option value="NO" selected>NO</option>
-        <option value="NO VERIFICADO">NO VERIFICADO</option>
-      </select>
-    </div>
-    <div>
-      <label>Logistica y Operaciones</label>
-      <select id="comp_logistica_operaciones">
-        <option value="SI">SI</option>
-        <option value="NO">NO</option>
-        <option value="NO VERIFICADO" selected>NO VERIFICADO</option>
-      </select>
-    </div>
-  </div>
-
-  <button type="button" id="btn-asignar">Asignar</button>
-  <p id="mensaje"></p>
-</form>
+</div>
 
 <script>
 let viajesAprobados = [];
@@ -514,8 +190,8 @@ async function cargarViajes() {
   });
 
   if (viajesAprobados.length === 0) {
-    document.getElementById("mensaje").style.color = "#dff5ff";
-    document.getElementById("mensaje").textContent = "No hay viajes aprobados disponibles para generar Orden de Salida.";
+    document.getElementById("mensaje").className = "help";
+    document.getElementById("mensaje").textContent = "No hay viajes aprobados disponibles para generar Orden de salida.";
   } else {
     document.getElementById("mensaje").textContent = "";
   }
@@ -568,25 +244,17 @@ function crearFilaAcompanante(nombre = "", viatico = "") {
 
   if (cantidadActual >= MAX_ACOMPANANTES) {
     const mensaje = document.getElementById("mensaje");
-    mensaje.style.color = "#ffb3b3";
+    mensaje.className = "field-error";
     mensaje.textContent = `Máximo ${MAX_ACOMPANANTES} acompañantes.`;
     return;
   }
 
-  const fila = document.createElement("div");
+  const fila = document.createElement("tr");
   fila.className = "acomp-row";
   fila.innerHTML = `
-    <div>
-      <label>Acompanante</label>
-      <input type="text" class="input-acomp" list="lista-acompanantes" placeholder="Nombre del acompañante" value="${nombre}">
-    </div>
-    <div>
-      <label>Viatico</label>
-      <input type="number" class="input-viatico-acomp" placeholder="0" min="0" step="0.01" value="${viatico}">
-    </div>
-    <div>
-      <button type="button" class="btn-small btn-remove">Quitar</button>
-    </div>
+    <td><input type="text" class="input input-acomp" list="lista-acompanantes" placeholder="Nombre del acompañante" aria-label="Acompañante" value="${SMG.escapeHtml(nombre)}"></td>
+    <td><input type="number" class="input num input-viatico-acomp" placeholder="0" min="0" step="0.01" aria-label="Viático" value="${SMG.escapeHtml(viatico)}"></td>
+    <td class="center"><button type="button" class="btn btn-ghost btn-sm btn-remove">Quitar</button></td>
   `;
 
   fila.querySelector(".btn-remove").addEventListener("click", () => {
@@ -708,7 +376,7 @@ async function procesarAsignacionRecursos() {
   try {
     if (viajesAprobados.length === 0) {
       const mensaje = document.getElementById("mensaje");
-      mensaje.style.color = "#ffb3b3";
+      mensaje.className = "field-error";
       mensaje.textContent = "No hay viajes disponibles para asignar.";
       return;
     }
@@ -777,12 +445,12 @@ async function procesarAsignacionRecursos() {
     const result = await res.json();
 
     if (result.error) {
-      mensaje.style.color = "#ffb3b3";
+      mensaje.className = "field-error";
       mensaje.textContent = result.error;
       return;
     }
 
-    mensaje.style.color = "#dff5ff";
+    mensaje.className = "help";
     mensaje.textContent = `Recursos asignados correctamente. Orden generada: ${result.nro_orden || "SIN NUMERO"}`;
     generarPDF(data, result.nro_orden);
     document.getElementById("form").reset();
@@ -791,7 +459,7 @@ async function procesarAsignacionRecursos() {
   } catch (error) {
     console.error("Error al asignar recursos:", error);
     const mensaje = document.getElementById("mensaje");
-    mensaje.style.color = "#ffb3b3";
+    mensaje.className = "field-error";
     mensaje.textContent = "No se pudo asignar recursos.";
   }
 }
@@ -831,9 +499,5 @@ document.getElementById("btn-add-acomp").addEventListener("click", () => crearFi
 
 resetAcompanantes();
 </script>
-
-</div>
-
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

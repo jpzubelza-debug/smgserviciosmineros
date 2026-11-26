@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Menu Principal - Dashboard Operaciones</title>
+  <title>Menú principal · SMG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg-1: #0f172a;
@@ -31,7 +31,8 @@
     body {
       margin: 0;
       min-height: 100%;
-      font-family: Arial, sans-serif;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
       color: var(--text);
       background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
       position: relative;
@@ -106,9 +107,8 @@
       margin: 0;
       font-size: clamp(1.6rem, 3.4vw, 2.4rem);
       line-height: 1.1;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: 0.4px;
-      text-transform: uppercase;
     }
 
     .title-wrap p {
@@ -254,7 +254,7 @@
     }
 
     .menu-btn:not(.logistica)::after {
-      content: "Proximamente";
+      content: "Próximamente";
       position: absolute;
       top: 10px;
       right: 12px;
@@ -326,13 +326,13 @@
       <div class="brand-wrap">
         <img class="brand-logo" src="/Imagenes/09-smg.png" alt="Logo SMG" />
         <div class="title-wrap">
-          <h1>Menu Principal</h1>
-          <p>Centro de acceso para los modulos operativos.</p>
+          <h1>Menú principal</h1>
+          <p>Centro de acceso para los módulos operativos.</p>
         </div>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <div class="user-chip" id="user-chip">Usuario</div>
-        <div class="live-chip">Sistema Operativo Activo</div>
+        <div class="live-chip">Sistema operativo activo</div>
         <a class="logout-btn" href="/logout">Cerrar sesión</a>
       </div>
     </header>
@@ -340,21 +340,21 @@
     <section class="menu-grid" id="menu-grid">
     </section>
 
-    <p class="footnote" id="footnote">Se muestran solo los modulos asignados al usuario autenticado.</p>
+    <p class="footnote" id="footnote">Se muestran solo los módulos asignados al usuario autenticado.</p>
   </main>
   <script>
     const MODULOS = [
       {
         key: "logistica",
-        titulo: "Logistica",
-        descripcion: "Acceso al dashboard completo de viajes, personal, vehiculos y ordenes.",
+        titulo: "Logística",
+        descripcion: "Acceso al dashboard completo de viajes, personal, vehículos y órdenes.",
         href: "/dashboard",
         habilitado: true,
       },
       {
         key: "almacen",
-        titulo: "Almacen",
-        descripcion: "Gestion de stock, ingresos, egresos y trazabilidad de materiales.",
+        titulo: "Almacén",
+        descripcion: "Gestión de stock, ingresos, egresos y trazabilidad de materiales.",
         href: "/almacen",
         habilitado: true,
       },
@@ -367,7 +367,7 @@
       },
       {
         key: "facturacion",
-        titulo: "Facturación y Cobranzas",
+        titulo: "Facturación y cobranzas",
         descripcion: "Pedidos de facturación, comprobantes de Tango, cobranzas, cuenta corriente y saldos por moneda.",
         href: "/facturacion",
         habilitado: true,
@@ -381,35 +381,35 @@
       },
       {
         key: "rrhh",
-        titulo: "Recursos Humanos",
-        descripcion: "Modulo de gestion de personal y administracion de habilitaciones.",
+        titulo: "Recursos humanos",
+        descripcion: "Módulo de gestión de personal y administración de habilitaciones.",
         href: "",
         habilitado: false,
       },
       {
         key: "mantenimiento",
         titulo: "Mantenimiento",
-        descripcion: "Control de estado tecnico, checklists y planificacion de mantenimientos.",
+        descripcion: "Control de estado técnico, check lists y planificación de mantenimientos.",
         href: "/mantenimiento",
         habilitado: true,
       },
       {
         key: "dashboard_ejecutivo",
-        titulo: "Dashboard Ejecutivo",
-        descripcion: "Indicadores estrategicos y seguimiento de performance.",
+        titulo: "Dashboard ejecutivo",
+        descripcion: "Indicadores estratégicos y seguimiento de desempeño.",
         href: "",
         habilitado: false,
       },
       {
         key: "administracion",
-        titulo: "Administracion",
-        descripcion: "Gestion de usuarios, roles, permisos y trazabilidad de accesos.",
+        titulo: "Administración",
+        descripcion: "Gestión de usuarios, roles, permisos y trazabilidad de accesos.",
         href: "/administracion",
         habilitado: true,
       },
       {
         key: "base_datos",
-        titulo: "Base de Datos",
+        titulo: "Base de datos",
         descripcion: "Consulta completa de las tablas del sistema en formato de hojas y celdas.",
         href: "/base_datos",
         habilitado: true,
@@ -478,9 +478,9 @@
         });
 
         if (visibles.length === 0) {
-          foot.textContent = "No hay modulos asignados para este usuario. Contacte al Administrador.";
+          foot.textContent = "No hay módulos asignados para este usuario. Contacte al administrador.";
         } else {
-          foot.textContent = "Se muestran solo los modulos asignados al usuario autenticado.";
+          foot.textContent = "Se muestran solo los módulos asignados al usuario autenticado.";
         }
       } catch (err) {
         window.location.href = "/login";

@@ -1,589 +1,662 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestion Operativa</title>
-<style>
-  :root {
-    --bg-1: #0f172a;
-    --bg-2: #1e293b;
-    --bg-3: #0b1120;
-    --panel: rgba(15, 23, 42, 0.66);
-    --panel-soft: rgba(15, 23, 42, 0.45);
-    --line: rgba(148, 163, 184, 0.35);
-    --text: #e2e8f0;
-    --muted: #93c5fd;
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    min-height: 100vh;
-    font-family: Arial, sans-serif;
-    color: var(--text);
-    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
-  }
-
-  .bg-photo {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center/cover no-repeat;
-    opacity: 0.66;
-    pointer-events: none;
-  }
-
-  .bg-blur {
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background:
-      radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-      radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-  }
-
-  .app-shell {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: 250px 1fr;
-    gap: 14px;
-    min-height: 100vh;
-    padding: 14px;
-  }
-
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-  }
-
-  .sidebar {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .brand {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 120px;
-    background: var(--panel-soft);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-  }
-
-  .brand img {
-    width: 78%;
-    max-width: 170px;
-    object-fit: contain;
-  }
-
-  .menu {
-    display: grid;
-    gap: 8px;
-  }
-
-  .menu button {
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    background: rgba(15, 23, 42, 0.55);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .menu button.active {
-    background: linear-gradient(135deg, #1d4ed8, #0284c7);
-    border-color: rgba(147, 197, 253, 0.8);
-  }
-
-  .main {
-    display: grid;
-    gap: 12px;
-    min-width: 0;
-  }
-
-  .top { padding: 14px; }
-  .top h1 { margin: 0; font-size: 24px; }
-  .top p { margin: 6px 0 0; color: #bfdbfe; font-size: 13px; }
-
-  .filters {
-    padding: 12px;
-    display: grid;
-    grid-template-columns: repeat(6, minmax(120px, 1fr));
-    gap: 8px;
-    align-items: end;
-  }
-
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .field label { font-size: 11px; text-transform: uppercase; color: #bfdbfe; font-weight: 700; letter-spacing: 0.05em; }
-
-  .filter-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  input, select, button {
-    border-radius: 8px;
-    border: 1px solid rgba(148, 163, 184, 0.45);
-    background: rgba(2, 6, 23, 0.55);
-    color: var(--text);
-    padding: 9px;
-  }
-
-  button { cursor: pointer; font-weight: 700; }
-  .btn-accent { background: linear-gradient(135deg, #1d4ed8, #0284c7); }
-
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
-    padding: 0;
-  }
-
-  .kpi-card { padding: 12px; }
-  .kpi-card small {
-    color: #bfdbfe;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 11px;
-  }
-  .kpi-card h3 { margin: 8px 0 0; font-size: 24px; }
-
-  .charts {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .chart-card {
-    padding: 12px;
-    min-height: 220px;
-  }
-
-  .chart-card h3 {
-    margin: 0 0 8px;
-    font-size: 16px;
-  }
-
-  .bars {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 160px;
-    overflow: auto;
-  }
-
-  .bar-row {
-    display: grid;
-    grid-template-columns: 130px 1fr 64px;
-    gap: 8px;
-    align-items: center;
-    font-size: 12px;
-  }
-
-  .bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #dbeafe; }
-  .bar-track { height: 10px; border-radius: 999px; background: rgba(148, 163, 184, 0.22); overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 999px; }
-  .bar-val { text-align: right; color: #bfdbfe; }
-
-  .table-card {
-    padding: 12px;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .table-wrap {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    overflow-y: auto;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    max-height: 360px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 1200px;
-  }
-
-  th, td {
-    padding: 8px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-    text-align: left;
-    font-size: 13px;
-  }
-
-  th {
-    position: sticky;
-    top: 0;
-    background: rgba(15, 23, 42, 0.95);
-    z-index: 2;
-    font-size: 12px;
-    color: #bfdbfe;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .right { text-align: right; }
-
-  @media (max-width: 1180px) {
-    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-
-  @media (max-width: 900px) {
-    .app-shell { grid-template-columns: 1fr; }
-    .sidebar { order: 2; }
-    .main { order: 1; }
-    .kpi-grid { grid-template-columns: 1fr; }
-    .charts { grid-template-columns: 1fr; }
-    .filters { grid-template-columns: 1fr; }
-    .top h1 { font-size: 20px; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión operativa · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
+  <style>
+    /* Solo de Gestión operativa: el resto (grillas, KPIs, tabla, filtros) viene de /ui/app.css */
+    #tabla-wrap { min-height: 0; }   /* la card se ajusta a las filas */
+  </style>
 </head>
-<body>
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="app-shell">
-  <aside class="sidebar card">
-    <div class="brand">
-      <img src="/Imagenes/09-smg.png" alt="Logo SMG">
-    </div>
-    <div class="menu">
-      <button type="button" onclick="ir('/dashboard')">Dashboard</button>
-      <button type="button" onclick="ir('/form')">Solicitud de Viaje</button>
-      <button type="button" onclick="ir('/recursos_form')">Asignar Recursos</button>
-      <button type="button" onclick="ir('/vehiculos_form')">Vehiculos</button>
-      <button type="button" onclick="ir('/personal_form')">Personal</button>
-      <button type="button" onclick="ir('/ordenes_view')">Ordenes de Salida</button>
-      <button class="active" type="button">Gestion Operativa</button>
-    </div>
-  </aside>
 
-  <main class="main">
-    <section class="top card">
-      <h1>Gestion Operativa</h1>
-      <p>Indicadores automaticos desde Ordenes de Salida y Cierre Logistico.</p>
-    </section>
+<body data-titulo="Gestión operativa">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-    <section class="filters card">
-      <div class="field">
-        <label for="f-desde">Desde</label>
-        <input id="f-desde" type="date">
+    <main class="content" id="contenido">
+      <!-- ============================== Encabezado ============================== -->
+      <div class="page-head">
+        <div>
+          <h1>Gestión operativa</h1>
+          <p class="page-sub">Indicadores desde Órdenes de salida y cierre logístico</p>
+        </div>
       </div>
-      <div class="field">
-        <label for="f-hasta">Hasta</label>
-        <input id="f-hasta" type="date">
-      </div>
-      <div class="field">
-        <label for="f-orden">N° de Orden</label>
-        <select id="f-orden">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-proyecto">Proyecto</label>
-        <select id="f-proyecto">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-centro">Centro de Costos</label>
-        <select id="f-centro">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-empleado">Empleado</label>
-        <select id="f-empleado">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="filter-actions">
-        <button class="btn-accent" type="button" onclick="buscarGestionOperativa()">Buscar</button>
-        <button type="button" onclick="limpiarFiltrosGestionOperativa()">Limpiar filtros</button>
-        <button type="button" onclick="descargarGestionOperativaPdf()">Descargar PDF</button>
-        <button type="button" onclick="descargarGestionOperativaExcel()">Exportar Excel</button>
-      </div>
-    </section>
 
-    <section class="kpi-grid">
-      <article class="kpi-card card"><small>Horas Hombre Mes</small><h3 id="kpi-hh">0</h3></article>
-      <article class="kpi-card card"><small>Horas Compensables Mes</small><h3 id="kpi-comp">0</h3></article>
-      <article class="kpi-card card"><small>Viajes Ejecutados</small><h3 id="kpi-viajes">0</h3></article>
-      <article class="kpi-card card"><small>Costo Operativo Mes</small><h3 id="kpi-costo">0</h3></article>
-      <article class="kpi-card card"><small>Jornadas (Filtro)</small><h3 id="kpi-jornadas">0</h3></article>
-    </section>
+      <!-- ============================== Filtros (consultan al servidor) ============================== -->
+      <section class="card" aria-label="Filtros">
+        <form class="filter-bar" id="form-filtros" novalidate autocomplete="off">
+          <label class="field">Desde<input id="f-desde" class="input" type="date"></label>
+          <label class="field">Hasta<input id="f-hasta" class="input" type="date"></label>
+          <label class="field">N.º de orden<select id="f-orden" class="select"><option value="">Todas</option></select></label>
+          <label class="field">Proyecto<select id="f-proyecto" class="select"><option value="">Todos</option></select></label>
+          <label class="field">Centro de costos<select id="f-centro" class="select"><option value="">Todos</option></select></label>
+          <label class="field">Empleado<select id="f-empleado" class="select"><option value="">Todos</option></select></label>
+          <div class="filter-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-limpiar-periodo">Limpiar</button>
+          </div>
+        </form>
+      </section>
 
-    <section class="charts">
-      <article class="chart-card card"><h3>Horas por Proyecto</h3><div id="chart-horas-proyecto" class="bars"></div></article>
-      <article class="chart-card card"><h3>Horas Compensables por Mes</h3><div id="chart-comp-mes" class="bars"></div></article>
-      <article class="chart-card card"><h3>Viajes por Proyecto</h3><div id="chart-viajes-proyecto" class="bars"></div></article>
-      <article class="chart-card card"><h3>Costos por Proyecto</h3><div id="chart-costos-proyecto" class="bars"></div></article>
-    </section>
+      <!-- ============================== KPIs ============================== -->
+      <section class="kpis" aria-label="Indicadores">
+        <article class="card kpi"><span class="kpi-label">Horas hombre</span><span id="kpi-hh" class="kpi-value">—</span><span class="kpi-sub" data-periodo>&nbsp;</span></article>
+        <article class="card kpi"><span class="kpi-label">Horas compensables</span><span id="kpi-comp" class="kpi-value">—</span><span class="kpi-sub" data-periodo>&nbsp;</span></article>
+        <article class="card kpi"><span class="kpi-label">Viajes ejecutados</span><span id="kpi-viajes" class="kpi-value">—</span><span class="kpi-sub">Órdenes cerradas · <span data-periodo-txt></span></span></article>
+        <article class="card kpi"><span class="kpi-label">Costo operativo</span><span id="kpi-costo" class="kpi-value">—</span><span class="kpi-sub" data-periodo>&nbsp;</span></article>
+        <article class="card kpi"><span class="kpi-label">Jornadas</span><span id="kpi-jornadas" class="kpi-value">—</span><span class="kpi-sub" data-periodo>&nbsp;</span></article>
+      </section>
 
-    <section class="table-card card">
-      <h3 style="margin-top:0;">Resumen Operativo</h3>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nro Orden</th>
-              <th>Inicio OS</th>
-              <th>Fin OS</th>
-              <th>Empleado</th>
-              <th>Rol</th>
-              <th>Proyecto</th>
-              <th>Centro de Costos</th>
-              <th>Origen</th>
-              <th>Destino</th>
-              <th class="right">Jornadas</th>
-              <th class="right">HH</th>
-              <th class="right">Compensables</th>
-              <th class="right">Viaticos</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-body"></tbody>
-        </table>
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-        <label for="f-limite">Lineas a visualizar</label>
-        <input id="f-limite" type="number" min="1" value="30" style="width:90px;" onchange="renderTabla(window._tablaGO)">
-        <label for="f-orden-por" style="margin-left:16px;">Ordenar por</label>
-        <select id="f-orden-por" onchange="renderTabla(window._tablaGO)">
-          <option value="nro_orden">Orden de Salida</option>
-          <option value="fecha_inicio_os">Inicio OS</option>
-          <option value="fecha_fin_os">Fin OS</option>
-        </select>
-        <select id="f-orden-dir" onchange="renderTabla(window._tablaGO)">
-          <option value="desc">Mayor a menor</option>
-          <option value="asc">Menor a mayor</option>
-        </select>
-        <span id="tabla-info"></span>
-      </div>
-    </section>
-  </main>
+      <!-- ============================== Gráficos ============================== -->
+      <section class="grid-cards grid-cards-4" id="go-charts" aria-label="Gráficos">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Horas por proyecto</h2><span class="help" id="help-horas-proyecto"></span></div>
+          <div class="card-body" id="chart-horas-proyecto"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Horas compensables por mes</h2><span class="help" id="help-comp-mes"></span></div>
+          <div class="card-body" id="chart-comp-mes"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Viajes por proyecto</h2><span class="help" id="help-viajes-proyecto"></span></div>
+          <div class="card-body" id="chart-viajes-proyecto"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Costos por proyecto</h2><span class="help" id="help-costos-proyecto"></span></div>
+          <div class="card-body" id="chart-costos-proyecto"></div>
+        </article>
+      </section>
+
+      <!-- ============================== Tabla ============================== -->
+      <section class="card" id="seccion-tabla" aria-labelledby="tabla-titulo">
+        <div class="card-head">
+          <h2 class="card-title" id="tabla-titulo">Resumen operativo</h2>
+          <span class="help" id="tabla-sub">&nbsp;</span>
+        </div>
+        <div class="toolbar">
+          <div class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="buscar-tabla" class="input" type="search" placeholder="Buscar OS, empleado o destino" aria-label="Buscar por N.º de OS, empleado o destino" autocomplete="off"></div>
+          <select class="chip-select" id="c-rol" data-chip="rol" aria-label="Rol"></select>
+          <select class="chip-select" id="c-proyecto" data-chip="proyecto" aria-label="Proyecto"></select>
+          <select class="chip-select" id="c-destino" data-chip="destino" aria-label="Destino"></select>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-limpiar-tabla" hidden>Limpiar</button>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="Agrupar" id="vistas">
+            <button type="button" data-vista="orden">Por orden</button>
+            <button type="button" data-vista="empleado">Por empleado</button>
+            <button type="button" data-vista="proyecto">Por proyecto</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-icon" id="btn-columnas" aria-haspopup="dialog" aria-label="Columnas visibles" title="Columnas visibles"><svg class="i i-sm"><use href="#i-columns"/></svg></button>
+          <button type="button" class="btn btn-sm" id="btn-exportar" aria-haspopup="menu" title="Exporta con los filtros de período"><svg class="i i-sm"><use href="#i-download"/></svg>Exportar ▾</button>
+        </div>
+        <div class="table-wrap" id="tabla-wrap">
+          <table id="lista" class="tbl">
+            <colgroup id="lista-cols"></colgroup>
+            <thead id="lista-head"></thead>
+            <tbody id="lista-body"></tbody>
+            <tfoot id="lista-foot"></tfoot>
+          </table>
+        </div>
+        <div class="tfoot">
+          <span id="tabla-rango" class="num">&nbsp;</span>
+          <div class="pager">
+            <label for="page-size" class="muted">Filas</label>
+            <select id="page-size" class="select"><option>25</option><option>50</option><option>100</option></select>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-prev" aria-label="Página anterior"><svg class="i i-sm"><use href="#i-left"/></svg></button>
+            <span id="pag-info" class="num"></span>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-next" aria-label="Página siguiente"><svg class="i i-sm"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 </div>
 
+<!-- ============================== Menús / popovers ============================== -->
+<div class="menu" id="menu-exportar" role="menu" hidden>
+  <div class="menu-head">Con los filtros de período</div>
+  <button type="button" class="menu-item" role="menuitem" data-exportar="pdf" data-cerrar-menu><svg class="i"><use href="#i-printer"/></svg>Descargar PDF</button>
+  <button type="button" class="menu-item" role="menuitem" data-exportar="excel" data-cerrar-menu><svg class="i"><use href="#i-download"/></svg>Exportar Excel</button>
+</div>
+<div class="menu pop" id="pop-columnas" role="dialog" aria-label="Columnas visibles" hidden>
+  <div class="pop-grid" id="pop-columnas-grid" style="gap:var(--s2)"></div>
+  <div class="pop-foot"><button type="button" class="btn btn-ghost btn-sm" id="pop-columnas-todas">Mostrar todas</button><button type="button" class="btn btn-sm" data-cerrar-menu>Listo</button></div>
+</div>
+
+<!-- ============================== Drawer (detalle de la orden) ============================== -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-head">
+    <div><h2 id="drawer-title">Orden</h2><p id="drawer-sub"></p></div>
+    <button type="button" class="btn btn-ghost btn-icon" data-cerrar-drawer aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-foot">
+    <button type="button" class="btn" data-cerrar-drawer>Cerrar</button>
+    <a class="btn btn-primary" href="/ordenes_view" id="drawer-ir">Ver en Órdenes de salida</a>
+  </div>
+</aside>
+
 <script>
-function ir(url) { window.location.href = url; }
+const { $, $$, collator, fmtNum, icon, prefs, escapeHtml, fold, pedirJson, toast, abrirMenu, cerrarMenu } = SMG;
 
-function esc(v) {
-  const d = document.createElement('div');
-  d.textContent = v == null ? '' : String(v);
-  return d.innerHTML;
+// =====================================================================================================
+// Estado
+// =====================================================================================================
+const S = {
+  cargando: true,
+  filas: [],                 // tabla del servidor (OS × empleado)
+  centros: new Map(),        // id → nombre del centro de costos
+  q: "",
+  chips: { rol: "", proyecto: "", destino: "" },
+  vista: prefs.get("go.vista", "orden"),
+  sort: { k: "nro_orden", dir: -1 },
+  page: 1,
+  pageSize: prefs.get("go.pageSize", 25),
+  ocultas: prefs.get("go.ocultas", {}),   // { vista: [claves] }
+  periodo: { desde: "", hasta: "" },
+};
+
+const COLS = {
+  orden: [
+    { k: "nro_orden", l: "N.º OS", w: 124, t: "os", sticky: true },
+    { k: "fecha_inicio_os", l: "Inicio", w: 104, t: "fecha" },
+    { k: "fecha_fin_os", l: "Fin", w: 104, t: "fecha" },
+    { k: "empleado", l: "Empleado", w: 220, t: "persona", flex: true },
+    { k: "rol", l: "Rol", w: 132, t: "chip" },
+    { k: "proyecto", l: "Proyecto", w: 220, t: "texto", flex: true },
+    { k: "centro_costo", l: "C. costo", w: 92, t: "cc" },
+    { k: "origen", l: "Origen", w: 180, t: "texto", flex: true },
+    { k: "destino", l: "Destino", w: 170, t: "texto", flex: true },
+    { k: "jornadas", l: "Jornadas", w: 100, t: "num", total: true },
+    { k: "hh", l: "HH", w: 100, t: "num", total: true },
+    { k: "compensables", l: "Compensables", w: 124, t: "num", total: true },
+    { k: "viaticos", l: "Viáticos", w: 136, t: "money", total: true },
+  ],
+  empleado: [
+    { k: "empleado", l: "Empleado", w: 240, t: "persona", sticky: true, flex: true },
+    { k: "rol", l: "Rol", w: 132, t: "chip" },
+    { k: "ordenes", l: "Órdenes", w: 100, t: "int" },
+    { k: "jornadas", l: "Jornadas", w: 100, t: "num", total: true },
+    { k: "hh", l: "HH", w: 100, t: "num", total: true },
+    { k: "compensables", l: "Compensables", w: 124, t: "num", total: true },
+    { k: "viaticos", l: "Viáticos", w: 136, t: "money", total: true },
+  ],
+  proyecto: [
+    { k: "proyecto", l: "Proyecto", w: 280, t: "texto", sticky: true, flex: true },
+    { k: "centro_costo", l: "C. costo", w: 92, t: "cc" },
+    { k: "ordenes", l: "Órdenes", w: 100, t: "int" },
+    { k: "empleados", l: "Empleados", w: 104, t: "int" },
+    { k: "jornadas", l: "Jornadas", w: 100, t: "num", total: true },
+    { k: "hh", l: "HH", w: 100, t: "num", total: true },
+    { k: "compensables", l: "Compensables", w: 124, t: "num", total: true },
+    { k: "viaticos", l: "Viáticos", w: 136, t: "money", total: true },
+  ],
+};
+const SORT_INICIAL = { orden: { k: "nro_orden", dir: -1 }, empleado: { k: "hh", dir: -1 }, proyecto: { k: "hh", dir: -1 } };
+const NUMERICAS = new Set(["jornadas", "hh", "compensables", "viaticos", "ordenes", "empleados"]);
+const CHIPS = { rol: "Rol", proyecto: "Proyecto", destino: "Destino" };
+
+// =====================================================================================================
+// Formato
+// =====================================================================================================
+const n2 = (v) => fmtNum(v, 2);
+const pesos = (v) => `$ ${n2(v)}`;
+const fechaCorta = (v) => {
+  const t = String(v || "").trim();
+  return t.length >= 10 && t[4] === "-" && t[7] === "-" ? `${t.slice(8, 10)}/${t.slice(5, 7)}/${t.slice(0, 4)}` : t;
+};
+const titulo = (s) => String(s || "").trim().toLowerCase().replace(/(^|[\s.\-/(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const mesLabel = (v) => (/^\d{4}-\d{2}$/.test(v) ? `${MESES[Number(v.slice(5)) - 1]} ${v.slice(0, 4)}` : v);
+const plural = (n, uno, varios) => `${fmtNum(n)} ${n === 1 ? uno : varios}`;
+const ccTitulo = (cc) => { const n = S.centros.get(String(cc)); return n ? `${cc} · ${n}` : String(cc || ""); };
+
+function textoPeriodo() {
+  const { desde, hasta } = S.periodo;
+  if (desde && hasta) return `${fechaCorta(desde)} – ${fechaCorta(hasta)}`;
+  if (desde) return `desde ${fechaCorta(desde)}`;
+  if (hasta) return `hasta ${fechaCorta(hasta)}`;
+  return "todo el historial";
 }
 
-function formatNumber(v) {
-  const n = Number(v || 0);
-  return Number.isFinite(n)
-    ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
-    : '0,00';
-}
+// =====================================================================================================
+// Filtros de período (servidor)
+// =====================================================================================================
+const IDS_FILTRO = { desde: "f-desde", hasta: "f-hasta", nro_orden: "f-orden", proyecto: "f-proyecto", centro_costo: "f-centro", empleado: "f-empleado" };
 
-function formatInt(v) {
-  const n = Number(v || 0);
-  return Number.isFinite(n) ? new Intl.NumberFormat('es-AR').format(n) : '0';
-}
-
-function construirQueryGestionOperativa(){
+function construirQuery() {
   const params = new URLSearchParams();
-  const desde = document.getElementById('f-desde')?.value || '';
-  const hasta = document.getElementById('f-hasta')?.value || '';
-  const nroOrden = document.getElementById('f-orden')?.value || '';
-  const proyecto = document.getElementById('f-proyecto')?.value || '';
-  const centroCosto = document.getElementById('f-centro')?.value || '';
-  const empleado = document.getElementById('f-empleado')?.value || '';
-  if (desde) params.set('desde', desde);
-  if (hasta) params.set('hasta', hasta);
-  if (nroOrden) params.set('nro_orden', nroOrden);
-  if (proyecto) params.set('proyecto', proyecto);
-  if (centroCosto) params.set('centro_costo', centroCosto);
-  if (empleado) params.set('empleado', empleado);
+  for (const [k, id] of Object.entries(IDS_FILTRO)) { const v = $(`#${id}`).value; if (v) params.set(k, v); }
   return params.toString();
 }
 
-function descargarArchivoGestionOperativa(url){
-  const link = document.createElement('a');
-  link.href = url;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+function cargarOpciones(id, valores, etiqueta, todos) {
+  const sel = $(`#${id}`), actual = sel.value;
+  sel.innerHTML = `<option value="">${todos}</option>` + valores.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(etiqueta(v))}</option>`).join("");
+  if (actual && valores.includes(actual)) sel.value = actual;
 }
 
-function buscarGestionOperativa(){
-  cargarGestionOperativa();
+async function cargarFiltros() {
+  try {
+    const [data, centros] = await Promise.all([
+      pedirJson("/gestion_operativa/filtros"),
+      pedirJson("/recursos/centros-costos").catch(() => []),
+    ]);
+    S.centros = new Map((centros || []).map((c) => [String(c.id), c.nombre]));
+    cargarOpciones("f-orden", data.ordenes || [], (v) => v, "Todas");
+    cargarOpciones("f-proyecto", data.proyectos || [], (v) => v, "Todos");
+    cargarOpciones("f-centro", data.centros_costo || [], ccTitulo, "Todos");
+    cargarOpciones("f-empleado", data.empleados || [], titulo, "Todos");
+  } catch (err) {
+    toast(`No se pudieron cargar los filtros: ${err.message}`, "error");
+  }
 }
 
-function limpiarFiltrosGestionOperativa(){
-  ['f-desde','f-hasta','f-orden','f-proyecto','f-centro','f-empleado'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+async function cargarDatos() {
+  S.cargando = true;
+  S.periodo = { desde: $("#f-desde").value, hasta: $("#f-hasta").value };
+  renderTabla();
+  renderGraficosCargando();
+  const qs = construirQuery();
+  try {
+    const data = await pedirJson(`/gestion_operativa/resumen${qs ? `?${qs}` : ""}`);
+    S.filas = Array.isArray(data.tabla) ? data.tabla : [];
+    S.cargando = false;
+    S.page = 1;
+    renderKpis(data.kpis || {});
+    renderGraficos(data.graficos || {});
+    poblarChips();
+    renderTabla();
+  } catch (err) {
+    S.filas = [];
+    S.cargando = false;
+    renderKpis({});
+    renderGraficos({});
+    poblarChips();
+    renderTabla();
+    toast(`No se pudo cargar el resumen: ${err.message}`, "error");
+  }
+}
+
+function descargar(tipo) {
+  const qs = construirQuery();
+  const a = document.createElement("a");
+  a.href = `/gestion_operativa/${tipo}${qs ? `?${qs}` : ""}`;
+  a.hidden = true;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// =====================================================================================================
+// KPIs y gráficos
+// =====================================================================================================
+function renderKpis(k) {
+  const viajes = Number(k.viajes_ejecutados || 0), jornadas = Number(k.jornadas_filtradas || 0);
+  $("#kpi-hh").textContent = `${n2(k.horas_hombre_mes)} h`;
+  $("#kpi-comp").textContent = `${n2(k.horas_compensables_mes)} h`;
+  $("#kpi-viajes").textContent = plural(viajes, "viaje", "viajes");
+  $("#kpi-costo").textContent = pesos(k.costo_operativo_mes);
+  $("#kpi-jornadas").textContent = `${n2(jornadas)} ${jornadas === 1 ? "jornada" : "jornadas"}`;
+  const p = textoPeriodo();
+  $$("[data-periodo]").forEach((el) => { el.textContent = p.charAt(0).toUpperCase() + p.slice(1); });
+  $$("[data-periodo-txt]").forEach((el) => { el.textContent = p; });
+}
+
+const GRAFICOS = [
+  { id: "chart-horas-proyecto", help: "help-horas-proyecto", clave: "horas_por_proyecto", fmt: (v) => `${n2(v)} h`, unidad: "proyectos", uno: "proyecto" },
+  { id: "chart-comp-mes", help: "help-comp-mes", clave: "horas_compensables_por_mes", fmt: (v) => `${n2(v)} h`, label: mesLabel, unidad: "meses", uno: "mes" },
+  { id: "chart-viajes-proyecto", help: "help-viajes-proyecto", clave: "viajes_por_proyecto", fmt: (v) => plural(Number(v), "viaje", "viajes"), unidad: "proyectos", uno: "proyecto" },
+  { id: "chart-costos-proyecto", help: "help-costos-proyecto", clave: "costos_por_proyecto", fmt: pesos, unidad: "proyectos", uno: "proyecto" },
+];
+const MAX_BARRAS = 10;
+
+function renderGraficosCargando() {
+  GRAFICOS.forEach((g) => {
+    $(`#${g.id}`).innerHTML = `<div class="meters meters-wide">${Array.from({ length: 3 }, () =>
+      `<div class="meter-row"><span class="skel" style="width:70%"></span><div class="meter"></div><span class="skel" style="width:60%;justify-self:end"></span></div>`).join("")}</div>`;
+    $(`#${g.help}`).textContent = "";
   });
-  cargarGestionOperativa();
 }
 
-function descargarGestionOperativaPdf(){
-  const qs = construirQueryGestionOperativa();
-  descargarArchivoGestionOperativa(`/gestion_operativa/pdf${qs ? `?${qs}` : ''}`);
-}
-
-function descargarGestionOperativaExcel(){
-  const qs = construirQueryGestionOperativa();
-  descargarArchivoGestionOperativa(`/gestion_operativa/excel${qs ? `?${qs}` : ''}`);
-}
-
-function renderBars(id, data, color) {
-  const cont = document.getElementById(id);
-  if (!cont) return;
-  const rows = Array.isArray(data) ? data.slice(0, 12) : [];
-  if (!rows.length) {
-    cont.innerHTML = '<div class="bar-row"><div class="bar-label">Sin datos</div><div class="bar-track"><div class="bar-fill" style="width:0;background:' + color + '"></div></div><div class="bar-val">0</div></div>';
-    return;
-  }
-
-  const max = Math.max(...rows.map(r => Number(r.value || 0)), 1);
-  cont.innerHTML = rows.map((row) => {
-    const val = Number(row.value || 0);
-    const pct = Math.max(0, Math.min(100, (val / max) * 100));
-    return '<div class="bar-row">'
-      + '<div class="bar-label" title="' + esc(row.label || '') + '">' + esc(row.label || '') + '</div>'
-      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct.toFixed(1) + '%;background:' + color + ';"></div></div>'
-      + '<div class="bar-val">' + esc(formatNumber(val)) + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-function formatFechaCorta(v) {
-  const texto = String(v || '').trim();
-  if (texto.length >= 10 && texto[4] === '-' && texto[7] === '-') {
-    return `${texto.slice(8, 10)}/${texto.slice(5, 7)}/${texto.slice(0, 4)}`;
-  }
-  return texto;
-}
-
-function renderTabla(data) {
-  const tbody = document.getElementById('tabla-body');
-  if (!tbody) return;
-  const todas = Array.isArray(data) ? data : [];
-  window._tablaGO = todas;
-  const limite = Math.max(1, parseInt(document.getElementById('f-limite')?.value, 10) || 30);
-  const campo = document.getElementById('f-orden-por')?.value || 'nro_orden';
-  const factor = (document.getElementById('f-orden-dir')?.value || 'desc') === 'asc' ? 1 : -1;
-  const ordenadas = todas.slice().sort((a, b) => {
-    const va = String(a[campo] || '');
-    const vb = String(b[campo] || '');
-    if (va !== vb) {
-      if (!va) return 1;
-      if (!vb) return -1;
-      return va.localeCompare(vb, undefined, { numeric: true }) * factor;
+function renderGraficos(graficos) {
+  GRAFICOS.forEach((g) => {
+    const todos = (graficos[g.clave] || []).filter((r) => Number(r.value || 0) !== 0);
+    const box = $(`#${g.id}`);
+    if (!todos.length) {
+      box.innerHTML = `<div class="empty-state">${icon("bar-chart")}<b>Sin datos en el período</b>Probá con otro rango de fechas.</div>`;
+      $(`#${g.help}`).textContent = "";
+      return;
     }
-    return String(b.nro_orden || '').localeCompare(String(a.nro_orden || ''), undefined, { numeric: true });
+    const filas = todos.slice(0, MAX_BARRAS);
+    const max = Math.max(...filas.map((r) => Math.abs(Number(r.value || 0))), 1);
+    $(`#${g.help}`).textContent = todos.length > MAX_BARRAS ? `${MAX_BARRAS} de ${todos.length} ${g.unidad}` : plural(todos.length, g.uno, g.unidad);
+    box.innerHTML = `<div class="meters meters-wide">${filas.map((r) => {
+      const etiqueta = g.label ? g.label(String(r.label || "")) : String(r.label || "");
+      const val = Number(r.value || 0);
+      return `<div class="meter-row" title="${escapeHtml(`${etiqueta}: ${g.fmt(val)}`)}">
+        <span class="meter-label">${escapeHtml(etiqueta)}</span>
+        <div class="meter"><span style="width:${((Math.abs(val) / max) * 100).toFixed(1)}%"></span></div>
+        <span class="meter-val num">${escapeHtml(g.fmt(val))}</span></div>`;
+    }).join("")}</div>`;
   });
-  const rows = ordenadas.slice(0, limite);
-  const info = document.getElementById('tabla-info');
-  if (info) info.textContent = 'Mostrando ' + rows.length + ' de ' + todas.length;
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="13">Sin datos para los filtros seleccionados.</td></tr>';
+}
+
+// =====================================================================================================
+// Tabla
+// =====================================================================================================
+function opcionesUnicas(lista, fn) {
+  const m = new Map();
+  lista.forEach((x) => { const v = String(fn(x) ?? "").trim(); if (v) m.set(v, (m.get(v) || 0) + 1); });
+  return [...m.entries()].sort((a, b) => collator.compare(a[0], b[0]));
+}
+
+function poblarChips() {
+  for (const [k, etiqueta] of Object.entries(CHIPS)) {
+    const sel = $(`#c-${k}`);
+    const valores = opcionesUnicas(S.filas, (r) => r[k]);
+    if (S.chips[k] && !valores.some(([v]) => v === S.chips[k])) S.chips[k] = "";
+    const ver = (v) => (k === "rol" ? titulo(v) : v);
+    sel.innerHTML = `<option value="">${etiqueta}: todos</option>` + valores.map(([v]) => `<option value="${escapeHtml(v)}" title="${escapeHtml(v)}">${etiqueta}: ${escapeHtml(ver(v))}</option>`).join("");
+    sel.value = S.chips[k];
+    sel.classList.toggle("on", !!S.chips[k]);
+  }
+}
+
+function filasFiltradas() {
+  const q = fold(S.q.trim());
+  return S.filas.filter((r) => {
+    for (const k of Object.keys(CHIPS)) if (S.chips[k] && String(r[k] || "").trim() !== S.chips[k]) return false;
+    if (q && ![r.nro_orden, r.empleado, r.destino].some((v) => fold(v).includes(q))) return false;
+    return true;
+  });
+}
+
+function agrupar(filas, campo) {
+  const m = new Map();
+  filas.forEach((r) => {
+    const key = String(r[campo] || "").trim();
+    if (!m.has(key)) m.set(key, { [campo]: key, _ordenes: new Set(), _empleados: new Set(), _roles: new Set(), _ccs: new Set(), jornadas: 0, hh: 0, compensables: 0, viaticos: 0 });
+    const g = m.get(key);
+    g._ordenes.add(r.nro_orden); g._empleados.add(r.empleado); g._roles.add(r.rol); g._ccs.add(r.centro_costo);
+    g.jornadas += Number(r.jornadas || 0); g.hh += Number(r.hh || 0);
+    g.compensables += Number(r.compensables || 0); g.viaticos += Number(r.viaticos || 0);
+  });
+  return [...m.values()].map((g) => ({
+    ...g,
+    ordenes: g._ordenes.size,
+    empleados: g._empleados.size,
+    rol: [...g._roles].filter(Boolean).join(" / "),
+    centro_costo: [...g._ccs].filter(Boolean).join(" / "),
+  }));
+}
+
+function datosVista() {
+  const base = filasFiltradas();
+  const filas = S.vista === "empleado" ? agrupar(base, "empleado") : S.vista === "proyecto" ? agrupar(base, "proyecto") : base;
+  const { k, dir } = S.sort;
+  return {
+    base,
+    filas: filas.slice().sort((a, b) => {
+      let r;
+      if (NUMERICAS.has(k)) r = (Number(a[k] || 0) - Number(b[k] || 0)) * dir;
+      else {
+        const sa = String(a[k] || "").trim(), sb = String(b[k] || "").trim();
+        if (!sa !== !sb) return sa ? -1 : 1;   // vacíos siempre al final
+        r = collator.compare(sa, sb) * dir;
+      }
+      return r || collator.compare(String(b.nro_orden || ""), String(a.nro_orden || ""));
+    }),
+  };
+}
+
+const columnas = () => COLS[S.vista].filter((c) => c.sticky || !(S.ocultas[S.vista] || []).includes(c.k));
+
+function celdaNum(v, t) {
+  const n = Number(v || 0);
+  const txt = t === "money" ? pesos(n) : t === "int" ? fmtNum(n) : n2(n);
+  return `<td class="num right">${n === 0 ? `<span class="muted">${txt}</span>` : txt}</td>`;
+}
+
+function celda(r, c) {
+  const raw = String(r[c.k] ?? "").trim();
+  const vacio = '<span class="muted">—</span>';
+  switch (c.t) {
+    case "os":
+      return `<td class="sticky-col mono" title="${escapeHtml(`Ver detalle de ${raw}`)}"><span class="codigo">${escapeHtml(raw) || vacio}</span></td>`;
+    case "fecha":
+      return `<td class="mono">${raw ? escapeHtml(fechaCorta(raw)) : vacio}</td>`;
+    case "persona": {
+      const nombre = titulo(raw);
+      return `<td class="${c.sticky ? "sticky-col" : ""}" title="${escapeHtml(nombre)}"><span class="trunc">${raw ? escapeHtml(nombre) : vacio}</span></td>`;
+    }
+    case "chip":
+      return `<td title="${escapeHtml(titulo(raw))}">${raw ? `<span class="chip">${escapeHtml(titulo(raw))}</span>` : vacio}</td>`;
+    case "cc":
+      return `<td class="mono right" title="${escapeHtml(raw.split(" / ").map(ccTitulo).join("\n"))}">${raw ? escapeHtml(raw) : vacio}</td>`;
+    case "num": case "money": case "int":
+      return celdaNum(r[c.k], c.t);
+    default:
+      return `<td class="${c.sticky ? "sticky-col" : ""}" title="${escapeHtml(raw)}"><span class="trunc">${raw ? escapeHtml(raw) : vacio}</span></td>`;
+  }
+}
+
+function claveFila(r) {
+  if (S.vista === "orden") return `data-os="${escapeHtml(r.nro_orden)}"`;
+  return `data-grupo="${escapeHtml(r[S.vista])}"`;
+}
+
+function renderTabla() {
+  const cols = columnas();
+  SMG.columnasTabla($("#lista"), $("#lista-cols"), cols);
+  $("#lista-head").innerHTML = `<tr>${cols.map((c) => {
+    const activo = S.sort.k === c.k;
+    const aria = activo ? (S.sort.dir > 0 ? "ascending" : "descending") : "none";
+    const der = ["num", "money", "int", "cc"].includes(c.t);
+    return `<th class="${c.sticky ? "sticky-col" : ""} ${der ? "right" : ""}" aria-sort="${aria}"><button type="button" class="th-sort" data-sort="${c.k}">${c.l}${icon(activo ? (S.sort.dir > 0 ? "up" : "down") : "sort")}</button></th>`;
+  }).join("")}</tr>`;
+  $$("#vistas [data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === S.vista)));
+
+  const body = $("#lista-body"), foot = $("#lista-foot");
+  if (S.cargando) {
+    body.innerHTML = Array.from({ length: 8 }, () => `<tr>${cols.map((c) => `<td class="${c.sticky ? "sticky-col" : ""}"><span class="skel" style="width:${40 + Math.round(Math.random() * 50)}%"></span></td>`).join("")}</tr>`).join("");
+    foot.innerHTML = "";
+    $("#tabla-rango").textContent = "Cargando…";
+    $("#tabla-sub").textContent = "Cargando…";
+    $("#pag-info").textContent = "";
     return;
   }
-  tbody.innerHTML = rows.map((r) =>
-    '<tr>'
-    + '<td>' + esc(r.nro_orden || '') + '</td>'
-    + '<td>' + esc(formatFechaCorta(r.fecha_inicio_os)) + '</td>'
-    + '<td>' + esc(formatFechaCorta(r.fecha_fin_os)) + '</td>'
-    + '<td>' + esc(r.empleado || '') + '</td>'
-    + '<td>' + esc(r.rol || '') + '</td>'
-    + '<td>' + esc(r.proyecto || '') + '</td>'
-    + '<td>' + esc(r.centro_costo || '') + '</td>'
-    + '<td>' + esc(r.origen || '') + '</td>'
-    + '<td>' + esc(r.destino || '') + '</td>'
-    + '<td class="right">' + esc(formatNumber(r.jornadas || 0)) + '</td>'
-    + '<td class="right">' + esc(formatNumber(r.hh || 0)) + '</td>'
-    + '<td class="right">' + esc(formatNumber(r.compensables || 0)) + '</td>'
-    + '<td class="right">' + esc(formatNumber(r.viaticos || 0)) + '</td>'
-    + '</tr>'
-  ).join('');
+
+  const { base, filas } = datosVista(), total = filas.length;
+  const nOrdenes = new Set(base.map((r) => r.nro_orden).filter(Boolean)).size;
+  $("#tabla-sub").textContent = `${plural(nOrdenes, "orden", "órdenes")} · período ${textoPeriodo()}`;
+  const paginas = Math.max(1, Math.ceil(total / S.pageSize));
+  S.page = Math.min(Math.max(1, S.page), paginas);
+  const desde = (S.page - 1) * S.pageSize;
+  const pagina = filas.slice(desde, desde + S.pageSize);
+  const hayFiltrosTabla = !!(S.q.trim() || Object.values(S.chips).some(Boolean));
+
+  body.innerHTML = pagina.length
+    ? pagina.map((r) => `<tr ${claveFila(r)} tabindex="0">${cols.map((c) => celda(r, c)).join("")}</tr>`).join("")
+    : `<tr><td class="empty" colspan="${cols.length}"><b>${S.filas.length && hayFiltrosTabla ? "No hay órdenes que coincidan" : "Sin órdenes en el período seleccionado"}</b>
+        Probá con otro período o <button type="button" class="btn-link" data-limpiar>limpiá los filtros</button>.</td></tr>`;
+
+  foot.innerHTML = total ? `<tr>${cols.map((c, i) => {
+    if (c.total) return `<td class="num right">${c.t === "money" ? pesos(base.reduce((s, r) => s + Number(r[c.k] || 0), 0)) : n2(base.reduce((s, r) => s + Number(r[c.k] || 0), 0))}</td>`;
+    return `<td class="${c.sticky ? "sticky-col" : ""}">${i === 0 ? "Totales" : ""}</td>`;
+  }).join("")}</tr>` : "";
+
+  $("#tabla-rango").textContent = total ? `Mostrando ${desde + 1}–${desde + pagina.length} de ${fmtNum(total)}` : "Sin resultados";
+  $("#pag-info").textContent = `${S.page} / ${paginas}`;
+  $("#pag-prev").disabled = S.page <= 1;
+  $("#pag-next").disabled = S.page >= paginas;
+  $("#page-size").value = String(S.pageSize);
+  $("#btn-limpiar-tabla").hidden = !hayFiltrosTabla;
 }
 
-function cargarOpcionesSelect(id, values) {
-  const select = document.getElementById(id);
-  if (!select) return;
-
-  const selected = select.value || '';
-  const opciones = Array.isArray(values) ? values : [];
-
-  select.innerHTML = '<option value="">Todos</option>'
-    + opciones.map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
-
-  if (selected && opciones.includes(selected)) {
-    select.value = selected;
-  }
+function pintarPopColumnas() {
+  const ocultas = S.ocultas[S.vista] || [];
+  $("#pop-columnas-grid").innerHTML = COLS[S.vista].filter((c) => !c.sticky).map((c) =>
+    `<label class="check"><input type="checkbox" value="${c.k}" ${ocultas.includes(c.k) ? "" : "checked"}>${c.l}</label>`).join("");
 }
 
-async function cargarFiltrosGestionOperativa() {
-  try {
-    const res = await fetch('/gestion_operativa/filtros');
-    const data = await res.json();
-    cargarOpcionesSelect('f-orden', data.ordenes || []);
-    cargarOpcionesSelect('f-proyecto', data.proyectos || []);
-    cargarOpcionesSelect('f-centro', data.centros_costo || []);
-    cargarOpcionesSelect('f-empleado', data.empleados || []);
-  } catch (err) {
-    console.warn('No se pudieron cargar opciones de filtros de gestion operativa', err);
-  }
+function cambiarVista(v) {
+  if (!COLS[v]) v = "orden";
+  S.vista = v;
+  S.sort = { ...SORT_INICIAL[v] };
+  S.page = 1;
+  prefs.set("go.vista", v);
+  renderTabla();
 }
 
-async function cargarGestionOperativa() {
-  const qs = construirQueryGestionOperativa();
-
-  try {
-    const res = await fetch(`/gestion_operativa/resumen${qs ? `?${qs}` : ''}`);
-    const data = await res.json();
-
-    const k = data.kpis || {};
-    document.getElementById('kpi-hh').textContent = formatNumber(k.horas_hombre_mes || 0);
-    document.getElementById('kpi-comp').textContent = formatNumber(k.horas_compensables_mes || 0);
-    document.getElementById('kpi-viajes').textContent = formatInt(k.viajes_ejecutados || 0);
-    document.getElementById('kpi-costo').textContent = formatNumber(k.costo_operativo_mes || 0);
-    document.getElementById('kpi-jornadas').textContent = formatNumber(k.jornadas_filtradas || 0);
-
-    renderTabla(data.tabla || []);
-
-    const g = data.graficos || {};
-    renderBars('chart-horas-proyecto', g.horas_por_proyecto || [], '#38bdf8');
-    renderBars('chart-comp-mes', g.horas_compensables_por_mes || [], '#f59e0b');
-    renderBars('chart-viajes-proyecto', g.viajes_por_proyecto || [], '#60a5fa');
-    renderBars('chart-costos-proyecto', g.costos_por_proyecto || [], '#fb7185');
-  } catch (err) {
-    console.error(err);
-  }
+function buscar(valor, origen) {
+  S.q = valor;
+  S.page = 1;
+  if (origen !== "tabla") $("#buscar-tabla").value = valor;
+  if (origen !== "global" && $("#buscar-global")) $("#buscar-global").value = valor;
+  renderTabla();
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await cargarFiltrosGestionOperativa();
-  await cargarGestionOperativa();
+function limpiarTabla() {
+  S.q = "";
+  Object.keys(S.chips).forEach((k) => { S.chips[k] = ""; });
+  $("#buscar-tabla").value = "";
+  if ($("#buscar-global")) $("#buscar-global").value = "";
+  poblarChips();
+  S.page = 1;
+  renderTabla();
+}
+
+function limpiarPeriodo() {
+  Object.values(IDS_FILTRO).forEach((id) => { $(`#${id}`).value = ""; });
+  cargarDatos();
+}
+
+// =====================================================================================================
+// Drawer: detalle de la orden
+// =====================================================================================================
+let drawerVolverFoco = null;
+function abrirOrden(nro) {
+  const filas = S.filas.filter((r) => r.nro_orden === nro);
+  if (!filas.length) return;
+  const f = filas[0];
+  const suma = (k) => filas.reduce((s, r) => s + Number(r[k] || 0), 0);
+  const dato = (etiqueta, valor, cls = "") => `<label class="field ${cls.includes("span2") ? "span2" : ""}">${etiqueta}<input class="input ${cls.includes("mono") ? "mono" : ""}" readonly value="${escapeHtml(valor || "—")}"></label>`;
+  $("#drawer-title").textContent = `Orden ${nro}`;
+  $("#drawer-sub").textContent = [fechaCorta(f.fecha_inicio_os), fechaCorta(f.fecha_fin_os)].filter(Boolean).join(" – ");
+  $("#drawer-body").innerHTML = `<div class="form">
+    <fieldset><legend>Orden</legend><div class="grid2">
+      ${dato("Proyecto", f.proyecto, "span2")}
+      ${dato("Centro de costos", ccTitulo(f.centro_costo), "span2")}
+      ${dato("Inicio", fechaCorta(f.fecha_inicio_os), "mono")}
+      ${dato("Fin", fechaCorta(f.fecha_fin_os), "mono")}
+      ${dato("Origen", f.origen)}
+      ${dato("Destino", f.destino)}
+    </div></fieldset>
+    <fieldset><legend>Personal (${filas.length})</legend>
+      <div class="card">
+        <table class="tbl tbl-edit" style="width:100%"><colgroup><col style="width:44%"><col style="width:20%"><col style="width:18%"><col style="width:18%"></colgroup>
+          <thead><tr><th>Empleado</th><th>Rol</th><th class="right">HH</th><th class="right">Viáticos</th></tr></thead>
+          <tbody>${filas.map((r) => `<tr><td title="${escapeHtml(titulo(r.empleado))}"><span class="trunc">${escapeHtml(titulo(r.empleado))}</span></td>
+            <td><span class="chip">${escapeHtml(titulo(r.rol) || "—")}</span></td>${celdaNum(r.hh, "num")}${celdaNum(r.viaticos, "money")}</tr>`).join("")}</tbody>
+        </table>
+      </div>
+    </fieldset>
+    <fieldset><legend>Totales</legend><div class="grid2">
+      ${dato("Jornadas", n2(suma("jornadas")))}${dato("HH", n2(suma("hh")))}
+      ${dato("Compensables", n2(suma("compensables")))}${dato("Viáticos", pesos(suma("viaticos")))}
+    </div></fieldset></div>`;
+  drawerVolverFoco = document.activeElement;
+  $("#drawer").hidden = false;
+  $("#scrim").hidden = false;
+  $("#drawer-body").scrollTop = 0;
+  $("#drawer [data-cerrar-drawer]").focus();
+}
+function cerrarDrawer() {
+  $("#drawer").hidden = true;
+  $("#scrim").hidden = true;
+  if (drawerVolverFoco && document.contains(drawerVolverFoco)) drawerVolverFoco.focus();
+}
+
+// =====================================================================================================
+// Eventos
+// =====================================================================================================
+function enlazar() {
+  SMG.registrarBuscador("Buscar OS, empleado o destino", (v) => buscar(v, "global"));
+  $("#form-filtros").addEventListener("submit", (e) => { e.preventDefault(); cargarDatos(); });
+  $("#btn-limpiar-periodo").addEventListener("click", limpiarPeriodo);
+
+  $("#buscar-tabla").addEventListener("input", (e) => buscar(e.target.value, "tabla"));
+  $$("[data-chip]").forEach((sel) => sel.addEventListener("change", () => {
+    S.chips[sel.dataset.chip] = sel.value;
+    sel.classList.toggle("on", !!sel.value);
+    S.page = 1;
+    renderTabla();
+  }));
+  $("#btn-limpiar-tabla").addEventListener("click", limpiarTabla);
+  $$("#vistas [data-vista]").forEach((b) => b.addEventListener("click", () => cambiarVista(b.dataset.vista)));
+
+  $("#btn-columnas").addEventListener("click", (e) => { pintarPopColumnas(); abrirMenu($("#pop-columnas"), e.currentTarget); });
+  $("#pop-columnas-grid").addEventListener("change", () => {
+    S.ocultas[S.vista] = $$("#pop-columnas-grid input:not(:checked)").map((i) => i.value);
+    prefs.set("go.ocultas", S.ocultas);
+    renderTabla();
+  });
+  $("#pop-columnas-todas").addEventListener("click", () => { S.ocultas[S.vista] = []; prefs.set("go.ocultas", S.ocultas); pintarPopColumnas(); renderTabla(); });
+
+  $("#btn-exportar").addEventListener("click", (e) => abrirMenu($("#menu-exportar"), e.currentTarget));
+  $$("[data-exportar]").forEach((b) => b.addEventListener("click", () => descargar(b.dataset.exportar)));
+
+  $("#lista-head").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sort]");
+    if (!b) return;
+    const k = b.dataset.sort;
+    S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : (NUMERICAS.has(k) ? -1 : 1) };
+    S.page = 1;
+    renderTabla();
+  });
+  const activarFila = (tr) => {
+    if (tr.dataset.os) { abrirOrden(tr.dataset.os); return; }
+    if (tr.dataset.grupo == null) return;
+    // desde una vista agrupada: baja al detalle de ese empleado / proyecto
+    if (S.vista === "empleado") { cambiarVista("orden"); buscar(tr.dataset.grupo, ""); return; }
+    if (S.vista === "proyecto") { S.chips.proyecto = tr.dataset.grupo; poblarChips(); cambiarVista("orden"); }
+  };
+  $("#lista-body").addEventListener("click", (e) => {
+    if (e.target.closest("[data-limpiar]")) { limpiarTabla(); limpiarPeriodo(); return; }
+    const tr = e.target.closest("tr[data-os], tr[data-grupo]");
+    if (tr) activarFila(tr);
+  });
+  $("#lista-body").addEventListener("keydown", (e) => {
+    const tr = e.target.closest("tr[data-os], tr[data-grupo]");
+    if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activarFila(tr); }
+  });
+
+  $("#page-size").addEventListener("change", (e) => { S.pageSize = Number(e.target.value) || 25; prefs.set("go.pageSize", S.pageSize); S.page = 1; renderTabla(); });
+  $("#pag-prev").addEventListener("click", () => { S.page -= 1; renderTabla(); });
+  $("#pag-next").addEventListener("click", () => { S.page += 1; renderTabla(); });
+
+  $$("[data-cerrar-drawer]").forEach((b) => b.addEventListener("click", cerrarDrawer));
+  $("#scrim").addEventListener("click", cerrarDrawer);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#drawer").hidden) cerrarDrawer(); });
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!COLS[S.vista]) S.vista = "orden";
+  S.sort = { ...SORT_INICIAL[S.vista] };
+  if (![25, 50, 100].includes(S.pageSize)) S.pageSize = 25;
+  enlazar();
+  renderTabla();
+  await cargarFiltros();
+  await cargarDatos();
 });
 </script>
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>

@@ -173,6 +173,36 @@ class ActasMedicionTests(unittest.TestCase):
         self.assertIn("dos veces", _err(self.c.post(f"{API}/actas", json=self._datos(equipos=[{"ci": "M-25"}, {"ci": "m-25"}])), 400))
         self.assertIn("período", _err(self.c.post(f"{API}/actas", json=self._datos(periodo_desde=HASTA, periodo_hasta=DESDE)), 400))
 
+    def test_05_filtro_por_centro_de_costos(self):
+        """El centro de costos del parte sale de Obra/Proyecto ("209 - ..."); el equipo del acta puede limitarse a uno."""
+        with _db() as conn:
+            for fecha, obra, hs in (("2026-10-01", "209 - MANTENIMIENTO DE CAMINO SSR", 8), ("2026-10-02", "209 - MANTENIMIENTO DE CAMINO SSR", 4),
+                                    ("2026-10-03", "210 - MANT. DE CAMINO SSR. TRAMO 2", 5), ("2026-10-04", "Mantenimiento de camino", 3)):
+                conn.execute("INSERT INTO horas_maquinas (ci, fecha_parte, nro_parte, turno, total_hs, obra, proyecto) VALUES ('ZZ-CC', ?, ?, 'DIA', ?, ?, ?)",
+                             (fecha, f"CC{fecha[-2:]}", hs, obra, obra))
+        lista = [x for x in _ok(self.c.get(f"{API}/equipos-con-partes", params={"desde": DESDE, "hasta": HASTA})) if x["ci"] == "ZZ-CC"]
+        self.assertEqual([(x["centro_costo_id"], x["partes"], x["total_hs"]) for x in lista], [(209, 2, 12), (210, 1, 5), (None, 1, 3)])
+        self.assertTrue(lista[0]["centro_costo"].startswith("209 - "))
+
+        def total(cc):
+            res = _ok(self.c.post(f"{API}/vista-previa", json=self._datos(equipos=[{"ci": "ZZ-CC", "item_oc_cliente_id": self.it_moto, "centro_costo_id": cc}])))
+            return self._eq(res, "ZZ-CC")["total"], res["indicadores"]["equipos"][0]["partes"]
+        self.assertEqual(total(209), (12, 2))
+        self.assertEqual(total(210), (5, 1))
+        self.assertEqual(total(None), (20, 4), "sin centro de costos cuentan todos los partes del equipo")
+        self.assertIn("no existe", _err(self.c.post(f"{API}/vista-previa", json=self._datos(equipos=[{"ci": "ZZ-CC", "centro_costo_id": 999999}])), 400))
+
+        a = _ok(self.c.post(f"{API}/actas", json=self._datos(numero=77, equipos=[{"ci": "ZZ-CC", "item_oc_cliente_id": self.it_moto, "centro_costo_id": 210}])))
+        self.assertEqual(a["equipos"][0]["centro_costo_id"], 210)
+        self.assertEqual(self._eq(a["resultado"], "ZZ-CC")["total"], 5)
+        self.assertEqual(_ok(self.c.get(f"{API}/sugerencia", params={"oc": self.oc_id}))["equipos"][0]["centro_costo_id"], 210,
+                         "la siguiente acta copia el centro de costos")
+        xl = self.c.get(f"{API}/actas/{a['id']}/excel")
+        self.assertEqual(xl.status_code, 200)
+        _ok(self.c.delete(f"{API}/actas/{a['id']}"))
+        with _db() as conn:
+            conn.execute("DELETE FROM horas_maquinas WHERE ci = 'ZZ-CC'")
+
     def test_10_ciclo_completo(self):
         a = _ok(self.c.post(f"{API}/actas", json=self._datos()))
         self.assertEqual((a["estado"], a["numero"], len(a["equipos"])), ("BORRADOR", 23, 5))

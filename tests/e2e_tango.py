@@ -192,8 +192,13 @@ def reconocido(res):
             for r in res["filas"]]
 
 
+# vista interna de la página → ítem de la sidebar del shell (/ui/shell.js)
+PANEL_DE_VISTA = {"tablero": "tablero", "pedidos": "pedidos", "documentos": "facturas", "cobranzas": "cobranzas",
+                  "ctacte": "cuenta_corriente", "saldos": "puesta_en_marcha", "config": "configuracion"}
+
+
 def ir(pagina, vista):
-    pagina.click(f".menu-btn[data-vista='{vista}']")
+    pagina.click(f"#sidebar [data-panel='{PANEL_DE_VISTA[vista]}']")
     pagina.wait_for_function(f"S.vista === '{vista}'")
     pagina.wait_for_timeout(300)
 

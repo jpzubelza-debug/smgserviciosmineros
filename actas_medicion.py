@@ -5,9 +5,13 @@ a una orden de compra del cliente para certificar:
 
     acta (am_mediciones): OC del cliente + período + columnas del parte que se muestran + columna que es la cantidad
       -> equipos (am_medicion_equipos): CI + ítem de la OC donde se certifica (+ columna de cantidad propia, opcional)
+         + centro de costos (opcional): solo cuentan los partes de ese CI cargados en ese centro de costos
       -> KPI (am_medicion_kpi): mínimo y objetivo por ítem de la OC + gráficos elegidos y su orden
 
 El mínimo y el objetivo son referencias de gestión: marcan el cumplimiento de cada ítem, no cambian lo que se certifica.
+
+El centro de costos del parte sale de Obra/Proyecto ("209 - MANTENIMIENTO DE CAMINO SSR"); los partes históricos con texto
+libre no tienen centro y solo cuentan en equipos sin centro de costos elegido.
 
 La cantidad de cada equipo es la suma de su columna de cantidad en los partes del período; la de cada ítem de la OC
 es la suma de sus equipos. Un acta nueva copia equipos, ítems y columnas de la última acta de la misma OC.
@@ -82,6 +86,7 @@ DDL = (
         ci TEXT NOT NULL,
         item_oc_cliente_id INTEGER,
         campo_cantidad TEXT,
+        centro_costo_id INTEGER,
         orden INTEGER NOT NULL DEFAULT 0,
         UNIQUE (medicion_id, ci),
         FOREIGN KEY (medicion_id) REFERENCES am_mediciones (id) ON DELETE CASCADE,
@@ -152,6 +157,9 @@ def migrar(conn):
         if trigger:
             conn.execute(f"DROP TRIGGER IF EXISTS {trigger.group(1)}")
         conn.execute(sentencia)
+    cols = {f[1] for f in conn.execute("PRAGMA table_info(am_medicion_equipos)").fetchall()}
+    if "centro_costo_id" not in cols:
+        conn.execute("ALTER TABLE am_medicion_equipos ADD COLUMN centro_costo_id INTEGER")
 
 
 # ============================================================================
@@ -292,6 +300,32 @@ def _campos_validos(conn):
 # ============================================================================
 # Lectura de partes
 # ============================================================================
+_RE_CC = re.compile(r"^\s*(\d+)\s*-")
+
+
+def _centros(conn):
+    return {f["id"]: _texto(f["nombre"]) for f in _filas(conn, "SELECT id, nombre FROM centros_costos")}
+
+
+def _cc_txt(centros, cc_id):
+    return f"{cc_id} - {centros.get(cc_id, '')}".strip(" -") if cc_id is not None else ""
+
+
+def _cc_de_parte(p, centros):
+    """Código del centro de costos del parte: centro_costo_id o el número al inicio de Obra/Proyecto ("209 - ...")."""
+    cc = p.get("centro_costo_id")
+    if cc not in (None, ""):
+        try:
+            return int(cc)
+        except (TypeError, ValueError):
+            pass
+    for campo in ("obra", "proyecto"):
+        m = _RE_CC.match(_texto(p.get(campo)))
+        if m and int(m.group(1)) in centros:
+            return int(m.group(1))
+    return None
+
+
 def _partes_periodo(conn, desde, hasta, cis=None):
     """Partes con fecha dentro del período (acepta fechas ISO o dd/mm/aaaa). cis: lista de CI o None (todos)."""
     d0, d1 = parse_fecha(desde), parse_fecha(hasta)
@@ -306,12 +340,13 @@ def _partes_periodo(conn, desde, hasta, cis=None):
         for i in range(0, len(cis), 400):
             lote = cis[i:i + 400]
             filas += _filas(conn, sql + f' AND UPPER(TRIM({CAMPO_EQUIPO})) IN ({",".join("?" for _ in lote)})', params + lote)
-    salida = []
+    salida, centros = [], _centros(conn)
     for f in filas:
         d = parse_fecha(f.get(CAMPO_FECHA))
         if d and d0 <= d <= d1:
             f["_fecha"] = d.isoformat()
             f["_ci"] = _texto(f.get(CAMPO_EQUIPO)).upper()
+            f["_cc"] = _cc_de_parte(f, centros)
             salida.append(f)
     salida.sort(key=lambda p: (p["_fecha"], _texto(p.get("turno")), p["id"]))
     return salida
@@ -323,18 +358,19 @@ def _descripcion_equipos(conn):
 
 
 def equipos_con_partes(conn, desde, hasta):
-    """CI con partes en el período, para elegir los equipos del acta."""
+    """CI con partes en el período, una fila por CI y centro de costos, para elegir los equipos del acta."""
     desde, hasta = _iso(desde, "desde"), _iso(hasta, "hasta")
-    conteo = {}
+    conteo, centros = {}, _centros(conn)
     for p in _partes_periodo(conn, desde, hasta):
-        c = conteo.setdefault(p["_ci"], {"ci": p["_ci"], "partes": 0, "clientes": set(), "total_hs": 0.0})
+        c = conteo.setdefault((p["_ci"], p["_cc"]), {"ci": p["_ci"], "centro_costo_id": p["_cc"], "centro_costo": _cc_txt(centros, p["_cc"]),
+                                                     "partes": 0, "clientes": set(), "total_hs": 0.0})
         c["partes"] += 1
         c["total_hs"] += num(p.get(CAMPO_CANTIDAD_DEFECTO)) or 0
         if _texto(p.get("cliente")):
             c["clientes"].add(_texto(p.get("cliente")))
     desc = _descripcion_equipos(conn)
     return [{**c, "descripcion": desc.get(c["ci"], ""), "clientes": sorted(c["clientes"])[:3], "total_hs": _r(c["total_hs"], 2)}
-            for c in sorted(conteo.values(), key=lambda x: x["ci"])]
+            for c in sorted(conteo.values(), key=lambda x: (x["ci"], x["centro_costo_id"] is None, x["centro_costo_id"] or 0))]
 
 
 # ============================================================================
@@ -412,15 +448,22 @@ def calcular(conn, a, equipos, metas=None):
     columnas = [c for c in a["columnas"] if c in campos]
     items = _items_oc(conn, a["orden_compra_cliente_id"])
     desc = _descripcion_equipos(conn)
+    centros = _centros(conn)
     partes = _partes_periodo(conn, a["periodo_desde"], a["periodo_hasta"], [e["ci"] for e in equipos])
     por_ci = {}
     for p in partes:
         por_ci.setdefault(p["_ci"], []).append(p)
+
+    def partes_de(e):
+        cc = e.get("centro_costo_id")
+        return [p for p in por_ci.get(e["ci"].upper(), []) if cc is None or p["_cc"] == cc]
+
     salida_eq, por_item, avisos = [], {}, []
     for e in equipos:
         ci = e["ci"].upper()
+        cc = e.get("centro_costo_id")
         campo = e.get("campo_cantidad") or a["campo_cantidad"]
-        lista = por_ci.get(ci, [])
+        lista = partes_de(e)
         filas, total, totales = [], 0.0, {c: 0.0 for c in columnas if c in SUMABLES}
         vistos, duplicados = {}, []
         for p in lista:
@@ -436,12 +479,13 @@ def calcular(conn, a, equipos, metas=None):
         item = items.get(e.get("item_oc_cliente_id"))
         salida_eq.append({
             "ci": ci, "descripcion": desc.get(ci, ""), "campo_cantidad": campo, "etiqueta_cantidad": _etiqueta(campo),
+            "centro_costo_id": cc, "centro_costo": _cc_txt(centros, cc),
             "item_oc_cliente_id": item["id"] if item else None,
             "item_oc": f"{item['numero']} · {item['descripcion'] or ''}".strip() if item else None,
             "partes": filas, "total": _r(total), "totales": {c: _r(v) for c, v in totales.items()},
         })
         if not lista:
-            avisos.append(f"{ci}: sin partes en el período.")
+            avisos.append(f"{ci}: sin partes en el período" + (f" en el centro de costos {cc}." if cc is not None else "."))
         if not item:
             avisos.append(f"{ci}: no tiene ítem de la OC; su cantidad no se certifica.")
         if duplicados:
@@ -465,7 +509,7 @@ def calcular(conn, a, equipos, metas=None):
     return {
         "columnas": [{"campo": c, "etiqueta": campos[c]["etiqueta"], "numerico": campos[c]["numerico"]} for c in columnas],
         "equipos": salida_eq, "items_oc": lineas, "avisos": avisos,
-        "indicadores": _indicadores(campos, [(e["ci"].upper(), desc.get(e["ci"].upper(), ""), por_ci.get(e["ci"].upper(), []))
+        "indicadores": _indicadores(campos, [(e["ci"].upper(), desc.get(e["ci"].upper(), ""), partes_de(e))
                                              for e in equipos]),
         "total_partes": sum(len(e["partes"]) for e in salida_eq),
         "total_importe": _r(sum(x["importe"] or 0 for x in lineas), 2),
@@ -493,7 +537,8 @@ def _acta(conn, acta_id):
 
 
 def _equipos(conn, acta_id):
-    return _filas(conn, "SELECT ci, item_oc_cliente_id, campo_cantidad FROM am_medicion_equipos WHERE medicion_id = ? ORDER BY orden, id", (acta_id,))
+    return _filas(conn, """SELECT ci, item_oc_cliente_id, campo_cantidad, centro_costo_id FROM am_medicion_equipos
+                           WHERE medicion_id = ? ORDER BY orden, id""", (acta_id,))
 
 
 def _certificados_de(conn, acta_id):
@@ -574,6 +619,7 @@ def _normalizar(conn, datos, acta_id=None, chequear_numero=True):
         if c not in columnas:
             columnas.append(c)
     items = _items_oc(conn, oc["id"])
+    centros = _centros(conn)
     equipos, vistos = [], set()
     for e in datos.get("equipos") or []:
         ci = _texto(e.get("ci")).upper()
@@ -590,7 +636,17 @@ def _normalizar(conn, datos, acta_id=None, chequear_numero=True):
         propio = _texto(e.get("campo_cantidad")) or None
         if propio and propio not in campos:
             _err("DATOS", f"{ci}: el parte diario no tiene la columna {propio}")
-        equipos.append({"ci": ci, "item_oc_cliente_id": item, "campo_cantidad": propio if propio != campo else None})
+        cc = e.get("centro_costo_id")
+        if cc in ("", None):
+            cc = None
+        else:
+            try:
+                cc = int(cc)
+            except (TypeError, ValueError):
+                _err("DATOS", f"{ci}: centro de costos inválido")
+            if cc not in centros:
+                _err("DATOS", f"{ci}: el centro de costos {cc} no existe")
+        equipos.append({"ci": ci, "item_oc_cliente_id": item, "campo_cantidad": propio if propio != campo else None, "centro_costo_id": cc})
     metas = _normalizar_metas(datos.get("metas"), items)
     repetida = _fila(conn, """SELECT id FROM am_mediciones WHERE orden_compra_cliente_id = ? AND numero = ? AND estado <> 'ANULADA'
                               AND id <> ?""", (oc["id"], numero, acta_id or 0))
@@ -708,8 +764,8 @@ def vista_previa(conn, datos):
 def _guardar_equipos(conn, acta_id, equipos):
     conn.execute("DELETE FROM am_medicion_equipos WHERE medicion_id = ?", (acta_id,))
     for i, e in enumerate(equipos):
-        conn.execute("INSERT INTO am_medicion_equipos (medicion_id, ci, item_oc_cliente_id, campo_cantidad, orden) VALUES (?, ?, ?, ?, ?)",
-                     (acta_id, e["ci"], e["item_oc_cliente_id"], e["campo_cantidad"], i))
+        conn.execute("""INSERT INTO am_medicion_equipos (medicion_id, ci, item_oc_cliente_id, campo_cantidad, centro_costo_id, orden)
+                        VALUES (?, ?, ?, ?, ?, ?)""", (acta_id, e["ci"], e["item_oc_cliente_id"], e["campo_cantidad"], e.get("centro_costo_id"), i))
 
 
 def crear(conn, datos, usuario):
@@ -860,10 +916,10 @@ def exportar_excel(conn, acta_id):
              formatos=[None, None, None, None, "#,##0.00", "#,##0.00", "#,##0.00", "#,##0.##", "#,##0.##", "0.0", None])
     fila(ws, ["Total", "", "", "", "", "", res["total_importe"], "", "", "", ""], tot, [None] * 6 + ["#,##0.00"] + [None] * 4)
     ws.append([])
-    fila(ws, ["Equipo", "Descripción", "Ítem OC", "Columna", "Partes", "Cantidad"], cab)
+    fila(ws, ["Equipo", "Descripción", "Centro de costos", "Ítem OC", "Columna", "Partes", "Cantidad"], cab)
     for e in res["equipos"]:
-        fila(ws, [e["ci"], e["descripcion"], e["item_oc"] or "— sin ítem —", e["etiqueta_cantidad"], len(e["partes"]), e["total"]],
-             formatos=[None] * 5 + ["#,##0.00"])
+        fila(ws, [e["ci"], e["descripcion"], e.get("centro_costo") or "Todos", e["item_oc"] or "— sin ítem —", e["etiqueta_cantidad"],
+                  len(e["partes"]), e["total"]], formatos=[None] * 6 + ["#,##0.00"])
     ind = res.get("indicadores")
     if ind and ind["equipos"]:
         ws.append([])
@@ -892,7 +948,8 @@ def exportar_excel(conn, acta_id):
             n, i = f"{nombre[:25]} {i}", i + 1
         usados.add(n)
         hs = wb.create_sheet(n)
-        encabezado(hs, f"{e['ci']} {e['descripcion']} — {e['item_oc'] or 'sin ítem de OC'}")
+        cc_txt = f" · CC {e['centro_costo']}" if e.get("centro_costo") else ""
+        encabezado(hs, f"{e['ci']} {e['descripcion']}{cc_txt} — {e['item_oc'] or 'sin ítem de OC'}")
         fila(hs, [c["etiqueta"] for c in cols] + [f"Cantidad ({e['etiqueta_cantidad']})"], cab)
         for p in e["partes"]:
             valores = []
@@ -983,7 +1040,7 @@ def acta_de_certificado(conn, certificado_id):
 # ============================================================================
 def opciones(conn):
     return {
-        "seguimientos": _filas(conn, """SELECT s.id, s.cliente_codigo, cl.razon_social AS cliente, cc.nombre AS centro_costo
+        "seguimientos": _filas(conn, """SELECT s.id, s.cliente_codigo, cl.razon_social AS cliente, s.centro_costo_id, cc.nombre AS centro_costo
                                         FROM seguimiento_cc s LEFT JOIN clientes cl ON cl.codigo = s.cliente_codigo
                                         LEFT JOIN centros_costos cc ON cc.id = s.centro_costo_id ORDER BY s.id"""),
         "ordenes": _filas(conn, """SELECT id, seguimiento_cc_id, numero, orden_compra, revision, moneda FROM Orden_de_compra_cliente
@@ -992,4 +1049,5 @@ def opciones(conn):
                                     FROM items_oc_cliente i ORDER BY i.orden_compra_cliente_id, i.numero"""),
         "equipos": [{"codigo": k, "descripcion": v} for k, v in sorted(_descripcion_equipos(conn).items())],
         "campos": campos_parte(conn),
+        "centros_costos": _filas(conn, "SELECT id, nombre FROM centros_costos WHERE COALESCE(activo, 1) = 1 ORDER BY id"),
     }

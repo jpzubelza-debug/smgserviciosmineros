@@ -55,6 +55,7 @@ ORDENES_VIEW_PATH = os.path.join(BASE_DIR, "ordenes_view.html")
 GESTION_OPERATIVA_PATH = os.path.join(BASE_DIR, "gestion_operativa.html")
 ALMACEN_V2_PATH = os.path.join(BASE_DIR, "almacen_v2.html")
 FLEETCARE_PATH = os.path.join(BASE_DIR, "fleetcare.html")
+MANTENIMIENTO_PATH = os.path.join(BASE_DIR, "mantenimiento.html")  # reemplaza a FleetCare
 BASE_DATOS_PATH = os.path.join(BASE_DIR, "base_datos.html")
 DOC_LOG_VIAJES_DIR = os.path.join(DATA_DIR, "Doc_Log_Viajes")
 DOC_ALMACEN_DIR = os.path.join(DATA_DIR, "Doc_Almacen")
@@ -113,6 +114,7 @@ os.makedirs(DOC_ALMACEN_ADJ_DIR, exist_ok=True)
 
 app = FastAPI()
 app.mount("/Imagenes", StaticFiles(directory=os.path.join(BASE_DIR, "Imagenes")), name="Imagenes")
+app.mount("/ui", StaticFiles(directory=os.path.join(BASE_DIR, "ui")), name="ui")  # design system y shell compartidos
 app.mount("/Doc_Log_Viajes", StaticFiles(directory=DOC_LOG_VIAJES_DIR), name="Doc_Log_Viajes")
 app.mount("/Doc_Almacen", StaticFiles(directory=DOC_ALMACEN_DIR), name="Doc_Almacen")
 app.mount("/Doc_Almacen_Adjuntos", StaticFiles(directory=DOC_ALMACEN_ADJ_DIR), name="Doc_Almacen_Adjuntos")
@@ -175,7 +177,7 @@ CONTINGENCY_PANELS = {
     "compras": ["dashboard", "solicitud_compra", "solicitudes_emitidas", "emision_orden_compra", "ordenes_compra_emitidas", "proveedores"],
     "operaciones": ["dashboard", "tarja_general", "carga_partes_diarios", "centros_costos", "seguimiento_cliente", "actas_medicion"],
     "rrhh": ["dashboard"],
-    "mantenimiento": ["dashboard"],
+    "mantenimiento": ["novedades", "ordenes", "checklist", "equipos", "preventivo", "indicadores", "configuracion"],
     "dashboard_ejecutivo": ["dashboard"],
     "administracion": ["usuarios", "accesos", "plantillas_emails"],
     "base_datos": ["tablas"],
@@ -233,6 +235,72 @@ EMAIL_TEMPLATE_DEFINITIONS = {
         ),
         "formato": "texto",
         "variables": ["tipo", "numero", "fecha", "detalle_principal", "total_items"],
+    },
+    "mt_novedad": {
+        "nombre": "Mantenimiento: nueva novedad",
+        "descripcion": "Aviso a los aprobadores de novedades (y responsables de Mantenimiento) cuando se reporta una novedad.",
+        "modulo": "mantenimiento",
+        "asunto": "Novedad #{{ novedad_id }} ({{ prioridad }}): {{ objetivo }}",
+        "cuerpo": (
+            "Se reportó una novedad nueva.\n\n"
+            "Novedad: #{{ novedad_id }}\n"
+            "Equipo / obra: {{ objetivo }}\n"
+            "Descripción: {{ descripcion }}\n"
+            "Prioridad: {{ prioridad }}\n"
+            "Reportó: {{ reportada_por }} ({{ origen }})\n"
+            "Fecha: {{ fecha }}\n\n"
+            "Resolvela en Mantenimiento › Novedades: pasarla a OT o cerrarla sin OT."
+        ),
+        "formato": "texto",
+        "variables": ["novedad_id", "objetivo", "descripcion", "prioridad", "reportada_por", "origen", "fecha"],
+    },
+    "mt_reporte_novedades": {
+        "nombre": "Mantenimiento: reporte con varias novedades",
+        "descripcion": "Un solo aviso a los aprobadores cuando se cargan varias novedades juntas (reporte del supervisor).",
+        "modulo": "mantenimiento",
+        "asunto": "Reporte de novedades #{{ reporte_id }}: {{ cantidad }} ítems en {{ equipos }} equipo(s)",
+        "cuerpo": (
+            "Se cargó un reporte con varias novedades.\n\n"
+            "Reporte: #{{ reporte_id }}\n"
+            "Reportó: {{ reportada_por }} ({{ origen }})\n"
+            "Fecha: {{ fecha }}\n"
+            "Ítems: {{ cantidad }} (urgentes: {{ urgentes }})\n\n"
+            "{{ detalle }}\n\n"
+            "Resolvelas en Mantenimiento › Novedades: cada ítem pasa a OT o se cierra sin OT."
+        ),
+        "formato": "texto",
+        "variables": ["reporte_id", "cantidad", "equipos", "urgentes", "detalle", "reportada_por", "origen", "fecha"],
+    },
+    "mt_preventivo": {
+        "nombre": "Mantenimiento: preventivo próximo o vencido",
+        "descripcion": "Aviso a quienes gestionan el preventivo cuando un equipo pasa a Próximo o Vencido (una vez por estado).",
+        "modulo": "mantenimiento",
+        "asunto": "Preventivo: {{ cantidad }} equipo(s) para atender ({{ vencidos }} vencido(s), {{ proximos }} próximo(s))",
+        "cuerpo": (
+            "Hay equipos que pasaron a Próximo o Vencido en el mantenimiento preventivo.\n\n"
+            "{{ detalle }}\n\n"
+            "Creá la OT preventiva desde Mantenimiento › Preventivo."
+        ),
+        "formato": "texto",
+        "variables": ["cantidad", "vencidos", "proximos", "detalle"],
+    },
+    "mt_ot_revision": {
+        "nombre": "Mantenimiento: OT lista para revisión",
+        "descripcion": "Aviso al administrador de Mantenimiento cuando el mecánico carga la corrección final de una OT.",
+        "modulo": "mantenimiento",
+        "asunto": "{{ numero }} lista para revisión: {{ objetivo }}",
+        "cuerpo": (
+            "El mecánico cargó la corrección final de una orden de trabajo.\n\n"
+            "OT: {{ numero }}\n"
+            "Equipo / obra: {{ objetivo }}\n"
+            "Trabajo: {{ titulo }}\n"
+            "Mecánico: {{ mecanico }}\n"
+            "Corrección final: {{ correccion }}\n"
+            "Horas registradas: {{ horas }}\n\n"
+            "Finalizala o devolvela con observación en Mantenimiento › Órdenes de trabajo."
+        ),
+        "formato": "texto",
+        "variables": ["numero", "objetivo", "titulo", "mecanico", "correccion", "horas"],
     },
 }
 
@@ -420,6 +488,16 @@ def _requiere_administrador(request: Request):
     perfil = _usuario_autenticado(request)
     if perfil is None or str(perfil.get("tipo_usuario", "")).upper() != "ADMINISTRADOR":
         raise HTTPException(status_code=403, detail="Se requiere perfil ADMINISTRADOR")
+    return perfil
+
+
+def _requiere_modulo_administracion(request: Request):
+    """Administración solo con el módulo "administracion" habilitado (sin bypass por tipo ni desarrollador)."""
+    perfil = _usuario_autenticado(request)
+    if perfil is None:
+        raise HTTPException(status_code=401, detail="Sesión no válida")
+    if "administracion" not in (perfil.get("modulos", []) or []):
+        raise HTTPException(status_code=403, detail="No tiene habilitado el módulo Administración")
     return perfil
 
 
@@ -722,6 +800,13 @@ def migrar_tabla_viajes(conn):
     conn.execute("PRAGMA foreign_keys = ON")
 
 
+def _clave_catalogo(nombre) -> str:
+    """Nombre de catálogo comparable: sin tildes, en minúsculas y con espacios simples."""
+    texto = unicodedata.normalize("NFD", str(nombre or ""))
+    texto = "".join(ch for ch in texto if unicodedata.category(ch) != "Mn")
+    return " ".join(texto.lower().split())
+
+
 def sembrar_configuracion_almacen(conn):
     categorias = [
         "Tecnologia",
@@ -755,7 +840,7 @@ def sembrar_configuracion_almacen(conn):
         "Electrico",
         "Seguridad",
     ]
-    marcas = ["Hikvision", "Samsung", "Dell", "Lenovo", "Genrica"]
+    marcas = ["Hikvision", "Samsung", "Dell", "Lenovo", "Genérica"]
     modelos = [
         ("Hikvision", "DS-7108"),
         ("Samsung", "SSD 1TB"),
@@ -791,7 +876,13 @@ def sembrar_configuracion_almacen(conn):
     for familia in familias:
         conn.execute("INSERT OR IGNORE INTO familias (nombre) VALUES (?)", (familia,))
 
+    # Se compara sin tildes ni mayúsculas: si la marca ya existe con otra escritura no se vuelve a crear.
+    # «Genrica» (error de tipeo de versiones anteriores) cuenta como «Genérica» hasta que se unifique.
+    marcas_existentes = {_clave_catalogo(r[0]) for r in conn.execute("SELECT nombre FROM marcas").fetchall()}
     for nombre in marcas:
+        clave = _clave_catalogo(nombre)
+        if clave in marcas_existentes or (clave == "generica" and "genrica" in marcas_existentes):
+            continue
         conn.execute("INSERT OR IGNORE INTO marcas (nombre, activo) VALUES (?, 1)", (nombre,))
 
     marca_map = {
@@ -2330,6 +2421,8 @@ def init_sqlite():
                 migrar_facturacion(conn)
                 migrar_actas_medicion(conn)
                 migrar_tarja(conn)
+                migrar_vehiculos_activo(conn)
+                migrar_mantenimiento(conn)
                 sembrar_configuracion_almacen(conn)
                 try:
                     conn.commit()
@@ -2348,15 +2441,32 @@ def init_sqlite():
             time.sleep(espera_segundos)
 
 
-def obtener_vehiculos_data():
+# Equipo activo: un vehículo inactivo (dado de baja) no cuenta en indicadores ni aparece en los demás módulos
+# (partes, Tarja, Mantenimiento, viajes, compras). Solo se ve en Logística › Vehículos, con el filtro de inactivos.
+VEHICULO_ACTIVO_SQL = "UPPER(TRIM(COALESCE(activo, 'SI'))) <> 'NO'"
+
+
+def migrar_vehiculos_activo(conn):
+    if "activo" not in {f[1] for f in conn.execute("PRAGMA table_info(vehiculos)")}:
+        conn.execute("ALTER TABLE vehiculos ADD COLUMN activo TEXT NOT NULL DEFAULT 'SI'")
+
+
+def _vehiculo_activo_valor(valor, actual="SI"):
+    texto = str(actual if valor is None else valor).strip().upper()
+    return "NO" if texto == "NO" else "SI"
+
+
+def obtener_vehiculos_data(incluir_inactivos=False):
+    filtro = "" if incluir_inactivos else f"WHERE {VEHICULO_ACTIVO_SQL}"
     with get_sqlite_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT codigo, propiedad, marca, tipo, modelo, dominio, anio, motor, chasis,
                    sector, proyecto, operativo,
                    habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj,
-                   habilitacion_rincon, habilitacion_arli
+                   habilitacion_rincon, habilitacion_arli, COALESCE(activo, 'SI') AS activo
             FROM vehiculos
+            {filtro}
             ORDER BY codigo
             """
         ).fetchall()
@@ -2975,6 +3085,7 @@ def reconciliar_gestion_operativa_cerradas(conn):
 from facturacion import migrar_facturacion  # noqa: E402  (tablas fac_*; ver facturacion.py)
 from actas_medicion import migrar as migrar_actas_medicion  # noqa: E402  (tablas am_mediciones*; ver actas_medicion.py)
 from tarja import migrar as migrar_tarja  # noqa: E402  (tablas tarja_*; ver tarja.py)
+from mantenimiento import migrar as migrar_mantenimiento  # noqa: E402  (tablas mt_*; ver mantenimiento.py)
 
 init_sqlite()
 
@@ -3588,7 +3699,7 @@ def _registrar_acceso_admin(conn, request: Request, evento: str, detalle: str = 
 @app.get("/administracion", response_class=HTMLResponse)
 def administracion_view(request: Request):
     try:
-        _requiere_administrador(request)
+        _requiere_modulo_administracion(request)
     except HTTPException:
         return RedirectResponse("/", status_code=302)
     return _leer_html(ADMINISTRACION_PATH)
@@ -3651,7 +3762,15 @@ def mantenimiento_view(request: Request):
     redirect = _requiere_login(request)
     if redirect is not None:
         return redirect
-    return _leer_html(FLEETCARE_PATH)
+    return _leer_html(MANTENIMIENTO_PATH)
+
+
+@app.get("/mantenimiento/ot/{numero}", response_class=HTMLResponse)
+def mantenimiento_ot_view(request: Request, numero: str):
+    redirect = _requiere_login(request)
+    if redirect is not None:
+        return redirect
+    return _leer_html(MANTENIMIENTO_PATH)
 
 
 def _requiere_modulo(request: Request, modulo: str):
@@ -3893,6 +4012,39 @@ def _email_template_sample_variables(codigo: str):
             "detalle_principal": "Ingreso de insumos varios",
             "total_items": 4,
         },
+        "mt_novedad": {
+            "novedad_id": 12,
+            "objetivo": "M-33 - Zoomilion ZE245E",
+            "descripcion": "Pérdida hidráulica en el brazo",
+            "prioridad": "URGENTE",
+            "reportada_por": "Juan Perez",
+            "origen": "App",
+            "fecha": "24/11/2026 08:15",
+        },
+        "mt_reporte_novedades": {
+            "reporte_id": 15,
+            "cantidad": 3,
+            "equipos": 2,
+            "urgentes": 1,
+            "detalle": "C-28 - Regador\n  · Problemas de embrague\n  · Torre de dirección con juego (URGENTE)\nM-40 - Excavadora\n  · Cilindro del balde pierde aceite",
+            "reportada_por": "Juan Perez",
+            "origen": "Web",
+            "fecha": "25/11/2026 10:45",
+        },
+        "mt_preventivo": {
+            "cantidad": 2,
+            "vencidos": 1,
+            "proximos": 1,
+            "detalle": "- C-28 - DONGFENG · Programado simple · VENCIDO (pasado 22 h)\n- M-26 - Caterpillar 140K · Programado simple · Próximo (faltan 18 h)",
+        },
+        "mt_ot_revision": {
+            "numero": "OT-00012",
+            "objetivo": "M-33 - Zoomilion ZE245E",
+            "titulo": "Pérdida hidráulica en el brazo",
+            "mecanico": "Pedro Gomez",
+            "correccion": "Cambio de retenes del cilindro y prueba con carga",
+            "horas": "3,5",
+        },
     }
     return muestras.get(codigo, {})
 
@@ -4116,7 +4268,7 @@ def base_datos_tabla(tabla: str, request: Request, pagina: int = 1, limite: int 
 
 @app.get("/admin/roles_funcionales")
 def admin_listar_roles(request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         return [dict(fila) for fila in conn.execute(
             "SELECT id, nombre, activo FROM roles_funcionales WHERE COALESCE(activo, 1) = 1 ORDER BY nombre"
@@ -4125,7 +4277,7 @@ def admin_listar_roles(request: Request):
 
 @app.get("/admin/usuarios")
 def admin_listar_usuarios(request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         filas = conn.execute(
             """
@@ -4140,7 +4292,7 @@ def admin_listar_usuarios(request: Request):
 
 @app.get("/admin/responsables-modulo")
 def admin_listar_responsables_modulo(request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         migrar_responsables_modulo(conn)
         filas = conn.execute(
@@ -4154,9 +4306,51 @@ def admin_listar_responsables_modulo(request: Request):
         return [dict(fila) for fila in filas]
 
 
+OP_TABS_DEFAULT = {"inicio": True, "nuevo": True, "lista": True, "novedades": True, "mto": True}
+
+
+def _op_tabs_migrar(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS operador_config (clave TEXT PRIMARY KEY, valor TEXT NOT NULL)")
+    conn.execute("INSERT OR IGNORE INTO operador_config (clave, valor) VALUES (?, ?)", ("pestanas_visibles", json.dumps(OP_TABS_DEFAULT)))
+
+
+def _op_tabs_leer(conn):
+    _op_tabs_migrar(conn)
+    fila = conn.execute("SELECT valor FROM operador_config WHERE clave = ?", ("pestanas_visibles",)).fetchone()
+    try:
+        guardado = json.loads(fila[0]) if fila else {}
+    except (TypeError, ValueError):
+        guardado = {}
+    return {k: bool(guardado.get(k, True)) for k in OP_TABS_DEFAULT}
+
+
+@app.get("/admin/operador/pestanas")
+def admin_operador_pestanas(request: Request):
+    _requiere_modulo_administracion(request)
+    with get_sqlite_connection() as conn:
+        return _op_tabs_leer(conn)
+
+
+@app.put("/admin/operador/pestanas")
+def admin_guardar_operador_pestanas(request: Request, payload: dict):
+    _requiere_modulo_administracion(request)
+    visibles = payload.get("visibles") if isinstance(payload, dict) else None
+    if not isinstance(visibles, dict) or any(k not in visibles or not isinstance(visibles[k], bool) for k in OP_TABS_DEFAULT):
+        raise HTTPException(status_code=400, detail="Debe indicar el estado de todas las pestañas")
+    normalizado = {k: visibles[k] for k in OP_TABS_DEFAULT}
+    if not any(normalizado[k] for k in ("inicio", "nuevo", "lista", "novedades")):
+        raise HTTPException(status_code=400, detail="Debe quedar visible al menos una pestaña general")
+    with get_sqlite_connection() as conn:
+        _op_tabs_migrar(conn)
+        conn.execute("UPDATE operador_config SET valor = ? WHERE clave = ?", (json.dumps(normalizado), "pestanas_visibles"))
+        _registrar_acceso_admin(conn, request, "PESTANAS_OPERADOR_ACTUALIZADAS", json.dumps(normalizado))
+        conn.commit()
+    return {"ok": True, "visibles": normalizado}
+
+
 @app.put("/admin/responsables-modulo/{modulo}")
 def admin_actualizar_responsables_modulo(modulo: str, request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     modulo = str(modulo or "").strip().lower()
     if modulo not in ALL_MODULES:
         raise HTTPException(status_code=400, detail="Módulo inválido")
@@ -4187,7 +4381,7 @@ def admin_actualizar_responsables_modulo(modulo: str, request: Request, payload:
 
 @app.get("/admin/email-templates")
 def admin_listar_email_templates(request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         migrar_email_templates(conn)
         filas = conn.execute("SELECT * FROM email_templates ORDER BY modulo, nombre").fetchall()
@@ -4197,7 +4391,7 @@ def admin_listar_email_templates(request: Request):
 
 @app.get("/admin/email-templates/{codigo}")
 def admin_obtener_email_template(codigo: str, request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     codigo = str(codigo or "").strip()
     if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
@@ -4206,7 +4400,7 @@ def admin_obtener_email_template(codigo: str, request: Request):
 
 @app.post("/admin/email-templates/{codigo}")
 def admin_guardar_email_template(codigo: str, request: Request, payload: dict):
-    perfil = _requiere_administrador(request)
+    perfil = _requiere_modulo_administracion(request)
     codigo = str(codigo or "").strip()
     if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
@@ -4244,7 +4438,7 @@ def admin_guardar_email_template(codigo: str, request: Request, payload: dict):
 
 @app.post("/admin/email-templates/{codigo}/preview")
 def admin_preview_email_template(codigo: str, request: Request, payload: dict = None):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     codigo = str(codigo or "").strip()
     if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
@@ -4279,7 +4473,7 @@ def admin_preview_email_template(codigo: str, request: Request, payload: dict = 
 
 @app.post("/admin/email-templates/{codigo}/restore")
 def admin_restaurar_email_template(codigo: str, request: Request):
-    perfil = _requiere_administrador(request)
+    perfil = _requiere_modulo_administracion(request)
     codigo = str(codigo or "").strip()
     if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
@@ -4305,7 +4499,7 @@ def admin_restaurar_email_template(codigo: str, request: Request):
 
 @app.post("/admin/email-templates/{codigo}/toggle")
 def admin_toggle_email_template(codigo: str, request: Request, payload: dict = None):
-    perfil = _requiere_administrador(request)
+    perfil = _requiere_modulo_administracion(request)
     codigo = str(codigo or "").strip()
     if codigo not in EMAIL_TEMPLATE_DEFINITIONS:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
@@ -4323,7 +4517,7 @@ def admin_toggle_email_template(codigo: str, request: Request, payload: dict = N
 
 @app.post("/admin/usuarios")
 def admin_crear_usuario_endpoint(request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     datos = dict(payload or {})
     password_temporal = ""
     if not str(datos.get("password", "")):
@@ -4340,7 +4534,7 @@ def admin_crear_usuario_endpoint(request: Request, payload: dict):
 
 @app.put("/admin/usuarios/{usuario_id}")
 def admin_actualizar_usuario(usuario_id: int, request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     datos = dict(payload or {})
     nombre = str(datos.get("nombre_apellido", "")).strip()
     correo = str(datos.get("correo", "")).strip()
@@ -4392,7 +4586,7 @@ def admin_actualizar_usuario(usuario_id: int, request: Request, payload: dict):
 
 @app.post("/admin/usuarios/{usuario_id}/estado")
 def admin_cambiar_estado_usuario(usuario_id: int, request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     estado = str((payload or {}).get("estado", "")).strip().upper()
     if estado not in {"ACTIVO", "INACTIVO"}:
         raise HTTPException(status_code=400, detail="Estado inválido")
@@ -4409,7 +4603,7 @@ def admin_cambiar_estado_usuario(usuario_id: int, request: Request, payload: dic
 
 @app.post("/admin/usuarios/{usuario_id}/bloqueo")
 def admin_cambiar_bloqueo_usuario(usuario_id: int, request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     bloqueado = 1 if bool((payload or {}).get("bloqueado")) else 0
     with get_sqlite_connection() as conn:
         cur = conn.execute("UPDATE usuarios SET bloqueado = ?, updated_at = datetime('now') WHERE id = ?", (bloqueado, usuario_id))
@@ -4424,7 +4618,7 @@ def admin_cambiar_bloqueo_usuario(usuario_id: int, request: Request, payload: di
 
 @app.post("/admin/usuarios/{usuario_id}/reset_password")
 def admin_resetear_password(usuario_id: int, request: Request, payload: dict):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     password = str((payload or {}).get("password", "")) or secrets.token_urlsafe(9)
     with get_sqlite_connection() as conn:
         cur = conn.execute(
@@ -4442,7 +4636,7 @@ def admin_resetear_password(usuario_id: int, request: Request, payload: dict):
 
 @app.get("/admin/usuarios/{usuario_id}/password")
 def admin_ver_password(usuario_id: int, request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         fila = conn.execute("SELECT password_cifrada FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
         if not fila:
@@ -4461,7 +4655,7 @@ def admin_ver_password(usuario_id: int, request: Request):
 
 @app.get("/admin/accesos")
 def admin_listar_accesos(request: Request, limit: int = Query(100, ge=1, le=500)):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         filas = conn.execute(
             """
@@ -4572,6 +4766,7 @@ def _operaciones_metadata_datos(conn):
         """
         SELECT codigo, marca, modelo, tipo, propiedad, sector
         FROM vehiculos
+        WHERE UPPER(TRIM(COALESCE(activo, 'SI'))) <> 'NO'
         ORDER BY codigo ASC
         """
     ).fetchall()
@@ -4661,9 +4856,10 @@ def _operaciones_metadata_datos(conn):
     acop_set = set()
     for f in conn.execute("SELECT DISTINCT acoplado FROM horas_maquinas WHERE acoplado IS NOT NULL AND TRIM(acoplado) != ''").fetchall():
         acop_set.add(f["acoplado"].strip())
-    for f in conn.execute("SELECT codigo FROM vehiculos WHERE LOWER(tipo) LIKE '%acoplado%' OR LOWER(tipo) LIKE '%semi%' OR LOWER(tipo) LIKE '%trailer%' OR LOWER(tipo) LIKE '%carreton%'").fetchall():
+    for f in conn.execute(f"SELECT codigo FROM vehiculos WHERE (LOWER(tipo) LIKE '%acoplado%' OR LOWER(tipo) LIKE '%semi%' OR LOWER(tipo) LIKE '%trailer%' OR LOWER(tipo) LIKE '%carreton%') AND {VEHICULO_ACTIVO_SQL}").fetchall():
         acop_set.add(f["codigo"].strip())
-    acoplados = sorted([a for a in acop_set if a])
+    inactivos = {f[0] for f in conn.execute(f"SELECT UPPER(TRIM(codigo)) FROM vehiculos WHERE NOT ({VEHICULO_ACTIVO_SQL})")}
+    acoplados = sorted([a for a in acop_set if a and a.upper() not in inactivos])
 
     turnos = ["Día", "Noche"]
     no_programadas = [
@@ -8007,16 +8203,19 @@ def _validar_centro_costo_operaciones(conn, valor: str) -> str:
     raise HTTPException(status_code=400, detail="El Centro de Costos seleccionado no es válido.")
 
 
-def _validar_ci_operaciones(conn, valor: str) -> str:
+def _validar_ci_operaciones(conn, valor: str, ci_actual: str = "") -> str:
+    """ci_actual: al modificar un parte, su CI de antes se acepta aunque el equipo ya esté inactivo."""
     ingresado = (valor or "").strip()
     if not ingresado:
         raise HTTPException(status_code=400, detail="El Código Interno del Equipo (CI) es obligatorio.")
 
     fila = conn.execute(
-        "SELECT codigo FROM vehiculos WHERE UPPER(TRIM(codigo)) = UPPER(TRIM(?)) LIMIT 1",
+        "SELECT codigo, COALESCE(activo, 'SI') AS activo FROM vehiculos WHERE UPPER(TRIM(codigo)) = UPPER(TRIM(?)) LIMIT 1",
         (ingresado,),
     ).fetchone()
     if fila:
+        if _vehiculo_activo_valor(fila["activo"]) == "NO" and ingresado.upper() != str(ci_actual or "").strip().upper():
+            raise HTTPException(status_code=400, detail=f"El equipo {fila['codigo']} está inactivo (dado de baja en Vehículos).")
         return str(fila["codigo"] or ingresado).strip()
 
     historico = conn.execute(
@@ -8447,6 +8646,12 @@ def _insertar_parte_diario(conn, payload: dict, origen_carga=None):
 
     no_programadas = str(payload.get("no_programadas") or "").strip()
 
+    # Control del horómetro (Mantenimiento): bloquea una jornada imposible; retrocesos y saltos frente al parte
+    # anterior del equipo se cargan igual y quedan como «lecturas a revisar».
+    bloqueo_lectura, avisos_lectura = mpv.revisar_lecturas(conn, ci, fecha_parte, hs_inicio, hs_final, km_inicio, km_final)
+    if bloqueo_lectura:
+        raise HTTPException(status_code=400, detail=bloqueo_lectura)
+
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -8505,6 +8710,7 @@ def _insertar_parte_diario(conn, payload: dict, origen_carga=None):
             origen_carga,
         ),
     )
+    mpv.registrar_observadas(conn, cursor.lastrowid, ci, fecha_parte, avisos_lectura, origen_carga or "ESCRITORIO")
     return cursor.lastrowid, ci, nro_parte
 
 
@@ -8515,6 +8721,7 @@ async def crear_hora_maquina(request: Request, payload: dict = Body(...)):
     with get_sqlite_connection() as conn:
         nuevo_id, ci, nro_parte = _insertar_parte_diario(conn, payload)
         conn.commit()
+    _mt_revisar_preventivo(ci)  # la lectura nueva puede vencer un preventivo
     return {
         "ok": True,
         "id": nuevo_id,
@@ -8545,7 +8752,8 @@ async def actualizar_hora_maquina(request: Request, id_parte: int, payload: dict
         raise HTTPException(status_code=400, detail="La Descripción de Trabajos Realizados es obligatoria.")
 
     with get_sqlite_connection() as conn:
-        ci = _validar_ci_operaciones(conn, ci)
+        anterior_ci = conn.execute("SELECT ci FROM horas_maquinas WHERE id = ?", (id_parte,)).fetchone()
+        ci = _validar_ci_operaciones(conn, ci, anterior_ci["ci"] if anterior_ci else "")
         centro_costo = _validar_centro_costo_operaciones(conn, payload.get("obra") or payload.get("proyecto"))
         cliente = _validar_cliente_operaciones(conn, payload.get("cliente"))
         control_supervisor = _validar_control_supervisor_operaciones(conn, payload.get("control_supervisor"))
@@ -8798,7 +9006,7 @@ def compras_metadata(request: Request):
                 "nombre_equipo": ((r["marca"] or "").strip() + " " + (r["modelo"] or "").strip()).strip(),
             }
             for r in conn.execute(
-                "SELECT codigo, marca, modelo FROM vehiculos ORDER BY codigo"
+                f"SELECT codigo, marca, modelo FROM vehiculos WHERE {VEHICULO_ACTIVO_SQL} ORDER BY codigo"
             ).fetchall()
         ]
 
@@ -8911,7 +9119,57 @@ def compras_listar_solicitudes(request: Request):
             params.append(nombre_usuario)
         sql += " ORDER BY sc.id DESC"
         filas = conn.execute(sql, params).fetchall()
-    return [dict(fila) for fila in filas]
+        _ensure_orden_compra_solicitudes(conn)
+        conteos = _conteos_items_solicitudes(conn)
+    return [_resumen_plazo_solicitud(dict(fila), conteos.get(fila["id"], {})) for fila in filas]
+
+
+# Plazo de compra según la prioridad (mismo criterio que el dashboard de compras).
+PLAZOS_PRIORIDAD_COMPRA = {"URGENTE": 7, "URGENTES": 7, "ALTA": 14, "MEDIA": 21, "BAJA": 30}
+
+
+def _conteos_items_solicitudes(conn):
+    """Por solicitud: total de ítems y cuántos hay en cada estado (el vínculo a una OC cuenta como gestionado)."""
+    filas = conn.execute(
+        """
+        SELECT d.id_solicitud AS id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN v.id IS NULL AND UPPER(COALESCE(d.estado_aprobacion, 'PENDIENTE')) NOT IN ('APROBADA', 'RECHAZADA', 'GESTIONADO') THEN 1 ELSE 0 END) AS sin_resolver,
+               SUM(CASE WHEN v.id IS NULL AND d.gestion_fecha IS NULL AND UPPER(COALESCE(d.estado_aprobacion, '')) = 'APROBADA' THEN 1 ELSE 0 END) AS por_gestionar,
+               SUM(CASE WHEN v.id IS NOT NULL OR UPPER(COALESCE(d.estado_aprobacion, '')) = 'GESTIONADO' THEN 1 ELSE 0 END) AS gestionados,
+               SUM(CASE WHEN v.id IS NULL AND UPPER(COALESCE(d.estado_aprobacion, '')) = 'RECHAZADA' THEN 1 ELSE 0 END) AS rechazados
+        FROM solicitud_compra_detalle d
+        LEFT JOIN (SELECT MIN(id) AS id, solicitud_compra_detalle_id FROM OrdenCompraDetalleSolicitud GROUP BY solicitud_compra_detalle_id) v
+               ON v.solicitud_compra_detalle_id = d.id
+        GROUP BY d.id_solicitud
+        """
+    ).fetchall()
+    return {fila["id"]: dict(fila) for fila in filas}
+
+
+def _resumen_plazo_solicitud(solicitud, conteo):
+    total = int(conteo.get("total") or 0)
+    sin_resolver = int(conteo.get("sin_resolver") or 0)
+    por_gestionar = int(conteo.get("por_gestionar") or 0)
+    solicitud.update({
+        "cantidad_items": total,
+        "items_sin_resolver": sin_resolver,
+        "items_por_gestionar": por_gestionar,
+        "items_gestionados": int(conteo.get("gestionados") or 0),
+        "items_rechazados": int(conteo.get("rechazados") or 0),
+        "vencimiento": None,
+        "fuera_plazo": False,
+    })
+    dias = PLAZOS_PRIORIDAD_COMPRA.get(str(solicitud.get("prioridad") or "").strip().upper())
+    try:
+        fecha = datetime.strptime(str(solicitud.get("fecha_solicitud") or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        fecha = None
+    if dias is not None and fecha is not None:
+        vencimiento = fecha + timedelta(days=dias)
+        solicitud["vencimiento"] = vencimiento.isoformat()
+        solicitud["fuera_plazo"] = bool(sin_resolver + por_gestionar) and datetime.now().date() > vencimiento
+    return solicitud
 
 
 @app.get("/compras/dashboard")
@@ -9595,7 +9853,9 @@ def compras_listar_ordenes_compra(request: Request):
             SELECT oc.id, oc.numero_oc, oc.fecha, oc.estado,
                    COALESCE(p."NOM_PROVEE", '') AS proveedor,
                    COALESCE(SUM(ocd.subtotal), 0) AS total_neto,
-                   COUNT(ocd.id) AS cantidad_items
+                   COUNT(ocd.id) AS cantidad_items,
+                   (SELECT COUNT(*) FROM OrdenCompraHistorial h
+                     WHERE h.orden_compra_id = oc.id AND LOWER(TRIM(h.accion)) = 'editada') AS ediciones
             FROM OrdenCompra oc
             LEFT JOIN proveedores p ON p.id = oc.proveedor_id
             LEFT JOIN OrdenCompraDetalle ocd ON ocd.orden_compra_id = oc.id
@@ -9811,11 +10071,44 @@ def _proveedor_values(payload):
     )
 
 
+def _cuit_digitos(valor):
+    return re.sub(r"\D", "", str(valor or ""))
+
+
+def _cuit_valido(digitos):
+    if len(digitos) != 11:
+        return False
+    suma = sum(int(d) * m for d, m in zip(digitos[:10], (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)))
+    verificador = 11 - suma % 11
+    verificador = 0 if verificador == 11 else 9 if verificador == 10 else verificador
+    return verificador == int(digitos[10])
+
+
+def _validar_cuit_proveedor(conn, values, proveedor_id=None):
+    """Valida el CUIT cuando se carga o se cambia (los registros con datos viejos se pueden seguir editando).
+    Devuelve los valores con el CUIT en formato XX-XXXXXXXX-X."""
+    digitos = _cuit_digitos(values[6])
+    if not digitos:
+        return values
+    if proveedor_id is not None:
+        actual = conn.execute('SELECT "CUIT" FROM proveedores WHERE id = ?', (proveedor_id,)).fetchone()
+        if actual is not None and _cuit_digitos(actual[0]) == digitos:
+            return values
+    if not _cuit_valido(digitos):
+        raise HTTPException(status_code=400, detail="El CUIT no es válido: revisá los 11 dígitos y el dígito verificador.")
+    for fila in conn.execute('SELECT id, "NOM_PROVEE", "CUIT" FROM proveedores').fetchall():
+        if fila[0] != proveedor_id and _cuit_digitos(fila[2]) == digitos:
+            raise HTTPException(status_code=409, detail=f"Ya existe un proveedor con ese CUIT: {fila[1]}.")
+    formateado = f"{digitos[:2]}-{digitos[2:10]}-{digitos[10]}"
+    return values[:6] + (formateado,) + values[7:]
+
+
 @app.post("/compras/proveedores")
 async def compras_crear_proveedor(request: Request):
     _requiere_accion_compras(request, "proveedores", "crear")
     values = _proveedor_values(await request.json())
     with get_sqlite_connection() as conn:
+        values = _validar_cuit_proveedor(conn, values)
         conn.execute(
             '''
             INSERT INTO proveedores (
@@ -9836,6 +10129,7 @@ async def compras_actualizar_proveedor(proveedor_id: int, request: Request):
     with get_sqlite_connection() as conn:
         if conn.execute("SELECT id FROM proveedores WHERE id = ?", (proveedor_id,)).fetchone() is None:
             raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+        values = _validar_cuit_proveedor(conn, values, proveedor_id)
         conn.execute(
             '''
             UPDATE proveedores SET
@@ -10333,6 +10627,7 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
     with get_sqlite_connection() as conn:
         _ensure_estado_detalle_compra(conn)
         _ensure_gestion_manual_detalle_compra(conn)
+        _ensure_orden_compra_solicitudes(conn)
         cabecera = conn.execute(
             """
             SELECT sc.id, sc.numero_solicitud, sc.fecha_solicitud,
@@ -10372,7 +10667,14 @@ def compras_obtener_solicitud(solicitud_id: int, request: Request):
                      COALESCE(oc.numero_oc, '') AS gestion_orden_compra,
                      COALESCE(d.gestion_observacion, '') AS gestion_observacion,
                      COALESCE(d.gestion_usuario, '') AS gestion_usuario,
-                     COALESCE(d.gestion_fecha, '') AS gestion_fecha
+                     COALESCE(d.gestion_fecha, '') AS gestion_fecha,
+                     COALESCE((
+                         SELECT GROUP_CONCAT(DISTINCT voc.numero_oc)
+                         FROM OrdenCompraDetalleSolicitud vds
+                         INNER JOIN OrdenCompraDetalle vocd ON vocd.id = vds.orden_compra_detalle_id
+                         INNER JOIN OrdenCompra voc ON voc.id = vocd.orden_compra_id
+                         WHERE vds.solicitud_compra_detalle_id = d.id
+                     ), '') AS oc_vinculada
             FROM solicitud_compra_detalle d
             LEFT JOIN centros_costos cc ON cc.id = d.id_centro_costo
                  LEFT JOIN OrdenCompra oc ON oc.id = d.gestion_orden_compra_id
@@ -11749,8 +12051,8 @@ def centros_costos_para_recursos():
 
 
 @app.get("/vehiculos")
-def obtener_vehiculos():
-    return obtener_vehiculos_data()
+def obtener_vehiculos(incluir_inactivos: bool = False):
+    return obtener_vehiculos_data(incluir_inactivos)
 
 @app.get("/choferes")
 def obtener_choferes():
@@ -11766,6 +12068,11 @@ def crear_vehiculo(data: dict):
         existe = conn.execute("SELECT 1 FROM vehiculos WHERE codigo = ?", (codigo,)).fetchone()
         if existe:
             return {"error": "El codigo de vehiculo ya existe"}
+        try:  # el tipo sale del catálogo estándar (Vehículos › Tipos de equipo)
+            data["tipo"] = mck.validar_tipo_vehiculo(conn, data.get("tipo"))
+        except mt.MtError as exc:
+            return {"error": exc.mensaje}
+        data["activo"] = _vehiculo_activo_valor(data.get("activo"))
 
         conn.execute(
             """
@@ -11773,9 +12080,9 @@ def crear_vehiculo(data: dict):
                 codigo, propiedad, marca, tipo, modelo, dominio, anio, motor, chasis,
                 sector, proyecto, operativo,
                 habilitacion_pirquitas, habilitacion_exar, habilitacion_sdj,
-                habilitacion_rincon, habilitacion_arli, raw_json
+                habilitacion_rincon, habilitacion_arli, activo, raw_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 codigo,
@@ -11795,6 +12102,7 @@ def crear_vehiculo(data: dict):
                 data.get("habilitacion_sdj"),
                 data.get("habilitacion_rincon"),
                 data.get("habilitacion_arli"),
+                data["activo"],
                 json.dumps(data, ensure_ascii=False),
             ),
         )
@@ -11816,15 +12124,19 @@ def vehiculos_form(request: Request):
         _requiere_panel(request, "logistica", "vehiculos")
     except HTTPException:
         return RedirectResponse("/", status_code=302)
-    with open("vehiculos.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return _leer_html(os.path.join(BASE_DIR, "vehiculos.html"))
 
 @app.put("/vehiculos/{codigo}")
 def actualizar_vehiculo(codigo: str, data: dict):
     with get_sqlite_connection() as conn:
-        row = conn.execute("SELECT raw_json FROM vehiculos WHERE codigo = ?", (codigo,)).fetchone()
+        row = conn.execute("SELECT tipo, activo, raw_json FROM vehiculos WHERE codigo = ?", (codigo,)).fetchone()
         if row is None:
             return {"error": "Vehículo no encontrado"}
+        if "tipo" in data:
+            try:  # un tipo nuevo tiene que ser del catálogo; si no cambia se acepta aunque falte estandarizarlo
+                data["tipo"] = mck.validar_tipo_vehiculo(conn, data.get("tipo"), row["tipo"])
+            except mt.MtError as exc:
+                return {"error": exc.mensaje}
 
         base_data = {}
         try:
@@ -11833,6 +12145,7 @@ def actualizar_vehiculo(codigo: str, data: dict):
             base_data = {}
 
         base_data.update(data)
+        base_data["activo"] = _vehiculo_activo_valor(data.get("activo"), row["activo"] or "SI")
 
         conn.execute(
             """
@@ -11853,6 +12166,7 @@ def actualizar_vehiculo(codigo: str, data: dict):
                    habilitacion_sdj = ?,
                    habilitacion_rincon = ?,
                    habilitacion_arli = ?,
+                   activo = ?,
                    raw_json = ?
              WHERE codigo = ?
             """,
@@ -11873,6 +12187,7 @@ def actualizar_vehiculo(codigo: str, data: dict):
                 base_data.get("habilitacion_sdj"),
                 base_data.get("habilitacion_rincon"),
                 base_data.get("habilitacion_arli"),
+                base_data["activo"],
                 json.dumps(base_data, ensure_ascii=False),
                 codigo,
             ),
@@ -11927,6 +12242,11 @@ _TABLAS_REFERENCIAN_LEGAJO = [
     ("auditoria", "usuario"),
     ("tarja_registros", "legajo"),
     ("tarja_historial", "legajo"),
+    ("mt_novedades", "legajo_reporta"),
+    ("mt_novedad_confirmaciones", "legajo"),
+    ("mt_ot_mecanicos", "legajo"),
+    ("mt_ot_eventos", "legajo"),
+    ("mt_ot_tiempos", "legajo"),
 ]
 
 
@@ -12627,6 +12947,10 @@ def descontar_stock(conn, producto_id: int, cantidad: float):
 
 def migrar_tabla_stock(conn):
     asegurar_tabla_stock(conn)
+    conn.execute("CREATE TABLE IF NOT EXISTS stock_migracion (id INTEGER PRIMARY KEY CHECK (id = 1), fecha TEXT)")
+    if conn.execute("SELECT 1 FROM stock_migracion WHERE id = 1").fetchone():
+        return
+    conn.execute("INSERT OR IGNORE INTO stock_migracion (id, fecha) VALUES (1, ?)", (fecha_actual_iso(),))
     total = conn.execute("SELECT COUNT(*) AS total FROM stock").fetchone()["total"]
     if total:
         return
@@ -13057,8 +13381,10 @@ def generar_pdf_remito(
 @app.get("/almacen", response_class=HTMLResponse)
 def almacen_view(request: Request):
     try:
-        _requiere_panel(request, "almacen", "dashboard")
+        perfil = _requiere_modulo(request, "almacen")
     except HTTPException:
+        return RedirectResponse("/", status_code=302)
+    if not (perfil.get("es_desarrollador") or (perfil.get("paneles", {}) or {}).get("almacen")):
         return RedirectResponse("/", status_code=302)
     return _leer_html(ALMACEN_V2_PATH)
 
@@ -13346,6 +13672,10 @@ def crear_remito_ingreso(payload: AlmacenRIPayload):
         return {"error": "Debe indicar al menos un item"}
     fecha = payload.fecha or datetime.now().strftime("%Y-%m-%d")
     with get_sqlite_connection() as conn:
+        error_series = _validar_series_remito(conn, payload.items)
+        if error_series:
+            return {"error": error_series}
+        migrar_tabla_stock(conn)   # antes de escribir el detalle: la reconstrucción no debe ver este remito
         numero = obtener_siguiente_numero(conn, "remitos_ingreso", "RI")
         responsable = obtener_persona_por_legajo(conn, payload.responsable_legajo)
         responsable_nombre = responsable["nombre"] if responsable else ""
@@ -13685,6 +14015,10 @@ def crear_remito_entrega(payload: AlmacenREPayload):
     fecha = payload.fecha or datetime.now().strftime("%Y-%m-%d")
     with get_sqlite_connection() as conn:
         migrar_remitos_entrega_autorizacion(conn)
+        error_series = _validar_series_remito(conn, payload.items)
+        if error_series:
+            return {"error": error_series}
+        migrar_tabla_stock(conn)
         numero = obtener_siguiente_numero(conn, "remitos_entrega", "RE")
         entrega = obtener_persona_por_legajo(conn, payload.entrega_legajo)
         recibe = obtener_persona_por_legajo(conn, payload.recibe_legajo)
@@ -14232,10 +14566,48 @@ class ProductoV2Payload(BaseModel):
     id_modelo: int | None = None
     id_unidad: int | None = None
     id_ubicacion: int | None = None
-    tipo_control: str = "CONSUMIBLE"
-    stock_ingreso: float = 0
+    tipo_control: str = "CONSUMIBLE"   # SERIALIZADO: cada unidad lleva N.º de serie en ingresos y salidas
+    stock_ingreso: float = 0           # en desuso: se acepta por compatibilidad y se ignora
     punto_reposicion: float = 0
     observaciones: str = ""
+
+
+class PuntoReposicionItem(BaseModel):
+    id: int
+    punto_reposicion: float
+
+
+class PuntoReposicionLotePayload(BaseModel):
+    items: list[PuntoReposicionItem]
+
+
+class CatalogoV2EdicionPayload(BaseModel):
+    nombre: str | None = None
+    activo: int | None = None
+
+
+class CatalogoV2UnificarPayload(BaseModel):
+    origen_ids: list[int]
+    destino_id: int
+
+
+def _tipo_control_producto(valor) -> str:
+    return "SERIALIZADO" if str(valor or "").strip().upper() == "SERIALIZADO" else "CONSUMIBLE"
+
+
+def _validar_series_remito(conn, items):
+    """Productos serializados: la cantidad debe ser entera y coincidir con los N.º de serie (sin repetir)."""
+    for item in items:
+        fila = conn.execute("SELECT codigo, tipo_control FROM productos WHERE id = ?", (item.producto_id,)).fetchone()
+        if fila is None or _tipo_control_producto(fila["tipo_control"]) != "SERIALIZADO":
+            continue
+        series = [str(s).strip() for s in (item.series or []) if str(s).strip()]
+        if len({s.lower() for s in series}) != len(series):
+            return f"N.º de serie repetido en {fila['codigo']}"
+        cantidad = float(item.cantidad or 0)
+        if cantidad != int(cantidad) or len(series) != int(cantidad):
+            return f"{fila['codigo']} requiere un N.º de serie por unidad (cantidad {cantidad:g}, series {len(series)})"
+    return None
 
 
 class DocumentoDetalleV2Payload(BaseModel):
@@ -14447,12 +14819,14 @@ def dashboard_almacen_v2(top_n: int = Query(default=10, ge=1, le=50)):
             """
             SELECT
                 COALESCE(c.nombre, 'Sin categoria') AS categoria,
-                COALESCE(SUM(COALESCE(s.stock_actual, 0)), 0) AS total
+                COALESCE(SUM(COALESCE(s.stock_actual, 0)), 0) AS total,
+                COUNT(*) AS productos,
+                SUM(CASE WHEN COALESCE(s.stock_actual, 0) > 0 THEN 1 ELSE 0 END) AS con_stock
             FROM productos p
             LEFT JOIN categorias c ON c.id = p.categoria_id
             LEFT JOIN stock s ON s.producto_id = p.id
             GROUP BY COALESCE(c.nombre, 'Sin categoria')
-            ORDER BY total DESC
+            ORDER BY productos DESC, categoria ASC
             """
         ).fetchall()
 
@@ -14542,6 +14916,36 @@ def dashboard_almacen_v2(top_n: int = Query(default=10, ge=1, le=50)):
     }
 
 
+# Columna de productos que referencia a cada catálogo (los demás catálogos no tienen productos asociados).
+ALMACEN_V2_CATALOGO_COLUMNA_PRODUCTO = {
+    "categorias": "categoria_id",
+    "familias": "id_familia",
+    "marcas": "id_marca",
+    "modelos": "id_modelo",
+    "unidades": "COALESCE(id_unidad, unidad_medida_id)",
+    "ubicaciones": "ubicacion_id",
+}
+# Nombre cacheado en la tabla stock (se mantiene en línea al renombrar o unificar).
+ALMACEN_V2_CATALOGO_CACHE_STOCK = {
+    "familias": ("id_familia", "familia_nombre"),
+    "marcas": ("id_marca", "marca_nombre"),
+    "modelos": ("id_modelo", "modelo_nombre"),
+    "unidades": ("id_unidad", "unidad_nombre"),
+}
+
+
+def _productos_por_catalogo(conn, tipo: str) -> dict:
+    columna = ALMACEN_V2_CATALOGO_COLUMNA_PRODUCTO.get(tipo)
+    if not columna:
+        return {}
+    rows = conn.execute(f"SELECT {columna} AS k, COUNT(*) AS n FROM productos WHERE {columna} IS NOT NULL GROUP BY {columna}").fetchall()
+    return {int(r["k"]): int(r["n"]) for r in rows if r["k"] is not None}
+
+
+def _columnas_tabla(conn, tabla: str) -> set:
+    return {r[1] for r in conn.execute(f"PRAGMA table_info({tabla})").fetchall()}
+
+
 @app.get("/almacen/v2/catalogos/{tipo}")
 def listar_catalogo_v2(tipo: str):
     tabla = ALMACEN_V2_CATALOGOS.get(tipo)
@@ -14549,7 +14953,98 @@ def listar_catalogo_v2(tipo: str):
         return {"error": "Catalogo no soportado"}
     with get_sqlite_connection() as conn:
         rows = conn.execute(f"SELECT * FROM {tabla} ORDER BY id DESC").fetchall()
-    return [dict(r) for r in rows]
+        usos = _productos_por_catalogo(conn, tipo)
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["productos"] = usos.get(int(item["id"]), 0)
+        out.append(item)
+    return out
+
+
+@app.put("/almacen/v2/catalogos/{tipo}/{item_id}")
+def editar_catalogo_v2(tipo: str, item_id: int, payload: CatalogoV2EdicionPayload, request: Request):
+    _requiere_panel(request, "almacen", "catalogos")
+    tabla = ALMACEN_V2_CATALOGOS.get(tipo)
+    if not tabla:
+        return {"error": "Catalogo no soportado"}
+    with get_sqlite_connection() as conn:
+        prev = conn.execute(f"SELECT * FROM {tabla} WHERE id = ?", (item_id,)).fetchone()
+        if prev is None:
+            return {"error": "Registro inexistente"}
+        columnas = _columnas_tabla(conn, tabla)
+        cambios = {}
+        if payload.nombre is not None:
+            nombre = " ".join(payload.nombre.split())
+            if not nombre:
+                return {"error": "El nombre es obligatorio"}
+            clave = _clave_catalogo(nombre)
+            for r in conn.execute(f"SELECT id, nombre FROM {tabla} WHERE id <> ?", (item_id,)).fetchall():
+                if _clave_catalogo(r["nombre"]) == clave:
+                    return {"error": f"Ya existe «{r['nombre']}». Usá «Unificar» para juntarlos."}
+            cambios["nombre"] = nombre
+            if tabla == "ubicaciones" and "ruta" in columnas and (prev["ruta"] or "") in ("", prev["nombre"]):
+                cambios["ruta"] = nombre
+        if payload.activo is not None:
+            if "activo" not in columnas:
+                return {"error": "Este catálogo no se puede desactivar"}
+            cambios["activo"] = 1 if payload.activo else 0
+        if not cambios:
+            return {"error": "No hay cambios para guardar"}
+        conn.execute(
+            f"UPDATE {tabla} SET {', '.join(f'{k} = ?' for k in cambios)} WHERE id = ?",
+            (*cambios.values(), item_id),
+        )
+        cache = ALMACEN_V2_CATALOGO_CACHE_STOCK.get(tipo)
+        if cache and "nombre" in cambios:
+            conn.execute(f"UPDATE stock SET {cache[1]} = ? WHERE {cache[0]} = ?", (cambios["nombre"], item_id))
+        auditar_v2(conn, None, "UPDATE", tabla, item_id, dict(prev), cambios)
+        conn.commit()
+    return {"mensaje": "Registro actualizado"}
+
+
+@app.post("/almacen/v2/catalogos/{tipo}/unificar")
+def unificar_catalogo_v2(tipo: str, payload: CatalogoV2UnificarPayload, request: Request):
+    """Pasa los productos de los registros de origen al de destino y borra los de origen."""
+    _requiere_panel(request, "almacen", "catalogos")
+    tabla = ALMACEN_V2_CATALOGOS.get(tipo)
+    columna = ALMACEN_V2_CATALOGO_COLUMNA_PRODUCTO.get(tipo)
+    if not tabla or not columna:
+        return {"error": "Este catálogo no se puede unificar"}
+    origenes = sorted({int(x) for x in payload.origen_ids if int(x) != int(payload.destino_id)})
+    if not origenes:
+        return {"error": "Elegí al menos un registro distinto del destino"}
+    with get_sqlite_connection() as conn:
+        destino = conn.execute(f"SELECT * FROM {tabla} WHERE id = ?", (payload.destino_id,)).fetchone()
+        if destino is None:
+            return {"error": "El registro de destino no existe"}
+        previos = conn.execute(
+            f"SELECT * FROM {tabla} WHERE id IN ({','.join('?' * len(origenes))})", origenes
+        ).fetchall()
+        if len(previos) != len(origenes):
+            return {"error": "Algún registro de origen ya no existe"}
+        marcas_q = ",".join("?" * len(origenes))
+        columnas_prod = ["id_unidad", "unidad_medida_id"] if tipo == "unidades" else [columna]
+        movidos = conn.execute(
+            f"SELECT COUNT(*) FROM productos WHERE {columna} IN ({marcas_q})", origenes
+        ).fetchone()[0]
+        for col in columnas_prod:
+            conn.execute(f"UPDATE productos SET {col} = ? WHERE {col} IN ({marcas_q})", (payload.destino_id, *origenes))
+        if tipo == "marcas":
+            conn.execute(f"UPDATE modelos SET id_marca = ? WHERE id_marca IN ({marcas_q})", (payload.destino_id, *origenes))
+        if tipo == "ubicaciones":
+            conn.execute(f"UPDATE stock SET id_ubicacion = ? WHERE id_ubicacion IN ({marcas_q})", (payload.destino_id, *origenes))
+        cache = ALMACEN_V2_CATALOGO_CACHE_STOCK.get(tipo)
+        if cache:
+            conn.execute(
+                f"UPDATE stock SET {cache[0]} = ?, {cache[1]} = ? WHERE {cache[0]} IN ({marcas_q})",
+                (payload.destino_id, destino["nombre"], *origenes),
+            )
+        conn.execute(f"DELETE FROM {tabla} WHERE id IN ({marcas_q})", origenes)
+        for prev in previos:
+            auditar_v2(conn, None, "MERGE", tabla, prev["id"], dict(prev), {"destino_id": payload.destino_id})
+        conn.commit()
+    return {"mensaje": f"Unificados en «{destino['nombre']}»", "productos": movidos, "eliminados": len(origenes)}
 
 
 @app.post("/almacen/v2/catalogos/{tipo}")
@@ -14611,6 +15106,9 @@ def eliminar_catalogo_v2(tipo: str, item_id: int):
         prev = conn.execute(f"SELECT * FROM {tabla} WHERE id = ?", (item_id,)).fetchone()
         if prev is None:
             return {"error": "Registro inexistente"}
+        en_uso = _productos_por_catalogo(conn, tipo).get(int(item_id), 0)
+        if en_uso:
+            return {"error": f"No se puede eliminar: tiene {en_uso} producto(s) asociado(s). Desactivalo o unificalo con otro."}
         conn.execute(f"DELETE FROM {tabla} WHERE id = ?", (item_id,))
         auditar_v2(conn, None, "DELETE", tabla, item_id, dict(prev), None)
         conn.commit()
@@ -14673,11 +15171,11 @@ def crear_producto_v2(payload: ProductoV2Payload):
                     payload.id_modelo,
                     payload.id_unidad,
                     payload.id_unidad,
-                    "CONSUMIBLE",
+                    _tipo_control_producto(payload.tipo_control),
                     0,
                     0,
-                    0,
-                    None,
+                    payload.punto_reposicion or 0,
+                    payload.id_ubicacion,
                     payload.observaciones,
                     fecha_actual_iso(),
                     None,
@@ -14691,6 +15189,26 @@ def crear_producto_v2(payload: ProductoV2Payload):
             return {"error": "Base de datos ocupada. Reintente en unos segundos."}
         raise
     return {"mensaje": "Producto creado"}
+
+
+@app.put("/almacen/v2/productos/lote/punto-reposicion")
+def actualizar_punto_reposicion_lote_v2(payload: PuntoReposicionLotePayload, request: Request):
+    _requiere_panel(request, "almacen", "productos")
+    if not payload.items:
+        return {"error": "No hay cambios para guardar"}
+    if any(float(it.punto_reposicion) < 0 for it in payload.items):
+        return {"error": "El punto de reposición no puede ser negativo"}
+    with get_sqlite_connection() as conn:
+        actualizados = 0
+        for it in payload.items:
+            prev = conn.execute("SELECT id, punto_reposicion FROM productos WHERE id = ?", (it.id,)).fetchone()
+            if prev is None:
+                continue
+            conn.execute("UPDATE productos SET punto_reposicion = ? WHERE id = ?", (float(it.punto_reposicion), it.id))
+            auditar_v2(conn, None, "UPDATE", "productos", it.id, {"punto_reposicion": prev["punto_reposicion"]}, {"punto_reposicion": float(it.punto_reposicion)})
+            actualizados += 1
+        conn.commit()
+    return {"mensaje": "Punto de reposición actualizado", "actualizados": actualizados}
 
 
 @app.put("/almacen/v2/productos/{producto_id}")
@@ -14729,10 +15247,10 @@ def actualizar_producto_v2(producto_id: int, payload: ProductoV2Payload):
                 payload.id_modelo,
                 payload.id_unidad,
                 payload.id_unidad,
-                "CONSUMIBLE",
-                payload.stock_ingreso,
+                _tipo_control_producto(payload.tipo_control),
+                prev["stock_minimo"] or 0,
                 0,
-                payload.punto_reposicion,
+                payload.punto_reposicion or 0,
                 payload.id_ubicacion,
                 payload.observaciones,
                 None,
@@ -14817,6 +15335,45 @@ def _stock_v2_rows(
         item["stock_reservado"] = round(reservado, 2)
         item["stock_disponible"] = round(float(item.get("stock_actual") or 0) - reservado, 2)
         out.append(item)
+
+    # Productos sin registro de stock (dados de alta y nunca ingresados): se listan con stock 0,
+    # así Inventario y Productos muestran el mismo universo.
+    sin_registro = conn.execute(
+        """
+        SELECT
+            p.id,
+            COALESCE(p.codigo, '') AS codigo,
+            COALESCE(p.descripcion, '') AS descripcion,
+            COALESCE(f.nombre, '') AS familia_nombre,
+            COALESCE(m.nombre, '') AS marca_nombre,
+            COALESCE(md.nombre, '') AS modelo_nombre,
+            COALESCE(um.nombre, '') AS unidad_nombre,
+            COALESCE(c.nombre, '') AS categoria,
+            COALESCE(u.ruta, '') AS ubicacion,
+            0 AS stock_actual,
+            COALESCE(p.punto_reposicion, 0) AS punto_reposicion
+        FROM productos p
+        LEFT JOIN stock s ON s.producto_id = p.id
+        LEFT JOIN familias f ON f.id = p.id_familia
+        LEFT JOIN marcas m ON m.id = p.id_marca
+        LEFT JOIN modelos md ON md.id = p.id_modelo
+        LEFT JOIN unidades_medida um ON um.id = COALESCE(p.id_unidad, p.unidad_medida_id)
+        LEFT JOIN categorias c ON c.id = p.categoria_id
+        LEFT JOIN ubicaciones u ON u.id = p.ubicacion_id
+        WHERE s.id IS NULL
+          AND COALESCE(p.codigo, '') LIKE ?
+          AND COALESCE(p.descripcion, '') LIKE ?
+          AND (? IS NULL OR p.categoria_id = ?)
+          AND (? IS NULL OR p.ubicacion_id = ?)
+        """,
+        (codigo_like, descripcion_like, id_categoria, id_categoria, id_ubicacion, id_ubicacion),
+    ).fetchall()
+    for r in sin_registro:
+        item = dict(r)
+        item["stock_reservado"] = 0
+        item["stock_disponible"] = 0
+        out.append(item)
+    out.sort(key=lambda x: str(x.get("codigo") or ""))
     return out
 
 
@@ -14827,7 +15384,29 @@ def _filtrar_stock_v2_rows(
     descripcion: str = "",
     categoria: str = "",
     ubicacion: str = "",
+    familia: str = "",
+    stock: str = "",
+    q: str = "",
 ):
+    familia_q = (familia or "").strip().lower()
+    stock_q = (stock or "").strip().lower()
+    texto_q = (q or "").strip().lower()
+    if texto_q:   # misma búsqueda que la pantalla: código o descripción
+        filas = [f for f in filas if texto_q in f"{f.get('codigo') or ''} {f.get('descripcion') or ''}".lower()]
+    if familia_q or stock_q:
+        def _pasa(fila):
+            actual = float(fila.get("stock_actual") or 0)
+            repo = float(fila.get("punto_reposicion") or 0)
+            if familia_q and familia_q != str(fila.get("familia_nombre") or "").strip().lower():
+                return False
+            if stock_q == "con" and not actual > 0:
+                return False
+            if stock_q == "sin" and actual > 0:
+                return False
+            if stock_q == "repo" and not (actual > 0 and repo > 0 and actual <= repo):
+                return False
+            return True
+        filas = [f for f in filas if _pasa(f)]
     codigo_q = (codigo or "").strip().lower()
     descripcion_q = (descripcion or "").strip().lower()
     categoria_q = (categoria or "").strip().lower()
@@ -14857,6 +15436,9 @@ def inventarios_v2_pdf(
     descripcion: str = "",
     categoria: str = "",
     ubicacion: str = "",
+    familia: str = "",
+    stock: str = "",
+    q: str = "",
 ):
     with get_sqlite_connection() as conn:
         filas = _stock_v2_rows(conn)
@@ -14866,6 +15448,9 @@ def inventarios_v2_pdf(
         descripcion=descripcion,
         categoria=categoria,
         ubicacion=ubicacion,
+        familia=familia,
+        stock=stock,
+        q=q,
     )
 
     try:
@@ -15041,6 +15626,9 @@ def inventarios_v2_excel(
     descripcion: str = "",
     categoria: str = "",
     ubicacion: str = "",
+    familia: str = "",
+    stock: str = "",
+    q: str = "",
 ):
     with get_sqlite_connection() as conn:
         filas = _stock_v2_rows(conn)
@@ -15050,6 +15638,9 @@ def inventarios_v2_excel(
         descripcion=descripcion,
         categoria=categoria,
         ubicacion=ubicacion,
+        familia=familia,
+        stock=stock,
+        q=q,
     )
 
     try:
@@ -15219,6 +15810,33 @@ def listar_documentos_v2(tipo: str = ""):
             (tipo, tipo),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/almacen/v2/remitos/{tipo}/{remito_id}/items")
+def items_remito_v2(tipo: str, remito_id: int):
+    tabla = {"RI": "remitos_ingreso_detalle", "RE": "remitos_entrega_detalle"}.get((tipo or "").strip().upper())
+    if not tabla:
+        return {"error": "Tipo de remito no soportado"}
+    with get_sqlite_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT d.id, d.producto_id, d.cantidad, d.series_json, d.instalacion, p.codigo, p.descripcion
+            FROM {tabla} d
+            LEFT JOIN productos p ON p.id = d.producto_id
+            WHERE d.remito_id = ?
+            ORDER BY d.id
+            """,
+            (remito_id,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        item = dict(r)
+        try:
+            item["series"] = json.loads(item.pop("series_json") or "[]") or []
+        except (TypeError, ValueError):
+            item["series"] = []
+        out.append(item)
+    return out
 
 
 @app.get("/almacen/v2/documentos/{id_documento}/detalle")
@@ -16629,6 +17247,7 @@ def operador_metadata(request: Request):
     _op_operador(request)
     with get_sqlite_connection() as conn:
         datos = _operaciones_metadata_datos(conn)
+        pestanas_visibles = _op_tabs_leer(conn)
     return {
         "equipos": [{"ci": e["ci"], "display": e["display"]} for e in datos["equipos"]],
         "centros_costos": datos["centros_costos"],
@@ -16639,6 +17258,7 @@ def operador_metadata(request: Request):
         "firmas_supervisores": datos["firmas_supervisores"],
         # Supervisor de turno SMG: empleados activos (solo el nombre, como en el escritorio).
         "supervisores_smg": [m["nombre"] for m in datos["maquinistas"] if str(m["nombre"] or "").strip()],
+        "pestanas_visibles": pestanas_visibles,
     }
 
 
@@ -16833,13 +17453,14 @@ async def operador_crear_parte(request: Request):
             if archivo:
                 _foto_borrar_archivo(archivo)
             raise
+    _mt_revisar_preventivo(ci)  # la lectura nueva puede vencer un preventivo
     return {"ok": True, "id": nuevo_id, "mensaje": f"Parte Nº {nro_parte} del equipo {ci} cargado."}
 
 
 # Administración de PINs de operadores (solo ADMINISTRADOR).
 @app.get("/admin/operadores-pin")
 def admin_operadores_pin(request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     ahora = _sesion_texto(_sesion_ahora())
     with get_sqlite_connection() as conn:
         filas = conn.execute(
@@ -16870,7 +17491,7 @@ def admin_operadores_pin(request: Request):
 
 @app.get("/admin/operadores-pin/{legajo}/pin")
 def admin_operador_ver_pin(legajo: str, request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         fila = conn.execute("SELECT pin_hash, pin_cifrado FROM operador_pines WHERE legajo = ?", (legajo,)).fetchone()
         if not fila or not fila["pin_hash"]:
@@ -16886,7 +17507,7 @@ def admin_operador_ver_pin(legajo: str, request: Request):
 @app.post("/admin/operadores-pin/{legajo}/reset")
 def admin_operador_reset_pin(legajo: str, request: Request):
     """Borra el PIN y cierra sus sesiones: el operador vuelve a crearlo validando su DNI."""
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     ahora = _sesion_texto(_sesion_ahora())
     with get_sqlite_connection() as conn:
         cursor = conn.execute(
@@ -16914,7 +17535,7 @@ def admin_operador_reset_pin(legajo: str, request: Request):
 
 @app.post("/admin/operadores-pin/{legajo}/desbloquear")
 def admin_operador_desbloquear(legajo: str, request: Request):
-    _requiere_administrador(request)
+    _requiere_modulo_administracion(request)
     with get_sqlite_connection() as conn:
         conn.execute(
             """
@@ -18030,3 +18651,1087 @@ async def tarja_exportar(request: Request):
         return Response(contenido, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
     return _tarja_ejecutar(op, escritura=False)
+
+
+# ============================================================================
+# Mantenimiento (reemplaza a FleetCare) · Etapa 1: novedades, OT, app del mecánico, estado y ubicación de equipos.
+# Lógica en mantenimiento.py; pantalla web en mantenimiento.html; la app de operadores usa /operador/api/mt/*.
+# Aprobador de novedades = acción novedades.aprobar; administrador de Mantenimiento = acción ordenes.finalizar
+# (ambas se asignan por usuario en Administración).
+# ============================================================================
+import mantenimiento as mt  # noqa: E402
+
+MT_API = "/api/mantenimiento"
+MT_ESTADO_HTTP = {"PERMISO": 403, "NO_EXISTE": 404, "VALIDACION": 422}
+
+
+def _mt_requiere(request: Request, panel: str, accion: str):
+    return _requiere_accion(request, mt.MODULO, panel, accion)
+
+
+def _mt_autor(perfil):
+    return str(perfil.get("nombre_apellido") or perfil.get("usuario") or "").strip() or "usuario"
+
+
+def _mt_ejecutar(operacion, escritura=True):
+    conn = get_sqlite_connection()
+    try:
+        if escritura:
+            conn.execute("BEGIN IMMEDIATE")
+        resultado = operacion(conn)
+        if escritura:
+            conn.commit()
+        return resultado
+    except mt.MtError as exc:
+        conn.rollback()
+        return JSONResponse({"detail": exc.mensaje, "codigo": exc.codigo}, status_code=MT_ESTADO_HTTP.get(exc.codigo, 400))
+    except HTTPException:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"La operación viola una regla de integridad: {exc}", "codigo": "INTEGRIDAD"}, status_code=409)
+    except sqlite3.Error as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Error de base de datos: {exc}", "codigo": "BASE"}, status_code=500)
+    except (KeyError, TypeError, ValueError) as exc:
+        conn.rollback()
+        return JSONResponse({"detail": f"Datos incompletos o inválidos ({exc})", "codigo": "DATOS"}, status_code=400)
+    finally:
+        conn.close()
+
+
+import threading  # noqa: E402  (avisos por email en segundo plano)
+
+# --- avisos por email (en segundo plano: un SMTP lento o caído no frena la app) ---
+def _mt_destinatarios(conn, panel: str, accion: str):
+    """Usuarios activos con la acción (p. ej. novedades.aprobar) + responsables del módulo Mantenimiento."""
+    destinatarios = {}
+    for f in conn.execute(
+            """SELECT nombre_apellido, correo, acciones_json FROM usuarios
+               WHERE upper(COALESCE(estado, 'ACTIVO')) = 'ACTIVO' AND COALESCE(bloqueado, 0) = 0
+                 AND trim(COALESCE(correo, '')) <> ''"""):
+        acciones = parse_json_dict(f["acciones_json"], default={}) or {}
+        if accion in (((acciones.get(mt.MODULO) or {}).get(panel)) or []):
+            destinatarios[f["correo"].strip().casefold()] = {"correo": f["correo"].strip(), "nombre_apellido": f["nombre_apellido"]}
+    for r in _obtener_destinatarios_responsables(conn, mt.MODULO):
+        destinatarios.setdefault(r["correo"].strip().casefold(), r)
+    return list(destinatarios.values())
+
+
+def _mt_avisar(codigo: str, panel: str, accion: str, variables: dict):
+    def tarea():
+        asunto, destinatarios, smtp_host, smtp_port = "", [], "", 0
+        try:
+            with get_sqlite_connection() as conn:
+                lista = _mt_destinatarios(conn, panel, accion)
+            smtp_usuario, smtp_password, smtp_host, smtp_port, remitente = _smtp_config()
+            destinatarios = _deduplicar_emails(d.get("correo", "") for d in lista)
+            if not (smtp_usuario and smtp_password and remitente and destinatarios):
+                return
+            render = _renderizar_email_template(codigo, variables)
+            asunto = render["asunto"]
+            mensaje = _crear_mensaje_email(asunto, remitente, destinatarios, [], render["cuerpo"], render["formato"])
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as servidor:
+                servidor.login(smtp_usuario, smtp_password)
+                servidor.send_message(mensaje)
+        except Exception:
+            _registrar_error_email(codigo, variables.get("novedad_id") or variables.get("numero"), asunto, destinatarios,
+                                   smtp_host, smtp_port, "_mt_avisar")
+    threading.Thread(target=tarea, daemon=True).start()
+
+
+def _mt_fecha_aviso(marca: str) -> str:
+    return f"{marca[8:10]}/{marca[5:7]}/{marca[:4]} {marca[11:16]}"
+
+
+def _mt_avisar_reporte(resultado):
+    """Un reporte de un solo ítem avisa como novedad suelta; con varios, un único mail con la lista agrupada por equipo."""
+    if not isinstance(resultado, dict):
+        return resultado
+    novedades = resultado["novedades"]
+    if len(novedades) == 1:
+        _mt_avisar_novedad(novedades[0])
+        return resultado
+    por_equipo = {}
+    for n in novedades:
+        por_equipo.setdefault(n.get("objetivo") or n["ci"], []).append(n)
+    detalle = "\n".join(
+        f"{equipo}\n" + "\n".join(f"  · {n['descripcion']}{' (URGENTE)' if n['prioridad'] == 'URGENTE' else ''}" for n in lista)
+        for equipo, lista in por_equipo.items())
+    primera = novedades[0]
+    _mt_avisar("mt_reporte_novedades", "novedades", "aprobar", {
+        "reporte_id": resultado["reporte_id"], "cantidad": len(novedades), "equipos": len(por_equipo),
+        "urgentes": sum(1 for n in novedades if n["prioridad"] == "URGENTE"), "detalle": detalle,
+        "reportada_por": primera["reportada_por"], "origen": "App" if primera.get("origen") == "APP" else "Web",
+        "fecha": _mt_fecha_aviso(primera["creada_en"]),
+    })
+    return resultado
+
+
+def _mt_avisar_novedad(resultado):
+    if isinstance(resultado, dict):
+        _mt_avisar("mt_novedad", "novedades", "aprobar", {
+            "novedad_id": resultado["id"], "objetivo": resultado.get("objetivo") or "", "descripcion": resultado["descripcion"],
+            "prioridad": resultado["prioridad"], "reportada_por": resultado["reportada_por"],
+            "origen": "App" if resultado.get("origen") == "APP" else "Web",
+            "fecha": f"{resultado['creada_en'][8:10]}/{resultado['creada_en'][5:7]}/{resultado['creada_en'][:4]} {resultado['creada_en'][11:16]}",
+        })
+    return resultado
+
+
+# --- fotos de novedades y OT: archivo en DATA_DIR/Doc_Mantenimiento, registro en mt_fotos ---
+MT_FOTOS_DIR = os.path.join(DATA_DIR, "Doc_Mantenimiento")
+MT_FOTO_MAX_BYTES = 5 * 1024 * 1024  # la app la manda comprimida (≤ ~600 KB); la web puede subir el original
+
+
+def _mt_foto_ruta(archivo: str) -> str:
+    base = os.path.realpath(MT_FOTOS_DIR)
+    ruta = os.path.realpath(os.path.join(base, archivo))
+    if os.path.commonpath([base, ruta]) != base:
+        raise HTTPException(status_code=400, detail="Ruta de foto inválida.")
+    return ruta
+
+
+async def _mt_subir_foto(request: Request, autor: str, legajo=None, novedad_id=None, ot_id=None, legajo_mecanico=None):
+    formulario = await request.form()
+    archivo = formulario.get("foto")
+    if archivo is None or not hasattr(archivo, "read"):
+        raise HTTPException(status_code=400, detail="Falta la foto.")
+    contenido = await archivo.read(MT_FOTO_MAX_BYTES + 1)
+    if len(contenido) > MT_FOTO_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="La foto es demasiado grande (máximo 5 MB).")
+    if contenido.startswith(b"\xff\xd8\xff"):
+        tipo, extension = "image/jpeg", ".jpg"
+    elif contenido.startswith(b"\x89PNG\r\n\x1a\n"):
+        tipo, extension = "image/png", ".png"
+    else:
+        raise HTTPException(status_code=400, detail="La foto tiene que ser JPG o PNG.")
+    escrito = []
+
+    def op(conn):
+        campo, valor = mt.validar_destino_foto(conn, novedad_id=novedad_id, ot_id=ot_id, legajo_mecanico=legajo_mecanico)
+        ahora = datetime.now()
+        relativo = os.path.join(f"{ahora:%Y}", f"{ahora:%m}", f"{'nov' if campo == 'novedad_id' else 'ot'}{valor}_{secrets.token_hex(6)}{extension}")
+        ruta = _mt_foto_ruta(relativo)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "wb") as f:
+            f.write(contenido)
+        escrito.append(ruta)
+        foto_id = mt.registrar_foto(conn, campo, valor, relativo, len(contenido), tipo, autor, legajo)
+        return {"id": foto_id, "fotos": mt.fotos(conn, **{campo: valor})}
+    resultado = _mt_ejecutar(op)
+    if not isinstance(resultado, dict):
+        for ruta in escrito:
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+    return resultado
+
+
+def _mt_foto_respuesta(foto_id: int):
+    conn = get_sqlite_connection()
+    try:
+        fila = mt.foto(conn, foto_id)
+    except mt.MtError as exc:
+        raise HTTPException(status_code=404, detail=exc.mensaje)
+    finally:
+        conn.close()
+    ruta = _mt_foto_ruta(fila["archivo"])
+    if not os.path.exists(ruta):
+        raise HTTPException(status_code=404, detail="No se encontró el archivo de la foto.")
+    return FileResponse(ruta, media_type=fila["tipo"], headers={"Cache-Control": "private, max-age=3600"})
+
+
+def _mt_informe_pdf(datos, archivos):
+    """Informe integral multipágina: texto ajustado, logo, tablas y fotos optimizadas."""
+    from io import BytesIO
+    from xml.sax.saxutils import escape
+    from PIL import Image as PILImage
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+                                    Image as FlowImage, KeepTogether, HRFlowable)
+
+    salida = BytesIO()
+    margen = 17 * mm
+    styles = getSampleStyleSheet()
+    normal = ParagraphStyle("OTNormal", parent=styles["BodyText"], fontName="Helvetica", fontSize=8.5,
+                            leading=11.5, spaceAfter=2, wordWrap="LTR")
+    small = ParagraphStyle("OTSmall", parent=normal, fontSize=7.5, leading=9.5)
+    titulo = ParagraphStyle("OTTitulo", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=17,
+                           leading=21, textColor=colors.HexColor("#17365D"), alignment=TA_CENTER, spaceAfter=8)
+    seccion = ParagraphStyle("OTSeccion", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=10.5,
+                             leading=13, textColor=colors.HexColor("#17365D"), spaceBefore=9, spaceAfter=5,
+                             keepWithNext=True)
+    etiqueta = ParagraphStyle("OTEtiqueta", parent=small, fontName="Helvetica-Bold")
+
+    def p(valor, estilo=normal):
+        if valor is None or valor == "":
+            valor = "—"
+        texto = escape(str(valor)).replace("\r\n", "\n").replace("\n", "<br/>")
+        return Paragraph(texto, estilo)
+
+    def tabla(filas, anchos=None, encabezado=True):
+        if not filas:
+            return p("Sin registros.", small)
+        t = Table(filas, colWidths=anchos, repeatRows=1 if encabezado else 0, hAlign="LEFT")
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")) if encabezado else ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#17365D")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    def valor(v, decimales=2):
+        try:
+            return f"{float(v):,.{decimales}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except (TypeError, ValueError):
+            return "—" if v is None else str(v)
+
+    def encabezado_pagina(pdf, doc):
+        if os.path.isfile(MEMBRETE_LOGO_PATH):
+            pdf.drawImage(MEMBRETE_LOGO_PATH, margen, A4[1] - 15 * mm, width=34 * mm, height=12 * mm,
+                          preserveAspectRatio=True, anchor="sw", mask="auto")
+        pdf.setFont("Helvetica-Bold", 9)
+        pdf.setFillColor(colors.HexColor("#17365D"))
+        pdf.drawRightString(A4[0] - margen, A4[1] - 11 * mm, f"INFORME DE OT {datos.get('numero', '')}")
+        pdf.setStrokeColor(colors.HexColor("#CBD5E1"))
+        pdf.line(margen, A4[1] - 18 * mm, A4[0] - margen, A4[1] - 18 * mm)
+        pdf.setFont("Helvetica", 7)
+        pdf.setFillColor(colors.HexColor("#64748B"))
+        pdf.drawString(margen, 9 * mm, f"SMG · {datos.get('numero', '')}")
+        pdf.drawRightString(A4[0] - margen, 9 * mm, f"Página {doc.page}")
+
+    doc = SimpleDocTemplate(salida, pagesize=A4, leftMargin=margen, rightMargin=margen,
+                            topMargin=25 * mm, bottomMargin=16 * mm,
+                            title=f"Informe de Orden de Trabajo {datos.get('numero', '')}",
+                            author="SMG")
+    story = [Paragraph(f"INFORME DE ORDEN DE TRABAJO {escape(str(datos.get('numero', '')))}", titulo)]
+    story.append(Paragraph("Datos generales", seccion))
+    general = [
+        [p("Equipo / CI", etiqueta), p(datos.get("ci") or datos.get("objetivo")), p("Tipo", etiqueta), p(datos.get("tipo"))],
+        [p("Título", etiqueta), p(datos.get("titulo")), p("Estado", etiqueta), p(datos.get("estado"))],
+        [p("Prioridad", etiqueta), p(datos.get("prioridad")), p("Centro de costo", etiqueta), p(datos.get("centro_costo_id"))],
+        [p("Creada", etiqueta), p(f"{datos.get('creada_en') or '—'} · {datos.get('creada_por') or '—'}"), p("Actualizada", etiqueta), p(datos.get("actualizada_en"))],
+        [p("Finalizada", etiqueta), p(f"{datos.get('finalizada_en') or '—'} · {datos.get('finalizada_por') or '—'}"), p("Días abierta", etiqueta), p(datos.get("dias"))],
+        [p("Descripción", etiqueta), p(datos.get("descripcion")), p("Objetivo", etiqueta), p(datos.get("objetivo"))],
+    ]
+    story.append(tabla(general, [25*mm, 56*mm, 25*mm, 56*mm], encabezado=False))
+    if datos.get("estado_equipo_final"):
+        story.append(p(f"Estado final del equipo: {datos['estado_equipo_final']}", small))
+
+    story.append(Paragraph("Personal asignado", seccion))
+    mecanicos = [[p("Legajo", etiqueta), p("Nombre", etiqueta)]]
+    mecanicos.extend([[p(m.get("legajo"), small), p(m.get("nombre"), small)] for m in datos.get("mecanicos", [])])
+    story.append(tabla(mecanicos, [35*mm, 127*mm]))
+
+    if datos.get("novedad"):
+        n = datos["novedad"]
+        story.append(Paragraph("Novedad de origen", seccion))
+        novedad_rows = [[p("Novedad", etiqueta), p(f"#{n.get('id')} · {n.get('descripcion')}")],
+                        [p("Reportada", etiqueta), p(f"{n.get('creada_en') or '—'} · {n.get('reportada_por') or '—'} · {n.get('origen') or '—'}")],
+                        [p("Resolución", etiqueta), p(n.get("resolucion"))]]
+        story.append(tabla(novedad_rows, [32*mm, 130*mm], encabezado=False))
+        if n.get("confirmaciones_detalle"):
+            story.append(Paragraph("Confirmaciones de la novedad", seccion))
+            conf = [[p("Fecha", etiqueta), p("Persona / legajo", etiqueta), p("Comentario", etiqueta)]]
+            conf.extend([[p(c.get("creada_en"), small), p(f"{c.get('autor') or ''} · {c.get('legajo') or ''}", small), p(c.get("comentario"), small)]
+                         for c in n["confirmaciones_detalle"]])
+            story.append(tabla(conf, [36*mm, 48*mm, 78*mm]))
+
+    story.append(Paragraph("Trabajo y observaciones", seccion))
+    eventos = [[p("Fecha", etiqueta), p("Evento / operador", etiqueta), p("Detalle / observación", etiqueta)]]
+    eventos.extend([[p(e.get("creado_en"), small), p(f"{e.get('tipo') or ''} · {e.get('autor') or ''} · {e.get('legajo') or ''}", small), p(e.get("texto"), small)]
+                    for e in reversed(datos.get("eventos", []))])
+    story.append(tabla(eventos, [34*mm, 51*mm, 77*mm]))
+
+    if datos.get("tareas_estado") or datos.get("tareas"):
+        story.append(Paragraph("Tareas de la OT", seccion))
+        tareas = [[p("Estado", etiqueta), p("Tarea", etiqueta), p("Completada por / fecha", etiqueta)]]
+        estados = datos.get("tareas_estado") or []
+        for i, t in enumerate(estados):
+            tareas.append([p("Hecha" if t.get("hecha") else "Pendiente", small), p(t.get("texto"), small),
+                           p(f"{t.get('hecha_por') or ''} · {t.get('hecha_en') or ''}" if t.get("hecha") else "—", small)])
+        if not estados:
+            tareas.extend([[p("Planificada", small), p(t, small), p("—", small)] for t in datos.get("tareas", [])])
+        story.append(tabla(tareas, [27*mm, 85*mm, 50*mm]))
+    if datos.get("tipo") == "PREVENTIVA":
+        story.append(Paragraph("Lecturas del mantenimiento preventivo", seccion))
+        story.append(tabla([[p("Horómetro", etiqueta), p(valor(datos.get("lectura_hs"), 1) + " h" if datos.get("lectura_hs") is not None else "—"),
+                             p("Kilometraje", etiqueta), p(valor(datos.get("lectura_km"), 1) + " km" if datos.get("lectura_km") is not None else "—")]],
+                           [29*mm, 52*mm, 29*mm, 52*mm], encabezado=False))
+
+    story.append(Paragraph("Repuestos", seccion))
+    repuestos = [[p(x, etiqueta) for x in ("Origen", "Código", "Descripción / referencia", "Cant.", "Unidad", "Costo unit.", "Cargó / fecha", "Remito")]]
+    for r in datos.get("repuestos", []):
+        remito = " · ".join(str(x) for x in (r.get("remito_numero"), r.get("remito_estado")) if x)
+        repuestos.append([p(r.get("origen"), small), p(r.get("codigo"), small),
+                          p(f"{r.get('descripcion') or ''} · {r.get('referencia') or ''}", small),
+                          p(valor(r.get("cantidad"), 2), small), p(r.get("unidad"), small),
+                          p(valor(r.get("costo_unitario")), small), p(f"{r.get('cargado_por') or ''} · {r.get('cargado_en') or ''}", small), p(remito, small)])
+    story.append(tabla(repuestos, [19*mm, 18*mm, 38*mm, 13*mm, 14*mm, 20*mm, 27*mm, 19*mm]))
+    moneda = (datos.get("config") or {}).get("moneda", "")
+    story.append(Spacer(1, 4))
+    story.append(p(f"Totales · Mano de obra: {moneda} {valor(datos.get('costo_mano_obra'))} · Repuestos: {moneda} {valor(datos.get('costo_repuestos'))} · Total: {moneda} {valor(datos.get('costo_total'))} · Horas: {valor(datos.get('horas'))} h", small))
+
+    story.append(Paragraph("Registro de tiempos por operador", seccion))
+    tiempos = [[p("Operador", etiqueta), p("Legajo", etiqueta), p("Inicio", etiqueta), p("Fin", etiqueta), p("Horas", etiqueta)]]
+    for t in datos.get("tiempos", []):
+        horas = valor((t.get("minutos") or 0) / 60)
+        tiempos.append([p(t.get("nombre"), small), p(t.get("legajo"), small), p(t.get("inicio"), small), p(t.get("fin") or "En curso"), p(horas, small)])
+    story.append(tabla(tiempos, [39*mm, 22*mm, 39*mm, 39*mm, 19*mm]))
+
+    if datos.get("control_tarja"):
+        story.append(Paragraph("Control contra Tarja", seccion))
+        control = [[p(x, etiqueta) for x in ("Fecha", "Operador", "Horas OT", "Horas Tarja", "Centro / código", "Resultado")]]
+        for c in datos["control_tarja"]:
+            control.append([p(c.get("fecha"), small), p(f"{c.get('nombre')} · {c.get('legajo')}", small),
+                            p(valor(c.get("horas_cronometro")), small), p(valor(c.get("horas_tarja")) if c.get("horas_tarja") is not None else "—", small),
+                            p(c.get("tarja"), small), p(c.get("alerta") or "OK", small)])
+        story.append(tabla(control, [23*mm, 39*mm, 22*mm, 22*mm, 47*mm, 22*mm]))
+
+    story.append(Paragraph("Registro fotográfico", seccion))
+    if not archivos:
+        story.append(p("Esta OT no tenía fotos adjuntas."))
+    for indice, (_nombre, contenido, subida_por, subida_en) in enumerate(archivos, 1):
+        original = PILImage.open(BytesIO(contenido)).convert("RGB")
+        original.thumbnail((1500, 1500), PILImage.Resampling.LANCZOS)
+        comprimida = BytesIO()
+        original.save(comprimida, format="JPEG", quality=72, optimize=True)
+        comprimida.seek(0)
+        foto = FlowImage(comprimida)
+        max_w, max_h = A4[0] - 2 * margen, A4[1] - 55 * mm
+        escala = min(max_w / foto.imageWidth, max_h / foto.imageHeight, 1)
+        foto.drawWidth *= escala
+        foto.drawHeight *= escala
+        story.append(KeepTogether([p(f"Foto {indice} · {subida_en} · {subida_por}", etiqueta), Spacer(1, 3), foto, Spacer(1, 7)]))
+
+    doc.build(story, onFirstPage=encabezado_pagina, onLaterPages=encabezado_pagina)
+    return salida.getvalue()
+
+
+def _mt_asegurar_informe(ot_id):
+    """Guarda el PDF primero; solo entonces elimina fotos y registros originales."""
+    conn = get_sqlite_connection()
+    try:
+        orden = conn.execute("SELECT * FROM mt_ordenes WHERE id = ?", (int(ot_id),)).fetchone()
+        if not orden:
+            raise HTTPException(status_code=404, detail="La OT no existe.")
+        if orden["estado"] != "FINALIZADA":
+            raise HTTPException(status_code=409, detail="El informe se genera al finalizar la OT.")
+        if orden["informe_archivo"]:
+            return orden["informe_archivo"]
+        datos = mt.detalle_orden(conn, ot_id)
+        if datos.get("ci"):
+            estado = conn.execute("SELECT estado FROM mt_equipos WHERE UPPER(TRIM(ci)) = UPPER(TRIM(?))", (datos["ci"],)).fetchone()
+            datos["estado_equipo_final"] = estado["estado"] if estado else None
+        filas = conn.execute(
+            "SELECT id, archivo, subida_por, subida_en FROM mt_fotos WHERE ot_id = ? OR novedad_id = ? ORDER BY subida_en, id",
+            (ot_id, orden["novedad_id"] or -1),
+        ).fetchall()
+    finally:
+        conn.close()
+    fuentes = []
+    for foto in filas:
+        ruta = _mt_foto_ruta(foto["archivo"])
+        if not os.path.isfile(ruta):
+            raise HTTPException(status_code=409, detail="Falta una foto adjunta; no se borró ningún original.")
+        with open(ruta, "rb") as archivo:
+            fuentes.append((foto["id"], foto["archivo"], archivo.read(), foto["subida_por"], foto["subida_en"]))
+    pdf = _mt_informe_pdf(datos, [(f[1], f[2], f[3], f[4]) for f in fuentes])
+    relativo = os.path.join("informes", f"{orden['numero'].replace('/', '-')}.pdf")
+    destino = _mt_foto_ruta(relativo)
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    temporal = destino + ".tmp"
+    with open(temporal, "wb") as archivo:
+        archivo.write(pdf)
+    os.replace(temporal, destino)
+    try:
+        conn = get_sqlite_connection()
+        conn.execute("BEGIN IMMEDIATE")
+        actual = conn.execute("SELECT informe_archivo FROM mt_ordenes WHERE id = ?", (ot_id,)).fetchone()
+        if actual["informe_archivo"]:
+            relativo = actual["informe_archivo"]
+        else:
+            conn.execute("UPDATE mt_ordenes SET informe_archivo = ?, informe_generado_en = ? WHERE id = ?",
+                         (relativo, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ot_id))
+            if fuentes:
+                conn.executemany("DELETE FROM mt_fotos WHERE id = ?", [(f[0],) for f in fuentes])
+        conn.commit()
+        conn.close()
+    except Exception:
+        try:
+            conn.rollback(); conn.close()
+        except Exception:
+            pass
+        raise
+    for foto in fuentes:
+        try:
+            os.remove(_mt_foto_ruta(foto[1]))
+        except FileNotFoundError:
+            pass
+    return relativo
+
+
+def _mt_informe_respuesta(ot_id):
+    conn = get_sqlite_connection()
+    try:
+        fila = conn.execute("SELECT estado, informe_archivo, numero FROM mt_ordenes WHERE id = ?", (ot_id,)).fetchone()
+    finally:
+        conn.close()
+    if not fila:
+        raise HTTPException(status_code=404, detail="La OT no existe.")
+    if fila["estado"] == "FINALIZADA" and not fila["informe_archivo"]:
+        _mt_asegurar_informe(ot_id)
+        conn = get_sqlite_connection()
+        try:
+            fila = conn.execute("SELECT estado, informe_archivo, numero FROM mt_ordenes WHERE id = ?", (ot_id,)).fetchone()
+        finally:
+            conn.close()
+    if not fila["informe_archivo"]:
+        raise HTTPException(status_code=404, detail="Esta OT todavía no tiene informe.")
+    ruta = _mt_foto_ruta(fila["informe_archivo"])
+    if not os.path.isfile(ruta):
+        raise HTTPException(status_code=404, detail="No se encontró el informe de esta OT.")
+    return FileResponse(ruta, media_type="application/pdf", filename=f"{fila['numero']}.pdf")
+
+
+@app.get(MT_API + "/fotos/{foto_id}")
+def mt_foto(request: Request, foto_id: int):
+    _requiere_modulo(request, mt.MODULO)
+    return _mt_foto_respuesta(foto_id)
+
+
+@app.get(MT_API + "/ordenes/{ot_id}/informe")
+def mt_orden_informe(request: Request, ot_id: int):
+    _mt_requiere(request, "ordenes", "consultar")
+    return _mt_informe_respuesta(ot_id)
+
+
+@app.post(MT_API + "/novedades/{novedad_id}/fotos")
+async def mt_novedad_foto(request: Request, novedad_id: int):
+    perfil = _mt_requiere(request, "novedades", "cargar")
+    return await _mt_subir_foto(request, _mt_autor(perfil), novedad_id=novedad_id)
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/fotos")
+async def mt_orden_foto(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    return await _mt_subir_foto(request, _mt_autor(perfil), ot_id=ot_id)
+
+
+@app.get(MT_API + "/opciones")
+def mt_opciones(request: Request):
+    _requiere_modulo(request, mt.MODULO)
+    return _mt_ejecutar(mt.opciones, escritura=False)
+
+
+@app.get(MT_API + "/resumen")
+def mt_resumen(request: Request):
+    _requiere_modulo(request, mt.MODULO)
+    _mt_revisar_preventivo()  # los vencimientos por días avanzan solos: se revisan al abrir Mantenimiento
+    return _mt_ejecutar(mt.resumen, escritura=False)
+
+
+# --- novedades ---
+@app.get(MT_API + "/novedades")
+def mt_novedades(request: Request, estado: str = "ABIERTA", ci: str = "", centro_costo_id: int = 0, tipo: str = ""):
+    _mt_requiere(request, "novedades", "consultar")
+    return _mt_ejecutar(lambda conn: mt.listar_novedades(conn, estado.upper(), ci, centro_costo_id or None, tipo.upper()), escritura=False)
+
+
+@app.get(MT_API + "/novedades/parecidas")
+def mt_novedades_parecidas(request: Request, ci: str = "", descripcion: str = ""):
+    """Aviso (no bloquea) de novedades parecidas del mismo equipo mientras se escribe un ítem."""
+    _mt_requiere(request, "novedades", "cargar")
+    return _mt_ejecutar(lambda conn: mt.novedades_parecidas(conn, ci, descripcion), escritura=False)
+
+
+@app.post(MT_API + "/novedades/reporte")
+async def mt_novedades_reporte(request: Request):
+    """Varias novedades juntas (uno o más equipos, varios ítems por equipo)."""
+    perfil = _mt_requiere(request, "novedades", "cargar")
+    datos = await _am_json(request)
+    return _mt_avisar_reporte(_mt_ejecutar(lambda conn: mt.crear_reporte(conn, datos.get("items"), _mt_autor(perfil), origen="WEB")))
+
+
+@app.get(MT_API + "/novedades/{novedad_id}")
+def mt_novedad(request: Request, novedad_id: int):
+    _mt_requiere(request, "novedades", "consultar")
+    return _mt_ejecutar(lambda conn: mt.detalle_novedad(conn, novedad_id), escritura=False)
+
+
+@app.post(MT_API + "/novedades")
+async def mt_novedad_crear(request: Request):
+    perfil = _mt_requiere(request, "novedades", "cargar")
+    datos = await _am_json(request)
+    return _mt_avisar_novedad(_mt_ejecutar(lambda conn: mt.crear_novedad(conn, datos, _mt_autor(perfil), origen="WEB")))
+
+
+@app.post(MT_API + "/novedades/{novedad_id}/confirmar")
+async def mt_novedad_confirmar(request: Request, novedad_id: int):
+    perfil = _mt_requiere(request, "novedades", "cargar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.confirmar_novedad(conn, novedad_id, _mt_autor(perfil), comentario=datos.get("comentario", "")))
+
+
+@app.post(MT_API + "/novedades/{novedad_id}/resolver")
+async def mt_novedad_resolver(request: Request, novedad_id: int):
+    perfil = _mt_requiere(request, "novedades", "aprobar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.resolver_novedad(conn, novedad_id, datos, _mt_autor(perfil)))
+
+
+# --- órdenes de trabajo ---
+@app.get(MT_API + "/ordenes")
+def mt_ordenes(request: Request, estado: str = "ACTIVAS", ci: str = "", legajo: str = ""):
+    _mt_requiere(request, "ordenes", "consultar")
+    return _mt_ejecutar(lambda conn: mt.listar_ordenes(conn, estado.upper(), ci, legajo), escritura=False)
+
+
+@app.get(MT_API + "/ordenes/{ot_id}")
+def mt_orden(request: Request, ot_id: int):
+    _mt_requiere(request, "ordenes", "consultar")
+    return _mt_ejecutar(lambda conn: mt.detalle_orden(conn, ot_id), escritura=False)
+
+
+@app.post(MT_API + "/ordenes")
+async def mt_orden_crear(request: Request):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.crear_orden(conn, datos, _mt_autor(perfil)))
+
+
+@app.put(MT_API + "/ordenes/{ot_id}/mecanicos")
+async def mt_orden_mecanicos(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.asignar_mecanicos(conn, ot_id, datos.get("mecanicos"), _mt_autor(perfil)))
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/comentario")
+async def mt_orden_comentario(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.comentar_orden(conn, ot_id, datos.get("texto"), _mt_autor(perfil)))
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/anular")
+async def mt_orden_anular(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.anular_orden(conn, ot_id, datos.get("motivo"), _mt_autor(perfil)))
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/finalizar")
+async def mt_orden_finalizar(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "finalizar")
+    datos = await _am_json(request)
+    resultado = _mt_ejecutar(lambda conn: mt.finalizar_orden(conn, ot_id, datos, _mt_autor(perfil)))
+    if isinstance(resultado, dict) and resultado.get("estado") == "FINALIZADA":
+        _mt_asegurar_informe(ot_id)
+        return _mt_ejecutar(lambda conn: mt.detalle_orden(conn, ot_id), escritura=False)
+    return resultado
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/devolver")
+async def mt_orden_devolver(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "finalizar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.devolver_orden(conn, ot_id, datos.get("observacion"), _mt_autor(perfil)))
+
+
+# --- equipos ---
+@app.get(MT_API + "/equipos")
+def mt_equipos(request: Request):
+    _mt_requiere(request, "equipos", "consultar")
+    return _mt_ejecutar(mt.listar_equipos, escritura=False)
+
+
+@app.get(MT_API + "/equipos/{ci}")
+def mt_equipo(request: Request, ci: str):
+    _mt_requiere(request, "equipos", "consultar")
+    return _mt_ejecutar(lambda conn: mt.historial_equipo(conn, ci), escritura=False)
+
+
+@app.put(MT_API + "/equipos/{ci}/estado")
+async def mt_equipo_estado(request: Request, ci: str):
+    perfil = _mt_requiere(request, "equipos", "cambiar_estado")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.cambiar_estado_equipo(conn, ci, datos.get("estado"), _mt_autor(perfil), datos.get("motivo")))
+
+
+@app.put(MT_API + "/equipos/{ci}/ubicacion")
+async def mt_equipo_ubicacion(request: Request, ci: str):
+    perfil = _mt_requiere(request, "equipos", "cambiar_estado")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.cambiar_ubicacion(conn, ci, datos.get("centro_costo_id"), _mt_autor(perfil), datos.get("motivo")))
+
+
+# --- configuración ---
+@app.put(MT_API + "/config")
+async def mt_config(request: Request):
+    perfil = _mt_requiere(request, "configuracion", "configurar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mt.guardar_config(conn, datos, _mt_autor(perfil)))
+
+
+# --- preventivo (planes por horas / km / días), repuestos de la OT y lecturas a revisar ---
+import mantenimiento_preventivo as mpv  # noqa: E402
+
+
+@app.get(MT_API + "/preventivo")
+def mt_preventivo(request: Request, ci: str = ""):
+    _mt_requiere(request, "preventivo", "consultar")
+    return _mt_ejecutar(lambda conn: mpv.estado(conn, ci), escritura=False)
+
+
+@app.get(MT_API + "/preventivo/planes")
+def mt_preventivo_planes(request: Request):
+    _mt_requiere(request, "preventivo", "consultar")
+    return _mt_ejecutar(mpv.planes, escritura=False)
+
+
+@app.post(MT_API + "/preventivo/planes")
+async def mt_preventivo_plan_crear(request: Request):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.guardar_plan(conn, datos, _mt_autor(perfil)))
+
+
+@app.put(MT_API + "/preventivo/planes/{plan_id}")
+async def mt_preventivo_plan_modificar(request: Request, plan_id: int):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.guardar_plan(conn, datos, _mt_autor(perfil), plan_id))
+
+
+@app.post(MT_API + "/preventivo/planes/{plan_id}/equipos")
+async def mt_preventivo_asignar(request: Request, plan_id: int):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.asignar_equipos(conn, plan_id, datos, _mt_autor(perfil)))
+
+
+@app.get(MT_API + "/preventivo/asignaciones/{asignacion_id}")
+def mt_preventivo_asignacion(request: Request, asignacion_id: int):
+    _mt_requiere(request, "preventivo", "consultar")
+    return _mt_ejecutar(lambda conn: mpv.detalle_asignacion(conn, asignacion_id), escritura=False)
+
+
+@app.delete(MT_API + "/preventivo/asignaciones/{asignacion_id}")
+def mt_preventivo_quitar(request: Request, asignacion_id: int):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    return _mt_ejecutar(lambda conn: mpv.quitar_equipo(conn, asignacion_id, _mt_autor(perfil)))
+
+
+@app.post(MT_API + "/preventivo/asignaciones/{asignacion_id}/realizado")
+async def mt_preventivo_realizado(request: Request, asignacion_id: int):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.registrar_realizado(conn, asignacion_id, datos, _mt_autor(perfil)))
+
+
+@app.post(MT_API + "/preventivo/asignaciones/{asignacion_id}/ot")
+async def mt_preventivo_ot(request: Request, asignacion_id: int):
+    _mt_requiere(request, "preventivo", "consultar")
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.crear_ot(conn, asignacion_id, datos, _mt_autor(perfil)))
+
+
+@app.get(MT_API + "/preventivo/lecturas")
+def mt_preventivo_lecturas(request: Request, todas: bool = False, ci: str = ""):
+    _mt_requiere(request, "preventivo", "consultar")
+    return _mt_ejecutar(lambda conn: mpv.lecturas_observadas(conn, not todas, ci), escritura=False)
+
+
+@app.post(MT_API + "/preventivo/lecturas/{obs_id}/revisada")
+async def mt_preventivo_lectura_revisada(request: Request, obs_id: int):
+    perfil = _mt_requiere(request, "preventivo", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.revisar_observada(conn, obs_id, datos.get("nota"), _mt_autor(perfil)))
+
+
+def _mt_revisar_preventivo(ci=""):
+    """Mail a quienes gestionan el preventivo cuando un equipo pasa a Próximo o Vencido. Nunca corta la operación."""
+    try:
+        nuevos = _mt_ejecutar(lambda conn: mpv.marcar_avisos(conn, ci))
+    except Exception:
+        return
+    if isinstance(nuevos, list) and nuevos:
+        _mt_avisar("mt_preventivo", "preventivo", "gestionar", {
+            "cantidad": len(nuevos), "vencidos": sum(1 for r in nuevos if r["estado"] == "VENCIDO"),
+            "proximos": sum(1 for r in nuevos if r["estado"] == "PROXIMO"), "detalle": mpv.texto_aviso(nuevos)})
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/repuestos/almacen")
+async def mt_orden_pedir_almacen(request: Request, ot_id: int):
+    """Pide el repuesto a Almacén: remito de entrega PENDIENTE (reserva stock; se descuenta cuando Almacén lo autoriza)."""
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    pedido = _mt_ejecutar(lambda conn: mpv.preparar_pedido_almacen(conn, ot_id, datos), escritura=False)
+    if not isinstance(pedido, dict):
+        return pedido
+    remito = crear_remito_entrega(AlmacenREPayload(**pedido))
+    if remito.get("error"):
+        return JSONResponse({"detail": remito["error"], "codigo": "ALMACEN"}, status_code=422)
+    return _mt_ejecutar(lambda conn: mpv.registrar_pedido_almacen(conn, ot_id, remito["id"], remito["numero"], datos, _mt_autor(perfil)))
+
+
+@app.put(MT_API + "/ordenes/{ot_id}/tareas/{orden}")
+async def mt_orden_tarea(request: Request, ot_id: int, orden: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.marcar_tarea(conn, ot_id, orden, datos.get("hecha"), _mt_autor(perfil)))
+
+
+@app.post("/operador/api/mt/ordenes/{ot_id}/tareas/{orden}")
+async def op_mt_orden_tarea(request: Request, ot_id: int, orden: int, payload: dict = Body(default={})):
+    o = _op_operador(request)
+    return _mt_ejecutar(lambda conn: mpv.marcar_tarea(conn, ot_id, orden, (payload or {}).get("hecha"), o["nombre"], legajo=o["legajo"]))
+
+
+# --- indicadores (etapa 3) ---
+import mantenimiento_indicadores as mind  # noqa: E402
+
+
+@app.get(MT_API + "/indicadores")
+def mt_indicadores(request: Request, desde: str = "", hasta: str = ""):
+    _mt_requiere(request, "indicadores", "consultar")
+    return _mt_ejecutar(lambda conn: mind.indicadores(conn, desde, hasta), escritura=False)
+
+
+@app.get(MT_API + "/ordenes/{ot_id}/repuestos/sugerencias")
+def mt_orden_repuestos_sugerencias(request: Request, ot_id: int, q: str = ""):
+    _mt_requiere(request, "ordenes", "gestionar")
+    return _mt_ejecutar(lambda conn: mpv.sugerencias_repuestos(conn, ot_id, q), escritura=False)
+
+
+@app.post(MT_API + "/ordenes/{ot_id}/repuestos")
+async def mt_orden_repuesto_agregar(request: Request, ot_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mpv.agregar_repuesto(conn, ot_id, datos, _mt_autor(perfil)))
+
+
+@app.delete(MT_API + "/ordenes/{ot_id}/repuestos/{repuesto_id}")
+def mt_orden_repuesto_quitar(request: Request, ot_id: int, repuesto_id: int):
+    perfil = _mt_requiere(request, "ordenes", "gestionar")
+    return _mt_ejecutar(lambda conn: mpv.quitar_repuesto(conn, ot_id, repuesto_id, _mt_autor(perfil)))
+
+
+# --- app de operadores y mecánicos (sesión por PIN) ---
+@app.get("/operador/api/mt/yo")
+def op_mt_yo(request: Request):
+    op = _op_operador(request)
+    return _mt_ejecutar(lambda conn: {"es_mecanico": mt.es_mecanico(conn, op["legajo"])}, escritura=False)
+
+
+@app.get("/operador/api/mt/novedades")
+def op_mt_novedades(request: Request, ci: str = ""):
+    """Novedades pendientes del equipo, para confirmar en lugar de repetir; incluye el estado del equipo."""
+    _op_operador(request)
+
+    def op(conn):
+        if ci:
+            return {"equipo": mt.estado_equipo(conn, ci), "novedades": mt.listar_novedades(conn, "PENDIENTES", ci=ci)}
+        return {"equipo": None, "novedades": []}
+    return _mt_ejecutar(op, escritura=False)
+
+
+@app.get("/operador/api/mt/mis-novedades")
+def op_mt_mis_novedades(request: Request):
+    o = _op_operador(request)
+
+    def op(conn):
+        filas = conn.execute(
+            """SELECT * FROM mt_novedades WHERE legajo_reporta = ?
+               OR id IN (SELECT novedad_id FROM mt_novedad_confirmaciones WHERE legajo = ?)
+               ORDER BY CASE estado WHEN 'CERRADA' THEN 1 ELSE 0 END, id DESC LIMIT 50""",
+            (o["legajo"], o["legajo"])).fetchall()
+        return [mt._novedad_dict(conn, f) for f in filas]
+    return _mt_ejecutar(op, escritura=False)
+
+
+@app.get("/operador/api/mt/novedades/parecidas")
+def op_mt_novedades_parecidas(request: Request, ci: str = "", descripcion: str = ""):
+    _op_operador(request)
+    return _mt_ejecutar(lambda conn: mt.novedades_parecidas(conn, ci, descripcion), escritura=False)
+
+
+@app.post("/operador/api/mt/novedades/reporte")
+async def op_mt_novedades_reporte(request: Request, payload: dict = Body(...)):
+    o = _op_operador(request)
+    return _mt_avisar_reporte(_mt_ejecutar(lambda conn: mt.crear_reporte(conn, (payload or {}).get("items"), o["nombre"],
+                                                                         legajo=o["legajo"], origen="APP")))
+
+
+@app.post("/operador/api/mt/novedades")
+async def op_mt_novedad_crear(request: Request, payload: dict = Body(...)):
+    o = _op_operador(request)
+    return _mt_avisar_novedad(_mt_ejecutar(lambda conn: mt.crear_novedad(conn, payload, o["nombre"], legajo=o["legajo"], origen="APP")))
+
+
+@app.post("/operador/api/mt/novedades/{novedad_id}/confirmar")
+async def op_mt_novedad_confirmar(request: Request, novedad_id: int, payload: dict = Body(default={})):
+    o = _op_operador(request)
+    return _mt_ejecutar(lambda conn: mt.confirmar_novedad(conn, novedad_id, o["nombre"], legajo=o["legajo"],
+                                                          comentario=(payload or {}).get("comentario", "")))
+
+
+@app.get("/operador/api/mt/ordenes")
+def op_mt_ordenes(request: Request):
+    o = _op_operador(request)
+    return _mt_ejecutar(lambda conn: mt.ordenes_del_mecanico(conn, o["legajo"]), escritura=False)
+
+
+@app.get("/operador/api/mt/historial")
+def op_mt_historial(request: Request):
+    """OT del mecánico finalizadas o anuladas en los últimos 90 días (se abren en solo lectura)."""
+    o = _op_operador(request)
+    return _mt_ejecutar(lambda conn: mt.historial_del_mecanico(conn, o["legajo"]), escritura=False)
+
+
+@app.get("/operador/api/mt/ordenes/{ot_id}")
+def op_mt_orden(request: Request, ot_id: int):
+    o = _op_operador(request)
+
+    def op(conn):
+        if not conn.execute("SELECT 1 FROM mt_ot_mecanicos WHERE ot_id = ? AND legajo = ?", (ot_id, o["legajo"])).fetchone():
+            raise mt.MtError("PERMISO", "Esta OT no está asignada a vos.")
+        return mt.orden_para_mecanico(conn, ot_id, o["legajo"])
+    return _mt_ejecutar(op, escritura=False)
+
+
+@app.get("/operador/api/mt/ordenes/{ot_id}/informe")
+def op_mt_orden_informe(request: Request, ot_id: int):
+    o = _op_operador(request)
+    autorizado = _mt_ejecutar(lambda conn: bool(conn.execute(
+        """SELECT 1 FROM mt_ordenes o LEFT JOIN mt_novedades n ON n.id = o.novedad_id
+           WHERE o.id = ? AND (EXISTS (SELECT 1 FROM mt_ot_mecanicos m WHERE m.ot_id = o.id AND m.legajo = ?)
+             OR n.legajo_reporta = ? OR EXISTS (SELECT 1 FROM mt_novedad_confirmaciones c
+                                                WHERE c.novedad_id = n.id AND c.legajo = ?))""",
+        (ot_id, o["legajo"], o["legajo"], o["legajo"])).fetchone()), escritura=False)
+    if not autorizado:
+        raise HTTPException(status_code=404, detail="No se encontró el informe de esta OT.")
+    return _mt_informe_respuesta(ot_id)
+
+
+@app.get("/operador/api/mt/fotos/{foto_id}")
+def op_mt_foto(request: Request, foto_id: int):
+    _op_operador(request)
+    return _mt_foto_respuesta(foto_id)
+
+
+@app.post("/operador/api/mt/novedades/{novedad_id}/fotos")
+async def op_mt_novedad_foto(request: Request, novedad_id: int):
+    o = _op_operador(request)
+    return await _mt_subir_foto(request, o["nombre"], legajo=o["legajo"], novedad_id=novedad_id)
+
+
+# Va antes de la ruta genérica /ordenes/{ot_id}/{accion}: FastAPI usa la primera que coincide.
+@app.post("/operador/api/mt/ordenes/{ot_id}/fotos")
+async def op_mt_orden_foto(request: Request, ot_id: int):
+    o = _op_operador(request)
+    return await _mt_subir_foto(request, o["nombre"], legajo=o["legajo"], ot_id=ot_id, legajo_mecanico=o["legajo"])
+
+@app.post("/operador/api/mt/ordenes/{ot_id}/{accion}")
+async def op_mt_orden_accion(request: Request, ot_id: int, accion: str, payload: dict = Body(default={})):
+    o = _op_operador(request)
+    texto = (payload or {}).get("texto", "")
+    r = _mt_ejecutar(lambda conn: mt.accion_mecanico(conn, ot_id, o["legajo"], o["nombre"], accion, texto))
+    if accion == "final" and isinstance(r, dict):
+        _mt_avisar("mt_ot_revision", "ordenes", "finalizar", {
+            "numero": r["numero"], "objetivo": r.get("objetivo") or "", "titulo": r["titulo"], "mecanico": o["nombre"],
+            "correccion": texto, "horas": f"{r.get('horas', 0):.2f}".replace(".", ","),
+        })
+    return r
+
+
+# ============================================================================
+# Mantenimiento › Check list (etapa 2): plantilla en tres capas, tipos de equipo y carga desde la web.
+# Lógica en mantenimiento_checklist.py. Fotos de las respuestas en Doc_Mantenimiento (las de ítems en Malo se suman a la novedad).
+# ============================================================================
+import mantenimiento_checklist as mck  # noqa: E402
+
+
+def _mt_tipo_imagen(contenido: bytes):
+    if contenido.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", ".jpg"
+    if contenido.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", ".png"
+    return None, None
+
+
+def _mt_requiere_config_o_checklist(request: Request):
+    perfil = _requiere_modulo(request, mt.MODULO)
+    if perfil.get("es_desarrollador"):
+        return perfil
+    acciones = ((perfil.get("acciones") or {}).get(mt.MODULO) or {})
+    if "configurar" in (acciones.get("configuracion") or []) or (acciones.get("checklist") or []):
+        return perfil
+    raise HTTPException(status_code=403, detail="No tiene habilitada esta acción")
+
+
+@app.get(MT_API + "/checklist")
+def mt_checklists(request: Request, ci: str = "", resultado: str = ""):
+    _mt_requiere(request, "checklist", "consultar")
+    return _mt_ejecutar(lambda conn: mck.listar(conn, ci, resultado.upper()), escritura=False)
+
+
+@app.get(MT_API + "/checklist/armar/{ci}")
+def mt_checklist_armar(request: Request, ci: str):
+    _mt_requiere(request, "checklist", "realizar")
+    return _mt_ejecutar(lambda conn: mck.armar(conn, ci), escritura=False)
+
+
+@app.get(MT_API + "/checklist/respuestas/{respuesta_id}/foto")
+def mt_checklist_foto(request: Request, respuesta_id: int):
+    _mt_requiere(request, "checklist", "consultar")
+    conn = get_sqlite_connection()
+    try:
+        fila = mck.foto_respuesta(conn, respuesta_id)
+    except mt.MtError as exc:
+        raise HTTPException(status_code=404, detail=exc.mensaje)
+    finally:
+        conn.close()
+    ruta = _mt_foto_ruta(fila["foto_archivo"])
+    if not os.path.exists(ruta):
+        raise HTTPException(status_code=404, detail="No se encontró el archivo de la foto.")
+    return FileResponse(ruta, media_type=fila["foto_tipo"] or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.get(MT_API + "/checklist/{checklist_id}")
+def mt_checklist(request: Request, checklist_id: int):
+    _mt_requiere(request, "checklist", "consultar")
+    return _mt_ejecutar(lambda conn: mck.detalle(conn, checklist_id), escritura=False)
+
+
+@app.post(MT_API + "/checklist")
+async def mt_checklist_guardar(request: Request):
+    """multipart: «datos» (JSON con ci, horometro, km, operador, observaciones y respuestas) + «foto__<clave>» por ítem."""
+    perfil = _mt_requiere(request, "checklist", "realizar")
+    formulario = await request.form()
+    try:
+        datos = json.loads(formulario.get("datos") or "{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Los datos del check list no son válidos.")
+    if not isinstance(datos, dict):
+        raise HTTPException(status_code=400, detail="Los datos del check list no son válidos.")
+    escritos, fotos = [], {}
+    try:
+        for campo, archivo in formulario.multi_items():
+            if not campo.startswith("foto__") or not hasattr(archivo, "read"):
+                continue
+            contenido = await archivo.read(MT_FOTO_MAX_BYTES + 1)
+            if not contenido:
+                continue
+            if len(contenido) > MT_FOTO_MAX_BYTES:
+                raise HTTPException(status_code=400, detail="Una de las fotos es demasiado grande (máximo 5 MB).")
+            tipo, extension = _mt_tipo_imagen(contenido)
+            if not tipo:
+                raise HTTPException(status_code=400, detail="Las fotos tienen que ser JPG o PNG.")
+            ahora = datetime.now()
+            relativo = os.path.join(f"{ahora:%Y}", f"{ahora:%m}", f"ck_{secrets.token_hex(8)}{extension}")
+            ruta = _mt_foto_ruta(relativo)
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with open(ruta, "wb") as f:
+                f.write(contenido)
+            escritos.append(ruta)
+            fotos[campo[len("foto__"):]] = (relativo, tipo)
+        resultado = _mt_ejecutar(lambda conn: mck.guardar(conn, datos.get("ci"), datos, fotos, _mt_autor(perfil)))
+    except Exception:
+        resultado = None
+        raise
+    finally:
+        if not isinstance(resultado, dict):
+            for ruta in escritos:
+                try:
+                    os.remove(ruta)
+                except OSError:
+                    pass
+    if not isinstance(resultado, dict):
+        return resultado
+    for nueva in resultado.pop("novedades_nuevas", []):
+        _mt_avisar_novedad(nueva)
+    return resultado
+
+
+@app.get(MT_API + "/plantilla")
+def mt_plantilla(request: Request):
+    _mt_requiere_config_o_checklist(request)
+    return _mt_ejecutar(mck.plantilla, escritura=False)
+
+
+@app.post(MT_API + "/plantilla/items")
+async def mt_plantilla_item_crear(request: Request):
+    _mt_requiere(request, "configuracion", "configurar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_item(conn, datos))
+
+
+@app.put(MT_API + "/plantilla/items/{item_id}")
+async def mt_plantilla_item(request: Request, item_id: int):
+    _mt_requiere(request, "configuracion", "configurar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_item(conn, datos, item_id))
+
+
+@app.post(MT_API + "/plantilla/modulos")
+async def mt_plantilla_modulo_crear(request: Request):
+    _mt_requiere(request, "configuracion", "configurar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_modulo(conn, datos))
+
+
+@app.put(MT_API + "/plantilla/modulos/{modulo_id}")
+async def mt_plantilla_modulo(request: Request, modulo_id: int):
+    _mt_requiere(request, "configuracion", "configurar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_modulo(conn, datos, modulo_id))
+
+
+# --- Tipos de equipo: catálogo estándar de vehiculos.tipo (Logística › Vehículos) ---------------------------------
+# El catálogo define además qué módulos lleva el check list de Mantenimiento. Consultar: panel Vehículos.
+# Tipo, neumáticos y módulos de un vehículo: acción «editar». Catálogo (crear / modificar tipos): acción «tipos_equipo».
+@app.get("/api/vehiculos/tipos-equipo")
+def vehiculos_tipos_equipo(request: Request):
+    _requiere_panel(request, "logistica", "vehiculos")
+    return _mt_ejecutar(mck.catalogo, escritura=False)
+
+
+@app.put("/api/vehiculos/tipos-equipo/equipos/{ci}")
+async def vehiculos_tipo_de_equipo(request: Request, ci: str):
+    perfil = _requiere_accion(request, "logistica", "vehiculos", "editar")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.asignar_tipo(conn, ci, datos, _mt_autor(perfil)))
+
+
+@app.post("/api/vehiculos/tipos-equipo/estandarizar")
+def vehiculos_tipos_estandarizar(request: Request):
+    _requiere_accion(request, "logistica", "vehiculos", "editar")
+    return _mt_ejecutar(mck.estandarizar_propuestos)
+
+
+@app.post("/api/vehiculos/tipos-equipo/tipos")
+async def vehiculos_tipo_crear(request: Request):
+    _requiere_accion(request, "logistica", "vehiculos", "tipos_equipo")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_tipo(conn, datos))
+
+
+@app.put("/api/vehiculos/tipos-equipo/tipos/{tipo_id}")
+async def vehiculos_tipo_modificar(request: Request, tipo_id: int):
+    _requiere_accion(request, "logistica", "vehiculos", "tipos_equipo")
+    datos = await _am_json(request)
+    return _mt_ejecutar(lambda conn: mck.guardar_tipo(conn, datos, tipo_id))

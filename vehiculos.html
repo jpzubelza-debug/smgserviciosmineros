@@ -1,1029 +1,1213 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <title>Gestión de Vehículos</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vehículos · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
-      min-height: 100vh;
-      overflow-x: hidden;
-      color: #eef4ff;
-      padding: 20px;
-      position: relative;
-    }
-    .bg-photo {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-      opacity: 0.66;
-      pointer-events: none;
-    }
-    .bg-blur {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-        radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-    }
-    .page {
-      position: relative;
-      z-index: 2;
-      max-width: 1500px;
-      margin: 0 auto;
-      background: rgba(15, 23, 42, 0.66);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-      border-radius: 12px;
-      padding: 16px;
-      overflow-x: auto;
-    }
-    h2 { text-align: center; color: #ffffff; }
-    input, select, button { padding: 8px; margin: 5px; }
-    input, select {
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      color: #eef4ff;
-      border-radius: 8px;
-    }
-
-    select option,
-    select optgroup {
-      background: #0f2237;
-      color: #eef4ff;
-    }
-
-    select option:checked {
-      background: #2f6fca;
-      color: #ffffff;
-    }
-    .habilitacion-select,
-    .campo-select {
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-image:
-        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
-        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
-      background-position:
-        calc(100% - 16px) calc(50% - 3px),
-        calc(100% - 10px) calc(50% - 3px);
-      background-size: 6px 6px, 6px 6px;
-      background-repeat: no-repeat;
-      padding-right: 30px;
-    }
-    button { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; cursor: pointer; border-radius: 8px; transition: 0.2s; }
-    button:hover { box-shadow: none; transform: none; }
-    .tabla-equipos-wrap {
-      margin-top: 20px;
-      max-height: 60vh;
-      overflow: auto;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      background: rgba(255,255,255,0.08);
-    }
-    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.08); }
-    th {
-      background: rgba(10, 24, 38, 0.82);
-      color: #ffffff;
-      padding: 12px;
-      text-align: left;
-      font-weight: bold;
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(255,255,255,0.24);
-    }
-    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); }
-    tr:hover { background: rgba(255,255,255,0.08); }
-    #lista th:first-child, #lista td:first-child {
-      position: sticky;
-      left: 0;
-      z-index: 2;
-      background: rgba(10, 24, 38, 0.98);
-      box-shadow: 2px 0 6px rgba(0,0,0,0.35);
-    }
-    #lista th:first-child { z-index: 4; }
-    #lista td:first-child { color: #eef4ff; }
-    .col-filter {
-      display: block;
-      width: 100%;
-      margin: 6px 0 0;
-      padding: 4px 6px;
-      font-size: 12px;
-      font-weight: normal;
-      box-sizing: border-box;
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      color: #eef4ff;
-      border-radius: 6px;
-    }
-    .col-filter::placeholder { color: rgba(238, 244, 255, 0.5); }
-    #lista th:nth-child(10), #lista td:nth-child(10),
-    #lista th:nth-child(11), #lista td:nth-child(11),
-    #lista th:nth-child(12), #lista td:nth-child(12),
-    #lista th:nth-child(13), #lista td:nth-child(13),
-    #lista th:nth-child(14), #lista td:nth-child(14),
-    #lista th:nth-child(15), #lista td:nth-child(15),
-    #lista th:nth-child(16), #lista td:nth-child(16),
-    #lista th:nth-child(17), #lista td:nth-child(17) {
-      width: 120px;
-      min-width: 120px;
-      max-width: 120px;
-    }
-    .operativo-select, .habilitacion-select, .campo-select {
-      width: 100%;
-      padding: 6px;
-      margin: 0;
-      box-sizing: border-box;
-    }
-    .operativo-select.estado-si {
-      background: rgba(34, 197, 94, 0.2);
-      border: 1px solid rgba(34, 197, 94, 0.45);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 10px rgba(34, 197, 94, 0.2);
-      color: #dcfce7;
-      font-weight: 700;
-    }
-    .operativo-select.estado-no {
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid rgba(239, 68, 68, 0.45);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 10px rgba(239, 68, 68, 0.2);
-      color: #fee2e2;
-      font-weight: 700;
-    }
-    .eliminar-btn { background: red; color: white; padding: 5px 10px; border: none; cursor: pointer; }
-    .eliminar-btn:hover { background: darkred; }
-    .toggle-btn { margin-bottom: 10px; }
-    .panel-form {
-      display: none;
-      background: rgba(15, 23, 42, 0.45);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
-      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
-      margin: 14px 0 12px;
-    }
-    .stat-card {
-      background: rgba(255,255,255,0.09);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-    }
-    .stat-title {
-      margin: 0 0 10px;
-      font-size: 14px;
-      color: #dbeafe;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-    }
-    .stat-filter {
-      width: 100%;
-      margin: 0 0 10px;
-      padding: 7px 28px 7px 10px;
-      box-sizing: border-box;
-      background: rgba(15,23,42,0.38);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      color: #eaf2ff;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-image:
-        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.85) 50%),
-        linear-gradient(135deg, rgba(255,255,255,0.85) 50%, transparent 50%);
-      background-position:
-        calc(100% - 15px) calc(50% - 3px),
-        calc(100% - 9px) calc(50% - 3px);
-      background-size: 6px 6px, 6px 6px;
-      background-repeat: no-repeat;
-    }
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .kpi-pill {
-      background: rgba(15,23,42,0.38);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      padding: 8px;
-      text-align: center;
-    }
-    .kpi-alerta {
-      border: 1px solid rgba(255, 80, 80, 0.5);
-      box-shadow: 0 0 10px rgba(255, 80, 80, 0.3);
-    }
-    .kpi-label {
-      display: block;
-      font-size: 11px;
-      color: #dbeafe;
-      opacity: 0.88;
-    }
-    .kpi-value {
-      display: block;
-      margin-top: 4px;
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffffff;
-      line-height: 1;
-    }
-    .chart-box {
-      position: relative;
-      height: 220px;
-    }
-    .chart-box canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-    .conclusion-card {
-      margin-top: 10px;
-      background: rgba(255,255,255,0.09);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-    }
-    .conclusion {
-      background: rgba(0,0,0,0.2);
-      border-left: 3px solid #3b82f6;
-    }
-    .conclusion-title {
-      margin: 0 0 8px;
-      font-size: 15px;
-      font-weight: 700;
-      color: #f8fbff;
-      letter-spacing: 0.3px;
-    }
-    .conclusion-main {
-      margin: 0 0 10px;
-      color: #e6f0ff;
-      line-height: 1.45;
-      font-size: 14px;
-    }
-    .conclusion-list {
-      margin: 0;
-      padding-left: 18px;
-      color: #dbeafe;
-      line-height: 1.5;
-      font-size: 13px;
-    }
+    /* Solo de Vehículos: el resto viene de /ui/app.css */
+    .tipo-ico { color: var(--text-muted); display: inline-flex; }
+    .tipo-pendiente .tipo-ico { color: var(--warning); }
+    .dq { border: 1px solid var(--border); border-radius: var(--r-card); padding: var(--s3) var(--s4); }
+    .dq h3 { margin: 0 0 4px; font-size: var(--fs-section); font-weight: 600; display: flex; align-items: center; gap: var(--s2); }
+    .dq-groups { margin-top: var(--s3); }   /* columnas: .form-grid */
+    .dq-groups h4 { margin: 0 0 var(--s2); font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .dq-groups ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+    .dq-groups li { line-height: 1.5; }
   </style>
 </head>
 
-<body>
+<body data-titulo="Vehículos">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
 
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="page">
-
-<h2>Vehículos</h2>
-
-<section class="stats-grid">
-  <article class="stat-card">
-    <h3 class="stat-title">Resumen General</h3>
-    <select id="filtro-proyecto-resumen" class="stat-filter" onchange="onCambioFiltroResumen()">
-      <option value="__GENERAL__">General (Todos los proyectos)</option>
-    </select>
-    <div class="kpi-row">
-      <div class="kpi-pill">
-        <span class="kpi-label">Total</span>
-        <span id="kpi-total" class="kpi-value">0</span>
+    <main class="content" id="contenido">
+      <!-- ============================== Encabezado ============================== -->
+      <div class="page-head">
+        <div>
+          <h1>Vehículos</h1>
+          <p class="page-sub"><span id="page-sub">Cargando…</span>
+            <button type="button" class="chip chip-warn dq-chip" id="chip-inconsistencias" hidden title="Ver en Estandarizar vehículos"></button></p>
+        </div>
+        <div class="head-actions">
+          <label class="sr-only" for="filtro-proyecto-resumen">Proyecto</label>
+          <select id="filtro-proyecto-resumen" class="select" title="Filtra indicadores, gráficos y tabla">
+            <option value="__GENERAL__">General (Todos los proyectos)</option>
+          </select>
+          <button type="button" class="btn btn-primary" id="btn-nuevo"><svg class="i"><use href="#i-plus"/></svg>Nuevo vehículo</button>
+          <button type="button" class="btn btn-icon" id="btn-mas" aria-haspopup="menu" aria-label="Más acciones" title="Más acciones"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
       </div>
-      <div class="kpi-pill">
-        <span class="kpi-label">Operativos</span>
-        <span id="kpi-si" class="kpi-value">0</span>
-      </div>
-      <div class="kpi-pill kpi-alerta">
-        <span class="kpi-label">No Operativos</span>
-        <span id="kpi-no" class="kpi-value">0</span>
-      </div>
-    </div>
-    <div class="chart-box">
-      <canvas id="chart-operativos"></canvas>
-    </div>
-  </article>
 
-  <article class="stat-card">
-    <h3 class="stat-title">Vehículos por Proyecto</h3>
-    <div class="chart-box">
-      <canvas id="chart-proyectos"></canvas>
-    </div>
-  </article>
+      <!-- ============================== KPIs ============================== -->
+      <section class="kpis" aria-label="Indicadores">
+        <article class="card kpi">
+          <span class="kpi-label">Total de equipos</span>
+          <span id="kpi-total" class="kpi-value">—</span>
+          <span class="kpi-sub" id="kpi-total-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi">
+          <span class="kpi-label">Operativos</span>
+          <span id="kpi-si" class="kpi-value">—</span>
+          <div class="bar" role="progressbar" aria-label="Porcentaje operativo" aria-valuemin="0" aria-valuemax="100" id="kpi-si-bar"><span style="width:0%" class="lv-success"></span></div>
+          <span class="kpi-sub" id="kpi-si-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi" id="kpi-no-card">
+          <span class="kpi-label">No operativos</span>
+          <span id="kpi-no" class="kpi-value">—</span>
+          <span class="kpi-sub" id="kpi-no-sub">&nbsp;</span>
+        </article>
+        <article class="card kpi">
+          <span class="kpi-label">Habilitación global</span>
+          <span id="kpi-hab" class="kpi-value">—</span>
+          <div class="bar" role="progressbar" aria-label="Habilitación global" aria-valuemin="0" aria-valuemax="100" id="kpi-hab-bar"><span style="width:0%"></span></div>
+          <span class="kpi-sub" id="kpi-hab-sub">&nbsp;</span>
+        </article>
+      </section>
 
-  <article class="stat-card">
-    <h3 class="stat-title">Habilitaciones (SI)</h3>
-    <div class="chart-box">
-      <canvas id="chart-habilitaciones"></canvas>
-    </div>
-  </article>
-</section>
+      <!-- ============================== Gráficos + Observaciones ============================== -->
+      <section class="grid-cards">
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Vehículos por proyecto</h2></div>
+          <div class="card-body"><div class="chart-box" id="chart-proyectos-box"><canvas id="chart-proyectos" aria-label="Vehículos por proyecto" role="img"></canvas></div></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2 class="card-title">Habilitaciones</h2><span class="help">% sobre el total de equipos</span></div>
+          <div class="card-body">
+            <div class="meters" id="hab-meters"></div>
+            <div class="legend" aria-hidden="true">
+              <span><i class="lv-danger"></i>&lt; 50%</span><span><i class="lv-warning"></i>50–80%</span><span><i class="lv-success"></i>&gt; 80%</span>
+            </div>
+          </div>
+        </article>
+        <article class="card obs" aria-labelledby="obs-title">
+          <div class="card-head"><h2 class="card-title" id="obs-title"><span class="obs-icon"><svg class="i i-sm"><use href="#i-sparkles"/></svg></span>Observaciones</h2></div>
+          <div class="card-body">
+            <ul class="obs-list" id="conclusion-list"><li><svg class="i"><use href="#i-info"/></svg><span class="muted">Analizando la flota…</span></li></ul>
+            <details id="obs-detalle"><summary>Ver análisis completo</summary><p id="conclusion-main">Cargando…</p></details>
+          </div>
+          <div class="obs-foot"><span id="obs-estado">Generando…</span>
+            <button type="button" class="btn btn-sm" id="obs-regenerar"><svg class="i i-sm"><use href="#i-refresh"/></svg>Regenerar</button></div>
+        </article>
+      </section>
 
-<section class="conclusion-card conclusion">
-  <h3 class="conclusion-title">Leyenda de Conclusiones</h3>
-  <p id="conclusion-main" class="conclusion-main">
-    Cargando conclusión operativa...
-  </p>
-  <p id="conclusion-source" class="conclusion-main" style="font-size:12px; opacity:0.85; margin-top:-4px;"></p>
-  <ul id="conclusion-list" class="conclusion-list"></ul>
-</section>
-
-<button class="toggle-btn" onclick="toggleFormularioVehiculos()">Agregar Vehiculos</button>
-
-<div id="panel-form-vehiculos" class="panel-form">
-
-<input id="codigo" placeholder="Código">
-<input id="propiedad" placeholder="Propiedad">
-<input id="marca" placeholder="Marca">
-<input id="tipo" placeholder="Tipo">
-<input id="modelo" placeholder="Modelo">
-<input id="dominio" placeholder="Dominio">
-<input id="anio" placeholder="Año">
-<input id="motor" placeholder="Motor">
-<input id="chasis" placeholder="Chasis">
-<input id="sector" placeholder="Sector">
-<select id="proyecto">
-  <option value="">Seleccionar proyecto</option>
-  <option value="Pirquitas">Pirquitas</option>
-  <option value="Exar">Exar</option>
-  <option value="SDJ">SDJ</option>
-  <option value="Rincón">Rincón</option>
-  <option value="ARLI">ARLI</option>
-</select>
-
-<select id="operativo">
-  <option value="SI">Operativo</option>
-  <option value="NO">No operativo</option>
-</select>
-
-<select id="habilitacion_pirquitas">
-  <option value="NO" selected>Habilitación Pirquitas: NO</option>
-  <option value="SI">Habilitación Pirquitas: SI</option>
-</select>
-
-<select id="habilitacion_exar">
-  <option value="NO" selected>Habilitación Exar: NO</option>
-  <option value="SI">Habilitación Exar: SI</option>
-</select>
-
-<select id="habilitacion_sdj">
-  <option value="NO" selected>Habilitación SDJ: NO</option>
-  <option value="SI">Habilitación SDJ: SI</option>
-</select>
-
-<select id="habilitacion_rincon">
-  <option value="NO" selected>Habilitación Rincón: NO</option>
-  <option value="SI">Habilitación Rincón: SI</option>
-</select>
-
-<select id="habilitacion_arli">
-  <option value="NO" selected>Habilitación ARLI: NO</option>
-  <option value="SI">Habilitación ARLI: SI</option>
-</select>
-
-<button onclick="agregar()">Guardar</button>
+      <!-- ============================== Tabla ============================== -->
+      <section class="card" id="seccion-tabla" aria-label="Listado de vehículos">
+        <div class="toolbar">
+          <div class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="buscar-tabla" class="input" type="search" placeholder="Buscar en la tabla" aria-label="Buscar en la tabla" autocomplete="off"></div>
+          <select class="chip-select" id="f-activo" aria-label="Equipos activos o inactivos">
+            <option value="SI">Activos</option><option value="NO">Inactivos</option><option value="">Activos e inactivos</option></select>
+          <select class="chip-select" id="f-proyecto" aria-label="Proyecto"></select>
+          <select class="chip-select" id="f-sector" data-chip="sector" aria-label="Sector"></select>
+          <select class="chip-select" id="f-propiedad" data-chip="propiedad" aria-label="Propiedad"></select>
+          <select class="chip-select" id="f-operativo" data-chip="operativo" aria-label="Estado operativo"></select>
+          <select class="chip-select" id="f-tipo" data-chip="tipo" aria-label="Tipo"></select>
+          <button type="button" class="btn btn-sm" id="btn-mas-filtros" aria-haspopup="dialog"><svg class="i i-sm"><use href="#i-filter"/></svg>Por columna<span class="count-badge" id="cnt-col-filtros" hidden>0</span></button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-limpiar-filtros" hidden>Limpiar filtros</button>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="Vistas guardadas" id="vistas">
+            <button type="button" data-vista="general">General</button>
+            <button type="button" data-vista="tecnica">Técnica</button>
+            <button type="button" data-vista="habilitaciones">Habilitaciones</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-icon" id="btn-columnas" aria-haspopup="dialog" aria-label="Columnas visibles" title="Columnas visibles"><svg class="i i-sm"><use href="#i-columns"/></svg></button>
+          <button type="button" class="btn btn-sm" id="btn-exportar" title="Exporta las filas filtradas (CSV compatible con Excel)"><svg class="i i-sm"><use href="#i-download"/></svg>Exportar</button>
+        </div>
+        <div class="table-wrap" id="tabla-wrap">
+          <table id="lista" class="tbl">
+            <colgroup id="lista-cols"></colgroup>
+            <thead id="lista-head"></thead>
+            <tbody id="lista-body"></tbody>
+          </table>
+        </div>
+        <div class="tfoot">
+          <span id="tabla-rango" class="num">&nbsp;</span>
+          <div class="pager">
+            <label for="page-size" class="muted">Filas</label>
+            <select id="page-size" class="select"><option>25</option><option>50</option><option>100</option></select>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-prev" aria-label="Página anterior"><svg class="i i-sm"><use href="#i-left"/></svg></button>
+            <span id="pag-info" class="num"></span>
+            <button type="button" class="btn btn-sm btn-icon" id="pag-next" aria-label="Página siguiente"><svg class="i i-sm"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 </div>
 
-<hr>
-
-<div class="tabla-equipos-wrap">
-  <table id="lista">
-    <thead>
-      <tr>
-        <th>Código<input class="col-filter" data-campo="codigo" placeholder="Filtrar..."></th>
-        <th>Propiedad<input class="col-filter" data-campo="propiedad" placeholder="Filtrar..."></th>
-        <th>Marca<input class="col-filter" data-campo="marca" placeholder="Filtrar..."></th>
-        <th>Tipo<input class="col-filter" data-campo="tipo" placeholder="Filtrar..."></th>
-        <th>Modelo<input class="col-filter" data-campo="modelo" placeholder="Filtrar..."></th>
-        <th>Dominio<input class="col-filter" data-campo="dominio" placeholder="Filtrar..."></th>
-        <th>Año<input class="col-filter" data-campo="anio" placeholder="Filtrar..."></th>
-        <th>Motor<input class="col-filter" data-campo="motor" placeholder="Filtrar..."></th>
-        <th>Chasis<input class="col-filter" data-campo="chasis" placeholder="Filtrar..."></th>
-        <th>Sector<input class="col-filter" data-campo="sector" placeholder="Filtrar..."></th>
-        <th>Proyecto<input class="col-filter" data-campo="proyecto" placeholder="Filtrar..."></th>
-        <th>Operativo<input class="col-filter" data-campo="operativo" placeholder="Filtrar..."></th>
-        <th>Pirquitas<input class="col-filter" data-campo="habilitacion_pirquitas" placeholder="Filtrar..."></th>
-        <th>Exar<input class="col-filter" data-campo="habilitacion_exar" placeholder="Filtrar..."></th>
-        <th>SDJ<input class="col-filter" data-campo="habilitacion_sdj" placeholder="Filtrar..."></th>
-        <th>Rincón<input class="col-filter" data-campo="habilitacion_rincon" placeholder="Filtrar..."></th>
-        <th>ARLI<input class="col-filter" data-campo="habilitacion_arli" placeholder="Filtrar..."></th>
-        <th>Acción<button type="button" class="col-filter" id="btn-limpiar-filtros" style="cursor:pointer;">Limpiar</button></th>
-      </tr>
-    </thead>
-    <tbody id="lista-body"></tbody>
-  </table>
+<!-- ============================== Menús / popovers ============================== -->
+<div class="menu" id="menu-mas" role="menu" hidden>
+  <button type="button" class="menu-item" role="menuitem" data-act="tipos"><svg class="i"><use href="#i-settings"/></svg>Tipos de equipo</button>
+  <button type="button" class="menu-item" role="menuitem" data-act="estandarizar"><svg class="i"><use href="#i-check"/></svg>Estandarizar vehículos</button>
+</div>
+<div class="menu" id="menu-fila" role="menu" hidden>
+  <button type="button" class="menu-item" role="menuitem" data-act="editar"><svg class="i"><use href="#i-pencil"/></svg>Editar</button>
+  <button type="button" class="menu-item" role="menuitem" data-act="duplicar"><svg class="i"><use href="#i-copy"/></svg>Duplicar</button>
+  <button type="button" class="menu-item" role="menuitem" data-act="activo"><svg class="i"><use href="#i-refresh"/></svg><span>Desactivar</span></button>
+  <div class="menu-sep"></div>
+  <button type="button" class="menu-item danger" role="menuitem" data-act="eliminar"><svg class="i"><use href="#i-trash"/></svg>Eliminar</button>
+</div>
+<div class="menu pop" id="pop-filtros" role="dialog" aria-label="Filtros por columna" hidden>
+  <div class="pop-grid" id="pop-filtros-grid"></div>
+  <div class="pop-foot"><button type="button" class="btn btn-ghost btn-sm" id="pop-filtros-limpiar">Limpiar</button><button type="button" class="btn btn-sm" data-cerrar-menu>Listo</button></div>
+</div>
+<div class="menu pop" id="pop-columnas" role="dialog" aria-label="Columnas visibles" hidden>
+  <div class="pop-grid" id="pop-columnas-grid" style="gap:var(--s2)"></div>
+  <div class="pop-foot"><button type="button" class="btn btn-ghost btn-sm" id="pop-columnas-todas">Mostrar todas</button><button type="button" class="btn btn-sm" data-cerrar-menu>Listo</button></div>
 </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- ============================== Drawer (vehículo / tipo) ============================== -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-head">
+    <div><h2 id="drawer-title">Vehículo</h2><p id="drawer-sub"></p></div>
+    <button type="button" class="btn btn-ghost btn-icon" data-cerrar-drawer aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <form id="form-vehiculo" class="form" novalidate autocomplete="off">
+      <div class="callout warn" id="fv-issues" hidden></div>
+      <fieldset>
+        <legend>Identificación</legend>
+        <div class="grid2">
+          <label class="field">Código *<input id="codigo" class="input" required></label>
+          <label class="field">Propiedad<input id="propiedad" class="input" list="dl-propiedad"></label>
+          <label class="field">Marca<input id="marca" class="input" list="dl-marca"></label>
+          <label class="field">Modelo<input id="modelo" class="input"></label>
+          <label class="field">Año<input id="anio" class="input num" inputmode="numeric"></label>
+          <label class="field">Dominio<input id="dominio" class="input mono"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Técnico</legend>
+        <div class="grid2">
+          <label class="field span2">Tipo de equipo<select id="tipo" class="select"><option value="">Tipo de equipo</option></select>
+            <span class="help" id="tipo-ayuda"></span></label>
+          <label class="field">Motor<input id="motor" class="input mono"></label>
+          <label class="field">Chasis<input id="chasis" class="input mono"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Asignación</legend>
+        <div class="grid2">
+          <label class="field">Sector<input id="sector" class="input" list="dl-sector"></label>
+          <label class="field">Proyecto<input id="proyecto" class="input" list="dl-proyecto"></label>
+          <label class="field">Estado operativo
+            <select id="operativo" class="select"><option value="SI">Operativo</option><option value="NO">No operativo</option></select></label>
+          <label class="field">Alta en la flota
+            <select id="activo" class="select"><option value="SI">Activo</option><option value="NO">Inactivo (dado de baja)</option></select></label>
+          <p class="help span2">Un equipo inactivo no cuenta en indicadores ni gráficos y desaparece de partes, Tarja, Mantenimiento, viajes y compras. Su historial se conserva.</p>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Habilitaciones</legend>
+        <div class="switches">
+          <label class="switch">Pirquitas<input type="checkbox" id="habilitacion_pirquitas"></label>
+          <label class="switch">Exar<input type="checkbox" id="habilitacion_exar"></label>
+          <label class="switch">SDJ<input type="checkbox" id="habilitacion_sdj"></label>
+          <label class="switch">Rincón<input type="checkbox" id="habilitacion_rincon"></label>
+          <label class="switch">ARLI<input type="checkbox" id="habilitacion_arli"></label>
+        </div>
+      </fieldset>
+    </form>
+
+    <form id="form-tipo" class="form" novalidate autocomplete="off" hidden>
+      <p class="help" style="margin-bottom:var(--s4)">Cada tipo lleva en el check list la Base (salvo los remolques), los ítems de su familia y los módulos marcados.
+        Si cambiás el nombre de un tipo, se actualiza en todos los vehículos que lo tienen.</p>
+      <fieldset>
+        <legend>Datos del tipo</legend>
+        <div class="grid2">
+          <label class="field span2">Nombre<input data-k="nombre" class="input"></label>
+          <label class="field span2">Familia<select data-k="familia" class="select" id="ft-familia"></select></label>
+          <label class="field">Neumáticos<input data-k="neumaticos" class="input num" inputmode="numeric"></label>
+          <label class="field">Auxilios<input data-k="auxilios" class="input num" inputmode="numeric"></label>
+          <label class="field span2">Palabras clave<input data-k="palabras_clave" class="input" placeholder="tolva, volcador, batea…">
+            <span class="help">Separadas por coma. Sirven para proponer el tipo a partir del texto escrito a mano.</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Módulos del check list</legend>
+        <div class="check-grid" id="ft-modulos"></div>
+      </fieldset>
+    </form>
+  </div>
+  <div class="drawer-foot">
+    <button type="button" class="btn" data-cerrar-drawer>Cancelar</button>
+    <button type="button" class="btn btn-primary" id="drawer-save">Guardar cambios</button>
+  </div>
+</aside>
+<datalist id="dl-propiedad"></datalist><datalist id="dl-marca"></datalist><datalist id="dl-sector"></datalist><datalist id="dl-proyecto"></datalist>
+
+<!-- ============================== Tipos de equipo (modal grande) ============================== -->
+<div class="modal" id="modal-tipos" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="mt-title">
+    <div class="modal-head">
+      <h2 id="mt-title">Configuración · Tipos de equipo</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" data-vista="catalogo">Catálogo de tipos</button>
+        <button type="button" class="tab" role="tab" data-vista="equipos">Estandarizar vehículos</button>
+      </div>
+      <span style="flex:1"></span>
+      <button type="button" class="btn btn-ghost btn-icon" id="mt-cerrar" aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="tipos-cuerpo"></div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-  let chartOperativos;
-  let chartProyectos;
-  let chartHabilitaciones;
-  let vehiculosCache = [];
-  const valueLabelPlugin = {
-    id: "valueLabels",
-    afterDatasetsDraw(chart, args, pluginOptions) {
-      if (chart.config.type !== "bar") {
-        return;
-      }
+// =====================================================================================================
+// Utilidades
+// =====================================================================================================
+const { $, $$, css, collator, fmtNum, fmtFecha, icon, prefs, escapeHtml, fold, nivel, pedirJson, toast, confirmar, abrirMenu, cerrarMenu, posicionarMenu } = SMG;
+function esSi(v) { return String(v ?? "").trim().toUpperCase() === "SI"; }
+function esActivo(v) { return String(v.activo ?? "SI").trim().toUpperCase() !== "NO"; }
+const vehActivos = () => S.vehiculos.filter(esActivo);
+function normalizarProyecto(valor) { return (valor || "SIN DATO").toString().trim() || "SIN DATO"; }
 
-      const { ctx } = chart;
-      const dataset = chart.data.datasets[0];
-      const meta = chart.getDatasetMeta(0);
-      const color = (pluginOptions && pluginOptions.color) || "#ffffff";
-      const fontSize = (pluginOptions && pluginOptions.fontSize) || 12;
 
-      ctx.save();
-      ctx.fillStyle = color;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.font = `700 ${fontSize}px Arial`;
+// =====================================================================================================
+// Estado y columnas (las 18 columnas de siempre)
+// =====================================================================================================
+const HABS = [
+  { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
+  { etiqueta: "Exar", campo: "habilitacion_exar" },
+  { etiqueta: "SDJ", campo: "habilitacion_sdj" },
+  { etiqueta: "Rincón", campo: "habilitacion_rincon" },
+  { etiqueta: "ARLI", campo: "habilitacion_arli" },
+];
+const COLS = [
+  { k: "codigo", l: "Código", w: 136, sticky: true },
+  { k: "propiedad", l: "Propiedad", w: 120 },
+  { k: "marca", l: "Marca", w: 140 },
+  { k: "tipo", l: "Tipo", w: 200, flex: true },
+  { k: "modelo", l: "Modelo", w: 160, flex: true },
+  { k: "dominio", l: "Dominio", w: 112, mono: true },
+  { k: "anio", l: "Año", w: 68, right: true },
+  { k: "motor", l: "Motor", w: 170, mono: true },
+  { k: "chasis", l: "Chasis", w: 190, mono: true },
+  { k: "sector", l: "Sector", w: 120 },
+  { k: "proyecto", l: "Proyecto", w: 130 },
+  { k: "operativo", l: "Operativo", w: 128 },
+  ...HABS.map((h) => ({ k: h.campo, l: h.etiqueta, w: 84, hab: true })),
+  { k: "_accion", l: "Acción", w: 56 },
+];
+const VISTAS = {
+  general: COLS.map((c) => c.k),
+  tecnica: ["codigo", "marca", "tipo", "modelo", "dominio", "anio", "motor", "chasis", "operativo", "_accion"],
+  habilitaciones: ["codigo", "tipo", "proyecto", "operativo", ...HABS.map((h) => h.campo), "_accion"],
+};
+const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
+const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
+const CHIPS = { sector: "Sector", propiedad: "Propiedad", operativo: "Estado", tipo: "Tipo" };
 
-      meta.data.forEach((bar, index) => {
-        const valor = Number(dataset.data[index] || 0);
-        ctx.fillText(String(valor), bar.x, bar.y - 6);
-      });
+const vistaInicial = VISTAS[prefs.get("vista", "general")] ? prefs.get("vista", "general") : "general";
+const S = {
+  vehiculos: [], cargando: true, actualizado: null,
+  proyecto: "__GENERAL__", q: "", activo: "SI",
+  chips: { sector: "", propiedad: "", operativo: "", tipo: "" },
+  colFiltros: {},
+  sort: { k: "codigo", dir: 1 },
+  page: 1, pageSize: [25, 50, 100].includes(prefs.get("pageSize", 25)) ? prefs.get("pageSize", 25) : 25,
+  vista: prefs.get("cols", null) ? "" : vistaInicial,
+  visibles: new Set(prefs.get("cols", null) || VISTAS[vistaInicial]),
+  issues: new Map(), dq: { motor: [], chasis: [], marca: [] },
+  obsPedida: false,
+};
+S.visibles.add("codigo"); S.visibles.add("_accion");
 
-      ctx.restore();
-    }
+function valorCelda(v, k) {
+  if (k === "operativo" || k.startsWith("habilitacion_")) return esSi(v[k]) ? "SI" : "NO";
+  return String(v[k] ?? "").trim();
+}
+function chipValor(v, k) { return k === "operativo" ? (esSi(v.operativo) ? "SI" : "NO") : (String(v[k] ?? "").trim() || "SIN DATO"); }
+
+// Indicadores y gráficos: solo equipos activos (los inactivos no cuentan).
+function datosBase() {
+  const d = vehActivos();
+  return S.proyecto === "__GENERAL__" ? d : d.filter((v) => normalizarProyecto(v.proyecto) === S.proyecto);
+}
+function datosTabla() {
+  let d = S.vehiculos.filter((v) => !S.activo || (S.activo === "SI") === esActivo(v));
+  if (S.proyecto !== "__GENERAL__") d = d.filter((v) => normalizarProyecto(v.proyecto) === S.proyecto);
+  for (const [k, val] of Object.entries(S.chips)) if (val) d = d.filter((v) => chipValor(v, k) === val);
+  const activos = Object.entries(S.colFiltros).filter(([, x]) => x);
+  if (activos.length) d = d.filter((v) => activos.every(([k, x]) => fold(valorCelda(v, k)).includes(fold(x))));
+  if (S.q) {
+    const q = fold(S.q.trim());
+    d = d.filter((v) => COLS.some((c) => c.k !== "_accion" && fold(valorCelda(v, c.k)).includes(q)));
+  }
+  const { k, dir } = S.sort;
+  return [...d].sort((a, b) => {
+    const x = valorCelda(a, k), y = valorCelda(b, k);
+    if (!x && y) return 1;
+    if (x && !y) return -1;
+    return dir * collator.compare(x, y);
+  });
+}
+
+// =====================================================================================================
+// Carga
+// =====================================================================================================
+async function cargar() {
+  if (!tiposCatalogo.tipos.length) await cargarTiposCatalogo();
+  try {
+    const data = await pedirJson("/vehiculos?incluir_inactivos=1");
+    S.vehiculos = Array.isArray(data) ? data : [];
+  } catch (e) {
+    toast(`No se pudieron cargar los vehículos: ${e.message}`, "error");
+  }
+  S.cargando = false;
+  S.actualizado = new Date();
+  calcularInconsistencias();
+  poblarFiltros();
+  renderTodo();
+  if (!S.obsPedida) { S.obsPedida = true; actualizarConclusiones(); } else renderObservaciones();
+  if (!$("#modal-tipos").hidden && tiposVista === "equipos" && tiposCatalogo.equipos) pintarTiposEquipos();
+}
+
+function renderTodo() {
+  renderEncabezado();
+  renderKpis();
+  renderGraficos();
+  renderTabla();
+}
+
+// =====================================================================================================
+// Encabezado y filtros
+// =====================================================================================================
+function renderEncabezado() {
+  const total = vehActivos().length, base = datosBase().length, inactivos = S.vehiculos.length - total;
+  const cuando = S.actualizado ? ` · actualizado ${fmtFecha(S.actualizado)}` : "";
+  const txtInact = inactivos ? ` · ${fmtNum(inactivos)} ${inactivos === 1 ? "inactivo" : "inactivos"}` : "";
+  $("#page-sub").textContent = S.proyecto === "__GENERAL__"
+    ? `${fmtNum(total)} equipos activos${txtInact}${cuando}`
+    : `${fmtNum(base)} de ${fmtNum(total)} equipos activos · ${S.proyecto}${cuando}`;
+  const n = S.issues.size, chip = $("#chip-inconsistencias");
+  chip.hidden = !n;
+  chip.innerHTML = `${icon("alert", "i-sm")}${n} ${n === 1 ? "inconsistencia" : "inconsistencias"}`;
+}
+
+function opcionesUnicas(lista, fn) {
+  const m = new Map();
+  lista.forEach((v) => { const x = fn(v); m.set(x, (m.get(x) || 0) + 1); });
+  return [...m].sort((a, b) => (a[0] === "SIN DATO") - (b[0] === "SIN DATO") || collator.compare(a[0], b[0]));
+}
+
+function poblarFiltros() {
+  const proyectos = opcionesUnicas(S.vehiculos, (v) => normalizarProyecto(v.proyecto));
+  if (S.proyecto !== "__GENERAL__" && !proyectos.some(([p]) => p === S.proyecto)) S.proyecto = "__GENERAL__";
+  const opts = (todos) => `<option value="__GENERAL__">${todos}</option>` + proyectos.map(([p, n]) => `<option value="${escapeHtml(p)}">${escapeHtml(p)} (${n})</option>`).join("");
+  $("#filtro-proyecto-resumen").innerHTML = opts("General (Todos los proyectos)");
+  $("#f-proyecto").innerHTML = opts("Proyecto: todos");
+  sincronizarProyecto();
+
+  for (const [k, etiqueta] of Object.entries(CHIPS)) {
+    const sel = $(`#f-${k}`);
+    const valores = k === "operativo"
+      ? [["SI", "Operativo"], ["NO", "No operativo"]].map(([v, l]) => [v, l])
+      : opcionesUnicas(S.vehiculos, (v) => chipValor(v, k)).map(([v]) => [v, v]);
+    if (S.chips[k] && !valores.some(([v]) => v === S.chips[k])) S.chips[k] = "";
+    sel.innerHTML = `<option value="">${etiqueta}: todos</option>` + valores.map(([v, l]) => `<option value="${escapeHtml(v)}">${etiqueta}: ${escapeHtml(l)}</option>`).join("");
+    sel.value = S.chips[k];
+    sel.classList.toggle("on", !!S.chips[k]);
+  }
+
+  // listas sugeridas del formulario
+  const dl = (id, base, campo) => {
+    const set = new Set(base);
+    S.vehiculos.forEach((v) => { const x = String(v[campo] ?? "").trim(); if (x) set.add(x); });
+    $(id).innerHTML = [...set].sort(collator.compare).map((x) => `<option value="${escapeHtml(x)}">`).join("");
   };
-
-function toggleFormularioVehiculos() {
-  const panel = document.getElementById("panel-form-vehiculos");
-  if (panel.style.display === "block") {
-    panel.style.display = "none";
-  } else {
-    panel.style.display = "block";
-  }
+  dl("#dl-propiedad", [], "propiedad");
+  dl("#dl-marca", [], "marca");
+  dl("#dl-sector", opcionesSector, "sector");
+  dl("#dl-proyecto", opcionesProyecto, "proyecto");
 }
 
-function selectHabilitacion(codigo, campo, valorActual) {
-  const valor = (valorActual || "NO").toString().toUpperCase() === "SI" ? "SI" : "NO";
-  const selectedSi = valor === "SI" ? "selected" : "";
-  const selectedNo = valor === "NO" ? "selected" : "";
-  return `
-    <select class="habilitacion-select" onchange="actualizarHabilitacionVehiculo('${codigo}', '${campo}', this.value)">
-      <option value="SI" ${selectedSi}>SI</option>
-      <option value="NO" ${selectedNo}>NO</option>
-    </select>
-  `;
+function sincronizarProyecto() {
+  $("#filtro-proyecto-resumen").value = S.proyecto;
+  $("#f-proyecto").value = S.proyecto;
+  $("#f-proyecto").classList.toggle("on", S.proyecto !== "__GENERAL__");
 }
 
-function escapeHtml(texto) {
-  return (texto || "")
-    .toString()
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function onCambioFiltroResumen(valor) {
+  S.proyecto = valor || "__GENERAL__";
+  S.page = 1;
+  sincronizarProyecto();
+  renderTodo();
 }
 
-function selectEditable(codigo, campo, valorActual, opciones) {
-  const valor = (valorActual || "").toString().trim();
-  const lista = [...opciones];
+// =====================================================================================================
+// KPIs y gráficos
+// =====================================================================================================
+function renderKpis() {
+  const d = datosBase(), total = d.length;
+  const si = d.filter((v) => esSi(v.operativo)).length, no = total - si;
+  const pctOp = total ? Math.round((si / total) * 100) : 0;
+  const hab = d.reduce((n, v) => n + HABS.filter((h) => esSi(v[h.campo])).length, 0);
+  const checks = total * HABS.length, pctHab = checks ? Math.round((hab / checks) * 100) : 0;
+  const nProy = new Set(d.map((v) => normalizarProyecto(v.proyecto))).size;
 
-  if (valor && !lista.includes(valor)) {
-    lista.unshift(valor);
-  }
-
-  const htmlOpciones = lista
-    .map(op => {
-      const selected = op === valor ? "selected" : "";
-      return `<option value="${escapeHtml(op)}" ${selected}>${escapeHtml(op)}</option>`;
-    })
-    .join("");
-
-  return `
-    <select class="campo-select" onchange="actualizarCampoVehiculo('${codigo}', '${campo}', this.value)">
-      <option value="">SIN DATO</option>
-      ${htmlOpciones}
-    </select>
-  `;
+  $("#kpi-total").textContent = fmtNum(total);
+  $("#kpi-total-sub").textContent = S.proyecto === "__GENERAL__" ? `en ${nProy} ${nProy === 1 ? "proyecto" : "proyectos"}` : `de ${fmtNum(vehActivos().length)} activos en la flota`;
+  $("#kpi-si").textContent = fmtNum(si);
+  $("#kpi-si-bar span").style.width = `${pctOp}%`;
+  $("#kpi-si-bar").setAttribute("aria-valuenow", pctOp);
+  $("#kpi-si-sub").textContent = `${pctOp}% de los equipos`;
+  $("#kpi-no").textContent = fmtNum(no);
+  $("#kpi-no-card").classList.toggle("is-danger", no > 0);
+  $("#kpi-no-sub").textContent = no > 0 ? `${100 - pctOp}% de los equipos fuera de servicio` : "Sin equipos fuera de servicio";
+  $("#kpi-hab").textContent = `${pctHab}%`;
+  const barHab = $("#kpi-hab-bar span");
+  barHab.style.width = `${pctHab}%`;
+  barHab.className = `lv-${nivel(pctHab)}`;
+  $("#kpi-hab-bar").setAttribute("aria-valuenow", pctHab);
+  $("#kpi-hab-sub").textContent = `${fmtNum(hab)} de ${fmtNum(checks)} habilitaciones (5 sitios)`;
 }
 
-function normalizarProyecto(valor) {
-  return (valor || "SIN DATO").toString().trim() || "SIN DATO";
-}
+let chartProyectos;
+const valueLabelPlugin = {
+  id: "valueLabels",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart, ds = chart.data.datasets[0], meta = chart.getDatasetMeta(0);
+    ctx.save();
+    ctx.fillStyle = css("--text");
+    ctx.font = `500 12px ${css("--font")}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    meta.data.forEach((bar, i) => ctx.fillText(fmtNum(ds.data[i]), bar.x + 6, bar.y));
+    ctx.restore();
+  },
+};
 
-function poblarFiltroResumen(data) {
-  const filtro = document.getElementById("filtro-proyecto-resumen");
-  const valorActual = filtro.value || "__GENERAL__";
-  const proyectos = Array.from(new Set(data.map(v => normalizarProyecto(v.proyecto)))).sort((a, b) => a.localeCompare(b));
 
-  filtro.innerHTML = '<option value="__GENERAL__">General (Todos los proyectos)</option>';
-  proyectos.forEach(proyecto => {
-    const option = document.createElement("option");
-    option.value = proyecto;
-    option.textContent = proyecto;
-    filtro.appendChild(option);
-  });
-
-  filtro.value = Array.from(filtro.options).some(op => op.value === valorActual)
-    ? valorActual
-    : "__GENERAL__";
-}
-
-function renderResumenGeneral(data) {
-  const filtro = document.getElementById("filtro-proyecto-resumen");
-  const proyectoSeleccionado = filtro ? filtro.value : "__GENERAL__";
-  const dataFiltrada = proyectoSeleccionado === "__GENERAL__"
-    ? data
-    : data.filter(v => normalizarProyecto(v.proyecto) === proyectoSeleccionado);
-
-  const total = dataFiltrada.length;
-  const totalSi = dataFiltrada.filter(v => String(v.operativo || "").toUpperCase() === "SI").length;
-  const totalNo = total - totalSi;
-
-  document.getElementById("kpi-total").textContent = total;
-  document.getElementById("kpi-si").textContent = totalSi;
-  document.getElementById("kpi-no").textContent = totalNo;
-
+function renderGraficos() {
+  const d = datosBase();
+  // Vehículos por proyecto (barras horizontales, desc.)
+  const pares = opcionesUnicas(d, (v) => normalizarProyecto(v.proyecto)).sort((a, b) => b[1] - a[1] || collator.compare(a[0], b[0]));
+  const box = $("#chart-proyectos-box");
+  box.style.height = `${Math.max(120, pares.length * 26 + 24)}px`;
   if (typeof Chart === "undefined") {
-    return;
-  }
-
-  if (chartOperativos) {
-    chartOperativos.destroy();
-  }
-  chartOperativos = new Chart(document.getElementById("chart-operativos"), {
-    type: "doughnut",
-    data: {
-      labels: ["Operativo", "No Operativo"],
-      datasets: [{
-        data: [totalSi, totalNo],
-        backgroundColor: ["rgba(34,197,94,0.82)", "rgba(239,68,68,0.82)"],
-        borderColor: ["rgba(34,197,94,1)", "rgba(239,68,68,1)"],
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          labels: {
-            color: "#e2e8f0",
-            font: { size: 12, family: "Arial" }
-          }
-        }
-      }
+    const max = Math.max(1, ...pares.map((p) => p[1]));
+    box.innerHTML = `<div class="meters">${pares.map(([p, n]) => `<div class="meter-row"><span class="meter-label" title="${escapeHtml(p)}">${escapeHtml(p)}</span><div class="meter"><span style="width:${(n / max) * 100}%"></span></div><span class="meter-val num">${n}</span></div>`).join("")}</div>`;
+  } else {
+    const labels = pares.map((p) => p[0]), data = pares.map((p) => p[1]);
+    if (chartProyectos) {
+      chartProyectos.data.labels = labels;
+      chartProyectos.data.datasets[0].data = data;
+      chartProyectos.update();
+    } else {
+      chartProyectos = new Chart($("#chart-proyectos"), {
+        type: "bar",
+        plugins: [valueLabelPlugin],
+        data: { labels, datasets: [{ label: "Vehículos", data, backgroundColor: css("--accent"), borderRadius: 3, barThickness: 16 }] },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 28 } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${fmtNum(c.raw)} vehículos` } } },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: css("--border") }, border: { display: false } },
+            y: { ticks: { color: css("--text"), autoSkip: false }, grid: { display: false }, border: { display: false } },
+          },
+        },
+      });
     }
-  });
+  }
+
+  // Habilitaciones: % sobre el total de equipos, color por umbral
+  const total = d.length;
+  $("#hab-meters").innerHTML = HABS.map((h) => {
+    const n = d.filter((v) => esSi(v[h.campo])).length;
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    return `<div class="meter-row" title="${h.etiqueta}: ${n} de ${total} equipos habilitados (${pct}%)">
+      <span class="meter-label">${h.etiqueta}</span>
+      <div class="meter" role="progressbar" aria-label="Habilitación ${h.etiqueta}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="lv-${nivel(pct)}" style="width:${pct}%"></span></div>
+      <span class="meter-val num">${n} / ${total} · ${pct}%</span></div>`;
+  }).join("");
 }
 
-function onCambioFiltroResumen() {
-  renderResumenGeneral(vehiculosCache);
-}
-
+// =====================================================================================================
+// Observaciones (IA en /analisis_vehiculos, con reglas locales de respaldo)
+// =====================================================================================================
 function construirResumenAnalitico(data) {
   const total = data.length;
-  const operativos = data.filter(v => String(v.operativo || "").toUpperCase() === "SI").length;
+  const operativos = data.filter((v) => esSi(v.operativo)).length;
   const noOperativos = total - operativos;
   const flotaOperativaPct = total > 0 ? Math.round((operativos / total) * 100) : 0;
-
-  const conteoProyectos = new Map();
-  const conteoSectores = new Map();
-  data.forEach(v => {
+  const conteoProyectos = new Map(), conteoSectores = new Map();
+  data.forEach((v) => {
     const proyecto = normalizarProyecto(v.proyecto);
     const sector = (v.sector || "SIN DATO").toString().trim().toUpperCase() || "SIN DATO";
     conteoProyectos.set(proyecto, (conteoProyectos.get(proyecto) || 0) + 1);
     conteoSectores.set(sector, (conteoSectores.get(sector) || 0) + 1);
   });
-  const proyectoTop = Array.from(conteoProyectos.entries()).sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
-  const sectorTop = Array.from(conteoSectores.entries()).sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
-  const pctTop = total > 0 ? Math.round((proyectoTop[1] / total) * 100) : 0;
-
-  const camposHab = [
-    "habilitacion_pirquitas",
-    "habilitacion_exar",
-    "habilitacion_sdj",
-    "habilitacion_rincon",
-    "habilitacion_arli"
-  ];
+  const proyectoTop = [...conteoProyectos.entries()].sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
+  const sectorTop = [...conteoSectores.entries()].sort((a, b) => b[1] - a[1])[0] || ["SIN DATO", 0];
   let habilitados = 0;
-  data.forEach(v => {
-    camposHab.forEach(campo => {
-      if (String(v[campo] || "").toUpperCase() === "SI") {
-        habilitados += 1;
-      }
-    });
-  });
-  const totalChecks = total * camposHab.length;
-  const pctHabilitaciones = totalChecks > 0 ? Math.round((habilitados / totalChecks) * 100) : 0;
-
+  data.forEach((v) => HABS.forEach((h) => { if (esSi(v[h.campo])) habilitados += 1; }));
+  const totalChecks = total * HABS.length;
   return {
-    total,
-    operativos,
-    no_operativos: noOperativos,
-    flota: flotaOperativaPct,
-    proyecto_principal: proyectoTop[0],
-    sector_principal: sectorTop[0],
-    pct_habilitaciones: pctHabilitaciones,
-    proyecto_top_cantidad: proyectoTop[1],
-    proyecto_top_pct: pctTop
+    total, operativos, no_operativos: noOperativos, flota: flotaOperativaPct,
+    proyecto_principal: proyectoTop[0], sector_principal: sectorTop[0],
+    pct_habilitaciones: totalChecks > 0 ? Math.round((habilitados / totalChecks) * 100) : 0,
+    proyecto_top_cantidad: proyectoTop[1], proyecto_top_pct: total > 0 ? Math.round((proyectoTop[1] / total) * 100) : 0,
   };
 }
 
 function generarConclusion(data) {
   let texto = "";
-
-  if (data.flota < 60) {
-    texto += "Baja disponibilidad de flota. ";
-  }
-
-  if (data.no_operativos > data.operativos) {
-    texto += "Mayor cantidad de equipos fuera de servicio. ";
-  }
-
-  if (data.proyecto_principal === "TALLER" || data.sector_principal === "TALLER") {
-    texto += "Alta concentración en Taller. ";
-  }
-
-  if (!texto) {
-    texto = "Operación estable con indicadores controlados y disponibilidad de flota adecuada.";
-  }
-
-  return texto.trim();
+  if (data.flota < 60) texto += "Baja disponibilidad de flota. ";
+  if (data.no_operativos > data.operativos) texto += "Mayor cantidad de equipos fuera de servicio. ";
+  if (data.proyecto_principal === "TALLER" || data.sector_principal === "TALLER") texto += "Alta concentración en Taller. ";
+  return (texto || "Operación estable con indicadores controlados y disponibilidad de flota adecuada.").trim();
 }
 
 async function obtenerConclusionIA(data) {
   const payload = {
-    total: data.total,
-    operativos: data.operativos,
-    no_operativos: data.no_operativos,
-    flota: data.flota,
-    proyecto_principal: data.proyecto_principal,
-    sector_principal: data.sector_principal,
-    pct_habilitaciones: data.pct_habilitaciones
+    total: data.total, operativos: data.operativos, no_operativos: data.no_operativos, flota: data.flota,
+    proyecto_principal: data.proyecto_principal, sector_principal: data.sector_principal, pct_habilitaciones: data.pct_habilitaciones,
   };
-
-  const res = await fetch("/analisis_vehiculos", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    throw new Error("No disponible");
-  }
-
+  const res = await fetch("/analisis_vehiculos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error("No disponible");
   const body = await res.json();
-  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) {
-    throw new Error("Respuesta invalida");
-  }
-
+  if (!body || typeof body.conclusion !== "string" || !body.conclusion.trim()) throw new Error("Respuesta invalida");
   return body.conclusion.trim();
 }
 
-async function actualizarConclusiones(data) {
-  const resumen = construirResumenAnalitico(data);
+async function actualizarConclusiones() {
+  const resumen = construirResumenAnalitico(vehActivos());
+  const btn = $("#obs-regenerar");
+  btn.disabled = true;
+  $("#obs-estado").textContent = "Generando…";
   let conclusion = generarConclusion(resumen);
-  let fuente = "Fuente: motor local de reglas";
-
-  try {
-    const conclusionIA = await obtenerConclusionIA(resumen);
-    conclusion = conclusionIA;
-    fuente = "Fuente: IA backend (/analisis_vehiculos)";
-  } catch (error) {
-    // Si no hay endpoint IA disponible, se conserva la conclusion local.
-  }
-
-  const recomendaciones = [
-    `Total equipos: ${resumen.total}. Operativos: ${resumen.operativos}. No operativos: ${resumen.no_operativos}.`,
-    `Mayor concentración en proyecto ${resumen.proyecto_principal} (${resumen.proyecto_top_cantidad} equipos, ${resumen.proyecto_top_pct}% del total).`,
-    `Nivel global de habilitaciones: ${resumen.pct_habilitaciones}% sobre los checks de Pirquitas, Exar, SDJ, Rincón y ARLI.`
-  ];
-
-  if (resumen.no_operativos > resumen.operativos) {
-    recomendaciones.push("La cantidad de no operativos supera a los operativos: activar plan de recuperación de flota de corto plazo.");
-  }
-  if (resumen.pct_habilitaciones < 50) {
-    recomendaciones.push("El nivel de habilitaciones es bajo: revisar documentación, vencimientos y gestión por proyecto.");
-  }
-
-  const main = document.getElementById("conclusion-main");
-  const source = document.getElementById("conclusion-source");
-  const list = document.getElementById("conclusion-list");
-  if (main) {
-    main.textContent = conclusion;
-  }
-  if (source) {
-    source.textContent = fuente;
-  }
-  if (list) {
-    list.innerHTML = recomendaciones.map(item => `<li>${escapeHtml(item)}</li>`).join("");
-  }
+  try { conclusion = await obtenerConclusionIA(resumen); } catch { /* se conserva la conclusión local */ }
+  $("#conclusion-main").textContent = conclusion;
+  $("#obs-estado").textContent = `Generado ${fmtFecha(new Date())}`;
+  btn.disabled = false;
+  renderObservaciones();
 }
 
-function actualizarGraficos(data) {
-  vehiculosCache = data;
-  poblarFiltroResumen(data);
-  renderResumenGeneral(data);
-  actualizarConclusiones(data);
-
-  if (typeof Chart === "undefined") {
-    return;
-  }
-
-  const baseOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        labels: {
-          color: "#e2e8f0",
-          font: { size: 12, family: "Arial" }
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: { color: "#dbeafe", font: { family: "Arial" } },
-        grid: { color: "rgba(255,255,255,0.12)" }
-      },
-      y: {
-        beginAtZero: true,
-        ticks: { color: "#dbeafe", precision: 0, font: { family: "Arial" } },
-        grid: { color: "rgba(255,255,255,0.12)" }
-      }
-    }
-  };
-
-  const mapaProyectos = new Map();
-  data.forEach(v => {
-    const proyecto = normalizarProyecto(v.proyecto);
-    mapaProyectos.set(proyecto, (mapaProyectos.get(proyecto) || 0) + 1);
-  });
-  const proyectosOrdenados = Array.from(mapaProyectos.entries()).sort((a, b) => b[1] - a[1]);
-  const labelsProyectos = proyectosOrdenados.map(([nombre]) => nombre);
-  const valoresProyectos = proyectosOrdenados.map(([, cantidad]) => cantidad);
-
-  if (chartProyectos) {
-    chartProyectos.destroy();
-  }
-  chartProyectos = new Chart(document.getElementById("chart-proyectos"), {
-    type: "bar",
-    plugins: [valueLabelPlugin],
-    data: {
-      labels: labelsProyectos,
-      datasets: [{
-        label: "Vehículos",
-        data: valoresProyectos,
-        backgroundColor: "rgba(56,189,248,0.7)",
-        borderColor: "rgba(56,189,248,1)",
-        borderWidth: 1,
-        borderRadius: 8
-      }]
-    },
-    options: {
-      ...baseOptions,
-      plugins: {
-        ...baseOptions.plugins,
-        valueLabels: {
-          color: "#eaf2ff",
-          fontSize: 12
-        }
-      }
-    }
-  });
-
-  const habilitaciones = [
-    { etiqueta: "Pirquitas", campo: "habilitacion_pirquitas" },
-    { etiqueta: "Exar", campo: "habilitacion_exar" },
-    { etiqueta: "SDJ", campo: "habilitacion_sdj" },
-    { etiqueta: "Rincón", campo: "habilitacion_rincon" },
-    { etiqueta: "ARLI", campo: "habilitacion_arli" }
-  ];
-  const labelsHab = habilitaciones.map(h => h.etiqueta);
-  const valoresHab = habilitaciones.map(h =>
-    data.filter(v => String(v[h.campo] || "").toUpperCase() === "SI").length
-  );
-
-  if (chartHabilitaciones) {
-    chartHabilitaciones.destroy();
-  }
-  chartHabilitaciones = new Chart(document.getElementById("chart-habilitaciones"), {
-    type: "bar",
-    plugins: [valueLabelPlugin],
-    data: {
-      labels: labelsHab,
-      datasets: [{
-        label: "Habilitados",
-        data: valoresHab,
-        backgroundColor: "rgba(250,204,21,0.72)",
-        borderColor: "rgba(250,204,21,1)",
-        borderWidth: 1,
-        borderRadius: 8
-      }]
-    },
-    options: {
-      ...baseOptions,
-      plugins: {
-        ...baseOptions.plugins,
-        valueLabels: {
-          color: "#fff7d6",
-          fontSize: 12
-        }
-      }
-    }
-  });
+function renderObservaciones() {
+  const d = vehActivos(), r = construirResumenAnalitico(d), items = [];
+  if (r.no_operativos > r.operativos) items.push(["bad", "alert", "Hay más equipos no operativos que operativos: activar un plan de recuperación de flota de corto plazo."]);
+  if (r.no_operativos > 0) items.push(["warn", "alert", `${r.no_operativos} ${r.no_operativos === 1 ? "equipo no operativo" : "equipos no operativos"} (${100 - r.flota}% de la flota): priorizar su vuelta a servicio.`]);
+  else items.push(["ok", "check", `Flota 100% operativa: ${r.operativos} de ${r.total} equipos en servicio.`]);
+  const sitios = HABS.map((h) => [h.etiqueta, d.filter((v) => esSi(v[h.campo])).length]).sort((a, b) => a[1] - b[1]);
+  const peor = sitios[0];
+  const txtHab = `Habilitación global ${r.pct_habilitaciones}%; el sitio más bajo es ${peor[0]} (${peor[1]} de ${r.total})`;
+  items.push(r.pct_habilitaciones < 50 ? ["warn", "alert", `${txtHab}: revisar documentación y vencimientos por proyecto.`] : ["info", "info", `${txtHab}.`]);
+  if (S.issues.size) items.push(["warn", "alert", `${S.issues.size} vehículos con datos a revisar (motor/chasis repetido o marca mal escrita). Ver Estandarizar vehículos.`]);
+  items.push(["info", "info", `${r.proyecto_principal} concentra ${r.proyecto_top_cantidad} equipos (${r.proyecto_top_pct}% del total).`]);
+  $("#conclusion-list").innerHTML = items.slice(0, 4).map(([c, i, t]) => `<li class="obs-${c}">${icon(i)}<span>${escapeHtml(t)}</span></li>`).join("");
 }
 
-let vehiculosData = [];
-let filtrosColumnas = {};
-
-const opcionesSector = ["OBRAS", "GERENCIA", "TALLER", "LOGISTICA", "ADMINISTRACION"];
-const opcionesProyecto = ["Pirquitas", "Exar", "SDJ", "Rincón", "ARLI", "GEMAR", "VIAP"];
-
-const claseOperativo = (valor) => {
-  return String(valor || "").toUpperCase() === "SI" ? "estado-si" : "estado-no";
+// =====================================================================================================
+// Calidad de datos (solo avisa: no modifica nada)
+// =====================================================================================================
+const MARCAS = {
+  MERCEDEZ: "Mercedes-Benz", MERCEDES: "Mercedes-Benz", MERCEDESBENZ: "Mercedes-Benz", MERCEDEZBENZ: "Mercedes-Benz", MB: "Mercedes-Benz",
+  IVECO: "Iveco", IVECCO: "Iveco", IVEKO: "Iveco", IVECO500: "Iveco",
+  DONGFENG: "Dongfeng", DONFENG: "Dongfeng", DONGFENGG: "Dongfeng",
+  TOYOTA: "Toyota", TOYOTAHILUX: "Toyota", HILUX: "Toyota",
+  ZOOMLION: "Zoomlion", ZOOMILION: "Zoomlion", ZOOMLON: "Zoomlion",
+  SINOTRUK: "Sinotruk", SINOTRUCK: "Sinotruk", SINOTRUCKHOWO: "Sinotruk", SINOTRUKHOWO: "Sinotruk", HOWO: "Sinotruk",
+  VOLKSWAGEN: "Volkswagen", VW: "Volkswagen", WOLKSWAGEN: "Volkswagen",
+  CATERPILLAR: "Caterpillar", CAT: "Caterpillar", CATERPILAR: "Caterpillar",
+  VOLVO: "Volvo", FIAT: "Fiat", FORD: "Ford", PEUGEOT: "Peugeot", PEUGEOUT: "Peugeot", RENAULT: "Renault", CHEVROLET: "Chevrolet",
+  KOMATSU: "Komatsu", SAKAI: "Sakai", KOBELCO: "Kobelco", LIUGONG: "LiuGong", SANY: "SANY", XCMG: "XCMG", LOVOL: "Lovol",
+  JOHNDEERE: "John Deere", NEWHOLLAND: "New Holland", CASE: "Case", JCB: "JCB", HYUNDAI: "Hyundai", SCANIA: "Scania",
 };
-
-function renderFilas(data) {
-  const tbody = document.getElementById("lista-body");
-  tbody.innerHTML = "";
-
-  data.forEach(v => {
-    const tr = document.createElement("tr");
-
-    tr.innerHTML = `
-      <td>${v.codigo || ""}</td>
-      <td>${v.propiedad || ""}</td>
-      <td>${v.marca || ""}</td>
-      <td>${v.tipo || ""}</td>
-      <td>${v.modelo || ""}</td>
-      <td>${v.dominio || ""}</td>
-      <td>${v.anio || ""}</td>
-      <td>${v.motor || ""}</td>
-      <td>${v.chasis || ""}</td>
-      <td>${selectEditable(v.codigo, "sector", v.sector, opcionesSector)}</td>
-      <td>${selectEditable(v.codigo, "proyecto", v.proyecto, opcionesProyecto)}</td>
-      <td>
-        <select class="operativo-select ${claseOperativo(v.operativo)}" onchange="actualizarOperativo('${v.codigo}', this.value)">
-          <option value="SI" ${v.operativo === "SI" ? "selected" : ""}>SI</option>
-          <option value="NO" ${v.operativo === "NO" ? "selected" : ""}>NO</option>
-        </select>
-      </td>
-      <td>${selectHabilitacion(v.codigo, "habilitacion_pirquitas", v.habilitacion_pirquitas)}</td>
-      <td>${selectHabilitacion(v.codigo, "habilitacion_exar", v.habilitacion_exar)}</td>
-      <td>${selectHabilitacion(v.codigo, "habilitacion_sdj", v.habilitacion_sdj)}</td>
-      <td>${selectHabilitacion(v.codigo, "habilitacion_rincon", v.habilitacion_rincon)}</td>
-      <td>${selectHabilitacion(v.codigo, "habilitacion_arli", v.habilitacion_arli)}</td>
-      <td><button class="eliminar-btn" onclick="eliminar('${v.codigo}')">X</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+const claveTxt = (s) => (s ?? "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+function claveSerie(s) {
+  const k = claveTxt(s);
+  return k.length >= 6 && !/^0+$/.test(k) && !/^(SINDATO|NOTIENE|SINNUMERO)$/.test(k) ? k : "";
 }
 
-function aplicarFiltros() {
-  const activos = Object.entries(filtrosColumnas).filter(([, valor]) => valor);
-  if (!activos.length) {
-    renderFilas(vehiculosData);
+function calcularInconsistencias() {
+  const issues = new Map(), dq = { motor: [], chasis: [], marca: [] };
+  const add = (cod, txt) => { if (!issues.has(cod)) issues.set(cod, []); issues.get(cod).push(txt); };
+  for (const [campo, etiqueta] of [["motor", "Motor"], ["chasis", "Chasis"]]) {
+    const grupos = new Map();
+    vehActivos().forEach((v) => { const k = claveSerie(v[campo]); if (k) { if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(v); } });
+    for (const vs of grupos.values()) {
+      const cods = [...new Set(vs.map((v) => v.codigo))];
+      if (cods.length < 2) continue;
+      dq[campo].push({ valor: String(vs[0][campo]).trim(), codigos: cods });
+      cods.forEach((c) => add(c, `${etiqueta} ${String(vs[0][campo]).trim()} repetido en ${cods.filter((x) => x !== c).join(", ")}`));
+    }
+  }
+  const marcas = new Map();
+  vehActivos().forEach((v) => {
+    const raw = String(v.marca ?? "").trim(), canon = MARCAS[claveTxt(raw)];
+    if (!raw || !canon || claveTxt(canon) === claveTxt(raw)) return;   // solo errores de escritura o marca mezclada con modelo
+    if (!marcas.has(raw)) marcas.set(raw, { valor: raw, sugerida: canon, codigos: [] });
+    marcas.get(raw).codigos.push(v.codigo);
+    add(v.codigo, `Marca «${raw}» → sugerida «${canon}»`);
+  });
+  dq.marca = [...marcas.values()];
+  S.issues = issues;
+  S.dq = dq;
+}
+
+// =====================================================================================================
+// Tabla
+// =====================================================================================================
+function iconoTipo(v) {
+  const t = tiposCatalogo.tipos.find((x) => normTipo(x.nombre) === normTipo(v.tipo));
+  return t && t.familia === "MAQUINARIA" ? "machine" : t && t.familia === "REMOLQUE" ? "trailer" : "truck";
+}
+
+function celda(v, c) {
+  const raw = String(v[c.k] ?? "").trim();
+  if (c.k === "codigo") {
+    const iss = S.issues.get(v.codigo);
+    const inact = !esActivo(v);
+    return `<td class="sticky-col" title="${escapeHtml((iss ? `${raw}\n⚠ ${iss.join("\n⚠ ")}` : raw) + (inact ? "\nInactivo (dado de baja)" : ""))}"><span class="cell-flex"><span class="codigo trunc">${escapeHtml(raw)}</span>${iss ? `<span class="warn-ico" aria-label="Con inconsistencias">${icon("alert", "i-sm")}</span>` : ""}${inact ? '<span class="chip" style="height:18px;font-size:11px">Inactivo</span>' : ""}</span></td>`;
+  }
+  if (c.k === "tipo") {
+    const estandar = esTipoEstandar(raw);
+    const pend = raw && !estandar;
+    const titulo = raw ? (pend ? `${raw}\nSin estandarizar: elegí un tipo de la lista` : raw) + (v.tipo_original ? `\nAntes: ${v.tipo_original}` : "") : "Sin dato";
+    return `<td title="${escapeHtml(titulo)}"><span class="cell-flex ${pend ? "tipo-pendiente" : ""}"><span class="tipo-ico">${icon(pend ? "alert" : iconoTipo(v), "i-sm")}</span><span class="trunc ${raw ? "" : "muted"}">${escapeHtml(raw || "—")}</span></span></td>`;
+  }
+  if (c.k === "operativo") {
+    const si = esSi(v.operativo);
+    return `<td><span class="chip ${si ? "chip-ok" : "chip-bad"}"><span class="chip-dot"></span>${si ? "Operativo" : "No operativo"}</span></td>`;
+  }
+  if (c.hab) {
+    const si = esSi(v[c.k]);
+    return `<td class="center" title="${c.l}: ${si ? "habilitado" : "no habilitado"}"><span class="${si ? "hab-si" : "hab-no"}" aria-label="${si ? "Sí" : "No"}">${icon(si ? "check" : "x", "i-sm")}</span></td>`;
+  }
+  if (c.k === "_accion") {
+    return `<td class="center"><button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-fila aria-haspopup="menu" aria-label="Acciones de ${escapeHtml(v.codigo)}">${icon("more")}</button></td>`;
+  }
+  if (c.k === "sector" || c.k === "proyecto") {
+    return `<td title="${escapeHtml(raw)}">${raw ? `<span class="chip">${escapeHtml(raw)}</span>` : '<span class="muted">—</span>'}</td>`;
+  }
+  return `<td class="${c.mono ? "mono" : ""} ${c.right ? "right num" : ""}" title="${escapeHtml(raw)}">${raw ? escapeHtml(raw) : '<span class="muted">—</span>'}</td>`;
+}
+
+function renderTabla() {
+  const cols = COLS.filter((c) => S.visibles.has(c.k));
+  SMG.columnasTabla($("#lista"), $("#lista-cols"), cols);
+  $("#lista-head").innerHTML = `<tr>${cols.map((c) => {
+    if (c.k === "_accion") return `<th class="center"><span class="sr-only">Acciones</span></th>`;
+    const activo = S.sort.k === c.k;
+    const aria = activo ? (S.sort.dir > 0 ? "ascending" : "descending") : "none";
+    return `<th class="${c.sticky ? "sticky-col" : ""} ${c.hab ? "center" : ""}" aria-sort="${aria}"><button type="button" class="th-sort" data-sort="${c.k}">${c.l}${icon(activo ? (S.sort.dir > 0 ? "up" : "down") : "sort")}</button></th>`;
+  }).join("")}</tr>`;
+
+  const body = $("#lista-body");
+  if (S.cargando) {
+    body.innerHTML = Array.from({ length: 8 }, () => `<tr>${cols.map((c) => `<td class="${c.sticky ? "sticky-col" : ""}"><span class="skel" style="width:${40 + Math.round(Math.random() * 50)}%"></span></td>`).join("")}</tr>`).join("");
+    $("#tabla-rango").textContent = "Cargando…";
+    $("#pag-info").textContent = "";
     return;
   }
-  const filtrados = vehiculosData.filter((v) =>
-    activos.every(([campo, valor]) =>
-      String(v[campo] || "").toLowerCase().includes(valor.toLowerCase())
-    )
-  );
-  renderFilas(filtrados);
+  const filas = datosTabla(), total = filas.length;
+  const paginas = Math.max(1, Math.ceil(total / S.pageSize));
+  S.page = Math.min(Math.max(1, S.page), paginas);
+  const desde = (S.page - 1) * S.pageSize;
+  const pagina = filas.slice(desde, desde + S.pageSize);
+  body.innerHTML = pagina.length
+    ? pagina.map((v) => `<tr data-codigo="${escapeHtml(v.codigo)}" class="${esActivo(v) ? "" : "inactivo"}" tabindex="0">${cols.map((c) => celda(v, c)).join("")}</tr>`).join("")
+    : `<tr><td class="empty" colspan="${cols.length}"><b>${S.vehiculos.length ? "No hay vehículos que coincidan" : "Todavía no hay vehículos cargados"}</b>
+        ${S.vehiculos.length ? 'Probá con otra búsqueda o <button type="button" class="btn-link" data-limpiar>limpiá los filtros</button>.' : "Usá «Nuevo vehículo» para cargar el primero."}</td></tr>`;
+  $("#tabla-rango").textContent = total ? `Mostrando ${desde + 1}–${desde + pagina.length} de ${fmtNum(total)}` : "Sin resultados";
+  $("#pag-info").textContent = `${S.page} / ${paginas}`;
+  $("#pag-prev").disabled = S.page <= 1;
+  $("#pag-next").disabled = S.page >= paginas;
+  $("#page-size").value = String(S.pageSize);
+
+  const nCol = Object.values(S.colFiltros).filter(Boolean).length;
+  $("#cnt-col-filtros").hidden = !nCol;
+  $("#cnt-col-filtros").textContent = nCol;
+  $("#btn-limpiar-filtros").hidden = !(nCol || S.q || Object.values(S.chips).some(Boolean) || S.proyecto !== "__GENERAL__" || S.activo !== "SI");
+  $("#f-activo").value = S.activo;
+  $("#f-activo").classList.toggle("on", S.activo !== "SI");
+  $$("#vistas [data-vista]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === S.vista)));
 }
 
-document.querySelectorAll("#lista thead .col-filter").forEach((input) => {
-  const campo = input.dataset.campo;
-  if (!campo) return;
-  filtrosColumnas[campo] = "";
-  input.addEventListener("input", () => {
-    filtrosColumnas[campo] = input.value.trim();
-    aplicarFiltros();
-  });
-});
-
-document.getElementById("btn-limpiar-filtros").addEventListener("click", () => {
-  document.querySelectorAll("#lista thead .col-filter").forEach((input) => { input.value = ""; });
-  Object.keys(filtrosColumnas).forEach((campo) => { filtrosColumnas[campo] = ""; });
-  aplicarFiltros();
-});
-
-async function cargar() {
-  const res = await fetch("/vehiculos");
-  const data = await res.json();
-  vehiculosData = data;
-
-  actualizarGraficos(data);
-  aplicarFiltros();
+function limpiarFiltros() {
+  S.q = ""; S.proyecto = "__GENERAL__"; S.activo = "SI"; S.page = 1;
+  Object.keys(S.chips).forEach((k) => { S.chips[k] = ""; });
+  Object.keys(S.colFiltros).forEach((k) => { S.colFiltros[k] = ""; });
+  $("#buscar-tabla").value = "";
+  if ($("#buscar-global")) $("#buscar-global").value = "";
+  $$("#pop-filtros-grid .col-filter").forEach((i) => { i.value = ""; });
+  poblarFiltros();
+  renderTodo();
 }
 
-async function actualizarHabilitacionVehiculo(codigo, campo, valor) {
-  await fetch(`/vehiculos/${codigo}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ [campo]: valor })
-  });
-
-  cargar();
+function aplicarVista(nombre) {
+  S.vista = nombre;
+  S.visibles = new Set(VISTAS[nombre]);
+  prefs.set("vista", nombre);
+  prefs.set("cols", null);
+  renderTabla();
 }
 
-async function actualizarOperativo(codigo, operativo) {
-  await fetch(`/vehiculos/${codigo}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ operativo: operativo })
-  });
-
-  cargar();
+function pintarPopColumnas() {
+  $("#pop-columnas-grid").innerHTML = COLS.filter((c) => c.k !== "codigo" && c.k !== "_accion").map((c) =>
+    `<label class="check"><input type="checkbox" value="${c.k}" ${S.visibles.has(c.k) ? "checked" : ""}>${c.l}</label>`).join("");
 }
 
-async function actualizarCampoVehiculo(codigo, campo, valor) {
-  await fetch(`/vehiculos/${codigo}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ [campo]: valor })
-  });
-
-  cargar();
-}
-
-async function agregar() {
-  const codigo = document.getElementById("codigo").value;
-
-  // Verificar si el vehículo ya existe
-  const res = await fetch("/vehiculos");
-  const vehiculos = await res.json();
-
-  if (vehiculos.some(v => v.codigo === codigo)) {
-    alert("El vehículo con código " + codigo + " ya existe en la base de datos");
-    return;
-  }
-
-  const vehiculo = {
-    codigo: codigo,
-    propiedad: document.getElementById("propiedad").value,
-    marca: document.getElementById("marca").value,
-    tipo: document.getElementById("tipo").value,
-    modelo: document.getElementById("modelo").value,
-    dominio: document.getElementById("dominio").value,
-    anio: document.getElementById("anio").value,
-    motor: document.getElementById("motor").value,
-    chasis: document.getElementById("chasis").value,
-    sector: document.getElementById("sector").value,
-    proyecto: document.getElementById("proyecto").value,
-    operativo: document.getElementById("operativo").value,
-    habilitacion_pirquitas: document.getElementById("habilitacion_pirquitas").value,
-    habilitacion_exar: document.getElementById("habilitacion_exar").value,
-    habilitacion_sdj: document.getElementById("habilitacion_sdj").value,
-    habilitacion_rincon: document.getElementById("habilitacion_rincon").value,
-    habilitacion_arli: document.getElementById("habilitacion_arli").value
+function exportarCsv() {
+  const cols = COLS.filter((c) => c.k !== "_accion");
+  const filas = datosTabla();
+  const esc = (s) => {
+    s = String(s ?? "");
+    if (/^[=+@]/.test(s)) s = `'${s}`;
+    return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  const csv = "\uFEFF" + [[...cols.map((c) => esc(c.l)), "Activo"].join(";"), ...filas.map((v) => [...cols.map((c) => esc(c.k === "operativo" || c.hab ? valorCelda(v, c.k) : v[c.k])), esActivo(v) ? "SI" : "NO"].join(";"))].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `vehiculos_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  toast(`${filas.length} vehículos exportados`);
+}
 
-  await fetch("/vehiculos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(vehiculo)
-  });
+// =====================================================================================================
+// Drawer: vehículo
+// =====================================================================================================
+let drawerModo = null;
+let drawerVolverFoco = null;
+let tipoInicialForm = "";
+let operativoInicialForm = "SI";
+let activoInicialForm = "SI";
 
-  document.getElementById("panel-form-vehiculos").style.display = "none";
-  cargar();
+function abrirDrawer(cual, titulo, sub, textoGuardar) {
+  cerrarMenu();
+  drawerVolverFoco = document.activeElement;
+  $("#drawer-title").textContent = titulo;
+  $("#drawer-sub").textContent = sub || "";
+  $("#drawer-save").textContent = textoGuardar;
+  $("#form-vehiculo").hidden = cual !== "vehiculo";
+  $("#form-tipo").hidden = cual !== "tipo";
+  $("#drawer").hidden = false;
+  $("#scrim").hidden = false;
+  $(".drawer-body").scrollTop = 0;
+  const foco = $(`#form-${cual} input:not([readonly]):not([type=checkbox])`);
+  foco && foco.focus();
+}
+function cerrarDrawer() {
+  $("#drawer").hidden = true;
+  $("#scrim").hidden = true;
+  drawerModo = null;
+  if (drawerVolverFoco && document.contains(drawerVolverFoco)) drawerVolverFoco.focus();
+}
+
+const CAMPOS_TEXTO = ["codigo", "propiedad", "marca", "modelo", "dominio", "anio", "motor", "chasis", "sector", "proyecto"];
+
+function llenarFormVehiculo(v, modo) {
+  CAMPOS_TEXTO.forEach((k) => { $(`#${k}`).value = String(v[k] ?? "").trim(); });
+  $("#codigo").readOnly = modo === "editar";
+  const actual = String(v.tipo ?? "").trim();
+  const pend = actual && !esTipoEstandar(actual);
+  const sel = $("#tipo");
+  sel.innerHTML = '<option value="">Tipo de equipo</option>'
+    + (pend ? `<option value="${escapeHtml(actual)}">⚠ ${escapeHtml(actual)} (sin estandarizar)</option>` : "")
+    + nombresTipos().map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  sel.value = pend ? actual : (nombresTipos().find((n) => normTipo(n) === normTipo(actual)) || "");
+  tipoInicialForm = sel.value;
+  $("#tipo-ayuda").textContent = pend ? "Sin estandarizar: elegí un tipo de la lista (define el check list de Mantenimiento)." : (v.tipo_original ? `Antes: ${v.tipo_original}` : "");
+  $("#operativo").value = modo === "nuevo" && !v.operativo ? "SI" : (esSi(v.operativo) ? "SI" : "NO");
+  operativoInicialForm = $("#operativo").value;
+  $("#activo").value = esActivo(v) ? "SI" : "NO";
+  activoInicialForm = $("#activo").value;
+  HABS.forEach((h) => { $(`#${h.campo}`).checked = esSi(v[h.campo]); });
+  const iss = modo === "editar" ? S.issues.get(v.codigo) : null;
+  $("#fv-issues").hidden = !iss;
+  $("#fv-issues").innerHTML = iss ? `${icon("alert")}<div><b>Datos a revisar</b><ul>${iss.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul></div>` : "";
+}
+
+function leerFormVehiculo() {
+  const d = {};
+  CAMPOS_TEXTO.forEach((k) => { d[k] = $(`#${k}`).value.trim(); });
+  d.tipo = $("#tipo").value;
+  d.operativo = $("#operativo").value;
+  d.activo = $("#activo").value;
+  HABS.forEach((h) => { d[h.campo] = $(`#${h.campo}`).checked ? "SI" : "NO"; });
+  return d;
+}
+
+function abrirDrawerVehiculo(codigo) {
+  const v = S.vehiculos.find((x) => x.codigo === codigo);
+  if (!v) return;
+  drawerModo = { tipo: "vehiculo", accion: "editar", codigo, original: v };
+  llenarFormVehiculo(v, "editar");
+  abrirDrawer("vehiculo", `Vehículo ${codigo}`, [v.marca, v.modelo, v.dominio].filter(Boolean).join(" · "), "Guardar cambios");
+}
+
+function abrirDrawerNuevo(base) {
+  const v = base ? { ...base, codigo: "", dominio: "", motor: "", chasis: "", tipo_original: "", activo: "SI" } : { operativo: "SI", activo: "SI" };
+  drawerModo = { tipo: "vehiculo", accion: "nuevo" };
+  llenarFormVehiculo(v, "nuevo");
+  abrirDrawer("vehiculo", base ? `Duplicar ${base.codigo}` : "Nuevo vehículo", base ? "Se copian los datos generales; código, dominio, motor y chasis van vacíos." : "Completá los datos del equipo.", "Crear vehículo");
+}
+
+async function guardarVehiculo() {
+  const d = leerFormVehiculo();
+  if (drawerModo.accion === "nuevo") {
+    if (!d.codigo) { toast("Indicá el código del vehículo.", "error"); $("#codigo").focus(); return; }
+    const existentes = await pedirJson("/vehiculos?incluir_inactivos=1");
+    if ((existentes || []).some((v) => v.codigo === d.codigo)) { toast(`El vehículo con código ${d.codigo} ya existe en la base de datos`, "error"); $("#codigo").focus(); return; }
+    await pedirJson("/vehiculos", { method: "POST", body: JSON.stringify(d) });
+    cerrarDrawer();
+    toast(`Vehículo ${d.codigo} creado`);
+    await cargar();
+    return;
+  }
+  const o = drawerModo.original, cambios = {};
+  CAMPOS_TEXTO.filter((k) => k !== "codigo").forEach((k) => { if (d[k] !== String(o[k] ?? "").trim()) cambios[k] = d[k]; });
+  if (d.tipo !== tipoInicialForm) cambios.tipo = d.tipo;
+  if (d.operativo !== operativoInicialForm) cambios.operativo = d.operativo;
+  if (d.activo !== activoInicialForm) {
+    if (d.activo === "NO" && !await confirmarBaja(o.codigo)) return;
+    cambios.activo = d.activo;
+  }
+  HABS.forEach((h) => { if (d[h.campo] !== (esSi(o[h.campo]) ? "SI" : "NO")) cambios[h.campo] = d[h.campo]; });
+  if (!Object.keys(cambios).length) { cerrarDrawer(); toast("Sin cambios para guardar", "info"); return; }
+  await pedirJson(`/vehiculos/${encodeURIComponent(o.codigo)}`, { method: "PUT", body: JSON.stringify(cambios) });
+  cerrarDrawer();
+  toast(`Cambios guardados en ${o.codigo}`);
+  await cargar();
+}
+
+function confirmarBaja(codigo) {
+  return confirmar(`¿Desactivar ${codigo}?`, "Deja de contar en indicadores y gráficos y desaparece de partes, Tarja, Mantenimiento, viajes y compras. El historial se conserva y se puede reactivar desde «Inactivos».", { ok: "Desactivar", peligro: true });
+}
+
+async function cambiarActivo(codigo) {
+  const v = S.vehiculos.find((x) => x.codigo === codigo);
+  if (!v) return;
+  const nuevo = esActivo(v) ? "NO" : "SI";
+  if (nuevo === "NO" && !await confirmarBaja(codigo)) return;
+  try {
+    await pedirJson(`/vehiculos/${encodeURIComponent(codigo)}`, { method: "PUT", body: JSON.stringify({ activo: nuevo }) });
+    toast(nuevo === "NO" ? `${codigo} desactivado` : `${codigo} reactivado`);
+  } catch (e) { toast(e.message, "error"); }
+  await cargar();
 }
 
 async function eliminar(codigo) {
-  await fetch(`/vehiculos/${codigo}`, {
-    method: "DELETE"
-  });
+  const ok = await confirmar(`¿Eliminar ${codigo}?`, "El vehículo se borra de la base. Esta acción no se puede deshacer.", { ok: "Eliminar", peligro: true });
+  if (!ok) return;
+  try {
+    await pedirJson(`/vehiculos/${encodeURIComponent(codigo)}`, { method: "DELETE" });
+    toast(`Vehículo ${codigo} eliminado`);
+  } catch (e) { toast(e.message, "error"); }
+  await cargar();
+}
 
+// =====================================================================================================
+// Tipos de equipo: catálogo estándar de la columna «tipo». Define también los módulos del check list de Mantenimiento.
+// =====================================================================================================
+let tiposCatalogo = { tipos: [], modulos: [], equipos: [] };
+const FAMILIAS_TIPO = { VIAL: "Vial", MAQUINARIA: "Maquinaria vial", REMOLQUE: "Remolque" };
+let tiposVista = "catalogo";
+let tiposSoloPendientes = true;
+let modalVolverFoco = null;
+
+async function cargarTiposCatalogo() {
+  try { tiposCatalogo = await pedirJson("/api/vehiculos/tipos-equipo"); }
+  catch { tiposCatalogo = { tipos: [], modulos: [], equipos: [] }; }
+}
+function nombresTipos() { return tiposCatalogo.tipos.filter((t) => t.activo).map((t) => t.nombre).sort((a, b) => a.localeCompare(b, "es")); }
+// Igual que el servidor: sin distinguir mayúsculas, tildes ni espacios repetidos.
+function normTipo(valor) { return (valor || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
+function esTipoEstandar(valor) { const v = normTipo(valor); return !!v && nombresTipos().some((n) => normTipo(n) === v); }
+
+function abrirTiposEquipo(vista) {
+  cerrarMenu();
+  if (vista) tiposVista = vista;
+  if ($("#modal-tipos").hidden) modalVolverFoco = document.activeElement;
+  $("#modal-tipos").hidden = false;
+  $("#mt-cerrar").focus();
+  pintarTipos();
+}
+function cerrarTipos() {
+  $("#modal-tipos").hidden = true;
+  if (modalVolverFoco && document.contains(modalVolverFoco)) modalVolverFoco.focus();
+}
+
+async function pintarTipos() {
+  $$("#modal-tipos .tab").forEach((b) => { const on = b.dataset.vista === tiposVista; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
+  $("#tipos-cuerpo").innerHTML = '<p class="help">Cargando…</p>';
+  await cargarTiposCatalogo();
+  if (tiposVista === "equipos") pintarTiposEquipos(); else pintarTiposCatalogo();
+}
+
+function chipsCortos(lista, max = 3) {
+  if (!lista.length) return '<span class="muted">—</span>';
+  return `<span class="chips">${lista.slice(0, max).map((x) => `<span class="chip">${escapeHtml(x)}</span>`).join("")}${lista.length > max ? `<span class="chip">+${lista.length - max}</span>` : ""}</span>`;
+}
+
+function pintarTiposCatalogo() {
+  const nombreModulo = Object.fromEntries(tiposCatalogo.modulos.map((m) => [m.id, m.nombre]));
+  const usoPorTipo = {};
+  (tiposCatalogo.equipos || []).forEach((e) => { if (e.tipo_equipo_id) usoPorTipo[e.tipo_equipo_id] = (usoPorTipo[e.tipo_equipo_id] || 0) + 1; });
+  const tipos = [...tiposCatalogo.tipos].sort((a, b) => collator.compare(a.nombre || "", b.nombre || ""));
+  $("#tipos-cuerpo").innerHTML = `<div class="sec-head">
+      <p class="help">Cada tipo lleva en el check list la Base (salvo los remolques), los ítems de su familia y los módulos marcados.
+        Si cambiás el nombre de un tipo, se actualiza en todos los vehículos que lo tienen.</p>
+      <button type="button" class="btn btn-primary" id="tipo-nuevo">${icon("plus")}Nuevo tipo</button></div>
+    <div class="table-wrap"><table class="tbl" style="width:100%;min-width:900px">
+      <colgroup><col style="width:22%"><col style="width:13%"><col style="width:9%"><col style="width:8%"><col style="width:22%"><col style="width:26%"></colgroup>
+      <thead><tr><th>Nombre</th><th>Familia</th><th class="right">Neumáticos</th><th class="right">Auxilios</th><th>Palabras clave</th><th>Módulos del check list</th></tr></thead>
+      <tbody>${tipos.map((t) => {
+        const palabras = String(t.palabras_clave || "").split(",").map((x) => x.trim()).filter(Boolean);
+        const modulos = (t.modulos || []).map((id) => nombreModulo[id]).filter(Boolean);
+        return `<tr class="tipo-fila" data-tipo-id="${t.id}" tabindex="0" title="Editar ${escapeHtml(t.nombre)}">
+          <td><span class="cell-flex"><span class="tipo-ico">${icon(t.familia === "MAQUINARIA" ? "machine" : t.familia === "REMOLQUE" ? "trailer" : "truck", "i-sm")}</span><span class="trunc" style="font-weight:500">${escapeHtml(t.nombre)}</span>${t.activo ? "" : '<span class="chip">Inactivo</span>'}<span class="muted num" title="Vehículos con este tipo">${usoPorTipo[t.id] || ""}</span></span></td>
+          <td>${escapeHtml(FAMILIAS_TIPO[t.familia] || t.familia || "")}</td>
+          <td class="right num">${t.neumaticos ?? 0}</td><td class="right num">${t.auxilios ?? 0}</td>
+          <td title="${escapeHtml(palabras.join(", "))}">${chipsCortos(palabras)}</td>
+          <td title="${escapeHtml(modulos.join(", "))}">${chipsCortos(modulos)}</td></tr>`;
+      }).join("") || '<tr><td colspan="6" class="empty">Todavía no hay tipos cargados.</td></tr>'}</tbody></table></div>`;
+  $("#tipo-nuevo").addEventListener("click", () => abrirDrawerTipo(null));
+  $$("#tipos-cuerpo .tipo-fila").forEach((tr) => {
+    const abrir = () => abrirDrawerTipo(tiposCatalogo.tipos.find((t) => String(t.id) === tr.dataset.tipoId));
+    tr.addEventListener("click", abrir);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter") abrir(); });
+  });
+}
+
+function abrirDrawerTipo(t) {
+  const tipo = t || { familia: "VIAL", neumaticos: 0, auxilios: 0, modulos: [] };
+  drawerModo = { tipo: "tipo", id: t ? t.id : "" };
+  $("#ft-familia").innerHTML = Object.entries(FAMILIAS_TIPO).map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+  $$("#form-tipo [data-k]").forEach((i) => { i.value = tipo[i.dataset.k] ?? ""; });
+  $("#ft-modulos").innerHTML = tiposCatalogo.modulos.map((m) =>
+    `<label class="check"><input type="checkbox" value="${m.id}" ${(tipo.modulos || []).includes(m.id) ? "checked" : ""}>${escapeHtml(m.nombre)}</label>`).join("");
+  abrirDrawer("tipo", t ? `Editar tipo` : "Nuevo tipo de equipo", t ? t.nombre : "", t ? "Guardar cambios" : "Crear tipo");
+}
+
+async function guardarTipo() {
+  const id = drawerModo.id;
+  const datos = { modulos: $$("#ft-modulos input:checked").map((i) => Number(i.value)) };
+  $$("#form-tipo [data-k]").forEach((i) => { datos[i.dataset.k] = i.value; });
+  if (!String(datos.nombre || "").trim()) { toast("Indicá el nombre del tipo.", "error"); return; }
+  await pedirJson(`/api/vehiculos/tipos-equipo/tipos${id ? `/${id}` : ""}`, { method: id ? "PUT" : "POST", body: JSON.stringify(datos) });
+  cerrarDrawer();
+  toast(id ? "Tipo de equipo actualizado" : "Tipo de equipo creado");
+  await pintarTipos();
   cargar();
 }
 
+function htmlCalidad() {
+  const { motor, chasis, marca } = S.dq;
+  const link = (c) => `<button type="button" class="btn-link" data-editar="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+  const lista = (items, fn) => items.length ? `<ul>${items.map(fn).join("")}</ul>` : '<p class="help">Sin casos.</p>';
+  return `<section class="dq" id="calidad-datos">
+    <h3>${S.issues.size ? `<span class="warn-ico">${icon("alert")}</span>` : `<span class="hab-si">${icon("check")}</span>`}Calidad de datos
+      ${S.issues.size ? `<span class="chip chip-warn">${S.issues.size} ${S.issues.size === 1 ? "vehículo" : "vehículos"}</span>` : ""}</h3>
+    <p class="help">Solo se avisa: no se modifica ningún dato. Abrí el vehículo para corregirlo.</p>
+    <div class="dq-groups form-grid">
+      <div><h4>Motor repetido</h4>${lista(motor, (g) => `<li><span class="mono">${escapeHtml(g.valor)}</span> → ${g.codigos.map(link).join(", ")}</li>`)}</div>
+      <div><h4>Chasis repetido</h4>${lista(chasis, (g) => `<li><span class="mono">${escapeHtml(g.valor)}</span> → ${g.codigos.map(link).join(", ")}</li>`)}</div>
+      <div><h4>Marca no normalizada</h4>${lista(marca, (g) => `<li>«${escapeHtml(g.valor)}» → <b>${escapeHtml(g.sugerida)}</b> · ${g.codigos.map(link).join(", ")}</li>`)}</div>
+    </div></section>`;
+}
+
+function pintarTiposEquipos() {
+  const cuerpo = $("#tipos-cuerpo");
+  const eqs = tiposCatalogo.equipos || [];
+  const pendientes = eqs.filter((e) => !e.estandarizado);
+  const nombrePorId = Object.fromEntries(tiposCatalogo.tipos.map((t) => [t.id, t.nombre]));
+  const conPropuesta = eqs.filter((e) => e.tipo_equipo_id && e.tipo !== nombrePorId[e.tipo_equipo_id]).length;
+  const lista = tiposSoloPendientes ? pendientes : eqs;
+  const opcTipos = (sel) => `<option value="">Elegir…</option>` + tiposCatalogo.tipos.filter((t) => t.activo).map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${escapeHtml(t.nombre)}</option>`).join("");
+  cuerpo.innerHTML = `${htmlCalidad()}
+    <div class="sec-head">
+      <p class="help">El tipo define qué lleva el check list de Mantenimiento. ${pendientes.length
+        ? `<b>${pendientes.length} vehículos</b> tienen el tipo escrito a mano (sin estandarizar).`
+        : "Todos los vehículos tienen un tipo estándar."} El texto anterior se guarda como referencia.</p>
+      <div class="head-actions">
+        <label class="check"><input type="checkbox" id="tipos-solo" ${tiposSoloPendientes ? "checked" : ""}> Solo sin estandarizar</label>
+        ${conPropuesta ? `<button type="button" class="btn btn-primary" id="tipos-estandarizar" title="Pasa al tipo propuesto y corrige la escritura de los que ya coinciden">Estandarizar ${conPropuesta} vehículos</button>` : ""}
+      </div></div>
+    <div class="table-wrap"><table class="tbl tbl-edit" style="width:100%;min-width:1000px">
+      <colgroup><col style="width:80px"><col style="width:22%"><col style="width:20%"><col style="width:22%"><col style="width:72px"><col style="width:72px"><col style="width:18%"><col style="width:92px"></colgroup>
+      <thead><tr><th>Código</th><th>Equipo</th><th>Tipo actual</th><th>Tipo estándar</th><th>Neum.</th><th>Aux.</th><th>Módulo extra / quitado</th><th></th></tr></thead><tbody>
+      ${lista.map((e) => `<tr data-ci="${escapeHtml(e.ci)}"><td class="codigo">${escapeHtml(e.ci)}</td><td title="${escapeHtml(e.display)}">${escapeHtml(e.display)}</td>
+        <td title="${escapeHtml(e.tipo + (e.tipo_original ? `\nantes: ${e.tipo_original}` : ""))}">${escapeHtml(e.tipo)}${e.tipo_original ? ` <span class="muted">· antes: ${escapeHtml(e.tipo_original)}</span>` : ""}</td>
+        <td><span class="cell-flex"><select class="select" data-tipo>${opcTipos(e.tipo_equipo_id)}</select>${e.estandarizado ? "" : (e.tipo_equipo_id ? '<span class="chip chip-warn">propuesto</span>' : '<span class="chip chip-bad">elegir</span>')}</span></td>
+        <td><input class="input num" data-neu placeholder="tipo" value="${e.neumaticos ?? ""}"></td>
+        <td><input class="input num" data-aux placeholder="tipo" value="${e.auxilios ?? ""}"></td>
+        <td><select class="select" data-extra><option value="">—</option>${tiposCatalogo.modulos.map((m) => `<option value="${m.id}:SUMAR" ${e.modulos[m.id] === "SUMAR" ? "selected" : ""}>+ ${escapeHtml(m.nombre)}</option><option value="${m.id}:QUITAR" ${e.modulos[m.id] === "QUITAR" ? "selected" : ""}>− ${escapeHtml(m.nombre)}</option>`).join("")}</select></td>
+        <td><button type="button" class="btn btn-sm" data-guardar>Guardar</button></td></tr>`).join("") || '<tr><td colspan="8" class="empty">No hay vehículos para mostrar.</td></tr>'}
+      </tbody></table></div>`;
+  $("#tipos-solo").addEventListener("change", (ev) => { tiposSoloPendientes = ev.target.checked; pintarTiposEquipos(); });
+  const be = $("#tipos-estandarizar");
+  if (be) be.addEventListener("click", async () => {
+    if (!await confirmar("Estandarizar vehículos", `Se cambia el tipo de ${conPropuesta} vehículos por el tipo propuesto. El texto anterior queda guardado. ¿Seguir?`, { ok: "Estandarizar" })) return;
+    be.disabled = true;
+    try { const r = await pedirJson("/api/vehiculos/tipos-equipo/estandarizar", { method: "POST" }); toast(`${r.estandarizados} vehículos estandarizados.`); }
+    catch (e) { toast(e.message, "error"); }
+    await pintarTipos(); cargar();
+  });
+  cuerpo.querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", () => abrirDrawerVehiculo(b.dataset.editar)));
+  cuerpo.querySelectorAll("[data-guardar]").forEach((b) => b.addEventListener("click", async () => {
+    const tr = b.closest("tr");
+    const extra = tr.querySelector("[data-extra]").value;
+    const modulos = {};
+    if (extra) { const [id, accion] = extra.split(":"); modulos[id] = accion; }
+    b.disabled = true;
+    try {
+      await pedirJson(`/api/vehiculos/tipos-equipo/equipos/${encodeURIComponent(tr.dataset.ci)}`, { method: "PUT", body: JSON.stringify({
+        tipo_equipo_id: tr.querySelector("[data-tipo]").value, neumaticos: tr.querySelector("[data-neu]").value,
+        auxilios: tr.querySelector("[data-aux]").value, modulos }) });
+      toast(`${tr.dataset.ci} guardado`);
+      await pintarTipos(); cargar();
+    } catch (e) { b.disabled = false; toast(e.message, "error"); }
+  }));
+}
+
+// =====================================================================================================
+// Eventos
+// =====================================================================================================
+function enlazar() {
+  // búsqueda (topbar y tabla comparten estado) + Ctrl+K
+  const buscar = (valor, origen) => {
+    S.q = valor; S.page = 1;
+    const otro = origen === "global" ? $("#buscar-tabla") : $("#buscar-global");
+    if (otro) otro.value = valor;
+    renderTabla();
+  };
+  SMG.registrarBuscador("Buscar vehículo, dominio, motor…", (valor) => buscar(valor, "global"));
+  $("#buscar-tabla").addEventListener("input", (e) => buscar(e.target.value, "tabla"));
+
+  // filtros
+  $("#filtro-proyecto-resumen").addEventListener("change", (e) => onCambioFiltroResumen(e.target.value));
+  $("#f-proyecto").addEventListener("change", (e) => onCambioFiltroResumen(e.target.value));
+  $("#f-activo").addEventListener("change", (e) => { S.activo = e.target.value; S.page = 1; renderTabla(); });
+  $$("[data-chip]").forEach((sel) => sel.addEventListener("change", () => {
+    S.chips[sel.dataset.chip] = sel.value; S.page = 1;
+    sel.classList.toggle("on", !!sel.value);
+    renderTabla();
+  }));
+  $("#pop-filtros-grid").innerHTML = COLS.filter((c) => c.k !== "_accion").map((c) =>
+    `<label>${c.l}<input class="input col-filter" data-campo="${c.k}" placeholder="Contiene…"></label>`).join("");
+  $$("#pop-filtros-grid .col-filter").forEach((input) => {
+    S.colFiltros[input.dataset.campo] = "";
+    input.addEventListener("input", () => { S.colFiltros[input.dataset.campo] = input.value.trim(); S.page = 1; renderTabla(); });
+  });
+  $("#btn-mas-filtros").addEventListener("click", (e) => abrirMenu($("#pop-filtros"), e.currentTarget));
+  $("#pop-filtros-limpiar").addEventListener("click", () => {
+    $$("#pop-filtros-grid .col-filter").forEach((i) => { i.value = ""; S.colFiltros[i.dataset.campo] = ""; });
+    renderTabla();
+  });
+  $("#btn-limpiar-filtros").addEventListener("click", limpiarFiltros);
+
+  // vistas y columnas
+  $$("#vistas [data-vista]").forEach((b) => b.addEventListener("click", () => aplicarVista(b.dataset.vista)));
+  $("#btn-columnas").addEventListener("click", (e) => { pintarPopColumnas(); abrirMenu($("#pop-columnas"), e.currentTarget); });
+  $("#pop-columnas-grid").addEventListener("change", (e) => {
+    const k = e.target.value;
+    if (e.target.checked) S.visibles.add(k); else S.visibles.delete(k);
+    S.vista = Object.entries(VISTAS).find(([, ks]) => ks.length === S.visibles.size && ks.every((x) => S.visibles.has(x)))?.[0] || "";
+    prefs.set("cols", [...S.visibles]);
+    renderTabla();
+  });
+  $("#pop-columnas-todas").addEventListener("click", () => { aplicarVista("general"); pintarPopColumnas(); });
+  $("#btn-exportar").addEventListener("click", exportarCsv);
+
+  // tabla: ordenar, abrir, menú por fila, paginar
+  $("#lista-head").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sort]");
+    if (!b) return;
+    S.sort = { k: b.dataset.sort, dir: S.sort.k === b.dataset.sort ? -S.sort.dir : 1 };
+    renderTabla();
+  });
+  $("#lista-body").addEventListener("click", (e) => {
+    if (e.target.closest("[data-limpiar]")) { limpiarFiltros(); return; }
+    const bm = e.target.closest("[data-menu-fila]");
+    const tr = e.target.closest("tr[data-codigo]");
+    if (!tr) return;
+    if (bm) {
+      const v = S.vehiculos.find((x) => x.codigo === tr.dataset.codigo);
+      $("#menu-fila").dataset.codigo = tr.dataset.codigo;
+      $("#menu-fila [data-act=activo] span").textContent = v && !esActivo(v) ? "Reactivar" : "Desactivar";
+      abrirMenu($("#menu-fila"), bm);
+      return;
+    }
+    abrirDrawerVehiculo(tr.dataset.codigo);
+  });
+  $("#lista-body").addEventListener("keydown", (e) => {
+    const tr = e.target.closest("tr[data-codigo]");
+    if (tr && e.target === tr && e.key === "Enter") { e.preventDefault(); abrirDrawerVehiculo(tr.dataset.codigo); }
+  });
+  $("#page-size").addEventListener("change", (e) => { S.pageSize = Number(e.target.value); S.page = 1; prefs.set("pageSize", S.pageSize); renderTabla(); });
+  $("#pag-prev").addEventListener("click", () => { S.page -= 1; renderTabla(); $("#tabla-wrap").scrollTop = 0; });
+  $("#pag-next").addEventListener("click", () => { S.page += 1; renderTabla(); $("#tabla-wrap").scrollTop = 0; });
+  $("#tabla-wrap").addEventListener("scroll", () => {   // el menú de la fila acompaña a su botón; si sale de la vista, se cierra
+    const m = SMG.menuActual();
+    if (!m || m.menu.id !== "menu-fila") return;
+    const w = $("#tabla-wrap").getBoundingClientRect(), r = m.ancla.getBoundingClientRect();
+    if (!document.contains(m.ancla) || r.bottom < w.top || r.top > w.bottom) { cerrarMenu(); return; }
+    posicionarMenu(m.menu, m.ancla);
+  });
+
+  $("#menu-fila").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const codigo = $("#menu-fila").dataset.codigo;
+    cerrarMenu();
+    if (b.dataset.act === "editar") abrirDrawerVehiculo(codigo);
+    if (b.dataset.act === "duplicar") abrirDrawerNuevo(S.vehiculos.find((v) => v.codigo === codigo));
+    if (b.dataset.act === "eliminar") eliminar(codigo);
+    if (b.dataset.act === "activo") cambiarActivo(codigo);
+  });
+
+  // encabezado
+  $("#btn-nuevo").addEventListener("click", () => abrirDrawerNuevo(null));
+  $("#btn-mas").addEventListener("click", (e) => abrirMenu($("#menu-mas"), e.currentTarget));
+  $("#menu-mas").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (b) abrirTiposEquipo(b.dataset.act === "tipos" ? "catalogo" : "equipos");
+  });
+  $("#chip-inconsistencias").addEventListener("click", () => abrirTiposEquipo("equipos"));
+  $("#obs-regenerar").addEventListener("click", actualizarConclusiones);
+
+  // drawer y modal
+  $$("[data-cerrar-drawer]").forEach((b) => b.addEventListener("click", cerrarDrawer));
+  $("#scrim").addEventListener("click", cerrarDrawer);
+  $("#drawer-save").addEventListener("click", async () => {
+    const b = $("#drawer-save");
+    if (!drawerModo || b.disabled) return;
+    b.disabled = true;
+    try { if (drawerModo.tipo === "vehiculo") await guardarVehiculo(); else await guardarTipo(); }
+    catch (e) { toast(e.message, "error"); }
+    finally { b.disabled = false; }
+  });
+  $$("#form-vehiculo, #form-tipo").forEach((f) => f.addEventListener("submit", (e) => { e.preventDefault(); $("#drawer-save").click(); }));
+  $("#mt-cerrar").addEventListener("click", cerrarTipos);
+  $("#modal-tipos").addEventListener("click", (e) => { if (e.target.id === "modal-tipos") cerrarTipos(); });
+  $$("#modal-tipos .tab").forEach((b) => b.addEventListener("click", () => { tiposVista = b.dataset.vista; pintarTipos(); }));
+
+  // Escape: los menús los cierra el shell; acá el drawer y el modal
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || SMG.hayConfirmAbierto()) return;
+    if (!$("#drawer").hidden) { cerrarDrawer(); return; }
+    if (!$("#modal-tipos").hidden) cerrarTipos();
+  });
+}
+
+
+SMG.configurarChart();
+enlazar();
+renderTabla();
 cargar();
 </script>
-
-</div>
-
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>
-

@@ -1,653 +1,43 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Ordenes de Salida</title>
-<style>
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  background: linear-gradient(135deg, #0f172a, #1e293b, #0b1120);
-  color: #e2e8f0;
-  min-height: 100vh;
-  overflow-x: hidden;
-  position: relative;
-}
-
-.bg-photo {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background: url('/Imagenes/fondo_de_pantalla_dashboard.PNG') center center / cover no-repeat;
-  opacity: 0.66;
-  pointer-events: none;
-}
-
-.bg-blur {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.2), transparent 48%),
-    radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.18), transparent 45%);
-}
-
-header {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  padding: 20px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.66);
-}
-
-.container {
-  position: relative;
-  z-index: 2;
-  max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 16px 20px;
-}
-
-.logo-corner {
-  position: fixed;
-  top: 14px;
-  left: 14px;
-  z-index: 3;
-  padding: 0;
-}
-
-.logo-corner img {
-  display: block;
-  width: 195px;
-  max-width: 38vw;
-  height: auto;
-}
-
-.logo-box img { filter: none; }
-
-.logo-text {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-}
-
-.selector-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.selector-card select {
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(2, 6, 23, 0.55);
-  color: #e2e8f0;
-}
-
-.selector-tools {
-  margin-top: 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.selector-tools input[type="text"] {
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(2, 6, 23, 0.55);
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.check-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #bfdbfe;
-  font-size: 13px;
-}
-
-.check-inline input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #2563eb;
-}
-
-select option,
-select optgroup {
-  background: #0f2237;
-  color: #eef4ff;
-}
-
-select option:checked {
-  background: #2f6fca;
-  color: #ffffff;
-}
-
-.card {
-  background: rgba(15, 23, 42, 0.66);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.4);
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 14px;
-  transition: none;
-}
-
-.card:hover {
-  transform: none;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.item {
-  background: rgba(2, 6, 23, 0.45);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-}
-
-.title {
-  font-weight: bold;
-  color: #93c5fd;
-  margin-bottom: 8px;
-}
-
-.bloque {
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.45);
-}
-
-.bloque h3 {
-  margin: 0 0 10px;
-  color: #bfdbfe;
-}
-
-.solicitud-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.solicitud-horas-row {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.solicitud-resumen-row {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-@media (max-width: 820px) {
-  .solicitud-resumen-row,
-  .solicitud-horas-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.solicitud-field {
-  background: #0b1220;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.solicitud-field label {
-  display: block;
-  margin-bottom: 6px;
-  color: #93c5fd;
-  font-size: 12px;
-}
-
-.solicitud-field input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.solicitud-field textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-  min-height: 88px;
-  resize: vertical;
-}
-
-.solicitud-span-2 {
-  grid-column: 1 / -1;
-}
-
-.asignacion-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.asignacion-field {
-  background: #0b1220;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.asignacion-field label {
-  display: block;
-  margin-bottom: 6px;
-  color: #93c5fd;
-  font-size: 12px;
-}
-
-.asignacion-field input,
-.asignacion-field select,
-.asignacion-field textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.asignacion-field textarea {
-  min-height: 72px;
-  resize: vertical;
-}
-
-.asignacion-span-2 {
-  grid-column: span 2;
-}
-
-.viaticos-list {
-  display: grid;
-  gap: 8px;
-}
-
-.viaticos-row {
-  display: grid;
-  grid-template-columns: minmax(230px, 2.8fr) minmax(95px, 0.8fr) auto;
-  gap: 8px;
-}
-
-.viaticos-row .acomp-nombre-editable {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.btn-remove-acomp {
-  margin: 0;
-  padding: 6px 8px;
-  min-width: 58px;
-  font-size: 12px;
-  line-height: 1.1;
-  background: #b91c1c;
-}
-
-.btn-remove-acomp:hover {
-  background: #991b1b;
-}
-
-.btn-add-acomp:disabled,
-.btn-remove-acomp:disabled,
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.btn-add-acomp:disabled:hover,
-.btn-remove-acomp:disabled:hover,
-button:disabled:hover {
-  background: inherit;
-}
-
-.asignacion-field input:disabled,
-.asignacion-field select:disabled,
-.asignacion-field textarea:disabled,
-.solicitud-field input:disabled,
-.solicitud-field select:disabled,
-.solicitud-field textarea:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btn-add-acomp {
-  margin-top: 8px;
-  background: #1d4ed8;
-}
-
-.btn-add-acomp:hover {
-  background: #1e40af;
-}
-
-.seguimiento-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-}
-
-.seguimiento-table th,
-.seguimiento-table td {
-  border: 1px solid #334155;
-  padding: 8px;
-  font-size: 13px;
-}
-
-.seguimiento-table th {
-  background: #1e293b;
-  color: #bfdbfe;
-  text-align: left;
-}
-
-.total-extra-box {
-  margin-top: 6px;
-  width: 100%;
-  padding: 6px;
-  border: 1px solid #60a5fa;
-  border-radius: 6px;
-  background: #0b1220;
-  color: #bfdbfe;
-  font-weight: 700;
-  box-sizing: border-box;
-}
-
-.seguimiento-table input {
-  width: 100%;
-  padding: 7px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.seguimiento-checks {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.seguimiento-check-item {
-  background: #0b1220;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.seguimiento-check-item label {
-  display: block;
-  margin-bottom: 6px;
-  color: #93c5fd;
-  font-size: 12px;
-}
-
-.seguimiento-check-item select {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #020617;
-  color: #e2e8f0;
-  box-sizing: border-box;
-}
-
-.adjuntos-grid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 10px;
-}
-
-.adjunto-item {
-  background: #0b1220;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.adjunto-item label {
-  display: block;
-  margin-bottom: 6px;
-  color: #93c5fd;
-  font-size: 12px;
-}
-
-.adjunto-item input[type="file"] {
-  width: 100%;
-}
-
-.adjunto-link {
-  display: inline-block;
-  margin-top: 8px;
-  color: #93c5fd;
-  text-decoration: underline;
-  font-size: 13px;
-}
-
-.adjunto-link:hover {
-  color: #bfdbfe;
-}
-
-.cierre-footer {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btn-imprimir {
-  background: linear-gradient(135deg, #0e7a46, #047857);
-}
-
-.btn-imprimir:hover {
-  box-shadow: 0 0 12px rgba(5,150,105,0.7);
-}
-
-@media print {
-  .bg-photo, .bg-blur, .logo-corner, header, .selector-card, .adjuntos-grid,
-  .cierre-footer, .btn-add-acomp, .btn-remove-acomp {
-    display: none !important;
-  }
-
-  body {
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  .container {
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  .card, .bloque {
-    background: #fff !important;
-    border: 1px solid #ccc !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    break-inside: avoid;
-  }
-
-  .card:hover {
-    transform: none !important;
-  }
-
-  .solicitud-field input,
-  .asignacion-field input,
-  .asignacion-field select,
-  .asignacion-field textarea,
-  .seguimiento-table input,
-  .seguimiento-check-item select,
-  .viaticos-row input,
-  .nombre-editable {
-    background: #fff !important;
-    color: #000 !important;
-    border: 1px solid #999 !important;
-  }
-
-  .title { color: #000 !important; }
-  .bloque h3 { color: #000 !important; }
-  label { color: #333 !important; }
-  .item { background: #f5f5f5 !important; color: #000 !important; border: 1px solid #ccc !important; }
-  .solicitud-field label, .asignacion-field label { color: #333 !important; }
-
-  .seguimiento-checks,
-  .seguimiento-table th:last-child,
-  .seguimiento-table td:last-child {
-    display: none !important;
-  }
-
-  .seguimiento-table {
-    table-layout: fixed;
-  }
-
-  .seguimiento-table th:nth-child(1),
-  .seguimiento-table td:nth-child(1) {
-    width: 8% !important;
-  }
-
-  .seguimiento-table th:nth-child(2),
-  .seguimiento-table td:nth-child(2) {
-    width: 14% !important;
-  }
-
-  .seguimiento-table th:nth-child(3),
-  .seguimiento-table td:nth-child(3),
-  .seguimiento-table th:nth-child(4),
-  .seguimiento-table td:nth-child(4) {
-    width: 12% !important;
-  }
-
-  .seguimiento-table th:nth-child(5),
-  .seguimiento-table td:nth-child(5) {
-    width: 54% !important;
-  }
-
-  .seguimiento-table td:nth-child(3) input,
-  .seguimiento-table td:nth-child(4) input,
-  .seguimiento-table td:nth-child(5) input {
-    color: transparent !important;
-    -webkit-text-fill-color: transparent !important;
-    font-size: 0 !important;
-    text-shadow: none !important;
-  }
-
-  .seguimiento-table td:nth-child(3) input::placeholder,
-  .seguimiento-table td:nth-child(4) input::placeholder,
-  .seguimiento-table td:nth-child(5) input::placeholder {
-    color: transparent !important;
-  }
-
-  .seguimiento-table td:nth-child(3) input::-webkit-calendar-picker-indicator,
-  .seguimiento-table td:nth-child(4) input::-webkit-calendar-picker-indicator,
-  .seguimiento-table td:nth-child(3) input::-webkit-inner-spin-button,
-  .seguimiento-table td:nth-child(4) input::-webkit-inner-spin-button,
-  .seguimiento-table td:nth-child(3) input::-webkit-clear-button,
-  .seguimiento-table td:nth-child(4) input::-webkit-clear-button {
-    opacity: 0 !important;
-    display: none !important;
-  }
-}
-
-.cierre-msg {
-  color: #bfdbfe;
-  font-size: 13px;
-}
-
-label {
-  color: #94a3b8;
-}
-
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #020617;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 12px;
-}
-
-button {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border: none;
-  color: white;
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-top: 8px;
-  transition: 0.2s;
-}
-
-button:hover {
-  box-shadow: 0 0 12px rgba(59,130,246,0.6);
-  transform: scale(1.05);
-}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Órdenes de salida · SMG</title>
+  <link rel="icon" href="/Imagenes/smg-icono-192.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/shell.js"></script>
 </head>
-<body>
-<div class="bg-photo"></div>
-<div class="bg-blur"></div>
-<div class="logo-corner logo-box">
-  <img src="/Imagenes/09-smg.png" alt="Logo SMG">
-</div>
-<header>
-  <h1>Ordenes de Salida</h1>
-  <p>Detalle completo de viajes asignados</p>
-</header>
 
-<div class="container">
-  <div class="card selector-card">
-    <div>
-      <label for="selector-os">Seleccionar Orden de Salida</label>
-      <select id="selector-os"></select>
-      <div class="selector-tools">
-        <label class="check-inline" for="filtro-cerradas">
-          <input id="filtro-cerradas" type="checkbox">
-          Solo OS cerradas
-        </label>
-        <input id="busqueda-os" type="text" placeholder="Buscar por Nro OS, ID viaje, solicitante o destino">
+<body data-titulo="Órdenes de salida">
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="content" id="contenido">
+      <div class="page-head">
+        <div>
+          <h1>Órdenes de salida</h1>
+          <p class="page-sub">Detalle completo de los viajes asignados y cierre logístico</p>
+        </div>
+        <div class="head-actions">
+          <button id="btn-recargar" type="button" class="btn"><svg class="i i-sm"><use href="#i-refresh"/></svg>Recargar</button>
+          <button id="btn-imprimir" type="button" class="btn btn-primary"><svg class="i i-sm"><use href="#i-printer"/></svg>Imprimir</button>
+        </div>
       </div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button id="btn-recargar" type="button">Recargar</button>
-      <button id="btn-imprimir" type="button" class="btn-imprimir">&#128438; Imprimir</button>
-    </div>
+
+      <section class="card" aria-label="Selección de orden">
+        <div class="filter-bar">
+          <label class="field span-all">Orden de salida<select id="selector-os" class="select"></select></label>
+          <label class="field">Buscar<input id="busqueda-os" class="input" type="search" placeholder="N.º OS, ID de viaje, solicitante o destino"></label>
+          <div class="filter-actions"><label class="check" for="filtro-cerradas"><input id="filtro-cerradas" type="checkbox">Solo OS cerradas</label></div>
+        </div>
+      </section>
+
+      <div id="listado" class="stack form-wide"></div>
+    </main>
   </div>
-  <div id="listado"></div>
 </div>
 
 <script>
@@ -680,7 +70,7 @@ function renderItems(obj) {
   return Object.entries(obj || {})
     .map(([k, v]) => {
       const valor = typeof v === "object" ? JSON.stringify(v, null, 2) : String(v ?? "");
-      return `<div class="item"><label>${esc(k)}:</label><br>${esc(valor)}</div>`;
+      return `<div class="field">${esc(k)}<span class="input is-static">${esc(valor)}</span></div>`;
     })
     .join("");
 }
@@ -787,12 +177,12 @@ function renderFilasSeguimiento(duracionJornadas, fechaSalida = "", bloqueado = 
     const fechaAuto = fechaSalida ? sumarDias(fechaSalida, i - 1) : "";
     filas += `
       <tr>
-        <td>Dia ${i}</td>
-        <td><input type="date" value="${esc(fechaAuto)}" ${attrBloqueado}></td>
-        <td><input type="time" class="hs-inicio" ${attrBloqueado}></td>
-        <td><input type="time" class="hs-final" ${attrBloqueado}></td>
-        <td><input type="text" placeholder="Observaciones" ${attrBloqueado}></td>
-        <td><input type="text" class="hs-acumuladas" value="0.00 hs | Extra: 0.00 hs" readonly></td>
+        <td class="mono">Día ${i}</td>
+        <td><input type="date" class="input" aria-label="Fecha" value="${esc(fechaAuto)}" ${attrBloqueado}></td>
+        <td><input type="time" class="input hs-inicio" aria-label="Hora de inicio" ${attrBloqueado}></td>
+        <td><input type="time" class="input hs-final" aria-label="Hora final" ${attrBloqueado}></td>
+        <td><input type="text" class="input" aria-label="Observaciones" placeholder="Observaciones" ${attrBloqueado}></td>
+        <td><input type="text" class="input mono hs-acumuladas" aria-label="Horas acumuladas y extra" value="0.00 hs | Extra: 0.00 hs" readonly></td>
       </tr>
     `;
   }
@@ -818,12 +208,12 @@ function renderFilasSeguimientoConDatos(duracionJornadas, fechaSalida = "", deta
 
     return `
       <tr data-extra-horas="${esc(String(extraHoras))}">
-        <td>Dia ${esc(String(dia))}</td>
-        <td><input type="date" value="${esc(fecha)}" ${attrBloqueado}></td>
-        <td><input type="time" class="hs-inicio" value="${esc(hsInicio)}" ${attrBloqueado}></td>
-        <td><input type="time" class="hs-final" value="${esc(hsFinal)}" ${attrBloqueado}></td>
-        <td><input type="text" placeholder="Observaciones" value="${esc(observaciones)}" ${attrBloqueado}></td>
-        <td><input type="text" class="hs-acumuladas" value="${esc(resumen)}" readonly></td>
+        <td class="mono">Día ${esc(String(dia))}</td>
+        <td><input type="date" class="input" aria-label="Fecha" value="${esc(fecha)}" ${attrBloqueado}></td>
+        <td><input type="time" class="input hs-inicio" aria-label="Hora de inicio" value="${esc(hsInicio)}" ${attrBloqueado}></td>
+        <td><input type="time" class="input hs-final" aria-label="Hora final" value="${esc(hsFinal)}" ${attrBloqueado}></td>
+        <td><input type="text" class="input" aria-label="Observaciones" placeholder="Observaciones" value="${esc(observaciones)}" ${attrBloqueado}></td>
+        <td><input type="text" class="input mono hs-acumuladas" aria-label="Horas acumuladas y extra" value="${esc(resumen)}" readonly></td>
       </tr>
     `;
   }).join("");
@@ -831,31 +221,20 @@ function renderFilasSeguimientoConDatos(duracionJornadas, fechaSalida = "", deta
 
 function renderBloqueoOrdenCerrada() {
   return `
-    <div class="card" style="margin-top:12px;border-left:4px solid #8c5b00;">
-      <strong>Orden cerrada</strong><br>
-      La información se muestra en modo solo lectura.
-    </div>
+    <div class="callout warn" role="status">${SMG.icon("info")}<div><b>Orden cerrada.</b> La información se muestra en modo solo lectura.</div></div>
   `;
 }
 
 function renderEdicionOrdenCerrada() {
   return `
-    <div class="card" style="margin-top:12px;border-left:4px solid #1d4ed8;">
-      <strong>Orden cerrada - edición habilitada (Rol Jefe de Area)</strong><br>
-      Los cambios que guarde reemplazarán los datos ya cargados.
-    </div>
+    <div class="callout info" role="status">${SMG.icon("pencil")}<div><b>Orden cerrada · edición habilitada (rol Jefe de Área).</b> Los cambios que guarde reemplazarán los datos ya cargados.</div></div>
   `;
 }
 
 function renderHabilitarEdicionOrdenCerrada() {
   return `
-    <div class="card" style="margin-top:12px;border-left:4px solid #1d4ed8;">
-      <strong>Orden cerrada</strong><br>
-      Su rol permite corregir esta orden.
-      <div style="margin-top:8px;">
-        <button type="button" onclick="habilitarEdicionOrdenCerrada()">Habilitar edición</button>
-      </div>
-    </div>
+    <div class="callout info" role="status">${SMG.icon("info")}<div><b>Orden cerrada.</b> Su rol permite corregir esta orden.
+      <div class="cell-flex" style="margin-top:var(--s2)"><button type="button" class="btn btn-sm" onclick="habilitarEdicionOrdenCerrada()">${SMG.icon("pencil", "i-sm")}Habilitar edición</button></div></div></div>
   `;
 }
 
@@ -980,61 +359,61 @@ function renderDatosSolicitud(orden, viaje, recursos, bloqueado = false) {
   const attrBloqueado = bloqueado ? "disabled" : "";
 
   return `
-    <div class="solicitud-grid">
-      <div class="solicitud-field">
-        <label>Fecha de Emision</label>
-        <input id="sol-fecha-emision" type="text" value="${esc(fechaEmision)}" readonly ${attrBloqueado}>
+    <div class="form-grid">
+      <div class="field">
+        <label>Fecha de emisión</label>
+        <input class="input" id="sol-fecha-emision" type="text" value="${esc(fechaEmision)}" readonly ${attrBloqueado}>
       </div>
-      <div class="solicitud-field">
-        <label>Centro de Costos</label>
-        <input id="sol-centro-costos" type="text" value="${esc(centroCosto)}" readonly ${attrBloqueado}>
+      <div class="field">
+        <label>Centro de costos</label>
+        <input class="input" id="sol-centro-costos" type="text" value="${esc(centroCosto)}" readonly ${attrBloqueado}>
       </div>
-      <div class="solicitud-field">
-        <label>Quien Solicita</label>
-        <input id="sol-quien-solicita" type="text" value="${esc(quienSolicita)}" readonly ${attrBloqueado}>
+      <div class="field">
+        <label>Quién solicita</label>
+        <input class="input" id="sol-quien-solicita" type="text" value="${esc(quienSolicita)}" readonly ${attrBloqueado}>
       </div>
-      <div class="solicitud-field">
-        <label>Area que Solicita</label>
-        <input id="sol-area-solicita" type="text" value="${esc(areaSolicita)}" readonly ${attrBloqueado}>
+      <div class="field">
+        <label>Área que solicita</label>
+        <input class="input" id="sol-area-solicita" type="text" value="${esc(areaSolicita)}" readonly ${attrBloqueado}>
       </div>
-      <div class="solicitud-field">
+      <div class="field">
         <label>Partida</label>
-        <input id="sol-partida" type="text" value="${esc(partida)}" readonly ${attrBloqueado}>
+        <input class="input" id="sol-partida" type="text" value="${esc(partida)}" readonly ${attrBloqueado}>
       </div>
-      <div class="solicitud-resumen-row">
-        <div class="solicitud-field">
+      <div class="form-grid span-all">
+        <div class="field">
           <label>Destino</label>
-          <input id="sol-destino" type="text" value="${esc(destino)}" readonly ${attrBloqueado}>
+          <input class="input" id="sol-destino" type="text" value="${esc(destino)}" readonly ${attrBloqueado}>
         </div>
-        <div class="solicitud-field">
-          <label>Fecha de Salida (Editable)</label>
-          <input id="solicitud-fecha-salida" type="date" value="${esc(fechaSalida)}" ${attrBloqueado}>
+        <div class="field">
+          <label>Fecha de salida (editable)</label>
+          <input class="input" id="solicitud-fecha-salida" type="date" value="${esc(fechaSalida)}" ${attrBloqueado}>
         </div>
-        <div class="solicitud-field">
-          <label>Fecha de Llegada (Editable)</label>
-          <input id="solicitud-fecha-llegada" type="date" value="${esc(fechaLlegada)}" ${attrBloqueado}>
+        <div class="field">
+          <label>Fecha de llegada (editable)</label>
+          <input class="input" id="solicitud-fecha-llegada" type="date" value="${esc(fechaLlegada)}" ${attrBloqueado}>
         </div>
-        <div class="solicitud-field">
-          <label>Duracion de Jornadas</label>
-          <input id="solicitud-duracion-jornadas" type="text" value="${esc(String(jornadas))}" readonly ${attrBloqueado}>
+        <div class="field">
+          <label>Duración (jornadas)</label>
+          <input class="input" id="solicitud-duracion-jornadas" type="text" value="${esc(String(jornadas))}" readonly ${attrBloqueado}>
         </div>
       </div>
-      <div class="solicitud-field solicitud-span-2">
-        <label>Motivo del Viaje</label>
-        <textarea id="sol-motivo" readonly rows="4" ${attrBloqueado}>${esc(motivo)}</textarea>
+      <div class="field span-all">
+        <label>Motivo del viaje</label>
+        <textarea class="textarea" id="sol-motivo" readonly rows="4" ${attrBloqueado}>${esc(motivo)}</textarea>
       </div>
-      <div class="solicitud-horas-row">
-        <div class="solicitud-field">
-          <label>Hora de Ingreso a Base</label>
-          <input id="sol-hora-ingreso-base" type="time" value="${esc(horaIngresoBase)}" readonly ${attrBloqueado}>
+      <div class="form-grid span-all">
+        <div class="field">
+          <label>Hora de ingreso a base</label>
+          <input class="input" id="sol-hora-ingreso-base" type="time" value="${esc(horaIngresoBase)}" readonly ${attrBloqueado}>
         </div>
-        <div class="solicitud-field">
-          <label>Hora de Salida</label>
-          <input id="sol-hora-salida" type="time" value="${esc(horaSalida)}" readonly ${attrBloqueado}>
+        <div class="field">
+          <label>Hora de salida</label>
+          <input class="input" id="sol-hora-salida" type="time" value="${esc(horaSalida)}" readonly ${attrBloqueado}>
         </div>
-        <div class="solicitud-field">
-          <label>Hora de Regreso</label>
-          <input id="sol-hora-regreso" type="time" value="${esc(horaRegreso)}" readonly ${attrBloqueado}>
+        <div class="field">
+          <label>Hora de regreso</label>
+          <input class="input" id="sol-hora-regreso" type="time" value="${esc(horaRegreso)}" readonly ${attrBloqueado}>
         </div>
       </div>
     </div>
@@ -1083,11 +462,11 @@ function renderFilaAcompanante(nombre = "", viatico = 0, bloqueado = false) {
   const attrBloqueado = bloqueado ? "disabled" : "";
 
   return `
-    <div class="viaticos-row">
-      <input type="text" class="acomp-nombre-editable" list="nomina-acompanantes" placeholder="Acompañante" value="${esc(valorNombre)}" ${attrBloqueado}>
-      <input type="number" min="0" step="0.01" class="viatico-acompanante" value="${esc(valorViatico.toFixed(2))}" ${attrBloqueado}>
-      <button type="button" class="btn-remove-acomp" onclick="quitarAcompanante(this)" ${attrBloqueado}>Quitar</button>
-    </div>
+    <tr class="viaticos-row">
+      <td><input type="text" class="input acomp-nombre-editable" list="nomina-acompanantes" placeholder="Acompañante" aria-label="Acompañante" value="${esc(valorNombre)}" ${attrBloqueado}></td>
+      <td><input type="number" class="input num viatico-acompanante" min="0" step="0.01" aria-label="Viático" value="${esc(valorViatico.toFixed(2))}" ${attrBloqueado}></td>
+      <td class="center"><button type="button" class="btn btn-ghost btn-sm btn-remove-acomp" onclick="quitarAcompanante(this)" ${attrBloqueado}>Quitar</button></td>
+    </tr>
   `;
 }
 
@@ -1132,7 +511,7 @@ function agregarFilaAcompanantePorHTML(htmlFila) {
     return;
   }
 
-  const wrapper = document.createElement("div");
+  const wrapper = document.createElement("tbody");   // las filas son <tr>: se parsean dentro de un tbody
   wrapper.innerHTML = htmlFila;
   const fila = wrapper.firstElementChild;
   if (!fila) {
@@ -1197,92 +576,98 @@ function renderDatosAsignacion(recursos, bloqueado = false) {
   const attrBloqueado = bloqueado ? "disabled" : "";
 
   return `
-    <div class="asignacion-grid">
-      <div class="asignacion-field asignacion-span-2">
-        <label>(Itinerario + Rutas + Paradas)</label>
-        <textarea readonly rows="${detalleItinerario.rows}" ${attrBloqueado}>${esc(detalleItinerario.texto)}</textarea>
+    <div class="form-grid">
+      <div class="field span-all">
+        <label>Itinerario, rutas y paradas</label>
+        <textarea class="textarea" readonly rows="${detalleItinerario.rows}" ${attrBloqueado}>${esc(detalleItinerario.texto)}</textarea>
       </div>
 
-      <div class="asignacion-field">
+      <div class="field">
         <label>Chofer</label>
         ${renderDatalistNominaChoferes()}
-        <input id="asig-chofer" type="text" list="nomina-choferes" value="${esc(chofer)}" ${attrBloqueado}>
+        <input class="input" id="asig-chofer" type="text" list="nomina-choferes" value="${esc(chofer)}" ${attrBloqueado}>
       </div>
 
-      <div class="asignacion-field">
-        <label>Vehiculo</label>
+      <div class="field">
+        <label>Vehículo</label>
         ${renderDatalistNominaVehiculos()}
-        <input id="asig-vehiculo" type="text" list="nomina-vehiculos" value="${esc(vehiculo)}" ${attrBloqueado}>
+        <input class="input" id="asig-vehiculo" type="text" list="nomina-vehiculos" value="${esc(vehiculo)}" ${attrBloqueado}>
       </div>
 
-      <div class="asignacion-field">
-        <label>Viatico Chofer</label>
-        <input id="asig-viatico-chofer" type="number" min="0" step="0.01" value="${esc(choferViatico.toFixed(2))}" ${attrBloqueado}>
+      <div class="field">
+        <label>Viático del chofer ($)</label>
+        <input class="input" id="asig-viatico-chofer" type="number" min="0" step="0.01" value="${esc(choferViatico.toFixed(2))}" ${attrBloqueado}>
       </div>
 
-      <div class="asignacion-field asignacion-span-2">
-        <label>Acompañantes y Viáticos</label>
+      <div class="field span-all">
+        <label>Acompañantes y viáticos</label>
         ${renderDatalistNominaAcompanantes()}
-        <div id="lista-acompanantes-editable" class="viaticos-list">${renderAcompanantesConViaticos(recursos, bloqueado)}</div>
-        <button type="button" class="btn-add-acomp" onclick="agregarAcompanante()" ${attrBloqueado}>+ Agregar Acompañante</button>
+        <div class="card table-scroll">
+          <table class="tbl tbl-edit">
+            <colgroup><col><col style="width:160px"><col style="width:96px"></colgroup>
+            <thead><tr><th>Acompañante</th><th class="right">Viático ($)</th><th><span class="sr-only">Quitar</span></th></tr></thead>
+            <tbody id="lista-acompanantes-editable">${renderAcompanantesConViaticos(recursos, bloqueado)}</tbody>
+          </table>
+        </div>
+        <div class="cell-flex"><button type="button" class="btn btn-sm btn-add-acomp" onclick="agregarAcompanante()" ${attrBloqueado}>${SMG.icon("plus", "i-sm")}Agregar acompañante</button></div>
       </div>
 
-      <div class="asignacion-field">
-        <label>Otros Gastos</label>
-        <input id="asig-otros-gastos" type="number" min="0" step="0.01" value="${esc(otrosGastos.toFixed(2))}" ${attrBloqueado}>
+      <div class="field">
+        <label>Otros gastos ($)</label>
+        <input class="input" id="asig-otros-gastos" type="number" min="0" step="0.01" value="${esc(otrosGastos.toFixed(2))}" ${attrBloqueado}>
       </div>
 
-      <div class="asignacion-field">
-        <label>Total (Viaticos + Otros Gastos)</label>
-        <input id="asig-total" type="text" value="0.00" readonly ${attrBloqueado}>
+      <div class="field">
+        <label>Total (viáticos + otros gastos)</label>
+        <input class="input" id="asig-total" type="text" value="0.00" readonly ${attrBloqueado}>
       </div>
 
-      <div class="asignacion-field">
-        <label>Medio (Caja / Transferencia)</label>
-        <select id="asig-medio-pago" ${attrBloqueado}>
+      <div class="field">
+        <label>Medio de pago</label>
+        <select class="select" id="asig-medio-pago" ${attrBloqueado}>
           <option value="Caja" ${medioPago === "Caja" ? "selected" : ""}>Caja</option>
           <option value="Transferencia" ${medioPago === "Transferencia" ? "selected" : ""}>Transferencia</option>
         </select>
       </div>
 
-      <div class="asignacion-field">
+      <div class="field">
         <label>Alojamiento</label>
-        <select id="asig-alojamiento" ${attrBloqueado}>
-          <option value="SI" ${alojamiento === "SI" ? "selected" : ""}>SI</option>
-          <option value="NO" ${alojamiento === "NO" ? "selected" : ""}>NO</option>
+        <select class="select" id="asig-alojamiento" ${attrBloqueado}>
+          <option value="SI" ${alojamiento === "SI" ? "selected" : ""}>Sí</option>
+          <option value="NO" ${alojamiento === "NO" ? "selected" : ""}>No</option>
         </select>
       </div>
 
-      <div class="asignacion-field">
-        <label>Comprobación Taller</label>
-        <select id="asig-comp-taller" ${attrBloqueado}>
+      <div class="field">
+        <label>Comprobación taller</label>
+        <select class="select" id="asig-comp-taller" ${attrBloqueado}>
           <option value="SI" ${(comp.taller || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.taller || "") === "NO" ? "selected" : ""}>NO</option>
           <option value="NO VERIFICADO" ${(comp.taller || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
         </select>
       </div>
 
-      <div class="asignacion-field">
+      <div class="field">
         <label>Comprobación RRHH</label>
-        <select id="asig-comp-rrhh" ${attrBloqueado}>
+        <select class="select" id="asig-comp-rrhh" ${attrBloqueado}>
           <option value="SI" ${(comp.rrhh || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.rrhh || "") === "NO" ? "selected" : ""}>NO</option>
           <option value="NO VERIFICADO" ${(comp.rrhh || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
         </select>
       </div>
 
-      <div class="asignacion-field">
-        <label>Comprobación Administración</label>
-        <select id="asig-comp-admin" ${attrBloqueado}>
+      <div class="field">
+        <label>Comprobación administración</label>
+        <select class="select" id="asig-comp-admin" ${attrBloqueado}>
           <option value="SI" ${(comp.administracion || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.administracion || "") === "NO" ? "selected" : ""}>NO</option>
           <option value="NO VERIFICADO" ${(comp.administracion || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
         </select>
       </div>
 
-      <div class="asignacion-field">
-        <label>Comprobación Logística y Operaciones</label>
-        <select id="asig-comp-logistica" ${attrBloqueado}>
+      <div class="field">
+        <label>Comprobación logística y operaciones</label>
+        <select class="select" id="asig-comp-logistica" ${attrBloqueado}>
           <option value="SI" ${(comp.logistica_operaciones || "") === "SI" ? "selected" : ""}>SI</option>
           <option value="NO" ${(comp.logistica_operaciones || "") === "NO" ? "selected" : ""}>NO</option>
           <option value="NO VERIFICADO" ${(comp.logistica_operaciones || "") === "NO VERIFICADO" ? "selected" : ""}>NO VERIFICADO</option>
@@ -1445,7 +830,7 @@ async function guardarCierreLogistica() {
 
   if (!orden || !orden.nro_orden) {
     if (msg) {
-      msg.textContent = "No hay una Orden de Salida válida seleccionada.";
+      msg.textContent = "No hay una Orden de salida válida seleccionada.";
     }
     return;
   }
@@ -1500,7 +885,7 @@ function renderOrdenSeleccionada(orden) {
   const cont = document.getElementById("listado");
 
   if (!orden) {
-    cont.innerHTML = '<div class="card">No hay orden seleccionada.</div>';
+    cont.innerHTML = `<section class="card"><div class="empty-state">${SMG.icon("inbox")}<b>No hay orden seleccionada</b>Elegí una orden o cambiá los filtros.</div></section>`;
     return;
   }
 
@@ -1536,41 +921,49 @@ function renderOrdenSeleccionada(orden) {
   const formularioUrl = formularioAdjunto ? `/Doc_Log_Viajes/${encodeURIComponent(formularioAdjunto)}` : "";
 
   const html = `
-    <div class="card">
-      <div class="title">${esc(orden.nro_orden || "SIN NUMERO")}</div>
-      ${bloqueado
-        ? (ordenCerrada && puedeEditarOrdenCerrada ? renderHabilitarEdicionOrdenCerrada() : renderBloqueoOrdenCerrada())
-        : (ordenCerrada ? renderEdicionOrdenCerrada() : "")}
-      <div class="grid">
-        <div class="item"><label>Fecha Orden:</label><br>${esc(orden.fecha_orden || "")}</div>
-        <div class="item"><label>ID Viaje:</label><br>${esc(orden.id_viaje || "")}</div>
-        <div class="item"><label>Nro Orden:</label><br>${esc(orden.nro_orden || "")}</div>
-        <div class="item"><label>Estado Viaje:</label><br>${esc(viaje.estado || "")}</div>
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title"><span class="mono codigo">${esc(orden.nro_orden || "SIN NUMERO")}</span>
+          <span class="chip ${ordenCerrada ? "chip-muted" : "chip-ok"}"><span class="chip-dot"></span>${ordenCerrada ? "Cerrada" : "Abierta"}</span></h2>
       </div>
-
-      <div class="bloque">
-        <h3>Datos de la Solicitud</h3>
-        ${renderDatosSolicitud(orden, viaje, recursosVista, bloqueado)}
+      <div class="card-body">
+        ${bloqueado
+          ? (ordenCerrada && puedeEditarOrdenCerrada ? renderHabilitarEdicionOrdenCerrada() : renderBloqueoOrdenCerrada())
+          : (ordenCerrada ? renderEdicionOrdenCerrada() : "")}
+        <div class="form-grid">
+          <div class="field">Fecha de la orden<span class="input mono is-static">${esc(orden.fecha_orden || "—")}</span></div>
+          <div class="field">ID de viaje<span class="input mono is-static">${esc(orden.id_viaje || "—")}</span></div>
+          <div class="field">N.º de orden<span class="input mono is-static">${esc(orden.nro_orden || "—")}</span></div>
+          <div class="field">Estado del viaje<span class="input is-static">${esc(viaje.estado || "—")}</span></div>
+        </div>
       </div>
+    </section>
 
-      <div class="bloque">
-        <h3>Datos de la Asignación</h3>
-        ${renderDatosAsignacion(recursosVista, bloqueado)}
-      </div>
+    <section class="card">
+      <div class="card-head"><h2 class="card-title">Datos de la solicitud</h2></div>
+      <div class="card-body">${renderDatosSolicitud(orden, viaje, recursosVista, bloqueado)}</div>
+    </section>
 
-      <div class="bloque">
-        <h3>CONTROL Y SEGUIMIENTO</h3>
-        <table class="seguimiento-table">
+    <section class="card">
+      <div class="card-head"><h2 class="card-title">Datos de la asignación</h2></div>
+      <div class="card-body">${renderDatosAsignacion(recursosVista, bloqueado)}</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2 class="card-title">Control y seguimiento</h2>
+        <label class="cell-flex help">Total horas extra<input id="seguimiento-total-extra" class="input mono num total-extra-box" style="width:110px" type="text" value="${esc(totalExtraHoras)}" readonly></label></div>
+      <div class="card-body">
+        <div class="card table-scroll">
+        <table class="tbl tbl-edit">
+          <colgroup><col style="width:72px"><col style="width:150px"><col style="width:120px"><col style="width:120px"><col><col style="width:230px"></colgroup>
           <thead>
             <tr>
-              <th></th>
+              <th>Día</th>
               <th>Fecha</th>
-              <th>Hs Inicio</th>
-              <th>Hs Final</th>
+              <th>Hora inicio</th>
+              <th>Hora final</th>
               <th>Observaciones</th>
-              <th>Hs Acumuladas / Extra
-                <input id="seguimiento-total-extra" class="total-extra-box" type="text" value="${esc(totalExtraHoras)}" readonly>
-              </th>
+              <th>Horas acumuladas / extra</th>
             </tr>
           </thead>
           <tbody id="seguimiento-body">${renderFilasSeguimientoConDatos(
@@ -1580,57 +973,58 @@ function renderOrdenSeleccionada(orden) {
             bloqueado
           )}</tbody>
         </table>
+        </div>
 
-        <div class="seguimiento-checks">
-          <div class="seguimiento-check-item">
-            <label>Cumple Procedimiento</label>
-            <select id="check-cumple-procedimiento" ${bloqueado ? "disabled" : ""}>
-              <option value="SI" ${cumpleProcedimiento === "SI" ? "selected" : ""}>SI</option>
-              <option value="NO" ${cumpleProcedimiento === "NO" ? "selected" : ""}>NO</option>
+        <div class="form-grid" style="margin-top:var(--s4)">
+          <div class="field">
+            <label>Cumple procedimiento</label>
+            <select class="select" id="check-cumple-procedimiento" ${bloqueado ? "disabled" : ""}>
+              <option value="SI" ${cumpleProcedimiento === "SI" ? "selected" : ""}>Sí</option>
+              <option value="NO" ${cumpleProcedimiento === "NO" ? "selected" : ""}>No</option>
             </select>
           </div>
 
-          <div class="seguimiento-check-item">
-            <label>Nota Desvios</label>
-            <select id="check-nota-desvios" ${bloqueado ? "disabled" : ""}>
-              <option value="SI" ${notaDesvios === "SI" ? "selected" : ""}>SI</option>
-              <option value="NO" ${notaDesvios === "NO" ? "selected" : ""}>NO</option>
+          <div class="field">
+            <label>Nota de desvíos</label>
+            <select class="select" id="check-nota-desvios" ${bloqueado ? "disabled" : ""}>
+              <option value="SI" ${notaDesvios === "SI" ? "selected" : ""}>Sí</option>
+              <option value="NO" ${notaDesvios === "NO" ? "selected" : ""}>No</option>
             </select>
           </div>
 
-          <div class="seguimiento-check-item">
-            <label>Aplica Sanciones</label>
-            <select id="check-aplica-sanciones" ${bloqueado ? "disabled" : ""}>
-              <option value="SI" ${aplicaSanciones === "SI" ? "selected" : ""}>SI</option>
-              <option value="NO" ${aplicaSanciones === "NO" ? "selected" : ""}>NO</option>
+          <div class="field">
+            <label>Aplica sanciones</label>
+            <select class="select" id="check-aplica-sanciones" ${bloqueado ? "disabled" : ""}>
+              <option value="SI" ${aplicaSanciones === "SI" ? "selected" : ""}>Sí</option>
+              <option value="NO" ${aplicaSanciones === "NO" ? "selected" : ""}>No</option>
             </select>
           </div>
         </div>
 
-        <div class="adjuntos-grid">
-          <div class="adjunto-item">
-            <label>Check List emitido por Mantenimiento del Equipo</label>
+        <div class="form-grid" style="margin-top:var(--s4)">
+          <div class="field">
+            <label>Check list emitido por Mantenimiento del equipo</label>
             <input id="adjunto-checklist" type="file" ${bloqueado ? "disabled" : ""}>
             ${checklistAdjunto
-              ? `<a class="adjunto-link" href="${checklistUrl}" target="_blank" rel="noopener noreferrer">Abrir adjunto guardado</a>`
-              : `<div class="cierre-msg">Sin adjunto guardado</div>`}
+              ? `<a class="btn-link" href="${checklistUrl}" target="_blank" rel="noopener noreferrer">Abrir adjunto guardado</a>`
+              : `<span class="help">Sin adjunto guardado</span>`}
           </div>
-          <div class="adjunto-item">
-            <label>Formulario Logística de Viaje</label>
+          <div class="field">
+            <label>Formulario de logística de viaje</label>
             <input id="adjunto-formulario" type="file" ${bloqueado ? "disabled" : ""}>
             ${formularioAdjunto
-              ? `<a class="adjunto-link" href="${formularioUrl}" target="_blank" rel="noopener noreferrer">Abrir adjunto guardado</a>`
-              : `<div class="cierre-msg">Sin adjunto guardado</div>`}
+              ? `<a class="btn-link" href="${formularioUrl}" target="_blank" rel="noopener noreferrer">Abrir adjunto guardado</a>`
+              : `<span class="help">Sin adjunto guardado</span>`}
           </div>
         </div>
 
-        <div class="cierre-footer">
-          <button type="button" onclick="guardarCierreLogistica()" ${bloqueado ? "disabled" : ""}>GUARDAR</button>
-          <span id="cierre-msg" class="cierre-msg"></span>
-        </div>
       </div>
-
-    </div>
+      <div class="card-foot">
+        <span id="cierre-msg" class="help" role="status"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" onclick="guardarCierreLogistica()" ${bloqueado ? "disabled" : ""}>Guardar cierre</button>
+      </div>
+    </section>
   `;
 
   cont.innerHTML = html;
@@ -1646,7 +1040,7 @@ function poblarSelector(ordenes) {
   selector.innerHTML = "";
 
   if (!Array.isArray(ordenes) || ordenes.length === 0) {
-    selector.innerHTML = '<option value="">Sin ordenes para el filtro actual</option>';
+    selector.innerHTML = '<option value="">Sin órdenes para el filtro actual</option>';
     renderOrdenSeleccionada(null);
     return;
   }
@@ -1718,7 +1112,7 @@ document.getElementById("btn-recargar").addEventListener("click", () => {
 document.getElementById("btn-imprimir").addEventListener("click", () => {
   const orden = obtenerOrdenActualSeleccionada();
   if (!orden) {
-    alert("Seleccione una Orden de Salida antes de imprimir.");
+    SMG.toast("Seleccione una orden de salida antes de imprimir.", "error");
     return;
   }
   const payload = {
@@ -1727,19 +1121,20 @@ document.getElementById("btn-imprimir").addEventListener("click", () => {
     generado_en: new Date().toISOString(),
   };
   localStorage.setItem("os_print_payload", JSON.stringify(payload));
-  const win = window.open("/print_orden_salida", "_blank", "noopener");
+  // Sin "noopener": con esa opción window.open siempre devuelve null y el aviso salía aunque la hoja se abriera.
+  const win = window.open("/print_orden_salida", "_blank");
   if (!win) {
-    alert("No se pudo abrir la vista de impresión. Verifique el bloqueador de ventanas emergentes.");
+    SMG.toast("No se pudo abrir la vista de impresión. Verifique el bloqueador de ventanas emergentes.", "error");
+  } else {
+    win.opener = null;
   }
 });
 
 cargarPerfilActual().then(() =>
   cargarOrdenes().catch((err) => {
-    document.getElementById("listado").innerHTML = `<div class="card">Error cargando ordenes: ${esc(err.message)}</div>`;
+    document.getElementById("listado").innerHTML = `<section class="card"><div class="empty-state">${SMG.icon("alert")}<b>Error cargando órdenes</b>${esc(err.message)}</div></section>`;
   })
 );
 </script>
-<style>#btn-menu-principal-flotante{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;align-items:center;gap:12px;box-sizing:border-box;width:44px;height:42px;padding:11px 12px;overflow:hidden;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(56,189,248,.4);border-radius:8px;font:600 13px Arial,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:width .22s ease,background .18s ease,color .18s ease}#btn-menu-principal-flotante:hover,#btn-menu-principal-flotante:focus{width:170px;background:rgba(56,189,248,.25);color:#fff}#btn-menu-principal-flotante svg{width:18px;height:18px;flex:0 0 18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style><a id="btn-menu-principal-flotante" href="/" title="Men&uacute; Principal"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Men&uacute; Principal</span></a>
 </body>
 </html>
-
