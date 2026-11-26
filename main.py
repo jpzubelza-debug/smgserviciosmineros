@@ -18036,6 +18036,40 @@ def _foto_purgar_controlados():
         logger.exception("No se pudieron eliminar las fotos de partes controlados")
 
 
+def _verificar_partes_hasta_20260730():
+    """Migración única (2026-11-26): los partes pendientes con fecha hasta el 30/07/2026 pasan a
+    verificados. Los que ya tenían control no se tocan; los posteriores quedan pendientes."""
+    nombre = "verificar_partes_hasta_20260730"
+    fecha = """CASE
+        WHEN fecha_parte GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]*' THEN substr(fecha_parte, 1, 10)
+        WHEN fecha_parte GLOB '[0-3][0-9]/[0-1][0-9]/[0-9][0-9][0-9][0-9]*'
+            THEN substr(fecha_parte, 7, 4) || '-' || substr(fecha_parte, 4, 2) || '-' || substr(fecha_parte, 1, 2)
+    END"""
+    try:
+        with get_sqlite_connection() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS migraciones_unicas (nombre TEXT PRIMARY KEY, aplicada_en TEXT, detalle TEXT)"
+            )
+            if conn.execute("SELECT 1 FROM migraciones_unicas WHERE nombre = ?", (nombre,)).fetchone():
+                return
+            n = conn.execute(
+                f"""
+                UPDATE horas_maquinas SET control = ?
+                WHERE TRIM(COALESCE(control, '')) = '' AND ({fecha}) <= '2026-07-30'
+                """,
+                ("Verificado (masivo al 30/07/2026)",),
+            ).rowcount
+            conn.execute(
+                "INSERT INTO migraciones_unicas (nombre, aplicada_en, detalle) VALUES (?, ?, ?)",
+                (nombre, _sesion_texto(_sesion_ahora()), f"{n} partes marcados como verificados"),
+            )
+            conn.commit()
+        logger.info("Partes hasta el 30/07/2026 marcados como verificados: %s", n)
+    except Exception:
+        logger.exception("No se pudieron marcar como verificados los partes hasta el 30/07/2026")
+
+
+_verificar_partes_hasta_20260730()
 _foto_purgar_controlados()
 
 
