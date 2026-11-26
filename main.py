@@ -17938,6 +17938,40 @@ def escritorio_archivar_foto(request: Request, id_parte: int):
         return {"ok": True, "foto": _foto_info(conn, parte)}
 
 
+def _foto_purgar_controlados():
+    """Una vez controlado el parte, la foto no se guarda en el servidor: al iniciar se borran
+    las que hayan quedado pendientes (p. ej. de cuando existía la opción "Más tarde")."""
+    try:
+        with get_sqlite_connection() as conn:
+            filas = conn.execute(
+                """
+                SELECT f.parte_id, f.archivo, h.id, h.nro_parte, h.ci, h.fecha_parte
+                FROM partes_fotos f JOIN horas_maquinas h ON h.id = f.parte_id
+                WHERE COALESCE(f.archivo, '') <> '' AND TRIM(COALESCE(h.control, '')) <> ''
+                """
+            ).fetchall()
+            if not filas:
+                return
+            ahora = _sesion_texto(_sesion_ahora())
+            for fila in filas:
+                conn.execute(
+                    """
+                    UPDATE partes_fotos SET archivo = NULL, archivada_en = ?, archivada_por = ?, nombre_archivo = ?
+                    WHERE parte_id = ?
+                    """,
+                    (ahora, "Sistema (limpieza)", _foto_nombre_archivo(fila), fila["parte_id"]),
+                )
+            conn.commit()
+        for fila in filas:
+            _foto_borrar_archivo(fila["archivo"])
+        logger.info("Fotos de partes controlados eliminadas del servidor: %s", len(filas))
+    except Exception:
+        logger.exception("No se pudieron eliminar las fotos de partes controlados")
+
+
+_foto_purgar_controlados()
+
+
 # --- Operaciones › Dashboard: partes diarios (app de operadores) -------------
 # Solo lectura. Por defecto mira los partes cargados desde la app (origen_carga =
 # 'APP_OPERADOR'); con origen=todos/escritorio incluye el resto. "Pendiente de

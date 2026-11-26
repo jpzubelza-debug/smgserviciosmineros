@@ -695,13 +695,13 @@
 <!-- Diálogo: guardar foto del parte (al controlar) -->
 <div class="dialog" id="modal-foto" role="dialog" aria-modal="true" aria-labelledby="modal-foto-titulo" hidden>
   <div class="dialog-panel" style="width: min(520px, 100%)">
-    <h2 id="modal-foto-titulo">Guardar foto del parte</h2>
-    <p>El parte quedó controlado. Guardá la foto en la PC: una vez guardada, se elimina del servidor.</p>
+    <h2 id="modal-foto-titulo">Foto del parte</h2>
+    <p>El parte quedó controlado. La foto no queda en el servidor: descargala a la PC o eliminala.</p>
     <img id="modal-foto-img" alt="Foto del parte" class="foto-parte">
     <p>Nombre del archivo: <b id="modal-foto-nombre"></b></p>
     <div class="dialog-actions">
-      <button type="button" class="btn btn-ghost" onclick="cerrarModalFoto()">Más tarde</button>
-      <button type="button" class="btn btn-primary" id="modal-foto-guardar">Guardar foto…</button>
+      <button type="button" class="btn btn-ghost" id="modal-foto-eliminar">Eliminar sin guardar</button>
+      <button type="button" class="btn btn-primary" id="modal-foto-guardar">Descargar foto…</button>
     </div>
   </div>
 </div>
@@ -2180,6 +2180,10 @@
       if (btnFoto) btnFoto.onclick = async () => {
         if (await guardarFotoParte(d.id, d.foto.nombre_archivo)) verDetalleParte(d.id);
       };
+      const btnFotoEliminar = document.getElementById('detalle-foto-eliminar');
+      if (btnFotoEliminar) btnFotoEliminar.onclick = async () => {
+        if (await eliminarFotoParte(d.id)) verDetalleParte(d.id);
+      };
 
       opAbrirDrawer('modal-detalle');
 
@@ -2195,10 +2199,13 @@
     const esc = escHtml;
     if (!f.en_servidor) {
       return `<section class="stack" style="gap: 8px"><h3 class="card-title">Foto del parte</h3>
-        <p class="help">Guardada en la PC como <b>${esc(f.nombre_archivo)}</b> el ${esc(f.archivada_en || '—')} por ${esc(f.archivada_por || '—')}. Ya no está en el servidor.</p></section>`;
+        <p class="help">Quitada del servidor el ${esc(f.archivada_en || '—')} por ${esc(f.archivada_por || '—')} (<b>${esc(f.nombre_archivo)}</b>).</p></section>`;
     }
     const accion = d.control
-      ? `<div><button type="button" class="btn" id="detalle-foto-guardar">${SMG.icon('download')}Guardar foto en la PC y quitar del servidor</button></div>`
+      ? `<div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button type="button" class="btn" id="detalle-foto-guardar">${SMG.icon('download')}Descargar y quitar del servidor</button>
+          <button type="button" class="btn btn-ghost" id="detalle-foto-eliminar">Eliminar sin guardar</button>
+        </div>`
       : '<p class="help">Se guarda en la PC al controlar el parte.</p>';
     return `<section class="stack" style="gap: 8px"><h3 class="card-title">Foto del parte <span class="muted mono">${esc(f.nombre_archivo)}</span></h3>
       <a href="/operaciones/horas-maquinas/${d.id}/foto" target="_blank" rel="noopener" title="Ver en tamaño completo">
@@ -2250,6 +2257,9 @@
     document.getElementById('modal-foto-guardar').onclick = async () => {
       if (await guardarFotoParte(idParte, nombre)) cerrarModalFoto();
     };
+    document.getElementById('modal-foto-eliminar').onclick = async () => {
+      if (await eliminarFotoParte(idParte)) cerrarModalFoto();
+    };
     document.getElementById('modal-foto').hidden = false;
   }
 
@@ -2273,7 +2283,7 @@
           });
         } catch (err) {
           if (err && err.name === 'AbortError') {
-            showToast('No se guardó la foto. Sigue en el servidor; podés guardarla desde el detalle del parte.', 'info');
+            showToast('No se guardó la foto. Descargala o eliminala.', 'info');
             return false;
           }
           throw err;
@@ -2292,7 +2302,7 @@
         a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         if (!confirm(`¿Se guardó "${nombre}" en la PC?\nSi confirmás, la foto se elimina del servidor.`)) {
-          showToast('La foto sigue en el servidor; podés guardarla desde el detalle del parte.', 'info');
+          showToast('La foto no se quitó del servidor. Descargala o eliminala.', 'info');
           return false;
         }
       }
@@ -2304,6 +2314,24 @@
     } catch (err) {
       console.error(err);
       showToast(err.message || 'No se pudo guardar la foto.', 'error');
+      return false;
+    }
+  }
+
+  // Quita la foto del servidor sin descargarla (mismo endpoint que tras guardarla).
+  async function eliminarFotoParte(idParte) {
+    if (!opExigir('carga_partes_diarios', 'controlar')) return false;
+    if (!confirm('¿Eliminar la foto del servidor sin guardarla en la PC?
+No se puede recuperar.')) return false;
+    try {
+      const res = await fetch(`/operaciones/horas-maquinas/${idParte}/foto/archivar`, { method: 'POST' });
+      const datos = await res.json();
+      if (!res.ok) throw new Error(datos.detail || 'No se pudo eliminar la foto del servidor.');
+      showToast('Foto eliminada del servidor.', 'success');
+      return true;
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'No se pudo eliminar la foto.', 'error');
       return false;
     }
   }
@@ -3425,7 +3453,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || SMG.hayDialogoAbierto() || SMG.menuActual()) return;
     if (!document.getElementById('modal-eliminar').hidden) { cerrarModalEliminar(); return; }
-    if (!document.getElementById('modal-foto').hidden) { cerrarModalFoto(); return; }
+    if (!document.getElementById('modal-foto').hidden) return; // hay que descargar o eliminar la foto
     if (!document.getElementById('modal-detalle').hidden) { cerrarModalDetalle(); return; }
     if (!document.getElementById('cc-drawer').hidden) limpiarFormularioCentroCosto();
   });
