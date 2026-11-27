@@ -31,6 +31,21 @@
     /* La tabla del historial ocupa todo el alto disponible. 315px = encabezado + título + filtros + paginación:
        si cambia el alto de esos elementos, ajustar para que la paginación quede visible sin scroll de página. */
     #sector-historial .table-wrap { max-height: calc(100vh - 315px); min-height: 360px; }
+    /* Panel › Exportar Excel */
+    #opd-m-export .opx-acciones { display: flex; gap: var(--s2); flex-wrap: wrap; }
+    #opd-m-export .opx-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+    @media (max-width: 760px) { #opd-m-export .opx-grid { grid-template-columns: minmax(0, 1fr); } #opd-m-export .modal-foot > .help { display: none; } }
+    #opd-m-export .opx-grupo h3 { margin: 0 0 var(--s2); }
+    #opd-m-export .opx-grupo .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #opd-m-export .check input:disabled { cursor: not-allowed; }
+    #opd-m-export .opx-orden h3 { margin: 0; }
+    #opd-m-export .opx-orden ol { list-style: none; margin: var(--s2) 0 0; padding: 0; max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-card); }
+    #opd-m-export .opx-orden li { display: flex; align-items: center; gap: var(--s2); padding: 4px 6px 4px 10px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: grab; background: var(--surface); }
+    #opd-m-export .opx-orden li:last-child { border-bottom: 0; }
+    #opd-m-export .opx-orden li.arrastrando { opacity: .45; }
+    #opd-m-export .opx-orden li .n { color: var(--text-muted); min-width: 20px; text-align: right; font-variant-numeric: tabular-nums; }
+    #opd-m-export .opx-orden li .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #opd-m-export .opx-orden li .btn { padding: 2px; height: 24px; width: 24px; min-height: 0; }
     #panel-carga-partes .pd-pag { display: flex; align-items: center; justify-content: flex-end; gap: var(--s2); }
     #panel-carga-partes .pd-pag .select { width: auto; }
     .badge-turno { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; }
@@ -70,6 +85,7 @@
           </div>
           <div class="head-actions">
             <button class="btn btn-ghost" type="button" id="opd-limpiar">Limpiar filtros</button>
+            <button class="btn" type="button" id="opd-exportar" data-op-req="carga_partes_diarios:exportar_excel" title="Descarga en Excel los partes con los filtros aplicados"><svg class="i"><use href="#i-download"/></svg>Exportar Excel</button>
             <button class="btn btn-icon" type="button" id="opd-refrescar" title="Actualizar" aria-label="Actualizar"><svg class="i"><use href="#i-refresh"/></svg></button>
           </div>
         </div>
@@ -728,6 +744,33 @@
 <div class="menu" id="op-menu-fila" role="menu" hidden></div>
 
 <!-- ================================================================ Certificados y reajustes: ventanas -->
+<!-- Panel de operaciones › Exportar Excel: columnas a incluir y su orden -->
+<div class="modal is-toggle" id="opd-m-export" role="dialog" aria-modal="true" aria-labelledby="opd-ex-titulo"><div class="modal-panel md">
+  <div class="modal-head"><h2 id="opd-ex-titulo">Exportar partes a Excel</h2><span class="spacer"></span><button class="btn btn-ghost btn-icon" type="button" data-opx-cerrar aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="modal-body">
+    <p class="help" id="opd-ex-resumen"></p>
+    <div class="opx-acciones">
+      <button class="btn btn-sm" type="button" data-opx="todas">Seleccionar todo</button>
+      <button class="btn btn-sm" type="button" data-opx="ninguna">Ninguna</button>
+      <button class="btn btn-sm btn-ghost" type="button" data-opx="defecto">Restablecer predeterminadas</button>
+    </div>
+    <div class="opx-grid">
+      <div class="stack" id="opd-ex-grupos"></div>
+      <div class="opx-orden">
+        <h3 class="kpi-label">Orden de las columnas en el Excel <span class="count-badge" id="opd-ex-cnt"></span></h3>
+        <p class="help">Arrastre para reordenar (o use las flechas).</p>
+        <ol id="opd-ex-orden"></ol>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="opd-ex-subtotales"> Incluir subtotales por día</label>
+  </div>
+  <div class="modal-foot">
+    <span class="help">Fecha, Equipo y Turno son fijas: definen el orden de las filas.</span><span class="spacer"></span>
+    <button class="btn btn-ghost" type="button" data-opx-cerrar>Cancelar</button>
+    <button class="btn btn-primary" type="button" id="opd-ex-descargar"><svg class="i"><use href="#i-download"/></svg>Descargar Excel</button>
+  </div>
+</div></div>
+
 <div class="modal is-toggle" id="cert-m-editor"><div class="modal-panel lg">
   <div class="modal-head"><h2 id="cert-ed-titulo">Certificado de servicio – borrador</h2><span class="spacer"></span><button class="btn btn-ghost btn-icon" type="button" data-cert-cerrar="cert-m-editor" aria-label="Cerrar"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div class="modal-body ctl-auto" id="cert-ed-cuerpo"></div>
@@ -5318,6 +5361,7 @@
       el('opd-operador').addEventListener('change', (e) => aplicar({ legajo: e.target.value }));
       el('opd-equipo').addEventListener('change', (e) => aplicar({ ci: e.target.value }));
       el('opd-refrescar').addEventListener('click', cargar);
+      el('opd-exportar').addEventListener('click', exAbrir);
       el('opd-limpiar').addEventListener('click', () => {
         pd.preset = '30d';
         const [desde, hasta] = rangoPreset('30d');
@@ -5345,6 +5389,183 @@
     }
 
     const visible = () => !el('panel-dashboard').hidden;
+
+    // ---- Exportar Excel ------------------------------------------------------
+    // GET /operaciones/horas-maquinas/exportar con los mismos filtros del panel y columnas=... (el backend
+    // valida los nombres contra la misma lista). Las columnas salen en el orden de la lista "Orden".
+    const EX_GRUPOS = [
+      ['Identificación', [['fecha_parte', 'Fecha'], ['ci', 'Equipo'], ['turno', 'Turno'], ['nro_parte', 'N.º parte'], ['legajo_empleado', 'Legajo'],
+        ['maquinista', 'Operador'], ['obra', 'Obra'], ['proyecto', 'Proyecto'], ['cliente', 'Cliente'], ['orden_compra', 'Orden de compra'],
+        ['descripcion_trabajos', 'Descripción de trabajos'], ['acoplado', 'Acoplado']]],
+      ['Horas', [['hs_inicio', 'Hs inicio'], ['hs_final', 'Hs final'], ['total_hs', 'Total hs'], ['hs_desplazamiento', 'Hs desplazamiento'],
+        ['hs_mantenimiento', 'Hs mantenimiento'], ['hs_reparaciones', 'Hs reparaciones'], ['hs_disposicion', 'Hs disposición'],
+        ['total_hs_control', 'Total hs control'], ['no_programadas', 'No programadas']]],
+      ['Km y consumos', [['km_inicio', 'Km inicio'], ['km_final', 'Km final'], ['km_total', 'Km total'], ['viajes', 'Viajes'], ['gasoil', 'Gasoil'], ['aceite', 'Aceite']]],
+      ['Control', [['novedades', 'Novedades'], ['firma_parte', 'Firma parte'], ['control_supervisor', 'Supervisor SMG'], ['estado', 'Estado (controlado / pendiente)'],
+        ['certificado', 'Certificado'], ['estado_sub_alquiler', 'Estado sub-alquiler'], ['origen_carga', 'Origen de carga'], ['created_at', 'Fecha de carga']]],
+    ];
+    const EX_CAT = EX_GRUPOS.flatMap(([, cols]) => cols.map(([k]) => k));
+    const EX_TXT = Object.fromEntries(EX_GRUPOS.flatMap(([, cols]) => cols));
+    const EX_FIJAS = ['fecha_parte', 'ci', 'turno'];
+    const EX_DEFECTO = ['fecha_parte', 'ci', 'turno', 'nro_parte', 'maquinista', 'obra', 'descripcion_trabajos', 'hs_inicio', 'hs_final',
+      'total_hs', 'km_total', 'gasoil', 'control_supervisor', 'estado'];
+    const EX_CLAVE = 'operaciones.dashboardPartes.exportarExcel';
+    const ex = { orden: EX_DEFECTO.slice(), subtotales: false, iniciado: false, arrastrado: null };
+
+    function exRestaurar() {
+      let g = null;
+      try { g = JSON.parse(localStorage.getItem(EX_CLAVE) || 'null'); } catch (e) { g = null; }
+      if (g && Array.isArray(g.orden)) {
+        const orden = [...new Set(g.orden.filter((k) => EX_CAT.includes(k)))];
+        ex.orden = [...EX_FIJAS.filter((k) => !orden.includes(k)), ...orden];
+        ex.subtotales = !!g.subtotales;
+      }
+    }
+    function exGuardar() {
+      try { localStorage.setItem(EX_CLAVE, JSON.stringify({ orden: ex.orden, subtotales: ex.subtotales })); } catch (e) { /* sin almacenamiento */ }
+    }
+    // Una columna nueva entra en su lugar del catálogo (antes de la primera elegida que va después en el modal).
+    function exAgregar(k) {
+      if (ex.orden.includes(k)) return;
+      const i = EX_CAT.indexOf(k);
+      const pos = ex.orden.findIndex((o) => EX_CAT.indexOf(o) > i);
+      if (pos < 0) ex.orden.push(k); else ex.orden.splice(pos, 0, k);
+    }
+
+    function exRender() {
+      el('opd-ex-grupos').innerHTML = EX_GRUPOS.map(([titulo, cols]) => `<div class="opx-grupo">
+          <h3 class="kpi-label">${titulo}</h3>
+          <div class="check-grid">${cols.map(([k, t]) => {
+            const fija = EX_FIJAS.includes(k);
+            return `<label class="check"${fija ? ' title="Fija: define el orden de las filas"' : ''}><input type="checkbox" data-col="${k}"
+              ${ex.orden.includes(k) ? 'checked' : ''} ${fija ? 'disabled' : ''}> ${esc(t)}</label>`;
+          }).join('')}</div></div>`).join('');
+      const ult = ex.orden.length - 1;
+      el('opd-ex-orden').innerHTML = ex.orden.map((k, i) => `<li draggable="true" data-col="${k}">
+          <span class="n">${i + 1}</span><span class="t">${esc(EX_TXT[k])}</span>
+          ${EX_FIJAS.includes(k) ? '<span class="chip chip-muted">Fija</span>' : ''}
+          <button class="btn btn-ghost btn-icon" type="button" data-mover="-1" aria-label="Subir ${esc(EX_TXT[k])}" ${i === 0 ? 'disabled' : ''}><svg class="i i-sm"><use href="#i-up"/></svg></button>
+          <button class="btn btn-ghost btn-icon" type="button" data-mover="1" aria-label="Bajar ${esc(EX_TXT[k])}" ${i === ult ? 'disabled' : ''}><svg class="i i-sm"><use href="#i-down"/></svg></button>
+        </li>`).join('');
+      el('opd-ex-cnt').textContent = ex.orden.length;
+      el('opd-ex-subtotales').checked = ex.subtotales;
+    }
+
+    function exCambio() { exGuardar(); exRender(); }
+
+    function exResumen() {
+      const d = pd.datos;
+      const fd = (s) => SMG.fmtDia(s);
+      const sel = (id) => { const s = el(id); return s.value ? s.options[s.selectedIndex].text : ''; };
+      const partes = [`<b>${d ? `${n0.format(d.kpis.partes)} ${d.kpis.partes === 1 ? 'parte' : 'partes'}` : '— partes'}</b>`, `${fd(filtros.desde)} – ${fd(filtros.hasta)}`,
+        sel('opd-origen'), filtros.estado ? sel('opd-estado') : '', sel('opd-obra'), sel('opd-operador'), sel('opd-equipo')].filter(Boolean);
+      el('opd-ex-resumen').innerHTML = `Se exportan todos los partes del filtro actual: ${partes.map((p, i) => (i ? esc(p) : p)).join(' · ')}.`;
+    }
+
+    function exAbrir() {
+      if (!opExigir('carga_partes_diarios', 'exportar_excel')) return;
+      if (pd.datos && !pd.datos.kpis.partes) { SMG.toast('No hay partes para exportar', 'info'); return; }
+      if (!ex.iniciado) { ex.iniciado = true; exRestaurar(); exIniciar(); }
+      exResumen();
+      exRender();
+      el('opd-m-export').classList.add('open');
+      el('opd-ex-descargar').focus();
+    }
+    const exCerrar = () => el('opd-m-export').classList.remove('open');
+
+    async function exDescargar() {
+      const btn = el('opd-ex-descargar');
+      const qs = new URLSearchParams({ fecha_desde: filtros.desde, fecha_hasta: filtros.hasta, origen: filtros.origen });
+      [['estado', filtros.estado], ['obra', filtros.obra], ['legajo', filtros.legajo], ['ci', filtros.ci]].forEach(([k, v]) => { if (v) qs.set(k, v); });
+      qs.set('columnas', ex.orden.join(','));
+      if (ex.subtotales) qs.set('subtotales', 'true');
+      btn.disabled = true;
+      const texto = btn.innerHTML;
+      btn.textContent = 'Generando…';
+      try {
+        const res = await fetch(`/operaciones/horas-maquinas/exportar?${qs}`, { credentials: 'same-origin' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(typeof err.detail === 'string' ? err.detail : `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const nombre = (cd.match(/filename="?([^";]+)"?/) || [])[1] || 'SMG_Partes.xlsx';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = nombre;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        const total = res.headers.get('X-Total-Partes');
+        SMG.toast(`Excel generado${total ? `: ${n0.format(Number(total))} partes` : ''}`, 'ok');
+        exCerrar();
+      } catch (err) {
+        SMG.toast(String(err.message || err).slice(0, 200), err.message === 'No hay partes para exportar' ? 'info' : 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = texto;
+      }
+    }
+
+    function exIniciar() {
+      const m = el('opd-m-export');
+      m.addEventListener('click', (ev) => {
+        if (ev.target === m || ev.target.closest('[data-opx-cerrar]')) { exCerrar(); return; }
+        const b = ev.target.closest('[data-opx]');
+        if (b) {
+          const a = b.dataset.opx;
+          if (a === 'todas') EX_CAT.forEach(exAgregar);
+          else if (a === 'ninguna') ex.orden = ex.orden.filter((k) => EX_FIJAS.includes(k));
+          else if (a === 'defecto') ex.orden = EX_DEFECTO.slice();
+          exCambio();
+          return;
+        }
+        const mv = ev.target.closest('[data-mover]');
+        if (mv) {
+          const k = mv.closest('li').dataset.col;
+          const i = ex.orden.indexOf(k), j = i + Number(mv.dataset.mover);
+          if (j < 0 || j >= ex.orden.length) return;
+          [ex.orden[i], ex.orden[j]] = [ex.orden[j], ex.orden[i]];
+          exCambio();
+          const foco = el('opd-ex-orden').querySelector(`li[data-col="${k}"] [data-mover="${mv.dataset.mover}"]`);
+          if (foco && !foco.disabled) foco.focus();
+        }
+      });
+      m.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') exCerrar(); });
+      el('opd-ex-grupos').addEventListener('change', (ev) => {
+        const k = ev.target.dataset.col;
+        if (!k || EX_FIJAS.includes(k)) return;
+        if (ev.target.checked) exAgregar(k); else ex.orden = ex.orden.filter((o) => o !== k);
+        exCambio();
+      });
+      el('opd-ex-subtotales').addEventListener('change', (ev) => { ex.subtotales = ev.target.checked; exGuardar(); });
+      el('opd-ex-descargar').addEventListener('click', exDescargar);
+      // Arrastrar y soltar en la lista de orden.
+      const ol = el('opd-ex-orden');
+      ol.addEventListener('dragstart', (ev) => {
+        const li = ev.target.closest('li');
+        if (!li) return;
+        ex.arrastrado = li;
+        li.classList.add('arrastrando');
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', li.dataset.col);
+      });
+      ol.addEventListener('dragover', (ev) => {
+        if (!ex.arrastrado) return;
+        ev.preventDefault();
+        const li = ev.target.closest('li');
+        if (!li || li === ex.arrastrado) return;
+        const r = li.getBoundingClientRect();
+        ol.insertBefore(ex.arrastrado, ev.clientY < r.top + r.height / 2 ? li : li.nextSibling);
+      });
+      ol.addEventListener('drop', (ev) => ev.preventDefault());
+      ol.addEventListener('dragend', () => {
+        if (!ex.arrastrado) return;
+        ex.arrastrado = null;
+        ex.orden = [...ol.children].map((li) => li.dataset.col);
+        exCambio();
+      });
+    }
 
     // Controlar desde el tablero: mismo flujo que el historial (confirmación y guardado de la foto).
     // Editar desde el tablero: se abre el formulario de Carga de Partes Diarios con el parte cargado.

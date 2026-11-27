@@ -8364,12 +8364,29 @@ def _hm_orden_correlativo(alias: str = "", desc: bool = True) -> str:
     )
 
 
-def _consultar_horas_maquinas_filas(conn, ci: str | None, fecha_desde: str | None, fecha_hasta: str | None, q: str | None):
+def _consultar_horas_maquinas_filas(conn, ci: str | None, fecha_desde: str | None, fecha_hasta: str | None, q: str | None,
+                                    obra: str | None = None, legajo: str | None = None, estado: str | None = None,
+                                    origen: str | None = None):
     condiciones = ["1=1"]
     params = []
     if ci and ci.strip():
         condiciones.append("UPPER(ci) = UPPER(?)")
         params.append(ci.strip())
+    # Obra, operador, estado y origen: mismo criterio que el Panel (/operaciones/dashboard-partes).
+    if obra and obra.strip():
+        condiciones.append("COALESCE(NULLIF(TRIM(obra), ''), 'Sin centro de costos') = ?")
+        params.append(obra.strip())
+    if legajo and legajo.strip():
+        condiciones.append("TRIM(COALESCE(legajo_empleado, '')) = ?")
+        params.append(legajo.strip())
+    if estado == "pendientes":
+        condiciones.append("TRIM(COALESCE(control, '')) = ''")
+    elif estado == "controlados":
+        condiciones.append("TRIM(COALESCE(control, '')) != ''")
+    if origen == "app":
+        condiciones.append("origen_carga = 'APP_OPERADOR'")
+    elif origen == "escritorio":
+        condiciones.append("COALESCE(origen_carga, '') != 'APP_OPERADOR'")
     if fecha_desde and fecha_desde.strip():
         condiciones.append("fecha_parte >= ?")
         params.append(fecha_desde.strip())
@@ -8408,6 +8425,10 @@ def listar_horas_maquinas(
     fecha_hasta: str | None = Query(None),
     q: str | None = Query(None),
     busqueda: str | None = Query(None),
+    obra: str | None = Query(None),
+    legajo: str | None = Query(None),
+    estado: str | None = Query(None),
+    origen: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(30, ge=1, le=500),
     solo_inconsistencias: bool = Query(False),
@@ -8415,7 +8436,8 @@ def listar_horas_maquinas(
     _requiere_accion(request, "operaciones", "carga_partes_diarios", "consultar")
     search_term = q or busqueda
     with get_sqlite_connection() as conn:
-        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term,
+                                                               obra, legajo, estado, origen)
         # El control se calcula sobre todos los partes del equipo (no solo la página) y se une a cada fila.
         inc_cte, inc_params = _hm_inconsistencias_cte(ci)
         desde_sql = f"FROM horas_maquinas LEFT JOIN inc ON inc.inc_id = horas_maquinas.id WHERE {where_clause}"
@@ -8528,9 +8550,18 @@ def exportar_horas_maquinas_excel(
     fecha_hasta: str | None = Query(None),
     q: str | None = Query(None),
     busqueda: str | None = Query(None),
+    obra: str | None = Query(None),
+    legajo: str | None = Query(None),
+    estado: str | None = Query(None),
+    origen: str | None = Query(None),
+    columnas: str | None = Query(None),
+    subtotales: bool = Query(False),
     limit: int | None = Query(None, ge=1, le=10000),
 ):
-    _requiere_accion(request, "operaciones", "carga_partes_diarios", "exportar_excel")
+    perfil = _requiere_accion(request, "operaciones", "carga_partes_diarios", "exportar_excel")
+    if columnas is not None:
+        # Exportación del Panel de operaciones: mismos filtros que la tarjeta "Partes cargados", sin tope.
+        return _hm_exportar_panel(perfil, fecha_desde, fecha_hasta, origen, estado, obra, legajo, ci, columnas, subtotales)
     search_term = q or busqueda
 
     try:
@@ -8540,7 +8571,8 @@ def exportar_horas_maquinas_excel(
         raise HTTPException(status_code=500, detail=f"No se pudo cargar generador Excel: {exc}")
 
     with get_sqlite_connection() as conn:
-        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term)
+        where_clause, params = _consultar_horas_maquinas_filas(conn, ci, fecha_desde, fecha_hasta, search_term,
+                                                               obra, legajo, estado, origen)
         limite_sql = limit if limit and limit > 0 else 5000
         query = f"""
             SELECT * FROM horas_maquinas
@@ -18119,6 +18151,78 @@ def _adm_partes_filtro(origen: str, desde: str, hasta: str, obra: str, legajo: s
     elif estado == "controlados":
         condiciones.append(f"NOT ({ADM_PARTES_PENDIENTE})")
     return " AND ".join(condiciones), params
+
+
+def _hm_exportar_panel(perfil, desde, hasta, origen, estado, obra, legajo, ci, columnas, subtotales):
+    """Excel del Panel de operaciones: los mismos partes que cuenta "Partes cargados" (_adm_partes_filtro),
+    con las columnas elegidas (lista blanca en partes_excel.COLUMNAS) y en el orden fecha → equipo → turno."""
+    import partes_excel as pex
+
+    try:
+        cols = pex.validar_columnas(columnas)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    hoy = datetime.now().date()
+    d_hasta = _adm_fecha_iso(hasta, hoy)
+    d_desde = _adm_fecha_iso(desde, d_hasta - timedelta(days=29))
+    if d_desde > d_hasta:
+        d_desde, d_hasta = d_hasta, d_desde
+    origen = origen if origen in ADM_PARTES_ORIGENES else "app"
+    estado = estado if estado in {"pendientes", "controlados"} else ""
+    obra, legajo, ci = (obra or "").strip(), (legajo or "").strip(), (ci or "").strip()
+    where, params = _adm_partes_filtro(origen, d_desde.isoformat(), d_hasta.isoformat(), obra, legajo, ci, estado)
+
+    with get_sqlite_connection() as conn:
+        filas = [dict(f) for f in conn.execute(f"SELECT h.* FROM horas_maquinas h WHERE {where}", params)]
+        if not filas:
+            raise HTTPException(status_code=404, detail="No hay partes para exportar")
+        personal = {
+            f[0]: (f[1] or "").strip()
+            for f in conn.execute("SELECT TRIM(CAST(legajo AS TEXT)), MAX(nombre) FROM personal GROUP BY 1")
+        }
+        vehiculos = {
+            f[0]: (f[1] or "").strip()
+            for f in conn.execute(
+                "SELECT UPPER(TRIM(codigo)), MAX(TRIM(COALESCE(tipo, '') || ' ' || COALESCE(marca, '') || ' ' || COALESCE(modelo, ''))) "
+                "FROM vehiculos GROUP BY 1"
+            )
+        }
+    for f in filas:
+        f["_nombre_personal"] = personal.get(str(f.get("legajo_empleado") or "").strip(), "")
+
+    clientes = sorted({str(f.get("cliente") or "").strip() for f in filas} - {""})
+    operador = "Todos"
+    if legajo:
+        operador = f"{personal.get(legajo) or next((f['maquinista'] for f in filas if f.get('maquinista')), '')} ({legajo})".strip()
+    contexto = [
+        ("Obra / Centro de costos", obra or "Todos"),
+        ("Cliente", (clientes[0] if len(clientes) == 1 else "Varios" if clientes else "—") if obra else "Todos"),
+        ("Período", f"{d_desde:%d/%m/%Y} – {d_hasta:%d/%m/%Y}"),
+        ("Equipo", ci.upper() or "Todos"),
+        ("Operador", operador),
+        ("Estado", pex.ESTADO_TXT.get(estado, "Todos")),
+        ("Origen", pex.ORIGEN_TXT.get(origen, "Todos")),
+    ]
+    meta = {
+        "empresa": EMPRESA_MEMBRETE,
+        "usuario": perfil.get("nombre_apellido") or perfil.get("usuario") or "",
+        "emitido": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=3),  # hora de Argentina
+        "contexto": contexto,
+        "logo": os.path.join(BASE_DIR, "Imagenes", "smg-icono-192.png"),
+        "vehiculos": vehiculos,
+        "titulo_archivo": f"Partes diarios de equipos {d_desde:%d/%m/%Y} – {d_hasta:%d/%m/%Y}",
+    }
+    contenido = pex.generar(filas, cols, meta, subtotales=subtotales)
+    nombre = pex.nombre_archivo(obra, d_desde, d_hasta)
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "X-Total-Partes": str(len(filas)),
+            "Access-Control-Expose-Headers": "Content-Disposition, X-Total-Partes",
+        },
+    )
 
 
 @app.get("/operaciones/dashboard-partes")
