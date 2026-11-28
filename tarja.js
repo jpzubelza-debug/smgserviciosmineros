@@ -14,11 +14,14 @@
   const TOTALES = [['trabajados', 'Trab.', 'Días trabajados'], ['cambios_turno', 'C.T.', 'Días de cambio de turno'], ['descansos', 'Desc.', 'Descansos'],
     ['vacaciones', 'Vac.', 'Vacaciones'], ['ausencias', 'Aus.', 'Ausencias'], ['horas_efectivas', 'Hs ef.', 'Horas efectivas'], ['horas_break', 'Hs br.', 'Horas de break']];
   const OPS_TXT = [['eq', 'Es igual a'], ['ne', 'No es igual a'], ['starts', 'Comienza con'], ['ends', 'Termina con'], ['contains', 'Contiene'], ['notcontains', 'No contiene']];
+  // Obra (hoy) sin centro de costo: hoy sin carga y sin ningún centro trabajado antes. Valor '-' en el filtro de arriba.
+  const SIN_CC = '(Sin centro de costo)';
+  const ESTADOS_HOY = [['', 'Todos los estados de hoy'], ['obra', 'En obra'], ['descanso', 'En descanso'], ['otro', 'Otro estado (vacaciones, licencia…)'], ['pendiente', 'Pendiente (hoy sin cargar)']];
   const OPS_NUM = [['neq', 'Igual a'], ['gt', 'Mayor que'], ['lt', 'Menor que'], ['between', 'Entre'], ['top', '10 mejores']];
 
   const T = {
     op: null, g: null, desde: '', hasta: '', cargado: false, ocupado: false,
-    filtros: {}, orden: null, rapidos: { cc: '', regimen: '', q: '' },
+    filtros: {}, orden: null, rapidos: { cc: '', estado: '', regimen: '', q: '' },
     visibles: [], rects: [], act: null, arrastrando: false, editor: null, timerPref: null,
     mostrarTot: false,  // columnas de totales ocultas hasta que el usuario elija mostrarlas (se guarda por usuario)
   };
@@ -96,6 +99,15 @@
     if (!cel.e) return 'trabajado';
     const k = codigo(cel.c); return k ? k.categoria.toLowerCase() : 'otro';
   };
+  // Obra (hoy) se filtra por el código del centro de costo: el de hoy o, si hoy está de descanso, con otro estado o sin
+  // cargar, el último trabajado. El estado de hoy (en obra / descanso / ...) es un filtro aparte.
+  const ccHoy = (o) => (o.obra.cc_id === null || o.obra.cc_id === undefined || o.obra.cc_id === '' ? '' : Number(o.obra.cc_id));
+  const etiquetaCC = (id) => (id === '' ? SIN_CC : `${id} - ${descCodigo(id)}`);
+  const estadoHoy = (o) => {
+    if (o.obra.pendiente) return 'pendiente';
+    if (!o.obra.estado) return 'obra';
+    const k = codigo(o.obra.estado); return k && k.categoria === 'DESCANSO' ? 'descanso' : 'otro';
+  };
   const colorDe = (cel) => (!cel ? null : (cel.e ? ((codigo(cel.c) || {}).color || '#cbd5e1') : paleta(cel.c)));
 
   // ---------------------------------------------------------------- estilos propios de la grilla
@@ -129,7 +141,8 @@
     const cols = [
       { key: 'legajo', label: 'Legajo', num: true, valor: (o) => (/^\d+$/.test(o.legajo) ? Number(o.legajo) : o.legajo) },
       { key: 'nombre', label: 'Apellido y Nombre', valor: (o) => o.nombre || '' },
-      { key: 'obra', label: 'Obra', valor: (o) => o.obra.texto || '', color: (o) => (o.obra.pendiente ? 'pendiente' : null) },
+      { key: 'obra', label: 'Obra (hoy)', num: true, ambos: true, valor: ccHoy, etiqueta: etiquetaCC, vacias: SIN_CC,
+        texto: (o) => { const v = ccHoy(o); return v === '' ? '' : etiquetaCC(v); } },
     ];
     // Clave por posición en el período (d1 = primera columna): el filtro se conserva al cambiar de período.
     (T.g ? T.g.dias : []).forEach((d, i) => cols.push({
@@ -142,10 +155,10 @@
   }
   const colPorKey = (k) => columnas().find((c) => c.key === k);
 
-  function cumpleCond(v, cond, col, todos) {
+  function cumpleCond(v, cond, col, todos, txt = v) {
     const op = cond.op;
     if (['eq', 'ne', 'starts', 'ends', 'contains', 'notcontains'].includes(op)) {
-      const s = String(v ?? '').toLowerCase(); const a = String(cond.a ?? '').toLowerCase();
+      const s = String(txt ?? '').toLowerCase(); const a = String(cond.a ?? '').toLowerCase();
       return { eq: s === a, ne: s !== a, starts: s.startsWith(a), ends: s.endsWith(a), contains: s.includes(a), notcontains: !s.includes(a) }[op];
     }
     if (typeof v !== 'number') return false;
@@ -166,14 +179,16 @@
     if (!col || !f) return true;
     const v = col.valor(o);
     if (f.vals && !f.vals.includes(String(v ?? ''))) return false;
-    if (f.cond && f.cond.op && !cumpleCond(v, f.cond, col, todos)) return false;
+    if (f.cond && f.cond.op && !cumpleCond(v, f.cond, col, todos, col.texto ? col.texto(o) : v)) return false;
     if (f.color && f.color.length && !f.color.includes(col.color ? col.color(o) : null)) return false;
     return true;
   }
   function pasaRapidos(o) {
     const r = T.rapidos;
     if (r.regimen && o.regimen !== r.regimen) return false;
-    if (r.cc && String(o.obra.cc_id) !== String(r.cc) && !Object.values(o.dias).some((c) => !c.e && c.c === String(r.cc))) return false;
+    // Mismo criterio que la columna Obra (hoy): así los dos filtros dan el mismo resultado para el mismo centro.
+    if (r.cc && String(ccHoy(o)) !== (r.cc === '-' ? '' : String(r.cc))) return false;
+    if (r.estado && estadoHoy(o) !== r.estado) return false;
     if (r.q) {
       const q = r.q.toLowerCase().trim();
       if (q && !o.legajo.toLowerCase().includes(q) && !(o.nombre || '').toLowerCase().includes(q)) return false;
@@ -226,8 +241,11 @@
           [T.desde, T.hasta] = rangoMes(Number(h.slice(0, 4)), Number(h.slice(5, 7)));
         }
         T.filtros = (prefs && prefs.filtros) || {};
+        // Filtros guardados antes de que Obra (hoy) filtrara por código: tenían el texto de la celda y ya no coinciden.
+        const fo = T.filtros.obra;
+        if (fo && fo.vals && fo.vals.some((v) => v !== '' && !/^\d+$/.test(v))) { delete fo.vals; if (!Object.keys(fo).length) delete T.filtros.obra; }
         T.orden = (prefs && prefs.orden) || null;
-        T.rapidos = { cc: '', regimen: '', q: '', ...((prefs && prefs.rapidos) || {}) };
+        T.rapidos = { cc: '', estado: '', regimen: '', q: '', ...((prefs && prefs.rapidos) || {}) };
         T.mostrarTot = !!(prefs && prefs.mostrarTotales);
         T.cargado = true;
         estilos(); const st = $('tj-estilos'); if (st) { st.remove(); estilos(); }
@@ -272,7 +290,8 @@
           <button type="button" class="btn btn-sm" id="tj-hoy" title="Mes actual">Hoy</button>
           <span class="range"><input type="date" class="input input-sm" id="tj-desde" value="${T.desde}" aria-label="Desde">–<input type="date" class="input input-sm" id="tj-hasta" value="${T.hasta}" aria-label="Hasta">
             <button type="button" class="btn btn-sm" id="tj-aplicar">Aplicar</button></span>
-          <select class="chip-select ${r.cc ? 'on' : ''}" id="tj-f-cc" aria-label="Centro de costo (obra de hoy o trabajado en el período)" title="Obra de hoy o trabajado en el período">${opts([['', 'Todos los centros de costo']].concat(T.op.centros_costos.map((c) => [c.id, `${c.id} - ${c.nombre}`])), r.cc)}</select>
+          <select class="chip-select ${r.cc ? 'on' : ''}" id="tj-f-cc" aria-label="Obra (hoy): centro de costo" title="Obra (hoy): centro de costo de hoy o, si hoy no está en obra, el último trabajado">${opts([['', 'Todos los centros de costo']].concat(T.op.centros_costos.slice().sort((a, b) => a.id - b.id).map((c) => [c.id, `${c.id} - ${c.nombre}`]), [['-', SIN_CC]]), r.cc)}</select>
+          <select class="chip-select ${r.estado ? 'on' : ''}" id="tj-f-est" aria-label="Estado hoy">${opts(ESTADOS_HOY, r.estado)}</select>
           <select class="chip-select ${r.regimen ? 'on' : ''}" id="tj-f-reg" aria-label="Régimen de turno">${opts([['', 'Todos los regímenes'], ['Rotativo', 'Rotativo'], ['Diario', 'Diario']], r.regimen)}</select>
           <div class="search">${ic('search')}<input type="search" class="input" id="tj-f-q" value="${e(r.q)}" placeholder="Legajo o nombre" aria-label="Buscar legajo o nombre" autocomplete="off"></div>
           <button type="button" class="btn btn-sm" id="tj-tot"></button>
@@ -305,11 +324,12 @@
     $('tj-aplicar').addEventListener('click', () => fijarPeriodo($('tj-desde').value, $('tj-hasta').value));
     ['tj-desde', 'tj-hasta'].forEach((id) => $(id).addEventListener('keydown', (ev) => { if (ev.key === 'Enter') $('tj-aplicar').click(); }));
     $('tj-f-cc').addEventListener('change', (ev) => { T.rapidos.cc = ev.target.value; aplicarFiltros(); });
+    $('tj-f-est').addEventListener('change', (ev) => { T.rapidos.estado = ev.target.value; aplicarFiltros(); });
     $('tj-f-reg').addEventListener('change', (ev) => { T.rapidos.regimen = ev.target.value; aplicarFiltros(); });
     let tq = null;
     $('tj-f-q').addEventListener('input', (ev) => { clearTimeout(tq); tq = setTimeout(() => { T.rapidos.q = ev.target.value; aplicarFiltros(); }, 200); });
     $('tj-tot').addEventListener('click', () => { T.mostrarTot = !T.mostrarTot; renderGrilla(); guardarPrefs(); });
-    $('tj-borrar-todo').addEventListener('click', () => { T.filtros = {}; T.orden = null; T.rapidos = { cc: '', regimen: '', q: '' }; render(); guardarPrefs(); });
+    $('tj-borrar-todo').addEventListener('click', () => { T.filtros = {}; T.orden = null; T.rapidos = { cc: '', estado: '', regimen: '', q: '' }; render(); guardarPrefs(); });
     $('tj-exp-f').addEventListener('click', () => exportar(true));
     $('tj-exp-t').addEventListener('click', () => exportar(false));
     if ($('tj-conf')) $('tj-conf').addEventListener('click', () => configuracion('jornada'));
@@ -361,8 +381,9 @@
       ${T.mostrarTot ? TOTALES.map(([k, c, l]) => `<th class="tot sg-total" title="${l}"><div class="tj-h sg-head">${c} ${fbtn(k)}</div></th>`).join('') : ''}</tr>`;
     const filas = T.visibles.map((o, ri) => {
       const obra = o.obra.pendiente
-        ? `<span class="chip chip-warn sg-tag tj-pend" title="Pendiente: hoy sin cargar${o.obra.cc_id ? ` (último centro: ${o.obra.cc_id} - ${e(descCodigo(o.obra.cc_id))})` : ''}">P</span><span class="muted tj-est">Pendiente</span>`
-        : (o.obra.estado ? `<span class="muted tj-est">${e(o.obra.texto)}</span>` : e(o.obra.texto));
+        ? `<span class="chip chip-warn sg-tag tj-pend" title="Pendiente: hoy sin cargar${o.obra.cc_id ? ` (último centro: ${o.obra.cc_id} - ${e(descCodigo(o.obra.cc_id))})` : ''}">P</span><span class="muted tj-est">Pendiente${o.obra.cc_id ? ` · ${e(o.obra.cc_id)}` : ''}</span>`
+        // Con un estado hoy (D, V, ...): badge con el código + el centro de costo (el sufijo largo se cortaba por el ancho).
+        : (o.obra.estado ? `<span class="chip chip-muted sg-tag tj-pend" title="Hoy: ${e(descCodigo(o.obra.estado))}">${e(o.obra.estado)}</span><span class="muted tj-est">${e(ccHoy(o) === '' ? '—' : etiquetaCC(ccHoy(o)))}</span>` : e(o.obra.texto));
       const dias = g.dias.map((d, ci) => {
         const cel = o.dias[d.fecha];
         let cls = `d sg-cell${d.fecha === hoy ? ' hoyc sg-today' : ''}${d.dow >= 5 || d.feriado ? ' fin sg-weekend' : ''}${d.dia === 1 && ci > 0 ? ' m1 sg-month-start' : ''}`;
@@ -639,7 +660,7 @@
     base.forEach((o) => { const v = col.valor(o); if (v === '' || v === null || v === undefined) vacias = true; else valores.set(String(v), v); });
     const lista = [...valores.values()].sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'es', { numeric: true })));
     const elegidos = f.vals ? new Set(f.vals) : null;
-    const ops = col.mixto ? [['', 'Sin condición']].concat(OPS_TXT, OPS_NUM) : (col.num ? [['', 'Sin condición']].concat(OPS_NUM) : [['', 'Sin condición']].concat(OPS_TXT));
+    const ops = col.mixto || col.ambos ? [['', 'Sin condición']].concat(OPS_TXT, OPS_NUM) : (col.num ? [['', 'Sin condición']].concat(OPS_NUM) : [['', 'Sin condición']].concat(OPS_TXT));
     const colores = col.mixto ? Object.keys(CATS) : [];
     const muestra = (cat) => ({ trabajado: '#cfe3fb', cambio: T.op.color_cambio_turno, descanso: (codigo('D') || {}).color || '#cbd5e1', vacaciones: (codigo('V') || {}).color || '#9be3b0',
       ausencia: (codigo('F') || {}).color || '#fca5a5', otro: (codigo('VJ') || {}).color || '#c4b5fd', vacia: '#ffffff' }[cat]);
@@ -653,15 +674,15 @@
       <button type="button" class="menu-item it" data-ord="desc">${ic('down', 'i-sm')}${desc}${T.orden && T.orden.key === key && T.orden.dir === 'desc' ? ` ${ic('check', 'i-sm')}` : ''}</button></div>
       <div class="menu-sep"></div>
       ${colores.length ? `<div class="kpi-label">Filtrar por color</div><div class="chip-row cols">${colores.map((c) => `<label><input type="checkbox" data-col="${c}" ${(f.color || []).includes(c) ? 'checked' : ''}><i class="swatch" style="--cell:${muestra(c)}"></i>${CATS[c]}</label>`).join('')}</div><div class="menu-sep"></div>` : ''}
-      <div class="kpi-label">${col.mixto ? 'Filtros de texto o número' : (col.num ? 'Filtros de número' : 'Filtros de texto')}</div>
-      <div class="pop-row fila"><select id="tj-m-op" class="select" aria-label="Condición">${col.mixto ? `<option value="">Sin condición</option><optgroup label="Texto">${opts(OPS_TXT, f.cond && f.cond.op)}</optgroup><optgroup label="Número">${opts(OPS_NUM, f.cond && f.cond.op)}</optgroup>` : opts(ops, f.cond && f.cond.op)}</select></div>
+      <div class="kpi-label">${col.mixto || col.ambos ? 'Filtros de texto o número' : (col.num ? 'Filtros de número' : 'Filtros de texto')}</div>
+      <div class="pop-row fila"><select id="tj-m-op" class="select" aria-label="Condición">${col.mixto || col.ambos ? `<option value="">Sin condición</option><optgroup label="Texto">${opts(OPS_TXT, f.cond && f.cond.op)}</optgroup><optgroup label="Número">${opts(OPS_NUM, f.cond && f.cond.op)}</optgroup>` : opts(ops, f.cond && f.cond.op)}</select></div>
       <div class="pop-row fila"><input type="text" class="input" id="tj-m-a" placeholder="Valor" aria-label="Valor" value="${e(f.cond ? f.cond.a ?? '' : '')}"><input type="text" class="input" id="tj-m-b" placeholder="y" aria-label="Hasta" value="${e(f.cond ? f.cond.b ?? '' : '')}"></div>
       <div class="menu-sep"></div>
       <input type="search" class="input" id="tj-m-q" placeholder="Buscar" aria-label="Buscar valores">
       <div class="pop-list vals" id="tj-m-vals">
         <label><input type="checkbox" id="tj-m-todo"> <b>(Seleccionar todo)</b></label>
-        ${vacias ? `<label data-v=""><input type="checkbox" value="" ${!elegidos || elegidos.has('') ? 'checked' : ''}> (Vacías)</label>` : ''}
-        ${lista.map((v) => { const s = String(v); const d = col.mixto ? descCodigo(s) : ''; return `<label data-v="${e(s.toLowerCase())} ${e(d.toLowerCase())}"><input type="checkbox" value="${e(s)}" ${!elegidos || elegidos.has(s) ? 'checked' : ''}> ${e(s)} ${d ? `<small>${e(d)}</small>` : ''}</label>`; }).join('')}
+        ${vacias ? `<label data-v=""><input type="checkbox" value="" ${!elegidos || elegidos.has('') ? 'checked' : ''}> ${e(col.vacias || '(Vacías)')}</label>` : ''}
+        ${lista.map((v) => { const s = String(v); const lab = col.etiqueta ? col.etiqueta(v) : s; const d = col.mixto ? descCodigo(s) : ''; return `<label data-v="${e(lab.toLowerCase())} ${e(d.toLowerCase())}"><input type="checkbox" value="${e(s)}" ${!elegidos || elegidos.has(s) ? 'checked' : ''}> ${e(lab)} ${d ? `<small>${e(d)}</small>` : ''}</label>`; }).join('')}
       </div>
       <div class="pop-foot pie"><button type="button" class="btn btn-ghost btn-sm" id="tj-m-borrar">Borrar filtro</button>
         <span class="head-actions"><button type="button" class="btn btn-sm" id="tj-m-cancel">Cancelar</button><button type="button" class="btn btn-sm btn-primary" id="tj-m-ok">Aceptar</button></span></div>`;
@@ -925,14 +946,21 @@
  * de cada proyecto (centro de costo), día por día, para planificar los cambios de turno.
  *
  * Cómo lee la tarja: cada día de cada operador tiene un código. Si es un número es el centro de costo donde
- * está trabajando; si son letras es un estado (D, V, LIC, BAJA, ...). Un movimiento es cualquier día en que el
- * código cambia respecto del día anterior:
+ * está trabajando; si son letras es un estado (D, V, LIC, BAJA, ...). Un movimiento es cualquier cambio de código
+ * respecto del día anterior:
  *   D → 106          Sube a 106
  *   106 → D          Baja de 106
  *   27 → 107         Sale de 27 y entra a 107 (traslado; figura en los dos proyectos)
  *   107 → 27 / D     Vuelve a 27 / baja de 107 (fin del traslado)
  *   NUE → 106        Ingreso nuevo        106 → BAJA  Egreso
  *   106 → V/LIC/...  Sale por estado      V → 106     Regresa
+ * Fechas (iguales al subrayado de cambio de turno de la grilla):
+ *   · la entrada a un proyecto se fecha el PRIMER día con su código;
+ *   · la salida se fecha el ÚLTIMO día con su código (el día anterior al D o al estado siguiente), porque ese día
+ *     todavía está en obra y se cruza con el grupo que sube. En un traslado, sale de 27 su último día en 27 y entra a
+ *     107 el primer día cargado con 107 (el día siguiente).
+ * Dotación de un día = los que quedan en el proyecto al cierre (ingresan + permanecen, sin los que bajan ese día);
+ * cruce = dotación + los que bajan ese día (todos los que estuvieron en obra ese día).
  * Los días sin cargar no cuentan como movimiento.
  *
  * Solo lee datos (GET /api/tarja/grilla y /api/tarja/opciones); no modifica nada.
@@ -1006,35 +1034,38 @@
       const u = t[t.length - 1];
       if (u && u.c === c) u.fin = f; else t.push({ c, ini: f, fin: f });
     });
+    // Tramo abierto: después solo hay días sin cargar (todavía sin planificar), igual que la grilla (no marca bajada).
+    t.forEach((x, i) => { x.abierto = i === t.length - 1 || (i === t.length - 2 && t[i + 1].c === ''); });
     return t;
   }
 
-  function tipoEntrada(de) {
+  function tipoEntrada(de, cat) {
     if (esCC(de)) return 'traslado_in';
     if (!de || de === 'NUE') return 'ingreso';
-    if (categoria(de) === 'DESCANSO') return 'sube';
+    if (cat(de) === 'DESCANSO') return 'sube';
     return 'regresa';
   }
-  function tipoSalida(a) {
+  function tipoSalida(a, cat) {
     if (esCC(a)) return 'traslado_out';
     if (a === 'BAJA') return 'egreso';
-    if (categoria(a) === 'DESCANSO') return 'baja';
+    if (cat(a) === 'DESCANSO') return 'baja';
     return 'sale_estado';
   }
 
-  /* Recorre la grilla y arma, por centro de costo y por fecha, quién entra y quién sale. */
-  function procesar(g, desde, limite) {
+  /* Recorre la grilla y arma, por centro de costo y por fecha, quién entra y quién sale.
+   * La entrada se fecha el primer día del tramo nuevo; la salida, el último día del tramo en el proyecto (el día del
+   * subrayado de cambio de turno), así quien sube y quien baja el mismo miércoles quedan en la misma fila.
+   * cat(codigo) devuelve la categoría del código de estado (DESCANSO, VACACIONES, ...). Función pura. */
+  function procesar(g, desde, limite, cat = categoria) {
     const fechas = g.dias.map((d) => d.fecha);
-    const ultima = fechas[fechas.length - 1];
     const primera = fechas[0];
     const movs = [];
     const ops = [];
     g.operadores.forEach((o) => {
       const t = tramos(fechas, o.dias);
-      ops.push({ legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, t, ultima });
+      ops.push({ legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, t });
       for (let k = 1; k < t.length; k += 1) {
         const cur = t[k];
-        if (cur.ini < desde || cur.ini > limite) continue;
         if (cur.c === '') continue;                         // pasar a "sin cargar" no es un movimiento
         let p = k - 1;                                       // código real anterior (salteando días sin cargar)
         while (p >= 0 && t[p].c === '') p -= 1;
@@ -1042,31 +1073,38 @@
         const de = prev ? prev.c : '';
         if (de === cur.c) continue;
         const sigue = t[k + 1];
-        const base = {
-          legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, fecha: cur.ini, de, a: cur.c,
-          // tramo nuevo: hasta cuándo dura y a qué pasa después
-          hasta: cur.fin, hastaAbierto: cur.fin === ultima, despues: sigue ? sigue.c : null,
-          // tramo anterior: desde cuándo venía
-          venia: prev ? prev.ini : null, veniaAbierto: prev ? prev.ini === primera : false,
-        };
-        if (esCC(cur.c)) movs.push({ ...base, cc: cur.c, lado: 'entra', tipo: tipoEntrada(de) });
-        if (esCC(de)) movs.push({ ...base, cc: de, lado: 'sale', tipo: tipoSalida(cur.c) });
+        const base = { legajo: o.legajo, nombre: o.nombre, regimen: o.regimen, de, a: cur.c };
+        if (esCC(cur.c) && cur.ini >= desde && cur.ini <= limite) {
+          movs.push({ ...base, cc: cur.c, lado: 'entra', tipo: tipoEntrada(de, cat), fecha: cur.ini,
+            // tramo nuevo: hasta cuándo dura (último día en obra) y a qué pasa después
+            hasta: cur.fin, hastaAbierto: cur.abierto, despues: sigue ? sigue.c : null });
+        }
+        if (esCC(de) && prev.fin >= desde && prev.fin <= limite) {
+          prev.sale = true; // ese último día baja: no cuenta en "Permanecen"
+          movs.push({ ...base, cc: de, lado: 'sale', tipo: tipoSalida(cur.c, cat), fecha: prev.fin,
+            // tramo que termina: desde cuándo venía (los días en obra incluyen el de la baja)
+            venia: prev.ini, veniaAbierto: prev.ini === primera, diasObra: difDias(prev.ini, prev.fin) + 1 });
+        }
       }
     });
     return { movs, ops };
   }
 
-  /* Los que ese día siguen en el proyecto: están en cc ese día y ya lo estaban el día anterior. */
-  function permanecen(ops, cc, f) {
-    const b = M.buscar.trim().toLowerCase();
-    return ops.filter((o) => (!M.regimen || o.regimen === M.regimen)
-      && (!b || `${o.legajo} ${o.nombre}`.toLowerCase().includes(b)))
+  /* Los que ese día siguen en el proyecto: están en cc ese día, ya lo estaban el día anterior y no bajan ese día.
+   * incluir(o) filtra por régimen / búsqueda. Función pura. */
+  function permanecen(ops, cc, f, incluir = coincide) {
+    return ops.filter(incluir)
       .map((o) => {
         const r = o.t.find((x) => x.ini <= f && x.fin >= f);
-        return r && r.c === cc && r.ini < f ? { ...o, hasta: r.fin, abierto: r.fin === o.ultima, desde: r.ini } : null;
+        const baja = r && r.sale && r.fin === f;
+        return r && r.c === cc && r.ini < f && !baja ? { ...o, hasta: r.fin, abierto: r.abierto, desde: r.ini } : null;
       })
       .filter(Boolean)
       .sort((a, b2) => a.nombre.localeCompare(b2.nombre));
+  }
+  function coincide(o) {
+    const b = M.buscar.trim().toLowerCase();
+    return (!M.regimen || o.regimen === M.regimen) && (!b || `${o.legajo} ${o.nombre}`.toLowerCase().includes(b));
   }
 
   const TIPOS = {
@@ -1091,7 +1129,7 @@
   function seleccion() {
     const base = filtrar(M.datos.movs);
     const hayMov = ['subidas', 'bajadas', 'traslados'].some((g) => M.ver.has(g));
-    return { hayMov, movs: hayMov ? base.filter((m) => M.ver.has(TIPOS[m.tipo].grupo)) : base };
+    return { hayMov, base, movs: hayMov ? base.filter((m) => M.ver.has(TIPOS[m.tipo].grupo)) : base };
   }
 
   const OPCIONES_VER = [['subidas', 'Ingresan'], ['bajadas', 'Salen'], ['permanecen', 'Permanecen'], ['traslados', 'Traslados']];
@@ -1138,7 +1176,7 @@
       const origen = m.tipo === 'traslado_in' ? `desde ${e(m.de)} · ` : (m.tipo === 'regresa' ? `de ${e(etiqueta(m.de))} · ` : '');
       det = `${origen}${fin}${luego}`;
     } else {
-      const dias = m.venia ? difDias(m.venia, m.fecha) : 0;
+      const dias = m.diasObra;
       const enObra = m.venia ? (m.veniaAbierto ? `${dias}+ d en obra` : `${dias} d en obra`) : '';
       const destino = m.tipo === 'traslado_out' ? `a ${e(m.a)}` : `a ${e(etiqueta(m.a))}`;
       det = [destino, enObra].filter(Boolean).join(' · ');
@@ -1151,7 +1189,7 @@
 
   function chipPermanece(p) {
     const dias = difDias(p.desde, p.hasta) + 1;
-    const fin = p.abierto ? 'sin fecha de bajada cargada' : `baja el ${corta(sumar(p.hasta, 1))}`;
+    const fin = p.abierto ? 'sin fecha de bajada cargada' : `baja el ${corta(p.hasta)}`;
     return `<span class="chip chip-muted" title="${e(p.legajo)} ${e(p.nombre)} · en obra desde ${corta(p.desde)} · ${e(fin)}">
       <b>${e(p.legajo)}</b> ${e(p.nombre)}${p.regimen !== 'Rotativo' ? ' (diario)' : ''}
       <span class="muted">${p.abierto ? `${dias}+ d` : `hasta ${corta(p.hasta)}`}</span></span>`;
@@ -1159,7 +1197,7 @@
 
   function render() {
     if (!M.datos) return;
-    const { movs, hayMov } = seleccion();
+    const { movs, hayMov, base } = seleccion();
     const hoy = M.op.hoy;
 
     // Totales
@@ -1204,12 +1242,16 @@
         const cuando = enDias === 0 ? 'hoy' : enDias === 1 ? 'mañana' : enDias === -1 ? 'ayer'
           : enDias < 0 ? `hace ${-enDias} días` : `en ${enDias} días`;
         const pe = permanecen(M.datos.ops, cc, f);
-        const enDot = new Set(en.map((m) => m.legajo)).size;
+        // Dotación al cierre del día (sin los que bajan) y cruce (todos los que estuvieron ese día), sin depender de "Mostrar".
+        const delDia = base.filter((m) => m.cc === cc && m.fecha === f);
+        const enDot = new Set(delDia.filter((m) => m.lado === 'entra').map((m) => m.legajo)).size;
+        const saDot = new Set(delDia.filter((m) => m.lado === 'sale').map((m) => m.legajo)).size;
+        const dot = enDot + pe.length;
         if (!hayMov && !pe.length) return '';
         nFilas += 1;
         return `<tr>
           <td><b>${larga(f)}</b><div class="muted">${cuando}</div>
-            <div class="muted" title="Personas en el proyecto ese día: las que ingresan más las que permanecen">Dotación: <b>${enDot + pe.length}</b></div></td>
+            <div class="muted" title="Dotación: quedan en el proyecto al cierre del día (ingresan + permanecen, sin los que salen).${saDot ? ' Cruce: todos los que estuvieron ese día (dotación + los que salen).' : ''}">Dotación: <b>${dot}</b>${saDot ? ` · cruce: <b>${dot + saDot}</b>` : ''}</div></td>
           ${verE ? `<td>${en.map(chip).join('') || nada}</td>` : ''}
           ${verS ? `<td>${sa.map(chip).join('') || nada}</td>` : ''}
           ${verP ? `<td>${pe.length ? `<div class="help" style="margin-bottom:4px">${pe.length} ${pe.length === 1 ? 'sigue' : 'siguen'} en obra</div><div class="chip-row">${pe.map(chipPermanece).join('')}</div>` : nada}</td>` : ''}</tr>`;
@@ -1233,8 +1275,8 @@
     const movs = sel.slice().sort((a, b) => Number(a.cc) - Number(b.cc) || a.fecha.localeCompare(b.fecha) || a.lado.localeCompare(b.lado));
     const enc = ['Centro de costo', 'Proyecto', 'Fecha', 'Movimiento', 'Legajo', 'Apellido y Nombre', 'Régimen', 'Código anterior', 'Código nuevo', 'Tramo hasta', 'Días del tramo', 'Después', 'En obra desde'];
     const filas = (hayMov ? movs : []).map((m) => [m.cc, nombreCC(m.cc), m.fecha, TIPOS[m.tipo].txt, m.legajo, m.nombre, m.regimen, m.de, m.a,
-      m.lado === 'entra' ? (m.hastaAbierto ? `${m.hasta}+` : m.hasta) : '',
-      m.lado === 'entra' ? difDias(m.fecha, m.hasta) + 1 : '',
+      m.lado === 'entra' ? (m.hastaAbierto ? `${m.hasta}+` : m.hasta) : m.fecha,
+      m.lado === 'entra' ? difDias(m.fecha, m.hasta) + 1 : (m.veniaAbierto ? `${m.diasObra}+` : m.diasObra),
       m.lado === 'entra' && !m.hastaAbierto ? (m.despues ?? '') : '',
       m.lado === 'sale' ? (m.venia || '') : '']);
     // Los que permanecen en cada proyecto en cada fecha de cambio
@@ -1365,4 +1407,6 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', instalar); else instalar();
   window.tjmAbrir = () => mostrar('mov');
+  // Cálculo puro, para las pruebas (tests/test_tarja_movimientos.py).
+  window.TarjaMovimientos = { procesar, permanecen };
 })();
