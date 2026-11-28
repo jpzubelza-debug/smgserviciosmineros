@@ -125,6 +125,7 @@
       bg = document.createElement('div');
       bg.id = 'tj-modal';
       bg.className = 'modal is-toggle encima';
+      bg.setAttribute('translate', 'no');
       document.body.appendChild(bg);
       bg.addEventListener('click', (ev) => { if (ev.target === bg || ev.target.closest('[data-tj-cerrar]')) cerrarModal(); });
     }
@@ -508,6 +509,7 @@
     const rc = td.getBoundingClientRect();
     const box = document.createElement('div');
     box.className = 'tj-ed sheet-editor';
+    box.setAttribute('translate', 'no');
     box.style.left = `${Math.min(rc.left, window.innerWidth - 360)}px`;
     box.style.top = `${rc.top}px`;
     box.innerHTML = '<input type="text" class="input" autocomplete="off" spellcheck="false" aria-label="Código o centro de costo"><div class="tj-sug menu" role="listbox"></div>';
@@ -667,6 +669,7 @@
     const m = document.createElement('div');
     m.id = 'tj-menu';
     m.className = 'tj-menu menu pop pop-stack ctl-auto';
+    m.setAttribute('translate', 'no');
     const asc = col.num || col.mixto ? 'Ordenar de menor a mayor' : 'Ordenar de A a Z';
     const desc = col.num || col.mixto ? 'Ordenar de mayor a menor' : 'Ordenar de Z a A';
     m.innerHTML = `<div class="menu-head" style="padding: 4px 4px 0"><b>${e(col.label)}</b></div>
